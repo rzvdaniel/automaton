@@ -80,7 +80,7 @@ class TableAndColumnMappingTests(unittest.TestCase):
     def test_framework_and_queue_tables_are_not_copied(self):
         for name in ('__EFMigrationsHistory', 'cap_api.published', 'cap_worker.received', 'hangfire.Job', 'hangfire.AggregatedCounter'):
             self.assertTrue(module.is_excluded_source_table(name), name)
-        for name in ('Users', 'Apps', 'RefreshTokens', 'AuditEvents'):
+        for name in ('Users', 'Apps', 'RefreshTokens', 'AuditEvents', 'cap_widgets', 'hangfire_jobs'):
             self.assertFalse(module.is_excluded_source_table(name), name)
 
     def test_every_source_column_needs_a_target_column(self):
@@ -95,6 +95,12 @@ class TableAndColumnMappingTests(unittest.TestCase):
     def test_new_optional_or_defaulted_target_columns_are_left_alone(self):
         target = {'Id': ('uuid', False, False), 'Note': ('text', True, False), 'Flag': ('boolean', False, True)}
         self.assertEqual(module.plan_columns('Users', ['Id'], target), ['Id'])
+
+
+class InspectOutcomeTests(unittest.TestCase):
+    def test_pending_work_has_its_own_exit_code_apart_from_failures(self):
+        self.assertEqual(module.EXIT_PENDING_WORK, 3)
+        self.assertNotIn(module.EXIT_PENDING_WORK, (0, 1, 2))
 
 
 class ComparisonTests(unittest.TestCase):

@@ -28,7 +28,7 @@ TEXT_TYPES = {'text', 'citext', 'character varying', 'character'}
 JSON_TYPES = {'json', 'jsonb'}
 TIMESTAMPTZ = 'timestamp with time zone'
 FRAMEWORK_TABLES = {'__EFMigrationsHistory'}
-FRAMEWORK_PREFIXES = ('cap_', 'hangfire.')
+EXIT_PENDING_WORK = 3
 
 
 class MigrationError(Exception):
@@ -36,8 +36,11 @@ class MigrationError(Exception):
 
 
 def is_excluded_source_table(name):
-    """Framework state that the baseline schema replaces or recreates: EF history, CAP messages and Hangfire jobs."""
-    return name in FRAMEWORK_TABLES or name.startswith(FRAMEWORK_PREFIXES)
+    """Framework state that the baseline schema replaces or recreates: EF history, CAP messages and Hangfire jobs.
+
+    CAP and Hangfire name their tables with a schema prefix and a dot (`cap_api.published`, `hangfire.Job`); no application table has a dot.
+    """
+    return name in FRAMEWORK_TABLES or '.' in name
 
 
 # ---- value conversion -------------------------------------------------------------------------------------------
@@ -426,47 +429,48 @@ def run_verify(log=print):
     return failures
 
 
+def optional_count(cursor, sql, params=()):
+    """A count from a framework table that may legitimately not exist (the Worker never ran); every other error is raised."""
+    import pymysql.err
+    try:
+        cursor.execute(sql, params)
+    except pymysql.err.ProgrammingError as error:
+        if error.args and error.args[0] == 1146:  # table does not exist
+            return 0
+        raise
+    return cursor.fetchone()[0]
+
+
 def run_inspect(log=print):
     my = connect_mysql()
     tables = source_tables(my)
+    pending = 0
     with my.cursor() as cursor:
         counts = {}
         for table in tables:
             cursor.execute(f'SELECT COUNT(*) FROM {quote_my(table)}')
             counts[table] = cursor.fetchone()[0]
-        queued = {}
-        for table in ('cap_api.published', 'cap_api.received', 'cap_worker.published', 'cap_worker.received'):
-            try:
-                cursor.execute(f'SELECT COUNT(*) FROM {quote_my(table)} WHERE StatusName <> %s', ('Succeeded',))
-                queued[table] = cursor.fetchone()[0]
-            except Exception:
-                queued[table] = 'n/a'
-        try:
-            cursor.execute("SELECT COUNT(*) FROM `hangfire.Job` WHERE StateName IN ('Enqueued','Processing','Scheduled','Awaiting')")
-            jobs = cursor.fetchone()[0]
-        except Exception:
-            jobs = 'n/a'
-        in_flight = {}
+        log(f'{len(tables)} application tables, {sum(counts.values())} rows')
+        for table, count in sorted(counts.items(), key=lambda item: -item[1])[:8]:
+            log(f'  {table}: {count}')
+        log('Not copied (recreated by the application): __EFMigrationsHistory, CAP messages, Hangfire jobs')
+        checks = [(f'CAP {table} not succeeded', f'SELECT COUNT(*) FROM {quote_my(table)} WHERE StatusName <> %s', ('Succeeded',))
+                  for table in ('cap_api.published', 'cap_api.received', 'cap_worker.published', 'cap_worker.received')]
+        checks.append(('Hangfire jobs waiting or running', "SELECT COUNT(*) FROM `hangfire.Job` WHERE StateName IN ('Enqueued','Processing','Scheduled','Awaiting')", ()))
+        for label, query, params in checks:
+            count = optional_count(cursor, query, params)
+            log(f'  {label}: {count}')
+            pending += count
+        # These tables are part of the schema; a failing query here is an error, not "nothing pending".
         for label, query in (
                 ('Runner operations not completed', 'SELECT COUNT(*) FROM `RunnerExecutionOperations` WHERE `CompletedAtUtc` IS NULL'),
                 ('Action executions running', "SELECT COUNT(*) FROM `AppModuleExecutions` WHERE `Status` IN ('Dispatching','Running') AND `CompletedAtUtc` IS NULL")):
-            try:
-                cursor.execute(query)
-                in_flight[label] = cursor.fetchone()[0]
-            except Exception:
-                in_flight[label] = 'n/a'
+            cursor.execute(query)
+            count = cursor.fetchone()[0]
+            log(f'  {label}: {count}')
+            pending += count
     my.close()
-    log(f'{len(tables)} application tables, {sum(counts.values())} rows')
-    for table, count in sorted(counts.items(), key=lambda item: -item[1])[:8]:
-        log(f'  {table}: {count}')
-    log('Not copied (recreated by the application): __EFMigrationsHistory, CAP messages, Hangfire jobs')
-    for table, count in queued.items():
-        log(f'  CAP {table} not succeeded: {count}')
-    log(f'  Hangfire jobs waiting or running: {jobs}')
-    for label, count in in_flight.items():
-        log(f'  {label}: {count}')
-    pending = [c for c in list(queued.values()) + [jobs] + list(in_flight.values()) if isinstance(c, int) and c > 0]
-    return 1 if pending else 0
+    return EXIT_PENDING_WORK if pending else 0
 
 
 def main(argv=None):

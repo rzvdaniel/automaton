@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Move an existing Automaton server from MySQL to PostgreSQL.
 #
-#   migrate-to-postgresql.sh --bundle-dir DIR            report what would happen; changes nothing (the default)
-#   migrate-to-postgresql.sh --bundle-dir DIR --run      migrate (a short downtime of API and Worker)
-#   migrate-to-postgresql.sh --rollback                  go back to the MySQL installation
+#   migrate-to-postgresql.sh --version server-vX.Y.Z             report what would happen; changes nothing (the default)
+#   migrate-to-postgresql.sh --version server-vX.Y.Z --run       migrate (a short downtime of API and Worker)
+#   migrate-to-postgresql.sh --version server-vX.Y.Z --finish    complete a migration that stopped after the switch
+#   migrate-to-postgresql.sh --rollback                          go back to the MySQL installation
 #
-# DIR is the extracted, verified release bundle (the "automaton-server" folder) of a release that runs on
-# PostgreSQL. --version server-vX.Y.Z downloads and verifies that bundle instead. See docs/prod/migrate-to-postgresql.md.
+# --version downloads and verifies the release bundle; --bundle-dir DIR uses an extracted, verified one instead.
+# Run it in tmux or screen. See docs/prod/migrate-to-postgresql.md.
 #
-# Until the new stack is started the old installation is only stopped, never modified: the MySQL volume stays untouched, and
-# any failure before that point restores the old services automatically. After it, run --rollback to return to MySQL
-# (everything written since the switch is lost).
+# Until the new stack is started the old installation is only stopped and its configuration patched (and saved first); the MySQL
+# volume is never modified. Any failure before the switch returns to the MySQL services. After it, --finish completes the
+# migration or --rollback returns to MySQL (everything written since the switch is lost).
 set -euo pipefail
 umask 077
 
@@ -26,6 +27,7 @@ confirm=''
 discard_in_flight=0
 rehearsal=0
 skip_app_check=0
+allow_override=0
 recovery_arg=''
 python_image=python:3.12-slim
 loader_packages=(pymysql==1.1.1 cryptography==43.0.3 'psycopg[binary]==3.2.3')
@@ -33,6 +35,7 @@ while (($#)); do
     case "$1" in
         --run) mode=run; shift ;;
         --plan) mode=plan; shift ;;
+        --finish) mode=finish; shift ;;
         --rollback) mode=rollback; shift ;;
         --recovery) recovery_arg="${2:?Missing recovery directory}"; shift 2 ;;
         --confirm) confirm="${2:?Missing domain}"; shift 2 ;;
@@ -46,8 +49,9 @@ while (($#)); do
         --python-image) python_image="${2:?Missing image}"; shift 2 ;;
         --discard-in-flight) discard_in_flight=1; shift ;;
         --skip-app-check) skip_app_check=1; shift ;;
+        --allow-override) allow_override=1; shift ;;
         --rehearsal) rehearsal=1; shift ;;
-        --help) sed -n '2,13p' "$0"; exit 0 ;;
+        --help) sed -n '2,15p' "$0"; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -63,20 +67,24 @@ flock -n 9 || { echo 'Another installation, update or migration is running.' >&2
 
 working=$(mktemp -d)
 recovery=''
+distribution=''
 phase=checks
+trap 'exit 130' INT TERM HUP    # a signal ends the script through the cleanup below
 cleanup() {
     local status=$?
     trap - EXIT
+    trap '' INT TERM HUP        # the return to MySQL must not be interrupted halfway
     if ((status != 0)) && [[ "$mode" == run ]]; then
         case "$phase" in
             downtime)
                 echo "The migration failed before the switch; returning to the MySQL installation." >&2
-                restore_mysql_stack || echo "Automatic return failed. Run: sudo bash $install_dir/migrate-to-postgresql.sh --rollback --install-dir $install_dir --config-dir $config_dir" >&2 ;;
+                restore_mysql_stack || echo "The automatic return failed. Fix the reported problem, then run: sudo bash $install_dir/migrate-to-postgresql.sh --rollback --install-dir $install_dir --config-dir $config_dir" >&2 ;;
             switched)
-                echo "The migration failed after the switch. Assess the services, then either fix and rerun the checks or run:" >&2
+                echo "The migration stopped after the switch. The PostgreSQL stack is running. Fix the reported problem and run --finish, or run:" >&2
                 echo "  sudo bash $install_dir/migrate-to-postgresql.sh --rollback --install-dir $install_dir --config-dir $config_dir   (loses what was written since the switch)" >&2 ;;
         esac
     fi
+    [[ -z "$distribution" ]] || docker rm -f "$distribution" >/dev/null 2>&1 || true
     rm -rf -- "$working"
     exit "$status"
 }
@@ -93,6 +101,10 @@ override="$install_dir/compose.override.yaml"
 extra=()
 if [[ -e "$override" || -L "$override" ]]; then
     [[ -f "$override" && ! -L "$override" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
+    if ((! allow_override)) && [[ "$mode" != rollback ]]; then
+        echo "This installation has a Compose override ($override). It would be applied to the PostgreSQL stack too; make sure it sets no database connection and refers to no MySQL service, then repeat with --allow-override." >&2
+        exit 1
+    fi
     extra=(-f "$override")
 fi
 old_compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml" "${extra[@]}")
@@ -106,45 +118,74 @@ set_state() { printf '%s\n' "$1" > "$recovery/STATE"; }
 project_name() { "${old_compose[@]}" config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])'; }
 
 # Stop what the migration started, put the old files and configuration back and start the MySQL services.
+# Every step is attempted; the function fails if any of them did, and keeps the recovery pointer then.
 restore_mysql_stack() {
-    local project old_dir
-    [[ -n "$recovery" && -d "$recovery" ]] || { echo 'No recovery data was found.' >&2; return 1; }
-    project=$(project_name)
-    old_dir=$recovery
+    local project failed=0 old_dir full=0
+    try() { "$@" || { echo "Step failed: $*" >&2; failed=1; }; }
+    project=$(project_name) || return 1
+    if [[ -n "$recovery" && -f "$recovery/compose.yaml" && -f "$recovery/release.env" && -f "$recovery/.env" && -f "$recovery/config.tar.gz" && -f "$recovery/SHA256SUMS" ]]; then
+        full=1
+        old_dir=$recovery
+    else
+        old_dir=$install_dir   # no backup was made yet, so nothing was changed; the live files are the old ones
+    fi
     local restore_compose=(docker compose --project-name "$project" --project-directory "$install_dir" --env-file "$old_dir/release.env" --env-file "$old_dir/.env" -f "$old_dir/compose.yaml" "${extra[@]}")
     echo 'Stopping the PostgreSQL services.'
     docker rm -f "$project-migration-schema" >/dev/null 2>&1 || true
     "${restore_compose[@]}" stop api worker >/dev/null 2>&1 || true
     local postgres
     postgres=$(docker ps -aq --filter "label=com.docker.compose.project=$project" --filter 'label=com.docker.compose.service=postgres')
-    if [[ -n "$postgres" ]]; then docker rm -f $postgres >/dev/null; fi
-    if grep -Fxq 'postgres_volume_created=1' "$recovery/NOTES" 2>/dev/null; then
-        docker volume rm "${project}_postgres-data" >/dev/null 2>&1 || true
+    if [[ -n "$postgres" ]]; then try docker rm -f $postgres; fi
+    if ((full)); then
+        if grep -Fxq 'postgres_volume_created=1' "$recovery/NOTES" 2>/dev/null; then
+            try docker volume rm -f "${project}_postgres-data"
+        fi
+        echo 'Restoring the previous configuration.'
+        (cd "$recovery" && sha256sum -c --quiet SHA256SUMS) || { echo 'The recovery data failed its checksum verification.' >&2; failed=1; }
+        try tar -C "$(dirname "$config_dir")" --no-overwrite-dir -xzf "$old_dir/config.tar.gz"
+        if [[ -f "$old_dir/config-files.txt" ]]; then
+            # Files the migration added to the configuration directory (generated routes, the PostgreSQL password, set-aside credentials).
+            while IFS= read -r added; do
+                [[ -n "$added" && "$added" != status/* ]] && rm -f -- "${config_dir:?}/$added"
+            done < <(comm -13 "$old_dir/config-files.txt" <(cd "$config_dir" && find . -type f -printf '%P\n' | sort))
+        fi
+        for file in release.env compose.yaml .env version update.sh install.sh backup.sh restore.sh; do
+            if [[ -f "$old_dir/$file" ]]; then try install -m "$(stat -c %a "$old_dir/$file")" "$old_dir/$file" "$install_dir/$file"; fi
+        done
     fi
-    echo 'Restoring the previous configuration.'
-    tar -C "$(dirname "$config_dir")" --no-overwrite-dir -xzf "$old_dir/config.tar.gz"
-    if grep -Fxq 'postgres_password_created=1' "$recovery/NOTES" 2>/dev/null; then rm -f "$config_dir/secrets/postgres-password"; fi
-    for file in release.env compose.yaml .env version update.sh install.sh backup.sh restore.sh; do
-        if [[ -f "$old_dir/$file" ]]; then install -m "$(stat -c %a "$old_dir/$file")" "$old_dir/$file" "$install_dir/$file"; fi
-    done
     echo 'Starting the MySQL services.'
-    if [[ -z "$(docker volume ls -q --filter "name=^${project}_mysql-data$")" ]]; then
+    if ((full)) && [[ -z "$(docker volume ls -q --filter "name=^${project}_mysql-data$")" ]]; then
         echo 'The MySQL volume is gone; recreating it from the recovery dump.'
-        "${restore_compose[@]}" up -d --wait --wait-timeout 300 mysql
-        zcat "$old_dir/mysql.sql.gz" | "${restore_compose[@]}" exec -T mysql sh -c 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password) mysql -uroot --default-character-set=utf8mb4 automaton'
+        try "${restore_compose[@]}" up -d --wait --wait-timeout 300 mysql
+        zcat "$old_dir/mysql.sql.gz" | "${restore_compose[@]}" exec -T mysql sh -c 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password) mysql -uroot --default-character-set=utf8mb4 automaton' || { echo 'Step failed: loading the MySQL dump' >&2; failed=1; }
     fi
-    "${restore_compose[@]}" up -d --wait --wait-timeout 600 mysql rabbitmq
-    "${restore_compose[@]}" up -d --wait --wait-timeout 600 --force-recreate api worker
-    "${restore_compose[@]}" up -d --wait --wait-timeout 600 $("${restore_compose[@]}" config --services | grep -Ev '^(mysql|rabbitmq|traefik|api|worker)$')
-    set_state rolled-back
+    try "${restore_compose[@]}" up -d --wait --wait-timeout 600 mysql rabbitmq
+    try "${restore_compose[@]}" up -d --wait --wait-timeout 600 --force-recreate api worker
+    local others
+    others=$("${restore_compose[@]}" config --services | grep -Ev '^(mysql|rabbitmq|traefik|api|worker)$' || true)
+    if [[ -n "$others" ]]; then try "${restore_compose[@]}" up -d --wait --wait-timeout 600 $others; fi
+    if ((failed)); then
+        echo 'The return to MySQL did not complete. Recovery data is kept; fix the problem above and run --rollback again (it is safe to repeat).' >&2
+        return 1
+    fi
+    if [[ -n "$recovery" ]]; then set_state rolled-back; fi
     rm -f "$pointer"
-    echo "Returned to MySQL. Recovery data stays in $recovery."
+    echo "Returned to MySQL. Recovery data stays in ${recovery:-the installation}."
+}
+
+# Which recovery data a rollback or --finish works on, and whether there is anything to do.
+select_recovery() {
+    recovery=${recovery_arg:-$(cat "$pointer" 2>/dev/null || true)}
+    [[ -n "$recovery" && -d "$recovery" ]] || { echo "No migration recovery data found (no migration is in progress). Use --recovery DIR for an older one." >&2; exit 1; }
 }
 
 if [[ "$mode" == rollback ]]; then
-    recovery=${recovery_arg:-$(cat "$pointer" 2>/dev/null || true)}
-    [[ -n "$recovery" && -d "$recovery" ]] || { echo "No migration recovery data found. Use --recovery DIR." >&2; exit 1; }
-    (cd "$recovery" && sha256sum -c --quiet SHA256SUMS) || { echo 'The recovery data failed its checksum verification; nothing was changed.' >&2; exit 1; }
+    if [[ -z "$recovery_arg" && ! -f "$pointer" ]]; then
+        echo 'No migration is in progress, so there is nothing to roll back. (Use --recovery DIR to roll back an older one.)'
+        exit 0
+    fi
+    select_recovery
+    if [[ "$(state)" == rolled-back ]]; then echo "That migration was already rolled back ($recovery)."; rm -f "$pointer"; exit 0; fi
     echo "Recovery data: $recovery (state: $(state))"
     if [[ "$(state)" == complete || "$(state)" == switched ]]; then
         echo 'This returns to the MySQL data as it was when the migration started. Everything written since is lost.'
@@ -160,11 +201,13 @@ fi
 
 # ---- the release bundle ------------------------------------------------------------------------------------------------
 
-if grep -q '^POSTGRES_IMAGE=' "$install_dir/release.env" && [[ ! -f "$config_dir/secrets/mysql-password" ]]; then
-    echo 'This installation already runs on PostgreSQL; nothing to migrate.'
-    exit 0
+if [[ "$mode" != finish ]]; then
+    if grep -q '^POSTGRES_IMAGE=' "$install_dir/release.env" && [[ ! -f "$config_dir/secrets/mysql-password" ]]; then
+        echo 'This installation already runs on PostgreSQL; nothing to migrate.'
+        exit 0
+    fi
+    grep -q '^MYSQL_IMAGE=' "$install_dir/release.env" && [[ -f "$config_dir/secrets/mysql-password" ]] || { echo 'This does not look like a MySQL installation; nothing was changed.' >&2; exit 1; }
 fi
-grep -q '^MYSQL_IMAGE=' "$install_dir/release.env" && [[ -f "$config_dir/secrets/mysql-password" ]] || { echo 'This does not look like a MySQL installation; nothing was changed.' >&2; exit 1; }
 
 if [[ -n "$bundle_dir" ]]; then
     bundle=$(realpath "$bundle_dir")
@@ -178,6 +221,7 @@ else
         docker cp "$distribution:/automaton-server.tar.gz" "$working/automaton-server.tar.gz"
         docker cp "$distribution:/automaton-server.tar.gz.sha256" "$working/automaton-server.tar.gz.sha256"
         docker rm "$distribution" >/dev/null
+        distribution=''
     else
         [[ -n "$bundle_checksum" && -f "$bundle_archive" && -f "$bundle_checksum" ]] || { echo 'An offline bundle needs its --checksum file.' >&2; exit 1; }
         cp -- "$bundle_archive" "$working/automaton-server.tar.gz"
@@ -195,9 +239,10 @@ with tarfile.open(sys.argv[1], 'r:gz') as archive:
 PY
     bundle="$working/automaton-server"
 fi
-for file in release.env compose.yaml version update.sh install.sh configure.py mysql_to_postgres.py migration_app_check.py; do
+for file in release.env compose.yaml version update.sh install.sh configure.py migrate-to-postgresql.sh mysql_to_postgres.py migration_app_check.py; do
     [[ -f "$bundle/$file" ]] || { echo "The release bundle is incomplete: $file is missing. Use a release that includes the migration." >&2; exit 1; }
 done
+cmp -s "$bundle/migrate-to-postgresql.sh" "${BASH_SOURCE[0]}" || echo "Note: this script differs from the one in the release bundle; the bundle's copy is the one installed for --rollback." >&2
 grep -q '^POSTGRES_IMAGE=' "$bundle/release.env" && ! grep -q '^MYSQL_IMAGE=' "$bundle/release.env" || { echo 'This release does not run on PostgreSQL.' >&2; exit 1; }
 new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$install_dir/.env" -f "$bundle/compose.yaml" "${extra[@]}")
 old_services=$("${old_compose[@]}" config --services | tr '\n' ' ')
@@ -209,26 +254,27 @@ for service in $new_services; do
 done
 project=$(project_name)
 mysql_container=$("${old_compose[@]}" ps -q mysql)
-[[ -n "$mysql_container" && "$(docker inspect -f '{{.State.Running}}' "$mysql_container")" == true ]] || { echo 'MySQL is not running; repair the installation first.' >&2; exit 1; }
-for service in api worker; do
-    container=$("${old_compose[@]}" ps -q "$service")
-    [[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || { echo "$service is not running; repair the installation first." >&2; exit 1; }
-done
+[[ -n "$mysql_container" ]] || { echo 'The MySQL container was not found; repair the installation first.' >&2; exit 1; }
+if [[ "$mode" != finish ]]; then
+    [[ "$(docker inspect -f '{{.State.Running}}' "$mysql_container")" == true ]] || { echo 'MySQL is not running; repair the installation first.' >&2; exit 1; }
+    for service in api worker; do
+        container=$("${old_compose[@]}" ps -q "$service")
+        [[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || { echo "$service is not running; repair the installation first." >&2; exit 1; }
+    done
+fi
 network=$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$mysql_container" | awk '{print $1}')
-available_kb=$(df -Pk "$install_dir" | awk 'NR==2 {print $4}')
-((rehearsal)) || (( available_kb >= 10485760 )) || { echo 'At least 10 GiB free disk space is required before migrating.' >&2; exit 1; }
 
 # ---- helpers for the data copy and checks ----------------------------------------------------------------------------
 
-mysql_secret() { cat "$config_dir/secrets/$1"; }
+read_secret() { cat "$config_dir/secrets/$1"; }
 
 # Runs a subcommand of mysql_to_postgres.py in a Python container on the installation's network.
 run_loader() {
     local env_file="$working/loader.env"
     (umask 077; {
-        echo 'MYSQL_HOST=mysql'; echo 'MYSQL_USER=automaton'; echo "MYSQL_PASSWORD=$(mysql_secret mysql-password)"; echo 'MYSQL_DATABASE=automaton'
+        echo 'MYSQL_HOST=mysql'; echo 'MYSQL_USER=automaton'; echo "MYSQL_PASSWORD=$(read_secret mysql-password)"; echo 'MYSQL_DATABASE=automaton'
         if [[ -f "$config_dir/secrets/postgres-password" ]]; then
-            echo 'PG_HOST=postgres'; echo 'PG_USER=automaton'; echo "PG_PASSWORD=$(mysql_secret postgres-password)"; echo 'PG_DATABASE=automaton'
+            echo 'PG_HOST=postgres'; echo 'PG_USER=automaton'; echo "PG_PASSWORD=$(read_secret postgres-password)"; echo 'PG_DATABASE=automaton'
         fi
     } > "$env_file")
     docker run --rm --network "$network" --memory 512m --env-file "$env_file" -v "$bundle/mysql_to_postgres.py:/migrate/mysql_to_postgres.py:ro" "$python_image" \
@@ -238,8 +284,7 @@ run_loader() {
 # Saves (before) or compares (after) what the administrator and a regular user see through the API.
 run_app_check() {
     local action=$1 file=$2
-    ((skip_app_check)) && return 0
-    [[ -n "${AUTOMATON_CHECK_EMAIL:-}" && -n "${AUTOMATON_CHECK_PASSWORD:-}" ]] || { echo 'Set AUTOMATON_CHECK_EMAIL and AUTOMATON_CHECK_PASSWORD to an administrator account (and optionally AUTOMATON_CHECK_USER_EMAIL / _PASSWORD), or pass --skip-app-check.' >&2; return 1; }
+    if ((skip_app_check)); then return 0; fi
     local env_file="$working/check.env"
     (umask 077; {
         echo "AUTOMATON_CHECK_EMAIL=$AUTOMATON_CHECK_EMAIL"; echo "AUTOMATON_CHECK_PASSWORD=$AUTOMATON_CHECK_PASSWORD"
@@ -250,46 +295,124 @@ run_app_check() {
         "$python_image" python /migrate/migration_app_check.py --api-url http://api:8080 "--$action" /out/snapshot.json
 }
 
+require_check_credentials() {
+    if ((! skip_app_check)) && [[ -z "${AUTOMATON_CHECK_EMAIL:-}" || -z "${AUTOMATON_CHECK_PASSWORD:-}" ]]; then
+        echo 'Set AUTOMATON_CHECK_EMAIL and AUTOMATON_CHECK_PASSWORD to an administrator account (and optionally AUTOMATON_CHECK_USER_EMAIL / _PASSWORD) so the result can be compared with what people see now, or pass --skip-app-check.' >&2
+        exit 2
+    fi
+}
+
+# The last part of a migration: what people see must match, then the release files replace the MySQL ones.
+finish_switch() {
+    echo 'Comparing what people see with the snapshot from before.'
+    run_app_check compare "$recovery/before.json"
+    if ((! rehearsal)); then
+        curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]'
+        curl --fail --silent --show-error "https://studio.$domain/" >/dev/null
+    fi
+    downtime=$((SECONDS - downtime_start))
+    echo 'Installing the release files.'
+    install -m 0600 "$bundle/release.env" "$install_dir/release.env"
+    install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
+    install -m 0644 "$bundle/version" "$install_dir/version"
+    for script in update.sh install.sh backup.sh restore.sh migrate-to-postgresql.sh; do
+        [[ ! -f "$bundle/$script" ]] || install -m 0700 "$bundle/$script" "$install_dir/$script"
+    done
+    echo 'Stopping MySQL (its data stays for rollback) and setting its credentials aside.'
+    docker stop "$mysql_container" >/dev/null
+    install -d -m 0700 "$config_dir/pre-postgresql"
+    for secret in mysql-password mysql-root-password; do
+        [[ ! -f "$config_dir/secrets/$secret" ]] || mv "$config_dir/secrets/$secret" "$config_dir/pre-postgresql/$secret"
+    done
+    set_state complete
+    phase=complete
+    if ((! rehearsal)) && [[ -f "$install_dir/backup.sh" ]]; then
+        bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
+        bash "$install_dir/backup.sh" --install-dir "$install_dir" || echo 'Warning: the first PostgreSQL backup failed.' >&2
+    fi
+    cat <<EOF
+
+Migrated to PostgreSQL (API and Worker were down for about ${downtime:-?}s). Recovery data (keep until you are sure): $recovery
+  - return to MySQL:  sudo bash $install_dir/migrate-to-postgresql.sh --rollback --install-dir $install_dir --config-dir $config_dir --confirm $domain
+    (this loses everything written since the switch)
+  - when satisfied, remove the old database: docker rm $mysql_container; docker volume rm ${project}_mysql-data
+EOF
+}
+
+downtime_start=$SECONDS
+
+if [[ "$mode" == finish ]]; then
+    select_recovery
+    [[ "$(state)" == switched ]] || { echo "Nothing to finish: the migration state is '$(state)', not 'switched'." >&2; exit 1; }
+    phase=switched
+    require_check_credentials
+    finish_switch
+    exit 0
+fi
+
 # ---- the plan ----------------------------------------------------------------------------------------------------------
 
 echo "Installation: $install_dir on $domain (Compose project $project)"
 echo "Release:      $(cat "$bundle/version")"
 echo "Services:     MySQL -> PostgreSQL; application services to restart: ${application_services[*]}"
 echo 'Source data:'
-run_loader inspect || echo 'Work is still in flight (see above); a migration needs --discard-in-flight, or wait until it is done.'
+rc=0
+run_loader inspect || rc=$?
+if ((rc == 3)); then
+    echo 'Work is still in flight (see above); a migration needs --discard-in-flight, or wait until it is done.'
+elif ((rc != 0)); then
+    echo 'The source could not be inspected (see above).' >&2
+    exit 1
+fi
 if [[ "$mode" == plan ]]; then
     cat <<EOF
 
 Nothing was changed. A real run (--run):
-  1. checks and a first API snapshot while the server still serves, then API and Worker stop (the downtime starts);
-  2. a verified backup: configuration, keys, app data and a MySQL dump, in $backup_root/mysql-to-postgresql-<time>;
-  3. PostgreSQL starts and the new API creates the schema in a container that receives no traffic;
-  4. all tables are copied and verified (row counts, content hashes, foreign keys);
-  5. the new stack starts, and the API snapshot must match the first one;
-  6. only then the installation files are replaced; MySQL is stopped and kept for rollback.
-Any failure before step 5 starts the MySQL services again. After it, "--rollback" returns to MySQL.
+  1. the checks, and an API snapshot of what the administrator and a user see now;
+  2. API and Worker stop (the downtime starts), and the pending work is checked;
+  3. a verified recovery backup in $backup_root/mysql-to-postgresql-<time>: configuration, keys, app data, a MySQL dump, the old release files;
+  4. the PostgreSQL password and connection string are set, PostgreSQL starts, and the new API creates the schema in a container that receives no traffic;
+  5. all tables are copied and verified (row counts, content hashes, foreign keys, sequences);
+  6. the new stack starts (the switch), and the API must answer exactly as in step 1;
+  7. the release files replace the MySQL ones, MySQL is stopped (its volume is kept for rollback), nightly backups continue.
+A failure before step 6 starts the MySQL services again. From step 6 on, --finish completes the migration or --rollback returns to MySQL.
+Run it in tmux or screen; if the connection drops during the downtime, run --rollback or --finish as the last message says.
 EOF
     exit 0
 fi
 
 # ---- the migration -----------------------------------------------------------------------------------------------------
 
-if ((! skip_app_check)) && [[ -z "${AUTOMATON_CHECK_EMAIL:-}" || -z "${AUTOMATON_CHECK_PASSWORD:-}" ]]; then
-    echo 'Set AUTOMATON_CHECK_EMAIL and AUTOMATON_CHECK_PASSWORD to an administrator account (and optionally AUTOMATON_CHECK_USER_EMAIL / _PASSWORD) so the result can be compared with what people see now, or pass --skip-app-check.' >&2
-    exit 2
+if [[ -f "$pointer" ]]; then
+    existing=$(cat "$pointer")
+    case "$(cat "$existing/STATE" 2>/dev/null || echo none)" in
+        rolled-back|none) rm -f "$pointer" ;;
+        *) echo "An earlier migration is unfinished (recovery data $existing, state $(cat "$existing/STATE")). Run --finish or --rollback first; running again would overwrite the PostgreSQL data with the old MySQL data." >&2; exit 1 ;;
+    esac
+fi
+if grep -q 'PostgreSqlConnection' "$config_dir/appsettings.Production.json" || [[ -n "$(docker volume ls -q --filter "name=^${project}_postgres-data$")" ]]; then
+    echo "A PostgreSQL volume or connection string already exists in this installation. Remove ${project}_postgres-data (after checking it holds nothing you need) or finish the earlier migration; nothing was changed." >&2
+    exit 1
+fi
+require_check_credentials
+if ((! rehearsal)); then
+    docker_root=$(docker info --format '{{.DockerRootDir}}')
+    for path in "$install_dir" "$docker_root"; do
+        available_kb=$(df -Pk "$path" | awk 'NR==2 {print $4}')
+        (( available_kb >= 10485760 )) || { echo "At least 10 GiB free disk space is required on $path before migrating." >&2; exit 1; }
+    done
 fi
 if [[ -z "$confirm" ]]; then
     [[ -t 0 ]] || { echo "Confirm non-interactively with --confirm $domain" >&2; exit 2; }
     read -r -p "Type the server domain ($domain) to start the migration: " confirm
 fi
 [[ "$confirm" == "$domain" ]] || { echo 'Confirmation did not match; nothing was changed.' >&2; exit 1; }
-if [[ -z "$(docker volume ls -q --filter "name=^${project}_mysql-data$")" ]]; then echo 'The MySQL data volume was not found.' >&2; exit 1; fi
+[[ -n "$(docker volume ls -q --filter "name=^${project}_mysql-data$")" ]] || { echo 'The MySQL data volume was not found.' >&2; exit 1; }
 
 install -d -m 0700 "$backup_root"
 recovery=$(mktemp -d "$backup_root/mysql-to-postgresql-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
 echo "Recovery data: $recovery"
 : > "$recovery/NOTES"
-printf '%s\n' "$recovery" > "$pointer"
 set_state started
 
 echo 'Taking the API snapshot (what people see before the migration).'
@@ -301,15 +424,20 @@ echo 'Stopping API and Worker (downtime starts).'
 downtime_start=$SECONDS
 "${old_compose[@]}" stop api worker
 echo 'Checking for work that cannot be carried over.'
-if ! run_loader inspect >/dev/null; then
+rc=0
+run_loader inspect >/dev/null || rc=$?
+if ((rc == 3)); then
     if ((discard_in_flight)); then echo 'Queued messages and background jobs are discarded (--discard-in-flight).'
     else echo 'Work was still in flight when the services stopped. Nothing was changed; rerun with --discard-in-flight to accept losing it.' >&2; false; fi
+elif ((rc != 0)); then
+    echo 'The source could not be inspected; nothing was changed.' >&2; false
 fi
 
 echo 'Creating the verified recovery backup.'
 cp -p "$install_dir/release.env" "$install_dir/compose.yaml" "$install_dir/.env" "$recovery/"
 for file in version update.sh install.sh backup.sh restore.sh; do [[ ! -f "$install_dir/$file" ]] || cp -p "$install_dir/$file" "$recovery/$file"; done
 [[ ! -f "$override" ]] || cp -p "$override" "$recovery/compose.override.yaml"
+(cd "$config_dir" && find . -type f -printf '%P\n' | sort) > "$recovery/config-files.txt"
 tar -C "$(dirname "$config_dir")" -czf "$recovery/config.tar.gz" "$(basename "$config_dir")"
 docker cp "$("${old_compose[@]}" ps -aq api):/app/data-protection-keys/." - | gzip > "$recovery/api-keys.tar.gz"
 docker cp "$("${old_compose[@]}" ps -aq worker):/app/data-protection-keys/." - | gzip > "$recovery/worker-keys.tar.gz"
@@ -317,11 +445,15 @@ docker cp "$("${old_compose[@]}" ps -aq api):/app/AppData/." - | gzip > "$recove
 "${old_compose[@]}" exec -T mysql sh -c 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password) mysqldump -uroot --single-transaction --no-tablespaces --routines=false --triggers=false --set-gtid-purged=OFF --default-character-set=utf8mb4 automaton' < /dev/null | gzip > "$recovery/mysql.sql.gz"
 for archive in config api-keys worker-keys api-data; do tar -tzf "$recovery/$archive.tar.gz" >/dev/null; done
 gzip -t "$recovery/mysql.sql.gz"
-(( $(zcat "$recovery/mysql.sql.gz" | grep -c '^CREATE TABLE') > 50 )) || { echo 'The MySQL dump looks incomplete.' >&2; false; }
-(cd "$recovery" && sha256sum release.env compose.yaml .env config.tar.gz api-keys.tar.gz worker-keys.tar.gz api-data.tar.gz mysql.sql.gz before.json > SHA256SUMS)
+expected_tables=$("${old_compose[@]}" exec -T mysql sh -c 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password) mysql -uroot -N -e "select count(*) from information_schema.tables where table_schema=\"automaton\" and table_type=\"BASE TABLE\""' < /dev/null 2>/dev/null)
+[[ "$expected_tables" =~ ^[0-9]+$ && "$expected_tables" -gt 0 ]] || { echo 'Could not count the MySQL tables.' >&2; false; }
+(( $(zcat "$recovery/mysql.sql.gz" | grep -c '^CREATE TABLE') == expected_tables )) || { echo 'The MySQL dump does not contain every table.' >&2; false; }
+(cd "$recovery" && sha256sum release.env compose.yaml .env config.tar.gz config-files.txt api-keys.tar.gz worker-keys.tar.gz api-data.tar.gz mysql.sql.gz before.json > SHA256SUMS)
 (cd "$recovery" && sha256sum -c --quiet SHA256SUMS)
 set_state backed-up
+printf '%s\n' "$recovery" > "$pointer"
 install -m 0700 "$bundle/migrate-to-postgresql.sh" "$install_dir/migrate-to-postgresql.sh"  # so --rollback is available whatever happens next
+echo 'postgres_volume_created=1' >> "$recovery/NOTES"
 
 echo 'Preparing the PostgreSQL configuration.'
 if [[ ! -f "$config_dir/secrets/postgres-password" ]]; then
@@ -331,13 +463,14 @@ fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, 'w') as stream:
     stream.write(secrets.token_hex(32))
 PY
-    echo 'postgres_password_created=1' >> "$recovery/NOTES"
 fi
-python3 - "$config_dir/appsettings.Production.json" "$(mysql_secret postgres-password)" <<'PY'
+PGPW="$(read_secret postgres-password)" python3 - "$config_dir/appsettings.Production.json" <<'PY'
 import json, os, sys, tempfile
-path, password = sys.argv[1:3]
+path = sys.argv[1]
 settings = json.load(open(path))
-settings['ConnectionStrings'] = {'PostgreSqlConnection': f'Host=postgres;Database=automaton;Username=automaton;Password={password}'}
+connections = settings.setdefault('ConnectionStrings', {})
+connections.pop('MySqlConnection', None)
+connections['PostgreSqlConnection'] = f'Host=postgres;Database=automaton;Username=automaton;Password={os.environ["PGPW"]}'
 if isinstance(settings.get('AppConfig'), dict):
     settings['AppConfig'].pop('DatabaseType', None)
 mode = os.stat(path).st_mode & 0o777
@@ -354,7 +487,6 @@ new_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$bundle/release.env" | cut -d= -f2
 if [[ "$old_runner_image" != "$new_runner_image" ]]; then python3 "$bundle/configure.py" --config-dir "$config_dir" --update-runner-image "$old_runner_image" "$new_runner_image"; fi
 
 ((rehearsal)) || { echo 'Pulling release images.'; "${new_compose[@]}" pull postgres "${application_services[@]}"; }
-[[ -n "$(docker volume ls -q --filter "name=^${project}_postgres-data$")" ]] || echo 'postgres_volume_created=1' >> "$recovery/NOTES"
 echo 'Starting PostgreSQL and creating the schema with the new API (it receives no traffic).'
 "${new_compose[@]}" up -d --no-deps --wait --wait-timeout 300 postgres
 schema_container="$project-migration-schema"
@@ -373,41 +505,8 @@ run_loader copy
 echo 'Verifying the copy.'
 run_loader verify
 
-echo 'Starting the PostgreSQL stack.'
+echo 'Starting the PostgreSQL stack (the switch).'
 phase=switched
 set_state switched
 "${new_compose[@]}" up -d --no-deps --wait --wait-timeout 600 --force-recreate "${application_services[@]}"
-echo 'Comparing what people see with the snapshot from before.'
-run_app_check compare "$recovery/before.json"
-if ((! rehearsal)); then
-    curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]'
-    curl --fail --silent --show-error "https://studio.$domain/" >/dev/null
-fi
-
-downtime=$((SECONDS - downtime_start))
-echo 'Installing the release files.'
-install -m 0600 "$bundle/release.env" "$install_dir/release.env"
-install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
-install -m 0644 "$bundle/version" "$install_dir/version"
-for script in update.sh install.sh backup.sh restore.sh; do
-    [[ ! -f "$bundle/$script" ]] || install -m 0700 "$bundle/$script" "$install_dir/$script"
-done
-echo 'Stopping MySQL (its data stays for rollback) and setting its credentials aside.'
-docker stop "$mysql_container" >/dev/null
-install -d -m 0700 "$config_dir/pre-postgresql"
-for secret in mysql-password mysql-root-password; do
-    [[ ! -f "$config_dir/secrets/$secret" ]] || mv "$config_dir/secrets/$secret" "$config_dir/pre-postgresql/$secret"
-done
-set_state complete
-phase=complete
-if ((! rehearsal)) && [[ -f "$install_dir/backup.sh" ]]; then
-    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
-    bash "$install_dir/backup.sh" --install-dir "$install_dir" || echo 'Warning: the first PostgreSQL backup failed.' >&2
-fi
-cat <<EOF
-
-Migrated to PostgreSQL (API and Worker were down for ${downtime}s). Recovery data (keep until you are sure): $recovery
-  - return to MySQL:  sudo bash $install_dir/migrate-to-postgresql.sh --rollback --install-dir $install_dir --config-dir $config_dir --confirm $domain
-    (this loses everything written since the switch)
-  - when satisfied, remove the old database: docker rm $mysql_container; docker volume rm ${project}_mysql-data
-EOF
+finish_switch
