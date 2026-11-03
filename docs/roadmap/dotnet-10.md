@@ -1,6 +1,6 @@
 # .NET 10 LTS
 
-Updated: 31 October 2026. Status: postponed in favor of [05 self-maintenance](05-self-maintenance.md) (31 October 2026). Deadline: .NET 9 support ends on 10 November 2026 ([support policy](https://dotnet.microsoft.com/en-us/platform/support/policy)); after that date it receives no security fixes. Work: parent issue [#492](https://github.com/rzvdaniel/automaton/issues/492) (retarget #493, rollout #494).
+Updated: 31 October 2026. Status: next, before other code work (decided 3 November 2026; postponed on 31 October in favor of [self-maintenance](self-maintenance.md)). Deadline: .NET 9 support ends on 10 November 2026 ([support policy](https://dotnet.microsoft.com/en-us/platform/support/policy)); after that date it receives no security fixes. Work: parent issue [#492](https://github.com/rzvdaniel/automaton/issues/492) (retarget #493, rollout #494).
 
 ## Scope
 

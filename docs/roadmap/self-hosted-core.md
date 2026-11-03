@@ -1,6 +1,6 @@
-# 01 Self-hosted core
+# Self-hosted core
 
-Status: done (M1–M4). Open before team use: two-user isolation and the combined restart/replay and small-team acceptance. This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](04-dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](05-self-maintenance.md).
+Status: done (M1–M4). Open before team use: two-user isolation and the combined restart/replay and small-team acceptance. This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](self-maintenance.md).
 
 Updated: 27 October 2026. Status: M3 and M4 are complete. The single-machine install/deploy/persistence flow is demonstrated, source cleanup/audit is merged through #416, and the demonstrated routing/CLI corrections are merged in #417 (`a442dda3`). M1/M2 implementation is merged; a single-account CLI/static/API/Action flow is now demonstrated. Multi-user and combined restart/replay acceptance remain deferred before team use.
 
@@ -22,7 +22,7 @@ The self-hosted positioning is now the intended onboarding story. Remaining rele
 
 - Move the .NET 9 applications and Runner runtime to a supported LTS release before .NET 9 support ends on 10 November 2026. See [Microsoft’s support policy](https://dotnet.microsoft.com/en-us/platform/support/policy).
 - Align the server bundle’s Runner reference and the separately published CLI/Runner artifacts with the versions used in lifecycle acceptance. The installed server’s verified Runner currently differs from the fresh-release manifest; NuGet CLI publication is separate from server publication. Portable CLI downloads are not currently published as public GitHub release assets.
-- Clean-host acceptance: done on 31 October 2026 on a rebuilt Ubuntu 26.04 host (installation, administrator setup, Runner enrollment, fresh NuGet CLI, app create/deploy/publish, moving an app between Runners, Runner upgrade and rename, updates 0.1.15–0.1.19, nightly backup and a database/key restore round trip). Fixes are in PRs #463–#468. Off-host restore on a different server remains unverified; see [self-maintenance](05-self-maintenance.md).
+- Clean-host acceptance: done on 31 October 2026 on a rebuilt Ubuntu 26.04 host (installation, administrator setup, Runner enrollment, fresh NuGet CLI, app create/deploy/publish, moving an app between Runners, Runner upgrade and rename, updates 0.1.15–0.1.19, nightly backup and a database/key restore round trip). Fixes are in PRs #463–#468. Off-host restore on a different server remains unverified; see [self-maintenance](self-maintenance.md).
 - Measure server-update downtime and publish resource guidance from observed workloads. The updater replaces application containers in place; it does not provide zero-downtime control-plane updates or remote backups.
 - Keep public DNS/HTTPS and x86_64 Ubuntu requirements explicit. Private-only/offline and ARM installation are not the supported quickstart. Managed hosting remains a possible service, not an announced plan or SLA.
 
@@ -201,10 +201,10 @@ These are later improvements, not prerequisites for M3's single-server target or
 - Second-machine acceptance and additional multi-machine operating features. Preserve existing enrollment/assignment behavior.
 - Additional monitoring, per-category storage breakdowns and system-app catalog work. Basic host retention/admission is covered by the [operations policies](../prod/production-docker-cheat-sheet.md#disk-cleanup); applying those policies to existing hosts remains an operator step, not milestone acceptance.
 - Automatic Runner self-update. Studio provides an operator-run Runner upgrade command with rollback (**Runners → Upgrade runner**).
-- Off-site backup destinations and app-data backups, delivered as maintenance apps; see [self-maintenance](05-self-maintenance.md). Nightly local database/key backups and `restore.sh` ship with the server.
+- Off-site backup destinations and app-data backups, delivered as maintenance apps; see [self-maintenance](self-maintenance.md). Nightly local database/key backups and `restore.sh` ship with the server.
 - Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.
-- Smaller developer-experience improvements found while building apps, such as persisted runtime logs and real-time connections, are tracked in [enhancements](03-enhancements.md).
-- Self-maintenance through premade maintenance apps (off-site backups, app-data backups, alerts and cleanup) and the remaining items from the clean-server review are planned in [self-maintenance](05-self-maintenance.md).
+- Smaller developer-experience improvements found while building apps, such as persisted runtime logs and real-time connections, are tracked in [enhancements](enhancements.md).
+- Self-maintenance through premade maintenance apps (off-site backups, app-data backups, alerts and cleanup) and the remaining items from the clean-server review are planned in [self-maintenance](self-maintenance.md).
 
 The broader M1/M2 acceptance remains recorded in the [M1 guide](../implementation/self-hosted-milestone-1.md) and milestone summaries above. It is still needed before claiming those guarantees for broader use; it must not be expanded into an unrelated feature program or a gate on every isolated cleanup PR.
 

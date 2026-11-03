@@ -1,4 +1,4 @@
-# 03 Enhancements
+# Enhancements
 
 Improvements found while building and operating apps on Automaton. They are not
 milestone prerequisites; the [roadmap index](README.md) lists all plans.

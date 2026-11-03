@@ -8,11 +8,11 @@ Automaton is a self-hosted workspace where individuals and small teams deploy, s
 
 Each machine runs **one management Runner**, responsible for machine management and application orchestration. User applications, builds and Actions run in separate containers. The Runner is a trusted management service, not a shared process in which users execute arbitrary code.
 
-Automaton maintains its own server with its own building blocks where possible: premade maintenance apps with Actions and schedules, rather than task-specific platform code. See [self-maintenance](05-self-maintenance.md); they are installed like any store app ([plan 06](06-app-install-and-stores.md)).
+Automaton maintains its own server with its own building blocks where possible: premade maintenance apps with Actions and schedules, rather than task-specific platform code. See [self-maintenance](self-maintenance.md); they are installed like any store app ([app-install-and-stores](app-install-and-stores.md)).
 
 ## Plans
 
-Each plan is a numbered file. The number is a permanent ID, not a priority: new plans take the next number and are never renumbered. This table lists open plans first, in priority order, then completed ones.
+Each plan is a file named after the plan (for example `self-maintenance.md`), with the same name as its parent issue and its value in the board's Plan field. Names carry no numbers; priority is the order of this table and the board's Priority field. This table lists open plans first, in priority order, then completed ones.
 
 ### Design here, work and status in GitHub
 
@@ -20,15 +20,16 @@ Each plan is a numbered file. The number is a permanent ID, not a priority: new 
 - **GitHub issues** hold the work. Each plan in progress has a parent issue; each step is a sub-issue with full context and acceptance criteria. Native *blocked by* links give the order: an issue without open blockers can start. Labels `agent:ready`, `agent:blocked`, `agent:in-progress` and `agent:human-review` show who can pick it up.
 - **Status** is the issue state and the [Automaton roadmap board](https://github.com/users/rzvdaniel/projects/1) (Status, Priority, Plan). A PR closes its issue and updates the step's one-line status in the plan file; do not keep detailed progress notes in these files.
 - New work found while implementing becomes a new sub-issue of the plan's parent issue, not a paragraph here.
+- Issue titles say what the work does, without plan or step numbers; *blocked by* links give the order.
 
-| # | Plan | Status |
-| --- | --- | --- |
-| 05 | [Self-maintenance](05-self-maintenance.md) | **In progress** ([#490](https://github.com/rzvdaniel/automaton/issues/490)): app secrets, shared vault, app permissions (#483) and the secret audit log (#479, this PR); next encrypted backup download (#484) |
-| 06 | [App install and shared stores](06-app-install-and-stores.md) | Planned ([#551](https://github.com/rzvdaniel/automaton/issues/551)): install any store app from Studio, from this or another server; step 1 (deploy from stored source) can start now |
-| 04 | [.NET 10 LTS](04-dotnet-10.md) | ([#492](https://github.com/rzvdaniel/automaton/issues/492)) Postponed (decided 31 October 2026). .NET 9 support ends 10 November 2026; after that it gets no security fixes |
-| 03 | [Enhancements](03-enhancements.md) | ([#495](https://github.com/rzvdaniel/automaton/issues/495)) Ongoing list: persisted runtime logs, real-time connections (failing tests on main: done) |
-| 01 | [Self-hosted core](01-self-hosted-core.md) | Done (M1–M4). Open before team use: two-user isolation and combined restart/replay acceptance |
-| 02 | [App store](02-app-store.md) | Done (server 0.1.12). Follow-up ideas only |
+| Plan | Status |
+| --- | --- |
+| [.NET 10 LTS](dotnet-10.md) | **Next** ([#492](https://github.com/rzvdaniel/automaton/issues/492)): .NET 9 support ends 10 November 2026, after which it gets no security fixes. Touches every project, so it goes alone, before other code work |
+| [Self-maintenance](self-maintenance.md) | **In progress** ([#490](https://github.com/rzvdaniel/automaton/issues/490)): app secrets, shared vault, app permissions and the secret audit log done; next encrypted backup download (#484) and our nightly maintenance apps (#556) |
+| [App install and shared stores](app-install-and-stores.md) | Planned ([#551](https://github.com/rzvdaniel/automaton/issues/551)): install any store app from Studio, from this or another server; deploy from stored source (#552) can start now |
+| [Enhancements](enhancements.md) | Ongoing ([#495](https://github.com/rzvdaniel/automaton/issues/495)): independent improvements and bugs not part of another plan |
+| [Self-hosted core](self-hosted-core.md) | Done (M1–M4). Open before team use: two-user isolation and combined restart/replay acceptance |
+| [App store](app-store.md) | Done (server 0.1.12). Follow-up ideas only |
 
 ## Working rules
 
