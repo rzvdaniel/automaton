@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Automaton.Api.Controllers;
 
+[TypeFilter<FlowStepExceptionFilter>]
 public class FlowsController : BaseController
 {
     private readonly FlowsService flowsService;
@@ -60,18 +61,7 @@ public class FlowsController : BaseController
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        try
-        {
-            await flowsService.Remove(id);
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        await flowsService.Remove(id);
 
         return NoContent();
     }
