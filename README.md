@@ -81,7 +81,7 @@ Your server backs itself up nightly (database and keys, 7 days, on the server). 
 - **Your Studio and API** on your domain, with app, user and access management.
 - **Your app store** at `store.your-domain.com`, listing the apps their owners choose to publish.
 - **Static sites, APIs and Actions** on your own machines. Static sites share a serving container; APIs and jobs use bounded containers.
-- **Persistent app data** across redeploys, explicit machine placement and multiple Runner machines.
+- **Persistent app data** across redeploys (not included in the nightly server backups), several Runner machines, and a choice of which Runner hosts each app.
 - **Your AI workflow** with CLI-generated agent instructions and deployment checks.
 
 The software is free under [Apache 2.0](LICENSE). You pay for your servers, domain and any AI services you choose. There is no required Automaton cloud subscription. You operate the installation and updates; nightly backups are set up for you, and off-server copies are yours to keep.

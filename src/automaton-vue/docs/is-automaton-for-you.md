@@ -32,10 +32,10 @@ Automaton is a self-hosted platform for deploying web apps, APIs and scheduled j
 | Maintenance | You update the server and Runners and keep backups | The provider operates the platform |
 | Availability | One server per Runner; if it is down, its apps are down | Redundancy and failover available |
 | Scale | Add Runner machines yourself | Elastic scale on demand |
-| Getting started | Install a server first, then deploy apps | Deploy in minutes without a server |
+| Getting started | Install a server first, then deploy apps | No server to install first |
 | On call | You are | The provider is, within its SLA |
 
-Choose Automaton when control, data location and predictable cost matter more to you than managed scale and availability. Choose a cloud provider when you need to scale or cannot be the one on call.
+Choose Automaton when control and data location matter more to you than managed scale and availability. Choose a cloud provider when you need to scale or cannot be the one on call.
 
 ### What it costs
 
