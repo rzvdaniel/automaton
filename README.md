@@ -14,7 +14,7 @@ Automaton is an open-source platform for deploying web apps, APIs and Actions on
 
 **It does not fit** if you need autoscaling, multi-region failover, live streaming connections, a hosted service to sign up for, or hosting for untrusted users.
 
-Compared with a cloud provider you gain control, data location and flat costs; you take on updates, backups and being on call, and you get no global scale. The full comparison, with pros and cons, is on [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you). Questions: [FAQ](https://automaton.monster/docs/faq).
+Compared with a cloud provider you gain control and data location, with costs set by the servers you rent; you take on updates, backups and being on call, and you get no global scale. The full comparison, with pros and cons, is on [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you). Questions: [FAQ](https://automaton.monster/docs/faq).
 
 ## Quickstart
 
@@ -22,8 +22,6 @@ Compared with a cloud provider you gain control, data location and flat costs; y
 2. Add a Runner from Studio.
 3. Install the CLI, `automaton login` against your server, then `automaton new "My App"`.
 4. Ask your coding agent to build the app, then `automaton validate` and `automaton deploy`.
-
-Details follow.
 
 ## Install
 
@@ -74,7 +72,7 @@ Approve CLI login in **your Studio** when prompted. Keep credentials out of AI c
 sudo bash /opt/automaton-server/update.sh
 ```
 
-The updater verifies the latest compatible release and makes a local recovery backup before replacing API, Worker, Studio and the app store. Updating to the first release with the app store needs the new updater once; see [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server). These services can be briefly unavailable. Infrastructure upgrades and existing Runner updates require separate review; this command does not upgrade every machine automatically. See [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server).
+The updater verifies the latest compatible release and makes a local recovery backup before replacing API, Worker, Studio and the app store. Updating to the first release with the app store needs the new updater once; see [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server). These services can be briefly unavailable. Infrastructure upgrades and existing Runner updates require separate review; this command does not upgrade every machine automatically.
 
 Your server backs itself up nightly (database and keys, 7 days, on the server). Also turn on your hosting provider's server backups; see [backups and restore](docs/prod/install-automaton.md#backups-and-restore).
 
