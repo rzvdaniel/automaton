@@ -13,7 +13,7 @@ How an Automaton installation protects apps, secrets and administrator control t
 User code does not run inside the Runner process. APIs, server-rendered sites, Actions and builds run in separate Docker containers that the Runner creates with:
 
 - all Linux capabilities dropped and `no-new-privileges`;
-- CPU, memory and process limits;
+- the CPU, memory and process limits the server configures;
 - the deployed app files mounted read-only, plus a per-app data directory for persistent data;
 - for Actions and builds, a non-root user; Actions also get a read-only root filesystem.
 
@@ -34,7 +34,7 @@ An app that needs platform access declares permissions in `automaton.json` (for 
 
 ## Audit log
 
-Secret changes and uses (names, scopes and versions, never values) and app permission decisions are recorded in the platform audit log and kept for 180 days. App owners see their app's history under **Secrets → Show history**; administrators see all events under **Admin → Audit Events**.
+Secret changes and uses (names, scopes and versions, never values) are recorded in the platform audit log and kept for 180 days; app permission requests, approvals and revocations are recorded there too. App owners see their app's history under **Secrets → Show history**; administrators see all events under **Admin → Audit Events**.
 
 ## Out of scope
 
