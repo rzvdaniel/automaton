@@ -11,10 +11,10 @@ Thanks for your interest. Automaton is in early access and maintained by a small
 
 ## Build and test
 
-Set up a local development environment with [repository development](docs/development.md) (.NET 9 SDK, Node.js 22+, Docker). The checks CI runs on every pull request:
+Set up a local development environment with [repository development](docs/development.md) (.NET 9 SDK, Node.js 22+, Docker). Before opening a pull request, run from the repository root (CI runs the `dotnet test` projects and Studio `npm test`):
 
 ```bash
-dotnet build Automaton.All.sln -c Debug
+dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal
 dotnet test src/UnitTests/Automaton.Api.Tests        # also Cli, Core, Runner, Worker, Ai, Architecture
 cd src/automaton-vue && npm ci                         # Studio tests import website config
 cd ../automaton-studio-vue && npm ci && npm test && npx vue-tsc --noEmit -p tsconfig.app.json
