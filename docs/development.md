@@ -28,7 +28,7 @@ Public app serving must never expose source files, secrets, logs, runner state, 
 
 - .NET 9 SDK
 - Node.js 22+ and npm/pnpm
-- MySQL 8.0 (the local Compose default)
+- PostgreSQL 16 (the local Compose default)
 - Docker, for local database/runner workflows
 
 ## Quickstart for repository development
@@ -37,15 +37,15 @@ Public app serving must never expose source files, secrets, logs, runner state, 
 
 ```bash
 # From repo root
-docker compose -f docker-compose.dev.yml up -d mysql
+docker compose -f docker-compose.dev.yml up -d postgres
 docker compose -f docker-compose.rabbitmq.yml up -d
 ```
 
-Configure the backend connection string. Replace `<your-MYSQL_PASSWORD>` with the `MYSQL_PASSWORD` the MySQL container starts with: set it in a local, untracked `.env` in the repo root (start from `.env.example`) before the first `docker compose up`. If you set nothing, the compose files fall back to a local-only default (see `docker-compose.mysql.yml`); never use that default on a machine reachable from a network.
+Configure the backend connection string. Replace `<your-POSTGRES_PASSWORD>` with the `POSTGRES_PASSWORD` the PostgreSQL container starts with: set it in a local, untracked `.env` in the repo root (start from `.env.example`) before the first `docker compose up`. If you set nothing, the compose files fall back to a local-only default (see `docker-compose.postgres.yml`); never use that default on a machine reachable from a network.
 
 ```bash
 cd src/Automaton.Api
-dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=<your-MYSQL_PASSWORD>;"
+dotnet user-secrets set "ConnectionStrings:PostgreSqlConnection" "Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=<your-POSTGRES_PASSWORD>"
 ```
 
 Apply migrations:

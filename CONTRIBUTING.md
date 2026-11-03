@@ -27,8 +27,8 @@ Run the tests for the projects you changed. Add a test for new behaviour and, fo
 
 ## Compose files in the repository root
 
-- `docker-compose.dev.yml`: local MySQL and RabbitMQ for development, plus an optional `runner-dev` Runner (API, Worker and Studio services are included but commented out).
-- `docker-compose.mysql.yml`: standalone MySQL when you run the API on the host.
+- `docker-compose.dev.yml`: local PostgreSQL and RabbitMQ for development, plus an optional `runner-dev` Runner (API, Worker and Studio services are included but commented out).
+- `docker-compose.postgres.yml`: standalone PostgreSQL when you run the API on the host.
 - `docker-compose.rabbitmq.yml`: standalone RabbitMQ when you run the API and Worker on the host.
 - `docker-compose.local.yml`: the whole stack in containers for a local test, with an optional Runner.
 - `docker-compose.runtime-local.yml`: local stack with Traefik and a Runner, set up by `scripts/setup-local-development.ps1`.

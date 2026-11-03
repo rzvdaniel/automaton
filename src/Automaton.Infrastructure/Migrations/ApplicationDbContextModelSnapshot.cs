@@ -1249,7 +1249,7 @@ namespace Automaton.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("DisplayName")
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -1277,7 +1277,7 @@ namespace Automaton.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
@@ -1297,7 +1297,7 @@ namespace Automaton.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("PublicUsername")
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("RegisteredAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1502,7 +1502,7 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("Category")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("timestamp with time zone");
@@ -1517,7 +1517,7 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Icon")
                         .IsRequired()
@@ -1529,7 +1529,7 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("Updated")
                         .HasColumnType("timestamp with time zone");
@@ -1718,7 +1718,7 @@ namespace Automaton.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("Updated")
                         .HasColumnType("timestamp with time zone");
@@ -3179,7 +3179,7 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<string>("OperatingSystem")
                         .HasMaxLength(256)
@@ -3674,7 +3674,7 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<string>("RunnerIds")
                         .IsRequired()
@@ -4013,7 +4013,7 @@ namespace Automaton.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("GitHubUsername")
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsValid")
                         .HasColumnType("boolean");
@@ -4177,7 +4177,7 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");

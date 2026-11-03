@@ -14,6 +14,9 @@ internal static class PostgreSqlModelConfiguration
     /// Longer columns (messages, logs, JSON) stay ordinary case-sensitive text.</summary>
     private const int MaxCaseInsensitiveLength = 512;
 
+    private static readonly HashSet<string> UnboundedLookupNames =
+        ["Name", "DisplayName", "PublicUsername", "GitHubUsername", "Category"];
+
     internal static void Apply(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("citext");
@@ -33,11 +36,11 @@ internal static class PostgreSqlModelConfiguration
     }
 
     // MySQL could index only bounded text (Pomelo mapped indexed text to varchar(255)), so indexed text
-    // without a length was case-insensitive too.
+    // without a length was case-insensitive too. Unbounded names that people look up are listed explicitly.
     private static bool IsCaseInsensitive(IMutableProperty property)
         => property.GetMaxLength() is { } length
             ? length <= MaxCaseInsensitiveLength
-            : property.GetContainingIndexes().Any() || property.IsKey();
+            : property.GetContainingIndexes().Any() || property.IsKey() || UnboundedLookupNames.Contains(property.Name);
 
     // timestamptz accepts only UTC values; dates read back carry Kind=Utc like the app always wrote them.
     private static DateTime ToUtc(DateTime value) => value.Kind switch

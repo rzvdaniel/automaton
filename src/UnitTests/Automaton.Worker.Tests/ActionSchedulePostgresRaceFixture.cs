@@ -6,11 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Worker.Tests;
 
-internal static class ActionScheduleMySqlRaceFixture
+internal static class ActionSchedulePostgresRaceFixture
 {
     internal static ApplicationDbContext Open(string connectionString) => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 36))).Options);
+            .UseNpgsql(connectionString).Options);
 
     internal static async Task<Guid> SeedAsync(ApplicationDbContext db, int maximum, bool queued)
     {

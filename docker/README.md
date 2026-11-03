@@ -1,6 +1,6 @@
 # Docker Setup for Automaton Development
 
-This directory contains Docker configurations for local development dependencies such as MySQL and RabbitMQ.
+This directory contains Docker configurations for local development dependencies such as PostgreSQL and RabbitMQ.
 
 ## Quick Start
 
@@ -14,7 +14,7 @@ bash docker/test-setup.sh
 This will:
 - Check prerequisites (Docker, Docker Compose, .NET SDK)
 - Validate configuration files
-- Start MySQL container
+- Start PostgreSQL container
 - Verify database and user creation
 - Confirm database is ready for automatic migrations
 - Clean up test environment
@@ -36,18 +36,18 @@ cp .env.example .env
 
 Edit `.env` with your preferred credentials (or use the defaults for local development).
 
-### 3. Start the MySQL Database
+### 3. Start the PostgreSQL Database
 
 From the project root directory:
 ```bash
-docker compose -f docker-compose.dev.yml up -d mysql
+docker compose -f docker-compose.dev.yml up -d postgres
 ```
 
 This will:
-- Pull the MySQL 8.0 image
+- Pull the PostgreSQL 16 image
 - Create a database named `automaton` (or your configured name)
 - Create a user with the configured credentials
-- Start MySQL on port 3306 (or your configured port)
+- Start PostgreSQL on port 5432 (or your configured port)
 - Persist data in a Docker volume
 
 ### 4. Start RabbitMQ
@@ -80,7 +80,7 @@ Update your `appsettings.Development.json` or use .NET user secrets:
 ```json
 {
   "ConnectionStrings": {
-    "MySqlConnection": "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
+    "PostgreSqlConnection": "Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=AutomatonPass123!"
   }
 }
 ```
@@ -88,7 +88,7 @@ Update your `appsettings.Development.json` or use .NET user secrets:
 **Option B: User Secrets (Recommended)**
 ```bash
 cd src/Automaton.Api
-dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
+dotnet user-secrets set "ConnectionStrings:PostgreSqlConnection" "Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=AutomatonPass123!"
 dotnet user-secrets set "RabbitMq:Host" "localhost"
 dotnet user-secrets set "RabbitMq:Username" "automaton"
 dotnet user-secrets set "RabbitMq:Password" "AutomatonRabbit123!"
@@ -104,7 +104,7 @@ dotnet run
 ```
 
 The server will automatically:
-- Connect to the MySQL database
+- Connect to the PostgreSQL database
 - Apply all pending Entity Framework migrations
 - Create the database schema (38 tables)
 - Connect to RabbitMQ using the configured credentials
@@ -112,15 +112,14 @@ The server will automatically:
 
 ## Useful Commands
 
-### Check MySQL Logs
+### Check PostgreSQL Logs
 ```bash
-docker logs automaton-mysql
+docker logs automaton-postgres
 ```
 
-### Connect to MySQL CLI
+### Connect with psql
 ```bash
-docker exec -it automaton-mysql mysql -u automaton_user -p
-# Enter password: AutomatonPass123! (or your configured password)
+docker exec -it automaton-postgres psql -U automaton_user -d automaton
 ```
 
 ### Check RabbitMQ Logs
@@ -130,48 +129,34 @@ docker logs automaton-rabbitmq
 
 ### Stop the Database
 ```bash
-docker compose -f docker-compose.mysql.yml down
+docker compose -f docker-compose.postgres.yml down
 docker compose -f docker-compose.rabbitmq.yml down
 ```
 
 ### Stop and Remove Data (fresh start)
 ```bash
-docker compose -f docker-compose.mysql.yml down -v
+docker compose -f docker-compose.postgres.yml down -v
 docker compose -f docker-compose.rabbitmq.yml down -v
 ```
 
 ### Backup the Database
 ```bash
-docker exec automaton-mysql mysqldump -u root -pAutomatonRoot123! automaton > backup.sql
+docker exec automaton-postgres pg_dump -U automaton_user -Fc automaton > backup.dump
 ```
 
 ### Restore from Backup
 ```bash
-docker exec -i automaton-mysql mysql -u root -pAutomatonRoot123! automaton < backup.sql
+docker exec -i automaton-postgres pg_restore -U automaton_user -d automaton --clean --if-exists < backup.dump
 ```
 
 ## Directory Structure
 
 ```
 docker/
-├── mysql/
-│   ├── conf.d/         # MySQL configuration files
-│   │   └── custom.cnf  # Custom MySQL settings
-│   └── init/           # Initialization scripts (run on first start)
-│       └── 01-init.sql # Database initialization
-├── ../docker-compose.mysql.yml
+├── ../docker-compose.postgres.yml
 ├── ../docker-compose.rabbitmq.yml
 └── README.md           # This file
 ```
-
-## Custom Configuration
-
-### MySQL Configuration
-Edit `docker/mysql/conf.d/custom.cnf` to customize MySQL settings.
-
-### Initialization Scripts
-Add `.sql` or `.sh` files to `docker/mysql/init/` to run custom initialization.
-These run only on the first container start (when data volume is empty).
 
 ## Private Docker Registry Setup
 
@@ -181,7 +166,7 @@ To keep your Docker images private for your team:
 
 1. **Build and tag your image:**
    ```bash
-   docker build -t ghcr.io/your-org/automaton-mysql:latest -f docker/Dockerfile.mysql .
+   docker build -t ghcr.io/your-org/automaton-postgres:latest -f docker/Dockerfile.postgres .
    ```
 
 2. **Authenticate with GitHub:**
@@ -191,12 +176,12 @@ To keep your Docker images private for your team:
 
 3. **Push to GitHub Container Registry:**
    ```bash
-   docker push ghcr.io/your-org/automaton-mysql:latest
+   docker push ghcr.io/your-org/automaton-postgres:latest
    ```
 
 4. **Team members pull the image:**
    ```bash
-   docker pull ghcr.io/your-org/automaton-mysql:latest
+   docker pull ghcr.io/your-org/automaton-postgres:latest
    ```
 
 ### Option 2: Docker Hub Private Repository
@@ -205,13 +190,13 @@ To keep your Docker images private for your team:
 
 2. **Build and tag:**
    ```bash
-   docker build -t your-username/automaton-mysql:latest -f docker/Dockerfile.mysql .
+   docker build -t your-username/automaton-postgres:latest -f docker/Dockerfile.postgres .
    ```
 
 3. **Login and push:**
    ```bash
    docker login
-   docker push your-username/automaton-mysql:latest
+   docker push your-username/automaton-postgres:latest
    ```
 
 4. **Grant access to team members** through Docker Hub settings
@@ -221,32 +206,32 @@ To keep your Docker images private for your team:
 Set up a private Docker registry on your infrastructure:
 ```bash
 docker run -d -p 5000:5000 --name registry registry:2
-docker tag automaton-mysql:latest localhost:5000/automaton-mysql:latest
-docker push localhost:5000/automaton-mysql:latest
+docker tag automaton-postgres:latest localhost:5000/automaton-postgres:latest
+docker push localhost:5000/automaton-postgres:latest
 ```
 
 ## Troubleshooting
 
 ### Connection Refused
-- Ensure MySQL container is running: `docker ps`
-- Check if port 3306 is available: `netstat -an | grep 3306`
+- Ensure the PostgreSQL container is running: `docker ps`
+- Check if port 5432 is available: `netstat -an | grep 5432`
 - Verify connection string has correct host (localhost when connecting from host machine)
 - Ensure RabbitMQ container is running if the API or Worker uses MassTransit
 
 ### Access Denied
 - Verify credentials in `.env` match those in connection string
-- Ensure user has proper privileges (check init script)
+- The migration creates the `citext` extension; the database user must own the database (the container user does)
 - Verify `RABBITMQ_USER` and `RABBITMQ_PASSWORD` in `.env` match the app config
 
 ### Container Won't Start
-- Check logs: `docker logs automaton-mysql-dev`
-- Verify port 3306 is not already in use
+- Check logs: `docker logs automaton-postgres-dev`
+- Verify port 5432 is not already in use
 - Remove volume and start fresh: `docker compose -f docker-compose.dev.yml down -v`
 
 ### Migrations Fail
-- Ensure MySQL is fully started (wait ~30 seconds after `docker-compose up`)
+- Ensure PostgreSQL is fully started (wait ~10 seconds after `docker-compose up`)
 - Verify connection string is correct
-- Check MySQL logs for errors
+- Check PostgreSQL logs for errors
 
 ## Production Considerations
 
@@ -255,5 +240,5 @@ This setup is for **development only**. For production:
 - Enable SSL/TLS connections
 - Configure proper backup strategies
 - Implement monitoring and alerting
-- Consider managed database services (AWS RDS, Azure Database for MySQL, etc.)
+- Consider managed database services (AWS RDS, Azure Database for PostgreSQL, etc.)
 - Use secrets management (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault)

@@ -9,29 +9,26 @@ name: automaton-local
 #   then run: docker compose -f docker-compose.local.yml up -d runner
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: automaton-local-mysql
+  postgres:
+    image: postgres:16
+    container_name: automaton-local-postgres
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-automaton}
-      MYSQL_USER: ${MYSQL_USER:-automaton_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-AutomatonPass123!}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-automaton}
+      POSTGRES_USER: ${POSTGRES_USER:-automaton_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AutomatonPass123!}
     ports:
-      - "${MYSQL_LOCAL_PORT:-3310}:3306"
+      - "${POSTGRES_LOCAL_PORT:-5434}:5432"
     volumes:
-      - local-mysql-data:/var/lib/mysql
-      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - local-postgres-data:/var/lib/postgresql/data
     networks:
       - automaton-local
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 5
+      start_period: 10s
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -64,7 +61,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:-AutomatonPass123!}
       Cors__AllowedOrigins__0: http://localhost:5173
       Cors__AllowedOrigins__1: http://localhost:5174
       JwtOptions__Issuer: http://localhost:7091
@@ -80,7 +77,7 @@ services:
     networks:
       - automaton-local
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -94,7 +91,7 @@ services:
     restart: unless-stopped
     environment:
       DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:-AutomatonPass123!}
       AppConfig__WebsiteUrl: http://localhost:5173
       AppConfig__ApiUrl: http://api:8080
       EmailConfig__EmailHost: smtp4dev
@@ -110,7 +107,7 @@ services:
     networks:
       - automaton-local
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -183,7 +180,7 @@ services:
       - api
 
 volumes:
-  local-mysql-data:
+  local-postgres-data:
   rabbitmq-data:
   local-api-appdata:
   local-api-logs:

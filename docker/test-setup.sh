@@ -1,11 +1,11 @@
 #!/bin/bash
-# Test script for Docker MySQL setup
+# Test script for Docker PostgreSQL setup
 # This script verifies the complete development setup workflow
 
 set -e  # Exit on any error
 
 echo "======================================"
-echo "Docker MySQL Setup Integration Test"
+echo "Docker PostgreSQL Setup Integration Test"
 echo "======================================"
 echo ""
 
@@ -72,26 +72,26 @@ else
     exit 1
 fi
 
-# Step 4: Start MySQL container
+# Step 4: Start PostgreSQL container
 echo ""
-echo "Step 4: Starting MySQL container..."
+echo "Step 4: Starting PostgreSQL container..."
 print_info "This may take a minute if pulling the image for the first time..."
-docker compose -f docker-compose.dev.yml up -d mysql
+docker compose -f docker-compose.dev.yml up -d postgres
 
-# Wait for MySQL to be healthy
+# Wait for PostgreSQL to be healthy
 echo ""
-echo "Step 5: Waiting for MySQL to be healthy..."
+echo "Step 5: Waiting for PostgreSQL to be healthy..."
 max_attempts=30
 attempt=0
 while [ $attempt -lt $max_attempts ]; do
-    if docker inspect automaton-mysql-dev --format='{{.State.Health.Status}}' 2>/dev/null | grep -q "healthy"; then
-        print_success "MySQL is healthy"
+    if docker inspect automaton-postgres-dev --format='{{.State.Health.Status}}' 2>/dev/null | grep -q "healthy"; then
+        print_success "PostgreSQL is healthy"
         break
     fi
     attempt=$((attempt + 1))
     if [ $attempt -eq $max_attempts ]; then
-        print_error "MySQL failed to become healthy after $max_attempts attempts"
-        docker logs automaton-mysql-dev
+        print_error "PostgreSQL failed to become healthy after $max_attempts attempts"
+        docker logs automaton-postgres-dev
         exit 1
     fi
     sleep 2
@@ -100,9 +100,9 @@ done
 # Step 6: Verify database and user exist
 echo ""
 echo "Step 6: Verifying database and user..."
-# Give MySQL a moment to fully initialize after health check passes
+# Give PostgreSQL a moment to fully initialize after health check passes
 sleep 2
-if docker exec automaton-mysql-dev mysql -u automaton_user -pAutomatonPass123! -e "SHOW DATABASES;" 2>/dev/null | grep -q "automaton"; then
+if docker exec automaton-postgres-dev psql -U automaton_user -d automaton -tAc "SELECT current_database();" 2>/dev/null | grep -q "automaton"; then
     print_success "Database 'automaton' exists and is accessible"
 else
     print_error "Failed to access database"
@@ -113,9 +113,9 @@ fi
 echo ""
 echo "Step 7: Verifying database initialization..."
 # Check if initialization ran in current session or database already exists with data
-if docker logs automaton-mysql-dev 2>&1 | grep -q "Automaton MySQL database initialized successfully"; then
+if docker logs automaton-postgres-dev 2>&1 | grep -q "Automaton PostgreSQL database initialized successfully"; then
     print_success "Initialization script ran in this session"
-elif docker exec automaton-mysql-dev mysql -u automaton_user -pAutomatonPass123! automaton -e "SELECT 1" 2>/dev/null > /dev/null; then
+elif docker exec automaton-postgres-dev psql -U automaton_user -d automaton -c "SELECT 1" 2>/dev/null > /dev/null; then
     print_success "Database is ready (may have been initialized previously)"
 else
     print_error "Database initialization verification failed"
@@ -127,7 +127,7 @@ echo ""
 echo "Step 8: Verifying database is ready for the server..."
 # Just verify the database is accessible and ready
 # Migrations will be applied automatically when developers run the server
-if docker exec automaton-mysql-dev mysql -u automaton_user -pAutomatonPass123! automaton -e "SELECT 1" 2>/dev/null > /dev/null; then
+if docker exec automaton-postgres-dev psql -U automaton_user -d automaton -c "SELECT 1" 2>/dev/null > /dev/null; then
     print_success "Database is ready for automatic migrations"
     print_info "Note: Migrations will be applied automatically when you run 'dotnet run'"
 else
@@ -138,7 +138,7 @@ fi
 # Step 9: Verify database is empty (no tables yet - waiting for first server start)
 echo ""
 echo "Step 9: Verifying database is empty and ready for first use..."
-table_count=$(docker exec automaton-mysql-dev mysql -u automaton_user -pAutomatonPass123! automaton -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='automaton';" 2>/dev/null)
+table_count=$(docker exec automaton-postgres-dev psql -U automaton_user -d automaton -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null)
 if [ "$table_count" -eq 0 ]; then
     print_success "Database is empty and ready for first server start"
 else
@@ -157,5 +157,5 @@ echo "======================================"
 echo -e "${GREEN}All tests passed successfully!${NC}"
 echo "======================================"
 echo ""
-echo "The Docker MySQL setup is working correctly."
+echo "The Docker PostgreSQL setup is working correctly."
 echo "Developers can now use this setup for local development."

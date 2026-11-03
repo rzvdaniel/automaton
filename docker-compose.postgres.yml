@@ -1,0 +1,44 @@
+# PostgreSQL Database Docker Compose
+# Usage: docker compose -f docker-compose.postgres.yml up -d
+#
+# This provides a standalone PostgreSQL database for development.
+# Use this when you want to run the Studio Server locally but need the database in Docker.
+#
+# Default credentials (can be overridden with environment variables):
+#   - Database: automaton
+#   - User: automaton_user (superuser, so the migration can create the citext extension)
+#   - Password: AutomatonPass123!
+#
+# Connection string for Studio Server:
+#   Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=AutomatonPass123!
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: automaton-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-automaton}
+      POSTGRES_USER: ${POSTGRES_USER:-automaton_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AutomatonPass123!}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Persist PostgreSQL data
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - postgres-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  postgres-network:
+    driver: bridge

@@ -42,30 +42,27 @@ services:
       retries: 12
       start_period: 10s
 
-  mysql:
-    image: mysql:8.0
-    container_name: automaton-runtime-local-mysql
+  postgres:
+    image: postgres:16
+    container_name: automaton-runtime-local-postgres
     restart: unless-stopped
     logging: *default-logging
     environment:
-      MYSQL_ROOT_PASSWORD: ${LOCAL_RUNTIME_MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}
-      MYSQL_DATABASE: ${LOCAL_RUNTIME_MYSQL_DATABASE:-automaton}
-      MYSQL_USER: ${LOCAL_RUNTIME_MYSQL_USER:-automaton_user}
-      MYSQL_PASSWORD: ${LOCAL_RUNTIME_MYSQL_PASSWORD:-AutomatonPass123!}
+      POSTGRES_DB: ${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton}
+      POSTGRES_USER: ${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user}
+      POSTGRES_PASSWORD: ${LOCAL_RUNTIME_POSTGRES_PASSWORD:-AutomatonPass123!}
     ports:
-      - "${LOCAL_RUNTIME_MYSQL_PORT:-3311}:3306"
+      - "${LOCAL_RUNTIME_POSTGRES_PORT:-5435}:5432"
     volumes:
-      - runtime-local-mysql-data:/var/lib/mysql
-      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - runtime-local-postgres-data:/var/lib/postgresql/data
     networks:
       - automaton-runtime-local
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${LOCAL_RUNTIME_MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 5
+      start_period: 10s
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -111,7 +108,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${LOCAL_RUNTIME_MYSQL_DATABASE:-automaton};User=${LOCAL_RUNTIME_MYSQL_USER:-automaton_user};Password=${LOCAL_RUNTIME_MYSQL_PASSWORD:-AutomatonPass123!};
+      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton};Username=${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user};Password=${LOCAL_RUNTIME_POSTGRES_PASSWORD:-AutomatonPass123!}
       Cors__AllowedOrigins__0: https://${LOCAL_RUNTIME_STUDIO_DOMAIN:-studio.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       Cors__AllowedOrigins__1: https://${LOCAL_RUNTIME_WEBSITE_DOMAIN:-website.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       JwtOptions__Issuer: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
@@ -143,7 +140,7 @@ services:
       - automaton-runtime-local
       - automaton-runtime-local-runner
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -164,7 +161,7 @@ services:
     logging: *default-logging
     environment:
       DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${LOCAL_RUNTIME_MYSQL_DATABASE:-automaton};User=${LOCAL_RUNTIME_MYSQL_USER:-automaton_user};Password=${LOCAL_RUNTIME_MYSQL_PASSWORD:-AutomatonPass123!};
+      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton};Username=${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user};Password=${LOCAL_RUNTIME_POSTGRES_PASSWORD:-AutomatonPass123!}
       AppConfig__WebsiteUrl: https://${LOCAL_RUNTIME_WEBSITE_DOMAIN:-website.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       AppConfig__ApiUrl: http://api:8080
       RabbitMq__Host: rabbitmq
@@ -183,7 +180,7 @@ services:
     networks:
       - automaton-runtime-local
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -258,7 +255,7 @@ services:
         condition: service_healthy
 
 volumes:
-  runtime-local-mysql-data:
+  runtime-local-postgres-data:
   runtime-local-rabbitmq-data:
   runtime-local-api-appdata:
   runtime-local-published-apps:

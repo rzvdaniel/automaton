@@ -30,5 +30,6 @@
     <ProjectReference Include="..\..\Automaton.Api\Automaton.Api.csproj" />
     <Compile Include="..\Shared\LoopbackTlsServer.cs" Link="LoopbackTlsServer.cs" />
     <Compile Include="..\Shared\RecordingCapPublisher.cs" Link="RecordingCapPublisher.cs" />
+    <Compile Include="..\Shared\PostgresTestDatabase.cs" Link="PostgresTestDatabase.cs" />
   </ItemGroup>
 </Project>

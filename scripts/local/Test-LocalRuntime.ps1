@@ -38,7 +38,7 @@ foreach ($endpoint in $expectedEndpoints) {
 
 $services = docker compose -f $composeFile ps --status running --services
 if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect the runtime-local Compose stack.' }
-$requiredServices = @('api', 'worker', 'studio', 'website', 'traefik', 'mysql', 'rabbitmq', 'smtp4dev')
+$requiredServices = @('api', 'worker', 'studio', 'website', 'traefik', 'postgres', 'rabbitmq', 'smtp4dev')
 $missing = @($requiredServices | Where-Object { $_ -notin $services })
 if ($missing.Count -gt 0) { throw "Required runtime services are not running: $($missing -join ', ')" }
 

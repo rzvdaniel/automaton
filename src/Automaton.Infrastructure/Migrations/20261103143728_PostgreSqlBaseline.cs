@@ -208,13 +208,13 @@ namespace Automaton.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    DisplayName = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "citext", nullable: false),
+                    DisplayName = table.Column<string>(type: "citext", nullable: false),
                     Description = table.Column<string>(type: "text", nullable: false),
                     MoreInfo = table.Column<string>(type: "text", nullable: false),
                     Icon = table.Column<string>(type: "text", nullable: false),
                     Definition = table.Column<string>(type: "text", nullable: false),
-                    Category = table.Column<string>(type: "text", nullable: false),
+                    Category = table.Column<string>(type: "citext", nullable: false),
                     VisibleInExplorer = table.Column<bool>(type: "boolean", nullable: false),
                     Created = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Updated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -245,7 +245,7 @@ namespace Automaton.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: true),
+                    Name = table.Column<string>(type: "citext", nullable: true),
                     Body = table.Column<string>(type: "text", nullable: true),
                     Created = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Updated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -423,7 +423,7 @@ namespace Automaton.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "citext", nullable: false),
                     FlowId = table.Column<Guid>(type: "uuid", nullable: false),
                     RunnerIds = table.Column<string>(type: "text", nullable: false),
                     CronRecurrence = table.Column<string>(type: "text", nullable: false)
@@ -537,7 +537,7 @@ namespace Automaton.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     EncryptedToken = table.Column<string>(type: "text", nullable: false),
-                    GitHubUsername = table.Column<string>(type: "text", nullable: true),
+                    GitHubUsername = table.Column<string>(type: "citext", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     LastValidatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     IsValid = table.Column<bool>(type: "boolean", nullable: false)
@@ -569,7 +569,7 @@ namespace Automaton.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     DeletionClaimId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Name = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "citext", nullable: false),
                     Summary = table.Column<string>(type: "text", nullable: false),
                     Description = table.Column<string>(type: "text", nullable: false),
                     Definition = table.Column<string>(type: "text", nullable: false),
@@ -741,7 +741,7 @@ namespace Automaton.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "citext", nullable: false),
                     ConnectionId = table.Column<string>(type: "text", nullable: true),
                     LastHeartbeatAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     LastConnectedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -1010,9 +1010,9 @@ namespace Automaton.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: true),
-                    DisplayName = table.Column<string>(type: "text", nullable: true),
-                    PublicUsername = table.Column<string>(type: "text", nullable: true),
+                    Name = table.Column<string>(type: "citext", nullable: true),
+                    DisplayName = table.Column<string>(type: "citext", nullable: true),
+                    PublicUsername = table.Column<string>(type: "citext", nullable: true),
                     Bio = table.Column<string>(type: "text", nullable: true),
                     AvatarUrl = table.Column<string>(type: "text", nullable: true),
                     IsEnterpriseEnabled = table.Column<bool>(type: "boolean", nullable: false),

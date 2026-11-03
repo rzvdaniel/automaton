@@ -1,31 +1,25 @@
 services:
-  # MySQL Database Service
-  mysql:
-    image: mysql:8.0
-    container_name: automaton-mysql-dev
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:16
+    container_name: automaton-postgres-dev
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-automaton}
-      MYSQL_USER: ${MYSQL_USER:-automaton_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-AutomatonPass123!}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-automaton}
+      POSTGRES_USER: ${POSTGRES_USER:-automaton_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AutomatonPass123!}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      # Persist MySQL data
-      - mysql-data:/var/lib/mysql
-      # Optional: Add custom MySQL configuration
-      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
-      # Optional: Add initialization scripts
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - automaton-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -54,9 +48,9 @@ services:
   #   environment:
   #     - ASPNETCORE_ENVIRONMENT=Development
   #     - ASPNETCORE_URLS=https://+:7091
-  #     - ConnectionStrings__MySqlConnection=Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+  #     - ConnectionStrings__PostgreSqlConnection=Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:-AutomatonPass123!}
   #   depends_on:
-  #     mysql:
+  #     postgres:
   #       condition: service_healthy
   #     rabbitmq:
   #       condition: service_started
@@ -74,7 +68,7 @@ services:
   #   restart: unless-stopped
   #   environment:
   #     - DOTNET_ENVIRONMENT=Development
-  #     - ConnectionStrings__MySqlConnection=Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+  #     - ConnectionStrings__PostgreSqlConnection=Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:-AutomatonPass123!}
   #     - AppConfig__WebsiteUrl=http://host.docker.internal:5173
   #     - AppConfig__ApiUrl=https://host.docker.internal:7091
   #     - RabbitMq__Host=rabbitmq
@@ -82,7 +76,7 @@ services:
   #     - RabbitMq__Password=${RABBITMQ_PASSWORD:-automaton}
   #     - Logging__File__Path=/app/logs
   #   depends_on:
-  #     mysql:
+  #     postgres:
   #       condition: service_healthy
   #     rabbitmq:
   #       condition: service_started
@@ -150,7 +144,7 @@ services:
       - automaton-network
 
 volumes:
-  mysql-data:
+  postgres-data:
     driver: local
   runner-config:
     driver: local

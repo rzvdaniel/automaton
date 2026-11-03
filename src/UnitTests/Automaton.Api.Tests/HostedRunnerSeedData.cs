@@ -5,7 +5,7 @@ using Automaton.Core.Enums;
 
 namespace Automaton.Api.Tests;
 
-internal static class HostedRunnerMySqlSeedData
+internal static class HostedRunnerSeedData
 {
     internal static RunnerHost SeedInfrastructureRunnerHost(ApplicationDbContext db)
     {
@@ -35,7 +35,7 @@ internal static class HostedRunnerMySqlSeedData
     }
     internal static (RunnerHost Host, Guid[] AccountIds) SeedComputeFixture(ApplicationDbContext db, bool cpu, bool resize)
     {
-        var host = HostedRunnerMySqlSeedData.SeedInfrastructureRunnerHost(db);
+        var host = HostedRunnerSeedData.SeedInfrastructureRunnerHost(db);
         host.TotalCpuCores = cpu ? 1 : 8;
         host.TotalMemoryMb = cpu ? 8192 : 1024;
         var planId = HostedRunnerAuditTestData.SeedHostedRunnerPlan(db, Guid.NewGuid().ToString("N")[..8]);
