@@ -305,8 +305,7 @@ public class ResourceAuthorizationService
     public async Task<bool> CanDeleteFlowAsync(Guid flowId, Guid userId, CancellationToken cancellationToken = default)
     {
         // Check personal ownership
-        var hasPersonalAccess = await dbContext.FlowUsers
-            .AnyAsync(u => u.FlowId == flowId && u.UserId == userId, cancellationToken);
+        var hasPersonalAccess = await HasPersonalFlowAccessAsync(flowId, userId, cancellationToken);
 
         if (!hasPersonalAccess)
         {
@@ -412,8 +411,7 @@ public class ResourceAuthorizationService
     public async Task<bool> CanDeleteCustomStepAsync(Guid stepId, Guid userId, CancellationToken cancellationToken = default)
     {
         // Check personal ownership
-        var hasPersonalAccess = await dbContext.CustomStepUsers
-            .AnyAsync(u => u.CustomStepId == stepId && u.UserId == userId, cancellationToken);
+        var hasPersonalAccess = await HasPersonalCustomStepAccessAsync(stepId, userId, cancellationToken);
 
         if (!hasPersonalAccess)
         {
@@ -501,8 +499,7 @@ public class ResourceAuthorizationService
     public async Task<bool> CanDeleteRunnerAsync(Guid runnerId, Guid userId, CancellationToken cancellationToken = default)
     {
         // Check personal ownership
-        var hasPersonalAccess = await dbContext.RunnerUsers
-            .AnyAsync(u => u.RunnerId == runnerId && u.UserId == userId, cancellationToken);
+        var hasPersonalAccess = await HasPersonalRunnerAccessAsync(runnerId, userId, cancellationToken);
 
         if (!hasPersonalAccess)
         {
@@ -515,6 +512,28 @@ public class ResourceAuthorizationService
 
         return !isPartOfProject;
     }
+
+    /// <summary>
+    /// Whether the current user is linked to the resource as its own user. Delete refusals use these to decide
+    /// who may be told that a project is what blocks the delete.
+    /// </summary>
+    public Task<bool> HasPersonalFlowAccessAsync(Guid flowId, CancellationToken cancellationToken = default)
+        => HasPersonalFlowAccessAsync(flowId, UserId, cancellationToken);
+
+    public Task<bool> HasPersonalCustomStepAccessAsync(Guid stepId, CancellationToken cancellationToken = default)
+        => HasPersonalCustomStepAccessAsync(stepId, UserId, cancellationToken);
+
+    public Task<bool> HasPersonalRunnerAccessAsync(Guid runnerId, CancellationToken cancellationToken = default)
+        => HasPersonalRunnerAccessAsync(runnerId, UserId, cancellationToken);
+
+    private Task<bool> HasPersonalFlowAccessAsync(Guid flowId, Guid userId, CancellationToken cancellationToken)
+        => dbContext.FlowUsers.AnyAsync(u => u.FlowId == flowId && u.UserId == userId, cancellationToken);
+
+    private Task<bool> HasPersonalCustomStepAccessAsync(Guid stepId, Guid userId, CancellationToken cancellationToken)
+        => dbContext.CustomStepUsers.AnyAsync(u => u.CustomStepId == stepId && u.UserId == userId, cancellationToken);
+
+    private Task<bool> HasPersonalRunnerAccessAsync(Guid runnerId, Guid userId, CancellationToken cancellationToken)
+        => dbContext.RunnerUsers.AnyAsync(u => u.RunnerId == runnerId && u.UserId == userId, cancellationToken);
 
     #endregion
 

@@ -150,9 +150,9 @@ public class CustomStepsService
         // Check if user can delete this custom step (must be personal owner AND not part of any project)
         if (!await authorizationService.CanDeleteCustomStepAsync(id))
         {
-            // Check if it's because the step is part of a project
-            var isPartOfProject = await dataContext.ProjectCustomSteps
-                .AnyAsync(pcs => pcs.CustomStepId == id);
+            // Only the step's own user is told a project blocks the delete; everyone else gets the usual refusal.
+            var isPartOfProject = await authorizationService.HasPersonalCustomStepAccessAsync(id)
+                && await dataContext.ProjectCustomSteps.AnyAsync(pcs => pcs.CustomStepId == id);
 
             if (isPartOfProject)
             {
