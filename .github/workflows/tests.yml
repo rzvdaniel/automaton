@@ -46,6 +46,7 @@ jobs:
       - name: Test
         run: >
           dotnet test src/UnitTests/Automaton.${{ matrix.project }}.Tests
+          -p:WarningsAsErrors=NU1902%3BNU1903%3BNU1904
           --logger "console;verbosity=minimal"
 
   scripts:
