@@ -28,7 +28,12 @@ done
 backup_root="$install_dir/backups/nightly"
 config_dir=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" | cut -d= -f2-)
 config_dir=${config_dir:-/etc/automaton}
-age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2- || true)
+if grep -q '^AGE_IMAGE=' "$install_dir/release.env"; then
+    age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
+    [[ -n "$age_image" ]] || { echo 'The release manifest has an empty age image.' >&2; exit 1; }
+else
+    age_image=''
+fi
 recipient_file="$config_dir/backup-recipient"
 identity_file="$config_dir/secrets/backup-key"
 status_dir="$config_dir/status"
