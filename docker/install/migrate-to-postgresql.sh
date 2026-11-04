@@ -123,6 +123,16 @@ if [[ -e "$override" || -L "$override" ]]; then
 fi
 old_compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml" "${extra[@]}")
 pointer="$install_dir/.postgresql-migration"
+# A resumed finish can find the installed files halfway through replacement. Recovery modes
+# resolve the old project and MySQL volume from the verified pre-switch manifest instead.
+if [[ "$mode" == finish || "$mode" == rollback ]]; then
+    saved_recovery=${recovery_arg:-$(cat "$pointer" 2>/dev/null || true)}
+    if [[ -f "$saved_recovery/release.env" && -f "$saved_recovery/compose.yaml" && -f "$saved_recovery/.env" ]]; then
+        recovery_extra=()
+        [[ ! -f "$saved_recovery/compose.override.yaml" ]] || recovery_extra=(-f "$saved_recovery/compose.override.yaml")
+        old_compose=(docker compose --project-directory "$install_dir" --env-file "$saved_recovery/release.env" --env-file "$saved_recovery/.env" -f "$saved_recovery/compose.yaml" "${recovery_extra[@]}")
+    fi
+fi
 
 # ---- rollback ----------------------------------------------------------------------------------------------------------
 
@@ -295,7 +305,7 @@ else bundle_args="--version $version"; fi
 for file in release.env compose.yaml version update.sh install.sh configure.py migrate-to-postgresql.sh mysql_to_postgres.py migration_app_check.py; do
     [[ -f "$bundle/$file" ]] || { echo "The release bundle is incomplete: $file is missing. Use a release that includes the migration." >&2; exit 1; }
 done
-cmp -s "$bundle/migrate-to-postgresql.sh" "${BASH_SOURCE[0]}" || echo "Note: this script differs from the one in the release bundle; the bundle's copy is the one installed for --rollback." >&2
+cmp -s "$bundle/migrate-to-postgresql.sh" "${BASH_SOURCE[0]}" || echo 'Note: the executing migration script differs from the release bundle; it will remain installed for --finish and --rollback.' >&2
 grep -q '^POSTGRES_IMAGE=' "$bundle/release.env" && ! grep -q '^MYSQL_IMAGE=' "$bundle/release.env" || { echo 'This release does not run on PostgreSQL.' >&2; exit 1; }
 # --finish uses the checked copy saved before downtime, even when the caller omits the original path.
 if [[ "$mode" == finish && -z "$postgres_override_arg" ]]; then
@@ -332,7 +342,9 @@ for service in config.get("services", {}).values():
     if isinstance(environment, list):
         environment = dict(item.split("=", 1) for item in environment if "=" in item)
     for key, value in environment.items():
-        if re.search(r"mysqlconnection", key, re.I) or re.search(r"mysql://|(?:server|host)\s*=\s*mysql(?:[;:/]|$)", str(value), re.I):
+        if (re.search(r"mysqlconnection", key, re.I)
+                or (re.search(r"connectionstring|database_url", key, re.I) and re.search(r"mysql", str(value), re.I))
+                or re.search(r"mysql://|(?:server|host)\s*=\s*mysql(?:[.;:/-]|$)", str(value), re.I)):
             raise SystemExit("The PostgreSQL override contains a MySQL connection string.")
 '
 old_services=$("${old_compose[@]}" config --services | tr '\n' ' ')
@@ -423,9 +435,12 @@ finish_switch() {
     install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
     [[ ! -f "$recovery/postgres-override.yaml" ]] || install -m 0644 "$recovery/postgres-override.yaml" "$override"
     install -m 0644 "$bundle/version" "$install_dir/version"
-    for script in update.sh install.sh backup.sh restore.sh migrate-to-postgresql.sh; do
+    for script in update.sh install.sh backup.sh restore.sh; do
         [[ ! -f "$bundle/$script" ]] || install -m 0700 "$bundle/$script" "$install_dir/$script"
     done
+    if ! cmp -s "${BASH_SOURCE[0]}" "$install_dir/migrate-to-postgresql.sh"; then
+        install -m 0700 "${BASH_SOURCE[0]}" "$install_dir/migrate-to-postgresql.sh"
+    fi
     echo 'Stopping MySQL (its data stays for rollback) and setting its credentials aside.'
     docker stop "$mysql_container" >/dev/null
     install -d -m 0700 "$config_dir/pre-postgresql"
@@ -539,7 +554,9 @@ echo "Recovery data: $recovery"
 set_state started
 # From here on a rollback is possible whatever happens, so the pointer and the script exist before anything is stopped.
 printf '%s\n' "$recovery" > "$pointer"
-install -m 0700 "$bundle/migrate-to-postgresql.sh" "$install_dir/migrate-to-postgresql.sh"
+if ! cmp -s "${BASH_SOURCE[0]}" "$install_dir/migrate-to-postgresql.sh"; then
+    install -m 0700 "${BASH_SOURCE[0]}" "$install_dir/migrate-to-postgresql.sh"
+fi
 if ((! rehearsal)); then
     echo 'Pulling the release images and the copy tool now, so the downtime does not wait for the network.'
     "${new_compose[@]}" pull postgres "${application_services[@]}"

@@ -156,6 +156,13 @@ elif args[0] == 'inspect':
         self.assertIn('MySQL connection string', result.stderr)
         self.assertFalse(any(args[0] == 'run' for args in self.calls()))
 
+    def test_mysql_hostname_in_generic_connection_is_refused_before_loader(self):
+        self.postgres_override.write_text(json.dumps({'services': {'api': {'environment': {
+            'ConnectionStrings__Default': 'Server=mysql.internal;Database=automaton'}}}}))
+        result = self.run_plan()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('MySQL connection string', result.stderr)
+
     def test_legacy_allow_override_cannot_carry_mysql_into_postgres(self):
         result = subprocess.run(['bash', str(SCRIPT), '--plan', '--rehearsal', '--skip-app-check',
                                  '--allow-override', '--bundle-dir', str(self.bundle),
@@ -173,6 +180,7 @@ elif args[0] == 'inspect':
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.old_override.read_bytes(), self.postgres_override.read_bytes())
         self.assertIn('Migrated to PostgreSQL', result.stdout)
+        self.assertEqual((self.install / 'migrate-to-postgresql.sh').read_bytes(), SCRIPT.read_bytes())
         recovery, = (self.install / 'backups').iterdir()
         self.assertIn('mysql_volume_name=scratch_external_mysql', (recovery / 'NOTES').read_text())
         self.assertEqual((recovery / 'STATE').read_text().strip(), 'complete')
@@ -208,10 +216,11 @@ elif args[0] == 'inspect':
             for name in ('release.env', 'compose.yaml', '.env', 'compose.override.yaml', 'config.tar.gz', 'postgres-override.yaml'):
                 sums.write(f'{hashlib.sha256((recovery / name).read_bytes()).hexdigest()}  {name}\n')
         (self.install / '.postgresql-migration').write_text(str(recovery))
+        shutil.copy2(SCRIPT, self.install / 'migrate-to-postgresql.sh')
         return recovery
 
     def rollback(self):
-        return subprocess.run(['bash', str(SCRIPT), '--rollback', '--rehearsal', '--confirm', 'example.invalid',
+        return subprocess.run(['bash', str(self.install / 'migrate-to-postgresql.sh'), '--rollback', '--rehearsal', '--confirm', 'example.invalid',
                                '--install-dir', str(self.install), '--config-dir', str(self.config)],
                               env=self.env, capture_output=True, text=True)
 
@@ -228,7 +237,7 @@ elif args[0] == 'inspect':
         with (recovery / 'NOTES').open('a') as notes:
             notes.write('postgres_override_saved=1\n')
         (recovery / 'postgres-override.yaml').unlink()
-        finish = subprocess.run(['bash', str(SCRIPT), '--finish', '--rehearsal', '--skip-app-check',
+        finish = subprocess.run(['bash', str(self.install / 'migrate-to-postgresql.sh'), '--finish', '--rehearsal', '--skip-app-check',
                                  '--bundle-dir', str(self.bundle), '--install-dir', str(self.install),
                                  '--config-dir', str(self.config)], env=self.env, capture_output=True, text=True)
         self.assertNotEqual(finish.returncode, 0)
@@ -238,11 +247,14 @@ elif args[0] == 'inspect':
     def test_finish_installs_postgres_override_and_completed_rollback_restores_mysql_override(self):
         recovery = self.prepare_switched_recovery()
         original_override = self.old_override.read_text()
-        finish = subprocess.run(['bash', str(SCRIPT), '--finish', '--rehearsal', '--skip-app-check',
+        # An interrupted file install left a PostgreSQL env with the old MySQL Compose file.
+        (self.install / 'release.env').write_bytes((self.bundle / 'release.env').read_bytes())
+        finish = subprocess.run(['bash', str(self.install / 'migrate-to-postgresql.sh'), '--finish', '--rehearsal', '--skip-app-check',
                                  '--bundle-dir', str(self.bundle), '--install-dir', str(self.install),
                                  '--config-dir', str(self.config)], env=self.env, capture_output=True, text=True)
         self.assertEqual(finish.returncode, 0, finish.stdout + finish.stderr)
         self.assertEqual(self.old_override.read_bytes(), self.postgres_override.read_bytes())
+        self.assertEqual((self.install / 'migrate-to-postgresql.sh').read_bytes(), SCRIPT.read_bytes())
         self.assertEqual((recovery / 'STATE').read_text().strip(), 'complete')
         rollback = self.rollback()
         self.assertEqual(rollback.returncode, 0, rollback.stdout + rollback.stderr)
