@@ -29,8 +29,14 @@ function* markdownFiles(entry) {
 }
 
 const withoutCode = text => text.replace(/^(```|~~~)[\s\S]*?^\1.*$/gm, '').replace(/`[^`\n]*`/g, '')
-const slug = heading => heading.trim().toLowerCase()
-  .replace(/<[^>]+>/g, '').replace(/[`*_]/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s/g, '-')
+// Remove inline HTML tags until none are left, so nested or split tags cannot survive a single pass.
+const stripTags = text => {
+  let previous
+  do { previous = text; text = text.replace(/<[^<>]*>/g, '') } while (text !== previous)
+  return text
+}
+const slug = heading => stripTags(heading.trim().toLowerCase())
+  .replace(/[`*_]/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s/g, '-')
 
 const anchorCache = new Map()
 function anchorsOf(file) {
