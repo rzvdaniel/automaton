@@ -16,6 +16,10 @@ Have a domain you can configure, a certificate notification email, sudo access, 
 | `apps.example.com` | Published app routing |
 | `*.apps.example.com` | Your deployed apps, one hostname each |
 
+As a shorter setup, add DNS-only wildcard records for `*.example.com` and `*.apps.example.com` pointing to the server. If `apps.example.com` does not resolve, add an explicit record for it as well. Standard wildcard DNS can leave this parent name without an address when the nested wildcard exists. Existing records at an exact hostname take precedence, so check them too.
+
+The installer checks all four hostnames and a generated name under `*.apps.example.com` before starting the stack. For a server behind NAT, pass `--public-ip ADDRESS` with the public address used by DNS. Repeat the option if you publish both IPv4 and IPv6.
+
 Measured on 3 November 2026 (release 0.2.0): a Hetzner CPX22 (2 vCPU, 4 GB RAM, 80 GB disk) runs the server and a Runner for small apps, at €24.19 a month including VAT. The installer finished in 90 seconds, and a first public app was live about 10 minutes after the server was created. At idle with one small app, everything used about 1.2 GB of memory.
 
 Before you start, check three things that cost time in that run:

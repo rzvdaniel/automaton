@@ -55,6 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/tests/mysql-to-postgres-conversion-test.py
+      - run: python3 scripts/tests/server-install-dns-test.py
       - run: bash -n docker/install/migrate-to-postgresql.sh
 
   studio:

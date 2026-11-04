@@ -11,11 +11,13 @@ version=''
 tls_mode=http
 configure_only=false
 status_only=false
+public_ips=()
 bundle_dir="${AUTOMATON_RELEASE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 [[ -f "$bundle_dir/configure.py" ]] || bundle_dir="$bundle_dir/../docker/install"
 while (($#)); do
     case "$1" in
         --domain) domain="${2:?Missing domain}"; shift 2 ;;
+        --public-ip) public_ips+=("${2:?Missing public IP}"); shift 2 ;;
         --email) email="${2:?Missing email}"; shift 2 ;;
         --tls-mode) tls_mode="${2:?Missing TLS mode}"; shift 2 ;;
         --version) version="${2:?Missing release tag}"; shift 2 ;;
@@ -24,7 +26,7 @@ while (($#)); do
         --install-docker) shift ;; # Accepted for commands written before Docker installation became automatic.
         --configure-only) configure_only=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically if missing. Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically if missing. Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -160,6 +162,9 @@ if ! $configure_only && [[ ! -f "$install_dir/release.env" ]]; then
 fi
 [[ -n "$domain" ]] || read -r -p 'Base domain (example.com): ' domain
 [[ -n "$email" ]] || read -r -p 'Certificate notification email: ' email
+if ! $configure_only && [[ -f "$bundle_dir/check_dns.py" ]]; then
+    python3 "$bundle_dir/check_dns.py" "$domain" "${public_ips[@]}"
+fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
 import re, sys
