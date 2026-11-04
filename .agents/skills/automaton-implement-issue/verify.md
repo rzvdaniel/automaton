@@ -61,13 +61,14 @@ and what you could not check.
 Proof on the PR: attach one HTML artifact named `proof` to the PR (GitHub issue artifacts; a PR is an issue):
 
 ```bash
-gh api -X POST repos/rzvdaniel/automaton/issues/<N>/artifacts   -f name=proof -f type=embedded_html -f body=@proof.html
+gh api -X POST repos/rzvdaniel/automaton/issues/<N>/artifacts -f name=proof -f type=embedded_html -F body=@proof.html
 ```
 
-It lists each done criterion from the issue, the evidence for it (the command and what came back, or a screenshot)
-and pass, fail or not checked with the reason. Update it by deleting it
-(`gh api -X DELETE .../issues/<N>/artifacts/<number>`) and creating it again. Add a `link` artifact to the issue that
-points to the PR. Artifact types are `generic` (Markdown), `link`, `plan` and `embedded_html`.
+It lists each done criterion from the issue, the evidence for it (the command and what came back, or a screenshot) and
+pass, fail or not checked with the reason. To update it, delete it and create it again; the artifact `number` is in
+the create response and in `gh api repos/rzvdaniel/automaton/issues/<N>/artifacts`, and `gh api -X DELETE
+repos/rzvdaniel/automaton/issues/<N>/artifacts/<number>` removes it. Add a `link` artifact to the issue that points to
+the PR. Artifact types are `generic` (Markdown), `link`, `plan` and `embedded_html`.
 
 Screenshots: GitHub has no image upload API, so push them to the orphan branch `pr-screenshots` under `pr-<N>/`
 (create the branch with `git switch --orphan pr-screenshots` if it does not exist; never merge it) and embed them in
