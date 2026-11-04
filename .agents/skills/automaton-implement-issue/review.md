@@ -10,5 +10,7 @@ Spawn a fresh, read-only subagent with no stake in the change. Give it:
 
 Ask for findings ranked by severity (high, medium, low), each with the file, line and a concrete failure case.
 
+Post the result as a formal GitHub review, as the [PR review](../pr-review/SKILL.md) skill describes.
+
 Fix every confirmed finding above low. Take product questions to the owner. Review once more after fixing. After two
 rounds, stop: list anything left in the PR and the handoff instead of looping.
