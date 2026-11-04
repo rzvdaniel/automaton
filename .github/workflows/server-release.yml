@@ -163,6 +163,7 @@ jobs:
           sudo python3 scripts/tests/server-installer-config-test.py
           sudo python3 scripts/tests/server-updater-test.py
           python3 scripts/tests/mysql-to-postgres-conversion-test.py
+          python3 scripts/tests/postgres-migration-override-test.py
           bash -n automaton-server/migrate-to-postgresql.sh
           sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-install-smoke.sh "$PWD/automaton-server"
       - name: Package release

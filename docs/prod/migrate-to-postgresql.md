@@ -2,7 +2,7 @@
 
 Servers installed before PostgreSQL (their `release.env` has a `MYSQL_IMAGE` line) keep their data in MySQL. Releases that run on PostgreSQL are not applied to them until the data has been moved once. `migrate-to-postgresql.sh` does that: it copies every table, checks the copy, and switches the installation over. The MySQL volume is never modified, so you can go back.
 
-This page covers the standard installation made by `install.sh`. A server with a hand-written Compose layout (such as an adopted production server) needs the script checked against its service and volume names first; do not run it there unreviewed. An installation with a `compose.override.yaml` needs `--allow-override` after you have checked that the override sets no database connection and mentions no MySQL service.
+This page covers the standard installation made by `install.sh`. An adopted installation needs a rehearsal with its service, network and volume names before migration. If its `compose.override.yaml` contains the MySQL service, supply a separate `--postgres-override FILE` for the PostgreSQL stack. The original override remains in use for reading MySQL. An override that works unchanged on both stacks can still be used with `--allow-override` after review.
 
 ## Before you start
 
@@ -14,6 +14,14 @@ This page covers the standard installation made by `install.sh`. A server with a
 - **Rehearse first.** Restore a recent backup onto a scratch machine (or a second Compose project name with `--rehearsal`, never on the real server) and run the whole migration there. The copy converts and checks every row only while the services are down, so a problem in your data (text PostgreSQL cannot store, a column that exists only in MySQL and holds data) shows up during the real downtime otherwise. It is safe, since the script then returns to MySQL, but it costs the window.
 
 ## Run it
+
+### Adopted installations
+
+Prepare a PostgreSQL Compose override that retains the installation's external volumes, networks, service ports and other required settings, but contains no `mysql` service or MySQL connection string. Give its path with `--postgres-override FILE` on the plan and run commands. The script checks that FILE is a regular file, validates the resolved PostgreSQL Compose configuration and rejects MySQL configuration before stopping any service. It uses the existing `compose.override.yaml` for MySQL operations and the new file for schema creation and the PostgreSQL stack.
+
+The script resolves the source MySQL volume through Compose, including an external volume with a custom name. It refuses an existing PostgreSQL data volume so the copy cannot overwrite an earlier migration.
+
+The recovery backup saves both overrides. `--finish` uses the saved PostgreSQL copy even if the original FILE path is unavailable; on completion it installs that copy as `compose.override.yaml`. `--rollback`, including after completion, restores the original override before restarting MySQL. Rehearse the full run, finish and rollback against a scratch Compose project with the same external resource layout before using these options on production.
 
 ```bash
 curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/docker/install/migrate-to-postgresql.sh -o migrate-to-postgresql.sh

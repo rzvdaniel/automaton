@@ -7,6 +7,7 @@
 #   migrate-to-postgresql.sh --rollback                          go back to the MySQL installation
 #
 # --version downloads and verifies the release bundle; --bundle-dir DIR uses an extracted, verified one instead.
+# --postgres-override FILE uses a separate Compose override after the switch; the installed override remains MySQL's.
 # Run it in tmux or screen. See docs/prod/migrate-to-postgresql.md.
 #
 # Until the new stack is started the old installation is only stopped and its configuration patched (and saved first); the MySQL
@@ -28,6 +29,7 @@ discard_in_flight=0
 rehearsal=0
 skip_app_check=0
 allow_override=0
+postgres_override_arg=''
 recovery_arg=''
 python_image=python:3.12-slim
 loader_packages=(pymysql==1.1.1 cryptography==43.0.3 'psycopg[binary]==3.2.3')
@@ -50,6 +52,7 @@ while (($#)); do
         --discard-in-flight) discard_in_flight=1; shift ;;
         --skip-app-check) skip_app_check=1; shift ;;
         --allow-override) allow_override=1; shift ;;
+        --postgres-override) postgres_override_arg="${2:?Missing PostgreSQL override file}"; shift 2 ;;
         --rehearsal) rehearsal=1; shift ;;
         --help) sed -n '2,15p' "$0"; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
@@ -112,8 +115,8 @@ override="$install_dir/compose.override.yaml"
 extra=()
 if [[ -e "$override" || -L "$override" ]]; then
     [[ -f "$override" && ! -L "$override" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
-    if ((! allow_override)) && [[ "$mode" != rollback ]]; then
-        echo "This installation has a Compose override ($override). It would be applied to the PostgreSQL stack too; make sure it sets no database connection and refers to no MySQL service, then repeat with --allow-override." >&2
+    if ((! allow_override)) && [[ -z "$postgres_override_arg" && "$mode" != rollback && "$mode" != finish ]]; then
+        echo "This installation has a Compose override ($override). Supply --postgres-override FILE for the PostgreSQL stack, or review this override and repeat with --allow-override." >&2
         exit 1
     fi
     extra=(-f "$override")
@@ -141,7 +144,13 @@ restore_mysql_stack() {
     else
         old_dir=$install_dir   # no backup was made yet, so nothing was changed; the live files are the old ones
     fi
-    local restore_compose=(docker compose --project-name "$project" --project-directory "$install_dir" --env-file "$old_dir/release.env" --env-file "$old_dir/.env" -f "$old_dir/compose.yaml" "${extra[@]}")
+    local restore_extra=()
+    if ((full)); then
+        [[ ! -f "$old_dir/compose.override.yaml" ]] || restore_extra=(-f "$old_dir/compose.override.yaml")
+    else
+        restore_extra=("${extra[@]}")
+    fi
+    local restore_compose=(docker compose --project-name "$project" --project-directory "$install_dir" --env-file "$old_dir/release.env" --env-file "$old_dir/.env" -f "$old_dir/compose.yaml" "${restore_extra[@]}")
     echo 'Stopping the PostgreSQL services.'
     docker rm -f "$project-migration-schema" >/dev/null 2>&1 || true
     "${restore_compose[@]}" stop api worker >/dev/null 2>&1 || true
@@ -160,7 +169,9 @@ restore_mysql_stack() {
     if [[ -n "$postgres" ]]; then try docker rm -f $postgres; fi
     if ((full)); then
         if grep -Fxq 'postgres_volume_created=1' "$recovery/NOTES" 2>/dev/null; then
-            try docker volume rm -f "${project}_postgres-data"
+            local postgres_volume_name
+            postgres_volume_name=$(sed -n 's/^postgres_volume_name=//p' "$recovery/NOTES" | head -n 1)
+            try docker volume rm -f "${postgres_volume_name:-${project}_postgres-data}"
         fi
         echo 'Restoring the previous configuration.'
         (cd "$recovery" && sha256sum -c --quiet SHA256SUMS) || { echo 'The recovery data failed its checksum verification.' >&2; failed=1; }
@@ -174,9 +185,19 @@ restore_mysql_stack() {
         for file in release.env compose.yaml .env version update.sh install.sh backup.sh restore.sh; do
             if [[ -f "$old_dir/$file" ]]; then try install -m "$(stat -c %a "$old_dir/$file")" "$old_dir/$file" "$install_dir/$file"; fi
         done
+        if [[ -f "$old_dir/compose.override.yaml" ]]; then
+            try install -m "$(stat -c %a "$old_dir/compose.override.yaml")" "$old_dir/compose.override.yaml" "$override"
+        elif [[ -f "$override" ]]; then
+            try rm -f -- "$override"
+        fi
     fi
     echo 'Starting the MySQL services.'
-    if ((full)) && [[ -z "$(docker volume ls -q --filter "name=^${project}_mysql-data$")" ]]; then
+    local source_volume=${mysql_volume_name:-}
+    if [[ -z "$source_volume" && -f "$recovery/NOTES" ]]; then
+        source_volume=$(sed -n 's/^mysql_volume_name=//p' "$recovery/NOTES" | head -n 1)
+    fi
+    source_volume=${source_volume:-${project}_mysql-data} # recovery data from older migrations used this name
+    if ((full)) && [[ -z "$(docker volume ls -q --filter "name=^${source_volume}$")" ]]; then
         echo 'The MySQL volume is gone; recreating it from the recovery dump.'
         try "${restore_compose[@]}" up -d --wait --wait-timeout 300 mysql
         zcat "$old_dir/mysql.sql.gz" | "${restore_compose[@]}" exec -T mysql sh -c 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password) mysql -uroot --default-character-set=utf8mb4 automaton' || { echo 'Step failed: loading the MySQL dump' >&2; failed=1; }
@@ -276,7 +297,44 @@ for file in release.env compose.yaml version update.sh install.sh configure.py m
 done
 cmp -s "$bundle/migrate-to-postgresql.sh" "${BASH_SOURCE[0]}" || echo "Note: this script differs from the one in the release bundle; the bundle's copy is the one installed for --rollback." >&2
 grep -q '^POSTGRES_IMAGE=' "$bundle/release.env" && ! grep -q '^MYSQL_IMAGE=' "$bundle/release.env" || { echo 'This release does not run on PostgreSQL.' >&2; exit 1; }
-new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$install_dir/.env" -f "$bundle/compose.yaml" "${extra[@]}")
+# --finish uses the checked copy saved before downtime, even when the caller omits the original path.
+if [[ "$mode" == finish && -z "$postgres_override_arg" ]]; then
+    saved_recovery=${recovery_arg:-$(cat "$pointer" 2>/dev/null || true)}
+    if grep -Fxq 'postgres_override_saved=1' "$saved_recovery/NOTES" 2>/dev/null && [[ ! -f "$saved_recovery/postgres-override.yaml" ]]; then
+        echo 'The saved PostgreSQL override is missing from recovery data.' >&2; exit 1
+    fi
+    [[ -z "$saved_recovery" || ! -f "$saved_recovery/postgres-override.yaml" ]] || postgres_override_arg="$saved_recovery/postgres-override.yaml"
+fi
+postgres_extra=("${extra[@]}")
+if [[ -n "$postgres_override_arg" ]]; then
+    [[ -f "$postgres_override_arg" && ! -L "$postgres_override_arg" ]] || { echo 'The PostgreSQL override must be a regular, non-symlink file.' >&2; exit 1; }
+    if [[ "$mode" == finish ]]; then
+        saved_recovery=${recovery_arg:-$(cat "$pointer" 2>/dev/null || true)}
+        [[ -f "$saved_recovery/postgres-override.yaml" ]] || { echo 'The saved PostgreSQL override is missing from recovery data.' >&2; exit 1; }
+        (cd "$saved_recovery" && sha256sum -c --quiet SHA256SUMS) || { echo 'The recovery data failed its checksum verification.' >&2; exit 1; }
+        cmp -s "$postgres_override_arg" "$saved_recovery/postgres-override.yaml" || { echo 'The PostgreSQL override differs from the saved migration copy.' >&2; exit 1; }
+        postgres_override_arg="$saved_recovery/postgres-override.yaml"
+    else
+        cp -p -- "$postgres_override_arg" "$working/postgres-override.yaml"
+        postgres_override_arg="$working/postgres-override.yaml"
+    fi
+    postgres_extra=(-f "$postgres_override_arg")
+fi
+new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$install_dir/.env" -f "$bundle/compose.yaml" "${postgres_extra[@]}")
+# Validate the resolved stack without showing environment values or secrets.
+"${new_compose[@]}" config --format json | python3 -c '
+import json, re, sys
+config = json.load(sys.stdin)
+if any(name.lower() == "mysql" for name in config.get("services", {})):
+    raise SystemExit("The PostgreSQL override adds a mysql service.")
+for service in config.get("services", {}).values():
+    environment = service.get("environment", {})
+    if isinstance(environment, list):
+        environment = dict(item.split("=", 1) for item in environment if "=" in item)
+    for key, value in environment.items():
+        if re.search(r"mysqlconnection", key, re.I) or re.search(r"mysql://|(?:server|host)\s*=\s*mysql(?:[;:/]|$)", str(value), re.I):
+            raise SystemExit("The PostgreSQL override contains a MySQL connection string.")
+'
 old_services=$("${old_compose[@]}" config --services | tr '\n' ' ')
 new_services=$("${new_compose[@]}" config --services | tr '\n' ' ')
 [[ " $new_services " == *' postgres '* ]] || { echo 'The Compose files do not match a MySQL to PostgreSQL migration.' >&2; exit 1; }
@@ -287,6 +345,19 @@ for service in $new_services; do
     [[ " postgres rabbitmq traefik mysql " == *" $service "* ]] || application_services+=("$service")
 done
 project=$(project_name)
+# Compose resolves an external MySQL volume to its actual name; it need not be <project>_mysql-data.
+mysql_volume_name=$("${old_compose[@]}" config --format json | python3 -c '
+import json, sys
+config = json.load(sys.stdin)
+mounts = config.get("services", {}).get("mysql", {}).get("volumes", [])
+source = next((mount.get("source") for mount in mounts if mount.get("type") == "volume" and mount.get("target") == "/var/lib/mysql"), None)
+print(config.get("volumes", {}).get(source, {}).get("name", source or ""))
+')
+if [[ "$mode" == finish && -z "$mysql_volume_name" ]]; then
+    saved_recovery=${recovery_arg:-$(cat "$pointer" 2>/dev/null || true)}
+    mysql_volume_name=$(sed -n 's/^mysql_volume_name=//p' "$saved_recovery/NOTES" | head -n 1)
+fi
+[[ -n "$mysql_volume_name" ]] || { echo 'Could not resolve the MySQL data volume.' >&2; exit 1; }
 mysql_container=$(docker ps -aq --filter "label=com.docker.compose.project=$project" --filter 'label=com.docker.compose.service=mysql' | head -n 1)
 [[ -n "$mysql_container" ]] || { echo 'The MySQL container was not found; repair the installation first.' >&2; exit 1; }
 if [[ "$mode" != finish ]]; then
@@ -350,6 +421,7 @@ finish_switch() {
     echo 'Installing the release files.'
     install -m 0600 "$bundle/release.env" "$install_dir/release.env"
     install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
+    [[ ! -f "$recovery/postgres-override.yaml" ]] || install -m 0644 "$recovery/postgres-override.yaml" "$override"
     install -m 0644 "$bundle/version" "$install_dir/version"
     for script in update.sh install.sh backup.sh restore.sh migrate-to-postgresql.sh; do
         [[ ! -f "$bundle/$script" ]] || install -m 0700 "$bundle/$script" "$install_dir/$script"
@@ -373,7 +445,7 @@ finish_switch() {
 Migrated to PostgreSQL (API and Worker were down for about ${downtime:-?}s, counting from the stop). Recovery data (keep until you are sure): $recovery
   - return to MySQL:  sudo bash $install_dir/migrate-to-postgresql.sh --rollback --install-dir $install_dir --config-dir $config_dir --confirm $domain
     (this loses everything written since the switch)
-  - when satisfied, remove the old database: docker rm $mysql_container; docker volume rm ${project}_mysql-data
+  - when satisfied, remove the old database: docker rm $mysql_container; docker volume rm $mysql_volume_name
 EOF
 }
 
@@ -431,8 +503,16 @@ if [[ -f "$pointer" ]]; then
         *) echo "An earlier migration was interrupted (recovery data $existing, state $(cat "$existing/STATE")). Run --rollback first." >&2; exit 1 ;;
     esac
 fi
-if grep -q 'PostgreSqlConnection' "$config_dir/appsettings.Production.json" || [[ -n "$(docker volume ls -q --filter "name=^${project}_postgres-data$")" ]]; then
-    echo "A PostgreSQL volume or connection string already exists in this installation. Remove ${project}_postgres-data (after checking it holds nothing you need) or finish the earlier migration; nothing was changed." >&2
+postgres_volume_name=$("${new_compose[@]}" config --format json | python3 -c '
+import json, sys
+config = json.load(sys.stdin)
+mounts = config.get("services", {}).get("postgres", {}).get("volumes", [])
+source = next((mount.get("source") for mount in mounts if mount.get("type") == "volume" and mount.get("target") == "/var/lib/postgresql/data"), None)
+print(config.get("volumes", {}).get(source, {}).get("name", source or ""))
+')
+[[ -n "$postgres_volume_name" ]] || { echo 'Could not resolve the PostgreSQL data volume.' >&2; exit 1; }
+if grep -q 'PostgreSqlConnection' "$config_dir/appsettings.Production.json" || [[ -n "$(docker volume ls -q --filter "name=^${postgres_volume_name}$")" ]]; then
+    echo "A PostgreSQL volume or connection string already exists in this installation. Check $postgres_volume_name or finish the earlier migration; nothing was changed." >&2
     exit 1
 fi
 require_check_credentials
@@ -450,12 +530,12 @@ if [[ -z "$confirm" ]]; then
     read -r -p "Type the server domain ($domain) to start the migration: " confirm
 fi
 [[ "$confirm" == "$domain" ]] || { echo 'Confirmation did not match; nothing was changed.' >&2; exit 1; }
-[[ -n "$(docker volume ls -q --filter "name=^${project}_mysql-data$")" ]] || { echo 'The MySQL data volume was not found.' >&2; exit 1; }
+[[ -n "$(docker volume ls -q --filter "name=^${mysql_volume_name}$")" ]] || { echo "The MySQL data volume ($mysql_volume_name) was not found." >&2; exit 1; }
 
 install -d -m 0700 "$backup_root"
 recovery=$(mktemp -d "$backup_root/mysql-to-postgresql-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
 echo "Recovery data: $recovery"
-{ echo 'postgres_volume_created=1'; echo "bundle_version=$(cat "$bundle/version")"; } > "$recovery/NOTES"
+{ echo 'postgres_volume_created=1'; echo "postgres_volume_name=$postgres_volume_name"; echo "mysql_volume_name=$mysql_volume_name"; [[ -z "$postgres_override_arg" ]] || echo 'postgres_override_saved=1'; echo "bundle_version=$(cat "$bundle/version")"; } > "$recovery/NOTES"
 set_state started
 # From here on a rollback is possible whatever happens, so the pointer and the script exist before anything is stopped.
 printf '%s\n' "$recovery" > "$pointer"
@@ -490,6 +570,11 @@ echo 'Creating the verified recovery backup.'
 cp -p "$install_dir/release.env" "$install_dir/compose.yaml" "$install_dir/.env" "$recovery/"
 for file in version update.sh install.sh backup.sh restore.sh; do [[ ! -f "$install_dir/$file" ]] || cp -p "$install_dir/$file" "$recovery/$file"; done
 [[ ! -f "$override" ]] || cp -p "$override" "$recovery/compose.override.yaml"
+[[ -z "$postgres_override_arg" ]] || cp -p "$postgres_override_arg" "$recovery/postgres-override.yaml"
+if [[ -n "$postgres_override_arg" ]]; then
+    postgres_override_arg="$recovery/postgres-override.yaml"
+    new_compose[-1]="$postgres_override_arg"
+fi
 tar -C "$(dirname "$config_dir")" -czf "$recovery/config.tar.gz" "$(basename "$config_dir")"
 docker cp "$("${old_compose[@]}" ps -aq api):/app/data-protection-keys/." - | gzip > "$recovery/api-keys.tar.gz"
 docker cp "$("${old_compose[@]}" ps -aq worker):/app/data-protection-keys/." - | gzip > "$recovery/worker-keys.tar.gz"
@@ -500,7 +585,7 @@ gzip -t "$recovery/mysql.sql.gz"
 expected_tables=$("${old_compose[@]}" exec -T mysql sh -c 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password) mysql -uroot -N -e "select count(*) from information_schema.tables where table_schema=\"automaton\" and table_type=\"BASE TABLE\""' < /dev/null 2>/dev/null)
 [[ "$expected_tables" =~ ^[0-9]+$ && "$expected_tables" -gt 0 ]] || { echo 'Could not count the MySQL tables.' >&2; false; }
 (( $(zcat "$recovery/mysql.sql.gz" | grep -c '^CREATE TABLE') == expected_tables )) || { echo 'The MySQL dump does not contain every table.' >&2; false; }
-(cd "$recovery" && sha256sum release.env compose.yaml .env config.tar.gz config-files.txt api-keys.tar.gz worker-keys.tar.gz api-data.tar.gz mysql.sql.gz before.json > SHA256SUMS)
+(cd "$recovery" && sha256sum release.env compose.yaml .env config.tar.gz config-files.txt api-keys.tar.gz worker-keys.tar.gz api-data.tar.gz mysql.sql.gz before.json ${extra:+compose.override.yaml} ${postgres_override_arg:+postgres-override.yaml} > SHA256SUMS)
 (cd "$recovery" && sha256sum -c --quiet SHA256SUMS)
 set_state backed-up
 
