@@ -18,6 +18,6 @@ Steps 1–3 can run in parallel; step 3 links to step 1's pages. Step 4 starts w
 
 1. **Documentation** (#628). Task pages with one source per topic (install, first administrator, Runner, deploy, update, backup and restore, secrets), `/llms.txt` and `/llms-full.txt` generated from the docs at website build, `scripts/check-doc-links.mjs` in CI, historical architecture plans archived. Implemented in the PR for #628 (pending review). Not yet done: a measured install-to-app timing page (#629) and an end-to-end run by an agent given only `llms.txt`.
 2. **Website** (#629). Remove outdated content, simplify, and show the measured install-to-app path.
-3. **README** (#630). About one screen, quickstart with exact commands, links to the docs.
+3. **README** (#630). About one screen, quickstart with exact commands, links to the docs. Implemented in the PR for #630 (pending review).
 4. **Studio** (#631). Audit, simpler information architecture, redesign matching the website, agent-friendly.
 5. **Update from Studio and the CLI** (#632). Root path unit triggered by the API, `automaton server update --wait`, an Update button in Studio. Implemented in the PR for #632 (pending owner approval and a real-server test); automatic patch updates are a follow-up.

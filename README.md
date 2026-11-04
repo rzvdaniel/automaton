@@ -1,95 +1,68 @@
 # Automaton
 
-**Build with AI. Deploy on your own server.**
+Automaton is a self-hosted platform where you or your AI agent build, deploy and share small web apps and automations on servers you control.
 
-Automaton is an open-source platform for deploying web apps, APIs and Actions on infrastructure you control. Build locally with your preferred coding agent, deploy with the CLI, and manage apps in Studio.
+## Who it is for
 
-[Website](https://automaton.monster) · [Install guide](docs/prod/install-automaton.md) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [App documentation](https://automaton.monster/docs/) · [Example apps](https://github.com/rzvdaniel/automaton-apps)
+**Fits** if you:
+- build many small apps, tools or automations, often with an AI coding agent;
+- want them on servers you control, at a cost set by the servers you rent;
+- are comfortable owning a Linux server (updates, backups, being on call).
 
-> **Early access.** The app lifecycle runs on our own production server. Not yet proven: a restore onto a different clean server. A fresh server installs in 90 seconds (measured on a Hetzner CPX22). There is no high availability, and apps cannot use WebSockets. Updates briefly interrupt the services, and backups stay on the same server unless you copy them. See [current limitations](https://automaton.monster/docs/limitations).
+**Does not fit** if you need:
+- autoscaling or multi-region failover;
+- WebSockets or streamed responses (apps cannot use them);
+- a hosted service to sign up for, or hosting for untrusted users.
 
-## Is Automaton for you?
-
-**It fits** if you or your small team build many small apps, tools or automations with an AI coding agent and want them on servers you control, at a cost set by the servers you rent, and you are comfortable owning a Linux server.
-
-**It does not fit** if you need autoscaling, multi-region failover, live streaming connections, a hosted service to sign up for, or hosting for untrusted users.
-
-Compared with a cloud provider you gain control and data location, with costs set by the servers you rent; you take on updates, backups and being on call, and you get no global scale. The full comparison, with pros and cons, is on [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you). Questions: [FAQ](https://automaton.monster/docs/faq).
+> **Early access.** The app lifecycle runs on our own production server. A restore onto a different clean server is not yet proven, and backups stay on the same server unless you copy them. A fresh server installs in 90 seconds (measured on a Hetzner CPX22). See [limitations](https://automaton.monster/docs/limitations), [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you) and the [FAQ](https://automaton.monster/docs/faq).
 
 ## Quickstart
 
-1. Install the server on an Ubuntu 24.04+ host (below) and create your administrator in Studio.
-2. Install the CLI, log in with `automaton login --server https://api.your-domain.com`, then add a Runner with `automaton runners install --name main --ssh user@host` (or `--local` on the host; add `--yes` for automation). The target is Ubuntu with Docker running, and the Machine Management Runner has Docker access on its host.
-3. Run `automaton new "My App"`.
-4. Ask your coding agent to build the app, then `automaton validate` and `automaton deploy`.
+1. **Install the server** on x86_64 Ubuntu 24.04+ with a domain ([install-server](https://automaton.monster/docs/install-server)). DNS only: two wildcard records (`*.your-domain.com`, `*.apps.your-domain.com`) or five named records (`api`, `studio`, `store`, `apps`, `*.apps`). Open TCP 80, 443 and 5671. Review the script before running it if you like (`less install-automaton.sh`).
 
-## Install
+   ```bash
+   curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh && sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com
+   ```
 
-Use an **x86_64 Ubuntu 24.04+ server**, a domain, and at least **10 GiB free disk space**. Configure `api`, `studio`, `store`, `apps` and `*.apps` DNS records; allow inbound TCP **80, 443 and 5671** (5671 is the TLS broker Runners connect to). The [install guide](docs/prod/install-automaton.md) explains certificates and networking.
+2. **Create the first administrator** by opening the one-time setup link the installer prints ([first-admin](https://automaton.monster/docs/first-admin)).
 
-```bash
-curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
-less install-automaton.sh
-sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com
-```
+3. **Install the CLI and log in** (needs the .NET 10 SDK; [automaton-cli](https://automaton.monster/docs/automaton-cli)):
 
-Without `--domain` and `--email` the installer asks for them; pass both when an AI agent runs the install.
+   ```bash
+   dotnet tool install -g Automaton.Cli
+   automaton login --server https://api.your-domain.com
+   ```
 
-The installer selects the latest stable release, verifies the bundle, installs Docker if needed, and starts the server. No source build or GitHub account is required.
+4. **Add a Runner**, which hosts your apps ([deploy-runner](https://automaton.monster/docs/deploy-runner)). Run on the server with `--local`, or from anywhere with `--ssh user@host`:
 
-1. Open `https://studio.your-domain.com/install`.
-2. Read `sudo cat /etc/automaton/secrets/setup-token` on the server and create your administrator in Studio.
-3. Use `automaton runners install --name main --local` on this machine, or `--ssh user@host` from another machine (Ubuntu with Docker running); add `--yes` to skip the confirmation in automation. Apps need a Runner, including static sites.
+   ```bash
+   automaton runners install --name main --local
+   ```
 
-## Build and publish an app
+5. **Deploy your first app** ([getting-started](https://automaton.monster/docs/getting-started), [deploy](https://automaton.monster/docs/deploy)):
 
-Install the CLI on your development computer, then connect it to **your server**:
+   ```bash
+   automaton new "My App" --template node
+   automaton validate
+   automaton deploy
+   automaton publish --yes --slug my-app
+   ```
 
-```bash
-dotnet tool install -g Automaton.Cli
-automaton login --server https://api.your-domain.com
-mkdir my-app && cd my-app
-automaton new "My App"
-```
+6. **Update the server** later ([update-server](https://automaton.monster/docs/update-server)):
 
-The CLI requires the .NET 10 SDK or later for NuGet installation. The server installer uses containers and does not require a separate .NET installation. See the [CLI guide](https://automaton.monster/cli).
+   ```bash
+   automaton server update --wait
+   ```
 
-Ask your coding agent to build the app. It should read the generated `AGENTS.md` and `automaton.json`, then validate, deploy and verify the real app behavior:
+Stuck? See [troubleshooting](https://automaton.monster/docs/troubleshooting).
 
-```bash
-automaton validate
-automaton deploy
-automaton publish --yes --slug my-app
-```
+## For AI agents
 
-Approve CLI login in **your Studio** when prompted. Keep credentials out of AI chat.
+- Start with [llms.txt](https://automaton.monster/llms.txt), or [llms-full.txt](https://automaton.monster/llms-full.txt) for all the docs in one file.
+- In an app folder, read the generated `AGENTS.md` and `automaton.json` ([reference](https://automaton.monster/docs/automaton-json)), then validate, deploy and verify the real app.
+- Safety: never put credentials in chat. Self sign-up is disabled; users come from an administrator. See [secrets and permissions](https://automaton.monster/docs/secrets-and-permissions) and [security](https://automaton.monster/docs/security).
+- Working on this repository: read [AGENTS.md](AGENTS.md).
 
-### Example apps
+## Links
 
-[automaton-apps](https://github.com/rzvdaniel/automaton-apps) collects apps built and deployed on Automaton, such as [Untranslatable](https://untranslatable.apps.automaton.monster/), a multiplayer word-bluffing game.
-
-## Update
-
-```bash
-sudo bash /opt/automaton-server/update.sh
-```
-
-The updater verifies the latest compatible release and makes a local recovery backup before replacing API, Worker, Studio and the app store. Updating to the first release with the app store needs the new updater once; see [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server). These services can be briefly unavailable. Infrastructure upgrades and existing Runner updates require separate review; this command does not upgrade every machine automatically.
-
-Your server backs itself up nightly (database and keys, 7 days, on the server). Also turn on your hosting provider's server backups; see [backups and restore](docs/prod/install-automaton.md#backups-and-restore).
-
-## What you get
-
-- **Your Studio and API** on your domain, with app, user and access management.
-- **Your app store** at `store.your-domain.com`, listing the apps their owners choose to publish.
-- **Static sites, APIs and Actions** on your own machines. Static sites share a serving container; APIs and jobs use bounded containers.
-- **Persistent app data** across redeploys (not included in the nightly server backups), several Runner machines, and a choice of which Runner hosts each app.
-- **Your AI workflow** with CLI-generated agent instructions and deployment checks.
-
-The software is free under [Apache 2.0](LICENSE). You pay for your servers, domain and any AI services you choose. There is no required Automaton cloud subscription. You operate the installation and updates; nightly backups are set up for you, and off-server copies are yours to keep.
-
-## Contribute
-
-Report security problems privately as described in [SECURITY.md](SECURITY.md); see also the [security overview](src/automaton-vue/docs/security.md).
-
-Ask questions in [Discussions](https://github.com/rzvdaniel/automaton/discussions), report bugs or request features with an [issue template](https://github.com/rzvdaniel/automaton/issues/new/choose), and read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. See also [repository development](docs/development.md) and the [roadmap](docs/roadmap/README.md). Coding agents should start with [AGENTS.md](AGENTS.md).
+[Website](https://automaton.monster) · [Docs](https://automaton.monster/docs/) · [Example apps](https://github.com/rzvdaniel/automaton-apps) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [License (Apache 2.0)](LICENSE)
