@@ -52,7 +52,7 @@ internal sealed partial class ServerUpdateRunner(
             return Failure(FailureMessage(finished), version, finished);
 
         var target = run.ToVersion ?? (version == "latest" ? null : version);
-        if (version != "latest" && run.ToVersion != version)
+        if (version != "latest" && (NormalizeVersion(run.ToVersion) is not { } reported || reported != NormalizeVersion(version)))
             return Failure($"The update finished, but the server reports {run.ToVersion ?? "no version"} instead of {version}.", version, finished);
         var verification = await VerifyAsync(target, ct);
         return verification is null
@@ -104,7 +104,7 @@ internal sealed partial class ServerUpdateRunner(
                 var health = await client.GetHealthAsync(ct);
                 var summary = await client.GetInstallationSummaryAsync(ct);
                 if (health != "ok") problem = $"The API health check returned \"{health}\".";
-                else if (expectedVersion is not null && NormalizeVersion(summary.Version) != NormalizeVersion(expectedVersion))
+                else if (expectedVersion is not null && (NormalizeVersion(summary.Version) is not { } reported || reported == "latest" || reported != NormalizeVersion(expectedVersion)))
                     problem = $"installation-status reports {summary.Version ?? "no version"} instead of {expectedVersion}.";
                 else return null;
             }
