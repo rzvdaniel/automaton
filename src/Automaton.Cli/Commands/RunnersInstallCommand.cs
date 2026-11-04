@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Automaton.Cli.Services;
 using Spectre.Console;
@@ -9,6 +10,8 @@ namespace Automaton.Cli.Commands;
 
 public static class RunnersInstallCommand
 {
+    internal const int InstallerTimeoutSeconds = 900;
+
     public static Command Build(ConfigService config)
     {
         var name = new Option<string>("--name", "Name of the new Runner") { IsRequired = true };
@@ -31,6 +34,7 @@ public static class RunnersInstallCommand
     {
         var parsed = context.ParseResult;
         var asJson = parsed.GetValueForOption(jsonOption);
+        string? runnerId = null;
         try
         {
             var name = parsed.GetValueForOption(nameOption)?.Trim() ?? "";
@@ -40,41 +44,63 @@ public static class RunnersInstallCommand
             ConfirmHostAccess(parsed.GetValueForOption(yesOption));
             var (server, apiKey) = config.RequireCredentials(directory: Directory.GetCurrentDirectory());
             using var client = new AutomatonApiClient(server, apiKey);
-            var installation = await client.CreateRunnerInstallationAsync(name, context.GetCancellationToken());
-            var command = installation.GetProperty("installationCommand").GetString() ?? throw new InvalidOperationException("Installation command missing.");
-            if (print)
-            {
-                Console.Error.WriteLine($"One-time secret: keep this command private. It expires at {installation.GetProperty("expiresAtUtc").GetString()}.");
-                Console.Out.WriteLine(command);
-            }
-            else await ExecuteAsync(command, ssh, context.GetCancellationToken());
-            var id = await WaitForRunnerAsync(client, installation.GetProperty("installationId").GetString()!, parsed.GetValueForOption(timeoutOption), context.GetCancellationToken());
-            var project = parsed.GetValueForOption(projectOption);
-            if (!string.IsNullOrWhiteSpace(project))
-            {
-                var (projectId, _) = ProjectCommand.PickProject(await client.ListProjectsAsync(context.GetCancellationToken()), project);
-                await client.AddRunnerToProjectAsync(projectId, id, context.GetCancellationToken());
-            }
+            var request = new InstallRequest(name, parsed.GetValueForOption(projectOption), ssh, print, parsed.GetValueForOption(timeoutOption), InstallerTimeoutSeconds);
+            var id = await InstallAsync(client, request, ExecuteAsync, TimeSpan.FromSeconds(3), context.GetCancellationToken(), found => runnerId = found);
             if (asJson) CliJson.Write(new { runnerId = id, name, status = "connected" });
             else Console.Out.WriteLine($"Runner {name} connected ({id}).");
             context.ExitCode = 0;
         }
         catch (Exception error)
         {
-            if (asJson) CliJson.Write(new { success = false, error = error.Message });
+            if (asJson) CliJson.Write(new { success = false, error = error.Message, runnerId });
             else Console.Error.WriteLine($"Runner installation failed: {error.Message}");
             context.ExitCode = 1;
         }
     }
 
-    private static bool ValidateMode(string name, string? ssh, bool local, bool print, int timeout)
+    internal sealed record InstallRequest(string Name, string? Project, string? Ssh, bool Print, int TimeoutSeconds, int InstallerTimeoutSeconds);
+
+    /// <summary>Resolves the project first, then installs, waits, and attaches the Runner. Returns the runner id.</summary>
+    internal static async Task<string> InstallAsync(AutomatonApiClient client, InstallRequest request,
+        Func<string, string?, int, CancellationToken, Task> execute, TimeSpan pollDelay, CancellationToken ct,
+        Action<string>? onRunnerId = null)
+    {
+        string? projectId = null;
+        if (!string.IsNullOrWhiteSpace(request.Project))
+            projectId = ProjectCommand.PickProject(await client.ListProjectsAsync(ct), request.Project).Id;
+        var installation = await client.CreateRunnerInstallationAsync(request.Name, ct);
+        var command = installation.GetProperty("installationCommand").GetString() ?? throw new InvalidOperationException("Installation command missing.");
+        if (request.Print)
+        {
+            Console.Error.WriteLine($"One-time secret: keep this command private. It expires at {installation.GetProperty("expiresAtUtc").GetString()}.");
+            Console.Out.WriteLine(command);
+        }
+        else await execute(command, request.Ssh, request.InstallerTimeoutSeconds, ct);
+        var id = await WaitForRunnerAsync(client, installation.GetProperty("installationId").GetString()!, request.TimeoutSeconds, pollDelay, ct);
+        onRunnerId?.Invoke(id);
+        if (projectId is not null)
+        {
+            try { await client.AddRunnerToProjectAsync(projectId, id, ct); }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                throw new InvalidOperationException($"Runner {id} connected but adding it to the project failed: {error.Message}", error);
+            }
+        }
+        return id;
+    }
+
+    internal static Func<bool> IsNonInteractive { get; set; } = () => Console.IsInputRedirected || Console.IsOutputRedirected;
+    internal static Func<bool> Prompt { get; set; } = () =>
+        AnsiConsole.Confirm("I understand the Runner can manage Docker containers on this machine. Continue?", false);
+
+    internal static bool ValidateMode(string name, string? ssh, bool local, bool print, int timeout)
     {
         if (name.Length is < 1 or > 120) throw new ArgumentException("Runner name must be 1 to 120 characters.");
         var modes = (ssh is not null ? 1 : 0) + (local ? 1 : 0) + (print ? 1 : 0);
         if (modes > 1) throw new ArgumentException("Choose one of --ssh, --local, or --print-command.");
         if (modes == 0)
         {
-            if (Console.IsInputRedirected || Console.IsOutputRedirected)
+            if (IsNonInteractive())
                 throw new ArgumentException("Choose --ssh, --local, or --print-command in a non-interactive terminal.");
             print = true;
         }
@@ -84,16 +110,15 @@ public static class RunnersInstallCommand
         return print;
     }
 
-    private static void ConfirmHostAccess(bool yes)
+    internal static void ConfirmHostAccess(bool yes)
     {
         Console.Error.WriteLine("Machine Management gives this trusted Runner access to the host Docker socket. A compromise of the Runner could control host Docker. Keep app and Action code in isolated containers.");
         if (yes) return;
-        if (Console.IsInputRedirected) throw new InvalidOperationException("Use --yes to acknowledge host access in non-interactive mode.");
-        if (!AnsiConsole.Confirm("I understand the Runner can manage Docker containers on this machine. Continue?", false))
-            throw new InvalidOperationException("Installation cancelled.");
+        if (IsNonInteractive()) throw new InvalidOperationException("Use --yes to acknowledge host access in non-interactive mode.");
+        if (!Prompt()) throw new InvalidOperationException("Installation cancelled.");
     }
 
-    internal static async Task ExecuteAsync(string command, string? ssh, CancellationToken ct)
+    internal static async Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct)
     {
         var start = new ProcessStartInfo(ssh is null ? "sudo" : "ssh")
         {
@@ -101,15 +126,21 @@ public static class RunnersInstallCommand
             UseShellExecute = false
         };
         if (ssh is null) { start.ArgumentList.Add("bash"); start.ArgumentList.Add("-s"); }
-        else { start.ArgumentList.Add("-T"); start.ArgumentList.Add(ssh); start.ArgumentList.Add("sudo bash -s"); }
+        else { start.ArgumentList.Add("-T"); start.ArgumentList.Add("--"); start.ArgumentList.Add(ssh); start.ArgumentList.Add("sudo bash -s"); }
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start installer process.");
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
         {
-            await process.StandardInput.WriteLineAsync(command.AsMemory(), ct);
-            process.StandardInput.Close();
-            var stdout = process.StandardOutput.ReadToEndAsync(ct);
-            var stderr = process.StandardError.ReadToEndAsync(ct);
-            await process.WaitForExitAsync(ct);
+            var stdout = process.StandardOutput.ReadToEndAsync(limit.Token);
+            var stderr = process.StandardError.ReadToEndAsync(limit.Token);
+            try
+            {
+                await process.StandardInput.WriteLineAsync(command.AsMemory(), limit.Token);
+                process.StandardInput.Close();
+            }
+            catch (IOException) { /* installer exited early; its output is reported below */ }
+            await process.WaitForExitAsync(limit.Token);
             var output = (await stdout + "\n" + await stderr).Trim();
             if (process.ExitCode != 0)
             {
@@ -121,26 +152,39 @@ public static class RunnersInstallCommand
         }
         catch (OperationCanceledException)
         {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             await process.WaitForExitAsync(CancellationToken.None);
-            throw;
+            if (ct.IsCancellationRequested) throw;
+            throw new TimeoutException($"Installer did not finish within {timeoutSeconds} seconds.");
         }
     }
 
-    private static async Task<string> WaitForRunnerAsync(AutomatonApiClient client, string installationId, int timeout, CancellationToken ct)
+    internal static async Task<string> WaitForRunnerAsync(AutomatonApiClient client, string installationId, int timeout, TimeSpan pollDelay, CancellationToken ct)
     {
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(TimeSpan.FromSeconds(timeout));
+        var failures = 0;
         try
         {
             while (true)
             {
-                var response = await client.GetRunnerInstallationStatusAsync(installationId, limit.Token);
+                JsonElement response;
+                try
+                {
+                    response = await client.GetRunnerInstallationStatusAsync(installationId, limit.Token);
+                    failures = 0;
+                }
+                catch (HttpRequestException error) when (++failures <= 5 && !Regex.IsMatch(error.Message, @"API error 4\d\d"))
+                {
+                    Console.Error.WriteLine($"Waiting for Runner: transient error ({error.Message}), retrying");
+                    await Task.Delay(pollDelay * failures, limit.Token);
+                    continue;
+                }
                 var status = response.GetProperty("status").GetString();
                 if (status == "RunnerConnected") return response.GetProperty("runnerId").GetString()!;
                 if (status == "Expired") throw new InvalidOperationException("Installation token expired before the Runner connected.");
                 Console.Error.WriteLine($"Waiting for Runner: {status}");
-                await Task.Delay(TimeSpan.FromSeconds(3), limit.Token);
+                await Task.Delay(pollDelay, limit.Token);
             }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)

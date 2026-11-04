@@ -24,13 +24,13 @@ an AI conversation.
 
 ## Install a Runner
 
-After login, install a Machine Management Runner on an Ubuntu host with Docker Engine running:
+After login, install a Machine Management Runner on an Ubuntu host with Docker running:
 
 ```bash
-automaton runners install --name main --ssh user@host --yes
+automaton runners install --name main --ssh user@host
 ```
 
-Use `--local` on the host, or `--print-command` to run the one-time command yourself before its printed expiry. Without a mode, an interactive terminal prints the command. The CLI asks you to acknowledge that the trusted Runner has Docker access on its host; `--yes` provides that acknowledgement for automation. The installer command goes to SSH or sudo over standard input and is not passed as a process argument. The CLI waits up to 300 seconds for a connection (`--timeout` changes this), prints the Runner ID, and can add the connected Runner to a project with `--project NAME`. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
+Use `--local` on the host (the Ubuntu host needs Docker running), or `--print-command` to run the one-time command yourself before its printed expiry. Without a mode, an interactive terminal prints the command. The CLI asks you to acknowledge that the trusted Runner has Docker access on its host; `--yes` provides that acknowledgement for automation (required when not interactive). The installer command goes to SSH or sudo over standard input and is not passed as a process argument. The installer step times out after 900 seconds. The CLI waits up to 300 seconds for a connection (`--timeout` changes this), prints the Runner ID, and can add the connected Runner to a project with `--project NAME`. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
 
 ## Create or link
 

@@ -14,7 +14,8 @@ dotnet tool install --global Automaton.Cli
 automaton login
 automaton login --local
 automaton login --device
-automaton runners install --name main --ssh user@host --yes
+# Install a Runner on Ubuntu with Docker running (add --yes for automation)
+automaton runners install --name main --ssh user@host
 automaton new "My App"
 automaton pull
 automaton pull my-remixed-app

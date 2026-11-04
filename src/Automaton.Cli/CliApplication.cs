@@ -31,6 +31,7 @@ internal static class CliApplication
         var authorizationCompletion = new CliAuthorizationCompletionService(config);
         return new CommandLineBuilder(root)
             .UseHelp()
+            .CancelOnProcessTermination()
             .UseParseErrorReporting()
             .AddMiddleware(async (context, next) =>
                 await HandleInvocationAsync(context, next, args, authorizationCompletion), MiddlewareOrder.Default)

@@ -85,7 +85,7 @@ Under **Admin → Installation**, a system administrator can check database and 
 
 ### Add a Runner
 
-After creating an administrator and approving `automaton login --server https://api.your-domain.com`, install a **Machine Management Runner** on the server with `automaton runners install --name main --local --yes`. From another machine, use `--ssh user@host --yes` to install on an Ubuntu host with Docker Engine running. Omit `--yes` to confirm the Docker host access interactively. `--print-command` displays a one-time secret for manual installation; keep it private and run it before the printed expiry. The CLI waits for the Runner to connect and can add it to a project with `--project NAME`. You can also install through Studio. Follow [Self-hosted Runners](self-hosted-runners.md) for host requirements and the trust boundary.
+After creating an administrator and approving `automaton login --server https://api.your-domain.com`, install a **Machine Management Runner** on the server (Ubuntu with Docker running) with `automaton runners install --name main --local`, which asks you to confirm the Docker host access. From another machine, use `--ssh user@host`. For automation, add `--yes` to acknowledge the access without prompting. `--print-command` displays a one-time secret for manual installation; keep it private and run it before the printed expiry. The CLI waits for the Runner to connect and can add it to a project with `--project NAME`. You can also install through Studio. Follow [Self-hosted Runners](self-hosted-runners.md) for host requirements and the trust boundary.
 
 ## Configuration and secrets
 
