@@ -9,6 +9,7 @@ internal static class CliCommandCatalog
     internal static RootCommand CreateRoot(ConfigService config)
     {
         var root = new RootCommand("Automaton CLI — create, deploy, and publish Automaton apps");
+        root.AddGlobalOption(new Option<string?>("--profile", "Use a named server profile"));
         AddCommands(root, config);
         root.Name = "automaton";
         return root;
@@ -19,6 +20,7 @@ internal static class CliCommandCatalog
         root.AddCommand(NewCommand.Build(config));
         root.AddCommand(SyncAiCommand.Build(config));
         root.AddCommand(LoginCommand.Build(config));
+        root.AddCommand(ProfilesCommand.Build(config));
         root.AddCommand(LogoutCommand.Build(config));
         root.AddCommand(WhoAmICommand.Build(config));
         root.AddCommand(CreateCommand.Build(config));

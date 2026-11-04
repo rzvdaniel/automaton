@@ -4,6 +4,8 @@ public sealed class ResolvedCliContext
 {
     public string? EnvironmentName { get; init; }
 
+    public string? ProfileName { get; init; }
+
     public string? Server { get; init; }
 
     public string? ApiKey { get; init; }

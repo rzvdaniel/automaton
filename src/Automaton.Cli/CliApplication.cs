@@ -34,7 +34,7 @@ internal static class CliApplication
             .CancelOnProcessTermination()
             .UseParseErrorReporting()
             .AddMiddleware(async (context, next) =>
-                await HandleInvocationAsync(context, next, args, authorizationCompletion), MiddlewareOrder.Default)
+                await HandleInvocationAsync(context, next, args, config, authorizationCompletion), MiddlewareOrder.Default)
             .Build();
     }
 
@@ -42,8 +42,12 @@ internal static class CliApplication
         InvocationContext context,
         Func<InvocationContext, Task> next,
         string[] args,
+        ConfigService config,
         CliAuthorizationCompletionService authorizationCompletion)
     {
+        var profileOption = context.ParseResult.RootCommandResult.Command.Options
+            .OfType<Option<string?>>().First(option => option.HasAlias("--profile"));
+        config.ProfileOverride = context.ParseResult.GetValueForOption(profileOption);
         if (HasUnsupportedInput(context, args))
         {
             WriteUnsupportedInputError(context);
@@ -51,7 +55,12 @@ internal static class CliApplication
         }
         if (RequiresAuthorizationCompletion(context) && !await CompleteAuthorizationAsync(context, authorizationCompletion))
             WritePendingAuthorizationWarning();
-        await next(context);
+        try { await next(context); }
+        catch (InvalidOperationException error)
+        {
+            Console.Error.WriteLine(error.Message);
+            context.ExitCode = 1;
+        }
     }
 
     private static bool HasUnsupportedInput(InvocationContext context, string[] args)
@@ -65,7 +74,7 @@ internal static class CliApplication
     }
 
     private static bool RequiresAuthorizationCompletion(InvocationContext context)
-        => context.ParseResult.CommandResult.Command.Name is not ("login" or "logout" or "config" or "help");
+        => context.ParseResult.CommandResult.Command.Name is not ("login" or "logout" or "config" or "profiles" or "help");
 
     private static Task<bool> CompleteAuthorizationAsync(
         InvocationContext context,

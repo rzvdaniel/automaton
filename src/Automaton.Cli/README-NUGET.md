@@ -16,6 +16,7 @@ automaton login --local
 automaton login --device
 # Install a Runner on Ubuntu with Docker running (add --yes for automation)
 automaton runners install --name main --ssh user@host
+automaton profiles
 automaton new "My App"
 automaton pull
 automaton pull my-remixed-app

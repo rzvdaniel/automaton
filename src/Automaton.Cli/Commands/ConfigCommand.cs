@@ -65,6 +65,12 @@ public static class ConfigCommand
                 return;
             }
 
+            if (global && server != null)
+            {
+                SaveGlobalServerProfile(config, server, key);
+                return;
+            }
+
             var updated = new GlobalConfig
             {
                 Server = server ?? current.Server,
@@ -85,6 +91,22 @@ public static class ConfigCommand
         }, serverOption, keyOption, showOption, localOption, globalOption);
 
         return cmd;
+    }
+
+    private static void SaveGlobalServerProfile(ConfigService config, string server, string? key)
+    {
+        var name = config.ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE")
+            ?? ConfigService.ProfileNameFromServer(server);
+        var profiles = config.LoadProfilesConfig();
+        profiles.Profiles.TryGetValue(name, out var existing);
+        if (existing?.Server != null && !string.Equals(existing.Server.TrimEnd('/'), server.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+        {
+            AnsiConsole.MarkupLine($"[red]Error:[/] Profile {Markup.Escape(name)} uses another server.");
+            Environment.ExitCode = 1;
+            return;
+        }
+        config.SaveProfile(name, new GlobalConfig { Server = server.TrimEnd('/'), ApiKey = key ?? existing?.ApiKey });
+        AnsiConsole.MarkupLine($"[green]✓[/] Profile {Markup.Escape(name)} saved to ~/.automaton/config.json");
     }
 
     private static void AddRow(Table table, string name, string? value, string envVar, string fileSource)

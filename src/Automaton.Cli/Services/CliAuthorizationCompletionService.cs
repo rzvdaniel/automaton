@@ -17,9 +17,18 @@ public sealed class CliAuthorizationCompletionService
 
     public async Task<bool> TryCompletePendingAsync(string directory, bool global = false, CancellationToken cancellationToken = default)
     {
-        var resolved = global
-            ? CreateGlobalContext(config.LoadGlobalConfig())
-            : config.ResolveContext(directory: directory);
+        ResolvedCliContext resolved;
+        try
+        {
+            resolved = global
+                ? CreateGlobalContext(config.LoadGlobalConfig())
+                : config.ResolveContext(directory: directory);
+        }
+        catch (InvalidOperationException)
+        {
+            // The command reports the missing or mismatched profile itself.
+            return true;
+        }
         var pending = resolved.PendingAuthorizationCompletion;
         if (pending is null)
         {
@@ -53,9 +62,11 @@ public sealed class CliAuthorizationCompletionService
         return false;
     }
 
-    private static ResolvedCliContext CreateGlobalContext(GlobalConfig stored)
+    private ResolvedCliContext CreateGlobalContext(GlobalConfig stored)
         => new()
         {
+            ProfileName = config.ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE")
+                ?? config.LoadProfilesConfig().Current,
             Server = stored.Server,
             ApiKey = stored.ApiKey,
             CredentialSource = CliCredentialSource.Global,

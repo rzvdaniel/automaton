@@ -27,7 +27,7 @@ internal static class WhoAmICommandHandler
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.UserProfile, true,
                 $"authenticated as {result.Name ?? result.Email ?? result.Id}"));
-            WriteSuccess(context.EnvironmentName, context.Server!, result, checks, asJson);
+            WriteSuccess(context.EnvironmentName, context.ProfileName, context.Server!, result, checks, asJson);
         }
         catch (Exception exception)
         {
@@ -113,6 +113,7 @@ internal static class WhoAmICommandHandler
 
     private static void WriteSuccess(
         string? environmentName,
+        string? profileName,
         string server,
         UserProfile user,
         IReadOnlyCollection<CommandDiagnosticCheck> checks,
@@ -127,6 +128,7 @@ internal static class WhoAmICommandHandler
                 checks = MapChecks(checks),
                 nextSteps = Array.Empty<string>(),
                 environment = environmentName,
+                profile = profileName,
                 authMode = "apiKey",
                 server,
                 user = new
@@ -141,16 +143,17 @@ internal static class WhoAmICommandHandler
             return;
         }
 
-        var table = BuildUserTable(environmentName, server, user);
+        var table = BuildUserTable(environmentName, profileName, server, user);
         AnsiConsole.Write(table);
     }
 
-    private static Table BuildUserTable(string? environmentName, string server, UserProfile user)
+    private static Table BuildUserTable(string? environmentName, string? profileName, string server, UserProfile user)
     {
         var table = new Table();
         table.AddColumn("Field");
         table.AddColumn("Value");
         table.AddRow("environment", string.IsNullOrWhiteSpace(environmentName) ? "-" : environmentName);
+        table.AddRow("profile", string.IsNullOrWhiteSpace(profileName) ? "-" : profileName);
         table.AddRow("server", server);
         table.AddRow("auth", "apiKey");
         table.AddRow("id", user.Id ?? "?");

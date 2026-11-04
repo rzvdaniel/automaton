@@ -31,6 +31,20 @@ automaton runners install --name main --ssh user@host
 ```
 
 Use `--local` on the host (the Ubuntu host needs Docker running), or `--print-command` to run the one-time command yourself before its printed expiry. Without a mode, an interactive terminal prints the command. The CLI asks you to acknowledge that the trusted Runner has Docker access on its host; `--yes` provides that acknowledgement for automation (required when not interactive). The installer command goes to SSH or sudo over standard input and is not passed as a process argument. The installer step times out after 900 seconds. The CLI waits up to 300 seconds for a connection (`--timeout` changes this), prints the Runner ID, and can add the connected Runner to a project with `--project NAME`. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
+## Several servers
+
+Log in to each server once. The CLI stores each server and its key together in a named profile:
+
+```bash
+automaton login --server https://api.first.example --profile first
+automaton login --server https://api.second.example --profile second
+automaton profiles
+automaton profiles use first
+automaton --profile second whoami
+automaton logout --profile second
+```
+
+Without `--profile`, login names a profile after the server host, dropping an initial `api.`. `automaton profiles` shows the server, current selection and a key fingerprint, never the key. `automaton whoami` shows the chosen profile and server. For any command, `--profile` takes precedence over `AUTOMATON_PROFILE`; otherwise an app folder chooses the profile matching the server recorded in its selected `.automaton` environment, then falls back to the current profile outside an app folder. Existing project-local credentials for that same server remain usable. If an app's server has no matching profile or local credential, log in to that server before deploying. `automaton logout` removes only the selected profile and leaves other logins intact.
 
 ## Create or link
 

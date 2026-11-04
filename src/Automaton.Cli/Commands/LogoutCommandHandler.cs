@@ -36,7 +36,7 @@ internal static class LogoutCommandHandler
         var clearLocal = local || all;
         var clearGlobal = !local || all;
         var clearedLocal = clearLocal && config.ClearProjectLocalConfig(cwd);
-        var clearedGlobal = clearGlobal && config.ClearGlobalConfig();
+        var clearedGlobal = clearGlobal && (all ? config.ClearGlobalConfig() : config.RemoveSelectedProfile());
         var envServer = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_SERVER"));
         var envApiKey = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
         var envOverridesActive = envServer || envApiKey;

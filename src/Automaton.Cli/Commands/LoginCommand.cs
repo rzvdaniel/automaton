@@ -43,6 +43,17 @@ public static class LoginCommand
             var global = !local;
             var existing = config.ResolveExistingConfig(global, cwd);
             server = ResolveServer(server, existing.Server);
+            if (global)
+            {
+                var name = config.ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE")
+                    ?? ConfigService.ProfileNameFromServer(server);
+                var profiles = config.LoadProfilesConfig();
+                if (profiles.Profiles.TryGetValue(name, out var saved) && saved.Server != null
+                    && !string.Equals(saved.Server.TrimEnd('/'), server, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Profile '{name}' already uses {saved.Server}; choose another profile name.");
+                config.ProfileOverride = name;
+                existing = config.ResolveExistingConfig(global, cwd);
+            }
             await CompletePendingAuthorizationAsync(config, cwd, global, asJson, existing, checks);
             key = ResolveRequestedKey(key);
             await CompleteLoginAsync(config, cwd, server, key, global, device, asJson, checks);

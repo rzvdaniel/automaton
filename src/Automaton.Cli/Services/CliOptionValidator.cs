@@ -31,6 +31,12 @@ internal static class CliOptionValidator
                 continue;
             }
 
+            if (alias == "--profile")
+            {
+                if (equalsIndex < 0 && index + 1 < tokens.Length) index++;
+                continue;
+            }
+
             if (!optionsByAlias.TryGetValue(alias, out var option))
             {
                 return true;
