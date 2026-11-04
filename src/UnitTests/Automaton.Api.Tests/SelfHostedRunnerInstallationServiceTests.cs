@@ -72,7 +72,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         };
 
         Assert.That(async () => await service.CreateAsync(request, CancellationToken.None),
-            Throws.TypeOf<UnauthorizedAccessException>());
+            Throws.TypeOf<ArgumentException>().With.Message.Contains("Acknowledge Docker host access for the Machine Management profile"));
 
         var response = await service.CreateAsync(request with { AcknowledgeHostAccess = true }, CancellationToken.None);
 
