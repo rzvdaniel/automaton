@@ -2,7 +2,7 @@
 
 - **Website**: Vue 3 + TypeScript + Vite (`src/automaton-vue/`)
 - **Studio frontend**: Vue 3 + TypeScript + Vite + PrimeVue (`src/automaton-studio-vue/`)
-- **Studio backend**: ASP.NET Core 9 REST API + SignalR (`src/Automaton.Api/`)
+- **Studio backend**: ASP.NET Core 10 REST API + SignalR (`src/Automaton.Api/`)
 - **Worker**: .NET background worker for CAP/RabbitMQ consumers and async side effects (`src/Automaton.Worker/`)
 - **CLI**: .NET global tool for local app workflows (`src/Automaton.Cli/`)
 - **Runner**: cross-platform .NET runner for backend execution (`src/Automaton.Runner/`)

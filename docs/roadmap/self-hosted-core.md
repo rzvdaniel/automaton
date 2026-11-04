@@ -223,7 +223,7 @@ The completion criteria are covered: a fresh machine installation, CLI deploymen
 These are later improvements, not prerequisites for M3's single-server target or M4 source cleanup:
 
 - Second-machine acceptance and additional multi-machine operating features. Preserve existing enrollment/assignment behavior.
-- Additional monitoring, per-category storage breakdowns and system-app catalog work. Basic host retention/admission is covered by the [operations policies](../prod/production-docker-cheat-sheet.md#disk-cleanup); applying those policies to existing hosts remains an operator step, not milestone acceptance.
+- Additional monitoring, per-category storage breakdowns and system-app catalog work. Basic host retention/admission is covered by the [operations policies](../prod/production-docker-cheat-sheet.md#storage-maintenance); applying those policies to existing hosts remains an operator step, not milestone acceptance.
 - Automatic Runner self-update. Studio provides an operator-run Runner upgrade command with rollback (**Runners → Upgrade runner**).
 - Off-site backup destinations and app-data backups, delivered as maintenance apps; see [self-maintenance](self-maintenance.md). Nightly local database/key backups and `restore.sh` ship with the server.
 - Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.

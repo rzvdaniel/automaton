@@ -110,7 +110,7 @@ Keep the batches independently reviewable. Any administrator-visible change need
 ## References
 
 - [Current analyzer baseline](analyzer-priority-baseline.md)
-- [Repository coding contract](../../AGENTS.md)
+- [Repository coding contract](../../../AGENTS.md)
 - [Sonar rule impact model](https://docs.sonarsource.com/sonarqube-cloud/standards/managing-rules/rules)
 - [Certificate validation rule S4830](https://github.com/SonarSource/sonar-dotnet/blob/master/analyzers/rspec/cs/S4830.json)
 - [Temporary file rule S5445](https://github.com/SonarSource/sonar-dotnet/blob/master/analyzers/rspec/cs/S5445.json)

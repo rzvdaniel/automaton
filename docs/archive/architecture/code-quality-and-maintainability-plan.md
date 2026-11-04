@@ -287,11 +287,11 @@ These examples are not a complete verification suite. The all-project analyzer b
 
 ## References
 
-- [Repository contract](../../AGENTS.md)
-- [Distributed platform architecture skill](../../.agents/skills/distributed-platform-architecture/SKILL.md)
-- [Generic runtime skill](../../.agents/skills/generic-runtime/SKILL.md)
-- [Admin documentation skill](../../.agents/skills/admin-docs/SKILL.md)
-- [Existing architecture guardrails](../../src/UnitTests/Automaton.Architecture.Tests/DistributedPlatformArchitectureTests.cs)
+- [Repository contract](../../../AGENTS.md)
+- [Distributed platform architecture skill](../../../.agents/skills/distributed-platform-architecture/SKILL.md)
+- [Generic runtime skill](../../../.agents/skills/generic-runtime/SKILL.md)
+- [Admin documentation skill](../../../.agents/skills/admin-docs/SKILL.md)
+- [Existing architecture guardrails](../../../src/UnitTests/Automaton.Architecture.Tests/DistributedPlatformArchitectureTests.cs)
 - [.NET analyzer configuration](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/configuration-files)
 - [.NET cyclomatic complexity rule CA1502](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca1502)
 - [Codex repository guidance and verification practices](https://learn.chatgpt.com/guides/best-practices)
