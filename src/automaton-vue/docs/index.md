@@ -1,57 +1,30 @@
 ---
 title: Docs
-description: Automaton Monster documentation. Learn how to build, deploy, and publish apps using the Automaton CLI.
+description: Automaton documentation. Install a server, add a Runner, deploy and publish apps, update and back up, with the CLI.
 ---
 
 # Documentation
 
-Automaton is open source and self-hosted. Install your own Studio and API, or use your team’s installation.
+Automaton is open source and self-hosted: you run your own Studio, API and Runners. Each page below does one task. AI agents can start from [llms.txt](https://automaton.monster/llms.txt) (an index) or [llms-full.txt](https://automaton.monster/llms-full.txt) (all key pages in one file).
 
-## Start here
+## Tasks, in order
 
-- [Is Automaton for you?](/is-automaton-for-you)
-- [Install your server](/install-server)
-- [Build an Automaton App](/build-an-automaton-app)
-- [Getting Started](/getting-started)
-- [Build with AI Tools](/cli-ai-tools)
-- [Build a Static App](/build-frontend-app)
-- [Run Server Code](/build-backend-app)
-
-## Exact discovery targets
-
-If you searched for one of these, you are in the right place:
-
-- `Automaton Monster app`
-- `Automaton app structure`
-- `Build a full-stack app`
-- `Todo app example`
-- `Install Automaton CLI`
-- `automaton.json`
-
-## Core workflow
-
-1. Install the server, create your administrator and connect a Runner.
-2. Install the CLI and sign in against your own API URL.
-3. Create or link an app.
-4. Build the app and configure any optional server runtime.
-5. Deploy with `automaton deploy`.
-6. Publish only when you are ready.
-
-## Common paths
-
-- Static sites: declare a build command and output directory; your Runner shares one static server across sites
-- APIs: declare a runtime image/command, port, health path and persistent storage; Actions run finite jobs
-- AI-assisted workflow: start with the prompt in [Build with AI Tools](/cli-ai-tools)
-- App contract and structure: start with [Build an Automaton App](/build-an-automaton-app)
+1. [Is Automaton for you?](/is-automaton-for-you)
+2. [Install the server](/install-server)
+3. [Create the first administrator](/first-admin)
+4. [Add a Runner](/deploy-runner)
+5. [Create your first app](/getting-started)
+6. [Build an Automaton app](/build-an-automaton-app)
+7. [Deploy and publish an app](/deploy)
+8. [Update the server](/update-server)
+9. [Back up and restore](/backup-restore)
+10. [Secrets and permissions](/secrets-and-permissions)
 
 ## Reference
 
-- [Build an Automaton App](/build-an-automaton-app)
-- [Deploy a Runner](/deploy-runner)
-- [Deploy](/deploy)
-- [Publish](/publish)
-- [automaton.json Reference](/automaton-json)
-- [Full-Stack Todo Example](/example-todo-fullstack)
-- [Automaton CLI Reference](/automaton-cli)
+- [Automaton CLI](/automaton-cli)
+- [automaton.json](/automaton-json)
+- [Troubleshooting](/troubleshooting)
 - [Current limitations](/limitations)
 - [FAQ](/faq)
+- [Security overview](https://github.com/rzvdaniel/automaton/blob/main/docs/security/overview.md)

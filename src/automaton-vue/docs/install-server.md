@@ -1,73 +1,60 @@
 ---
-title: Install Automaton on your server
-description: Install your own Automaton Studio and API, connect a Runner, and update your installation.
+title: Install the server
+description: Install Automaton (Studio, API, app store, PostgreSQL, RabbitMQ, Traefik) on one Ubuntu server with a domain, using one command.
 ---
 
-# Install on your server
+# Install the server
 
-Automaton is open source under Apache 2.0. You run your own Studio, API and app workloads. No Automaton cloud account or subscription is required; you cover infrastructure and any AI tools you choose.
+This page installs your own Automaton server on one Ubuntu machine. Next steps: [create the first administrator](./first-admin), then [add a Runner](./deploy-runner).
 
-Already have a team installation? Ask your administrator for its API URL and go to [Getting started](./getting-started).
+Already have a team server? Ask its administrator for the API URL and go to [Create your first app](./getting-started).
 
-## Before starting
+## Prerequisites
 
-- An x86_64 Ubuntu 24.04+ server with sudo access and at least 10 GiB free disk space. Size memory, CPU and app storage for your workloads; this disk figure is installation headroom.
-- A domain with `api`, `studio`, `store`, `apps` and `*.apps` DNS records pointing to the server. `store` serves your public app store.
-- Inbound TCP ports 80 and 443 for HTTPS, and 5671 for the TLS Runner broker. The API hostname must remain directly reachable on the broker port.
+- An x86_64 Ubuntu 24.04 server with sudo access, outbound internet and at least 10 GiB free disk space.
+- A domain you can edit DNS for, and an email for certificate notices.
+- Inbound TCP ports 80 and 443 (HTTPS) and 5671 (TLS Runner broker). Keep the `api` hostname directly reachable on 5671.
+- DNS records pointing to the server's public IP, set to DNS only (no proxy). Pick one of:
 
-The server currently requires public DNS and HTTPS. A private-only, offline or ARM installation is not the supported quickstart. Docker is installed automatically if missing.
+  | Setup | Records |
+  |---|---|
+  | Two wildcards (shortest) | `*.example.com` and `*.apps.example.com`, plus an explicit `apps.example.com` if it does not resolve |
+  | One record per name | `api`, `studio`, `store`, `apps` and `*.apps` under `example.com` |
+
+Private-only, offline and ARM installs are not supported.
 
 ## Install
 
-Download and review the installer, then run it:
+1. Download the installer and read it.
+
+   ```bash
+   curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
+   less install-automaton.sh
+   ```
+
+2. Run it with your domain and email. The installer first checks that DNS resolves to this server and stops with the records to fix if it does not.
+
+   ```bash
+   sudo bash install-automaton.sh --domain example.com --email owner@example.com
+   ```
+
+3. Wait for it to finish. It installs Docker if missing, downloads the latest stable release, verifies its checksum, starts the stack and prints a one-time first-administrator setup link. Open that link in the next step.
+
+Options: `--version server-vX.Y.Z` pins a release; `--public-ip ADDRESS` is for servers behind NAT (repeat for IPv6); `--tls-mode cloudflare` uses a Cloudflare wildcard certificate (enter the DNS token only at the hidden prompt). Never pass secrets as command arguments.
+
+## Verify it worked
 
 ```bash
-curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
-less install-automaton.sh
-sudo bash install-automaton.sh
+curl -fsS https://api.example.com/health
 ```
 
-It asks for your domain and certificate email, downloads the latest stable release, verifies its checksum, and starts Studio, API, the app store, Worker, PostgreSQL, RabbitMQ and Traefik. Add `--version server-vX.Y.Z` to select a release. Use `--tls-mode cloudflare` for optional Cloudflare wildcard certificates; provide the scoped DNS token only at the hidden terminal prompt.
+Expected: `ok` with HTTP 200. Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
 
-## Create the administrator and connect a Runner
+## Common errors
 
-1. Open `https://studio.your-domain.com/install`.
-2. On the server, read `sudo cat /etc/automaton/secrets/setup-token` and paste it into the setup page. Create your administrator, then sign in.
-3. In **Runners**, create a Machine Management Runner installation and run its one-time command on the workload machine. You can use the same server or another supported machine. This trusted management component controls host Docker; ordinary apps do not receive its Docker socket or credentials.
+- **DNS check fails.** The installer lists the names that do not resolve to this server. Fix the records, wait for DNS, rerun the same command. Proxied (orange cloud) records break certificates and the Runner broker.
+- **Port in use or different installation found.** The installer refuses to take over. Free the port or use a clean server.
+- **Certificate not issued.** Port 80 must be reachable from the internet.
+- **Retrying.** Rerun the same command with the same domain and email; generated credentials are kept. Never run `docker compose down -v`: it deletes data.
 
-Every app needs a Runner. Static sites share a static serving container; APIs and Actions use their declared runtime or execution containers.
-
-## Connect the CLI
-
-On your development computer, install the CLI and authenticate against **your API URL**:
-
-```bash
-dotnet tool install -g Automaton.Cli
-automaton login --server https://api.your-domain.com
-```
-
-The NuGet tool requires the .NET 10 SDK or later. Approve login in your own Studio. Keep credentials out of AI chat. Continue with [your first app](./getting-started).
-
-## Update
-
-```bash
-sudo bash /opt/automaton-server/update.sh
-```
-
-The updater selects the latest compatible stable release, checks its checksum, creates a local recovery backup, then replaces API, Worker, Studio and the app store. Updating to the first release with the app store needs the new updater once; see the complete guide linked below. These services can briefly be unavailable. Infrastructure changes and Runner-machine upgrades are separate operations; app workloads are not automatically moved to another server.
-
-## Backups
-
-Your server backs itself up every night by default: a consistent copy of the database and the keys that decrypt it, kept for 7 days in `/opt/automaton-server/backups/nightly`. **Admin → Installation → Backups** in Studio shows each backup and the command to restore it.
-
-These backups live on the same server. Also turn on your hosting provider's server backups (snapshots), and copy backups to storage elsewhere if losing the server or hosting account would hurt.
-
-To restore, run the command Studio shows on the server, for example:
-
-```bash
-sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z
-```
-
-It asks you to type your domain, saves the current state first, then replaces the database and keys with the backup. Everything written after that backup is lost.
-
-See the [complete installation, update and recovery guide](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md) for networking, custom paths, protected settings, adopted installations and recovery limits.
+For custom paths, protected settings, adopted installs and recovery, see the [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md). To update or restore later: [Update the server](./update-server), [Back up and restore](./backup-restore).

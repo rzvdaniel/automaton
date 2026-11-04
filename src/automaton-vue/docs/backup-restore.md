@@ -1,0 +1,54 @@
+---
+title: Back up and restore
+description: Nightly server backups, how to take and list one, and how to restore the database and keys from a backup.
+---
+
+# Back up and restore
+
+This page covers the server's database and keys. It does not cover files that apps keep in their own data directories.
+
+## Prerequisites
+
+SSH access with sudo on the server.
+
+## What you get by default
+
+The installer turns on a nightly backup between 03:00 and 04:00 server time and keeps the newest 7 in `/opt/automaton-server/backups/nightly`. Each holds a PostgreSQL dump and the keys that decrypt it. **Admin → Installation → Backups** in Studio lists them with the restore command.
+
+## Take or list a backup
+
+```bash
+sudo bash /opt/automaton-server/backup.sh            # back up now
+sudo bash /opt/automaton-server/backup.sh --list     # list backups
+sudo systemctl list-timers automaton-backup.timer    # next scheduled run
+```
+
+These backups live on the same server. Also turn on your hosting provider's backups and copy `/opt/automaton-server/backups/nightly` and `/etc/automaton` to encrypted storage elsewhere.
+
+## Restore
+
+Restoring replaces the whole database and keys. Everything written after that backup is lost.
+
+```bash
+sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z
+```
+
+It verifies checksums, asks you to type the server's domain (for automation, `--confirm example.com`), saves the current state as a new backup, stops the services, restores, starts and checks Studio. A backup from an older server version restores onto a newer one; the reverse is not supported.
+
+To move to a new server, install the same release there, copy a backup folder into `/opt/automaton-server/backups/nightly/`, restore it, and copy `/etc/automaton` if existing sessions and Runners must keep working.
+
+## Verify it worked
+
+```bash
+curl -fsS https://api.example.com/health
+automaton installation-status
+```
+
+Expected: `ok`, and your users and apps are counted. Restoring onto a clean second server is not yet proven; see [Current limitations](./limitations).
+
+## Common errors
+
+- **Studio shows a Backups error.** The last backup failed or is over 36 hours old. Check `sudo journalctl -u automaton-backup.service`.
+- **Restore refuses.** Pick a name from `--list`; it must match a folder in `backups/nightly`.
+
+Details: [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md#backups-and-restore).

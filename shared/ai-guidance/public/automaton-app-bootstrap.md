@@ -1,27 +1,17 @@
-# Starting an Automaton app
+# Automaton
+
+Automaton is a self-hosted platform for building, deploying and publishing web apps. The user runs their own server (Studio, API, app store) and one or more Runners that run the apps. Documentation: https://automaton.monster/docs/ . This file is the index for AI agents; every page below is one task with exact commands, a way to verify the result and common errors.
+
+## Starting an Automaton app
 
 If you are in an empty directory and the user asks you to build an Automaton app:
 
-1. Check whether the `automaton` CLI is available with `automaton --help`.
-2. If it is missing, follow the official [CLI installation instructions](/docs/automaton-cli).
-3. Use the user’s own Automaton API URL. If there is no installation yet, follow
-   [server setup](/docs/install-server); for a team installation, use its administrator-provided URL.
-   Authenticate with `automaton login --server <api-url>` if necessary, then run
-   `automaton new "My App"` using a name appropriate to the request. Do not assume
-   the public project website is the user’s Automaton server.
-4. Before implementing the app, read the generated `AGENTS.md`,
-   `.automaton/agents/skills/automaton-app/SKILL.md`, and `automaton.json`.
-5. Follow those local instructions and the deployment contract as the authoritative
-   workflow for the project. Public guidance provides discovery and bootstrap;
-   the generated files guide app development.
-6. Choose the language, framework, and build tools after inspecting the user's
-   requirements and available runtime environment. Do not assume that tools
-   installed locally are available on the assigned Runner.
+1. Check whether the `automaton` CLI is available with `automaton --help`. If it is missing, follow [Create your first app](https://automaton.monster/docs/getting-started) (`dotnet tool install -g Automaton.Cli`).
+2. Use the user's own Automaton API URL. If there is no server yet, follow [Install the server](https://automaton.monster/docs/install-server), [Create the first administrator](https://automaton.monster/docs/first-admin) and [Add a Runner](https://automaton.monster/docs/deploy-runner); for a team server, use its administrator-provided URL. Authenticate with `automaton login --server <api-url>` (add `--profile NAME` for several servers), then run `automaton new "My App" --template node|python|dotnet|static` (or no template) with a name appropriate to the request. Do not assume the public project website is the user's Automaton server.
+3. Before implementing the app, read the generated `AGENTS.md`, `.automaton/agents/skills/automaton-app/SKILL.md` and `automaton.json`. They are the authoritative workflow for the project; this public guidance provides discovery and bootstrap.
+4. Choose the language, framework and build tools after inspecting the user's requirements and the Runner environment. Do not assume that tools installed locally are available on the Runner.
+5. Run `automaton validate`, `automaton deploy` and wait for `Succeeded`, verify the app's real behavior, then publish with `automaton publish --yes --slug NAME` when that is within the request ([Deploy and publish an app](https://automaton.monster/docs/deploy)).
 
-The app's deployment target needs a Machine Management Runner. `automaton deploy`
-assigns the only online one available to the app; otherwise assign one in Studio
-or with `automaton set-runner`. Do not assume an unassigned or unsupported
-Runner can host the app.
+The app's deployment target needs a Machine Management Runner. `automaton deploy` assigns the only online one; otherwise use `automaton set-runner` or `--runner`. For an existing remote app use `automaton link <app-id>` instead of creating another app.
 
-For an existing remote app, use `automaton link <app-id>` instead of creating
-another app, then read the generated local guidance before making changes.
+Never paste or print API keys, tokens or passwords. Self sign-up is disabled; users come only from an administrator.

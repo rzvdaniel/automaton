@@ -1,30 +1,56 @@
 ---
 title: Build an Automaton app
-description: Build, configure, validate, deploy, and publish an Automaton application.
+description: The app contract in practice; static sites, servers with a runtime, durable data and what to tell a coding agent.
 ---
 
 # Build an Automaton app
 
-An Automaton app is a project with `automaton.json` and application source. The
-source layout and technology are yours to choose.
+An app is a folder with `automaton.json` and source in any language. This page shows the two common shapes. The complete field list is the [automaton.json reference](./automaton-json).
 
-## Workflow
+## Prerequisites
 
-1. Install and authenticate the CLI.
-2. Run `automaton new "<app-name>"` or `automaton link <app-id>`.
-3. Inspect `automaton.json` and the generated `AGENTS.md`.
-4. Choose a suitable technology and implement the requested app.
-5. Configure `application.build`, `application.runtime`, `application.health`,
-   and `application.storage` as needed.
-6. Run `automaton validate`.
-7. Run `automaton deploy` and wait for `Succeeded`.
-8. Verify the deployed URL.
+An app folder from [Create your first app](./getting-started).
 
-The generic contract supports optional build work, a long-running runtime,
-HTTP readiness, and durable data. The Runner supplies `AUTOMATON_PORT` and
-`AUTOMATON_APP_DATA_DIR` to the process. Publishing is separate and requires
-explicit approval.
+## Static site
 
-Read the [automaton.json reference](/automaton-json) for the field contract,
-the [CLI reference](/automaton-cli) for commands, and [Deploy](/deploy) for
-deployment details.
+Build files, no server process. `automaton new "My Site" --template static` creates this shape: a build command that writes the files into `outputDirectory`, and a health file.
+
+```json
+{
+  "name": "My Site",
+  "application": {
+    "build": {
+      "command": { "executable": "sh", "arguments": ["-c", "mkdir -p dist && cp index.html health dist/"] },
+      "outputDirectory": "dist"
+    },
+    "health": { "path": "/health" }
+  }
+}
+```
+
+Runners serve static output from one shared static server. Static sites cannot use [secrets](./secrets-and-permissions).
+
+## Server with a runtime
+
+For APIs, server-rendered sites and anything with logic. Declare `application.runtime.command`; the process must listen on `AUTOMATON_PORT` and answer `application.health.path`. Store durable files under `AUTOMATON_APP_DATA_DIR`. `--template node|python|dotnet` creates a working example.
+
+Requests and responses are complete: WebSockets and streamed responses (Server-Sent Events) are not supported. For live views, poll a small JSON endpoint.
+
+## Deploy and verify
+
+```bash
+automaton validate
+automaton deploy
+```
+
+Wait for `Succeeded` and verify the real behavior at the URL. See [Deploy and publish an app](./deploy).
+
+## For coding agents
+
+`automaton new` writes `AGENTS.md` and `.automaton/agents/skills/automaton-app/SKILL.md`. An agent should read them and `automaton.json`, keep the contract accurate, run `automaton validate` then `automaton deploy`, wait for `Succeeded`, and verify the app before reporting success. Do not paste API keys into the conversation. Machine-readable entry point: <https://automaton.monster/llms.txt>.
+
+## Common errors
+
+- **Build tools exist locally but not on the Runner.** Set `application.build.image` to an image that has them.
+- **Port mismatch.** Listen on `AUTOMATON_PORT`, not a fixed port.
+- More: [Troubleshooting](./troubleshooting).

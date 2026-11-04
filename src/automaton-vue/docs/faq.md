@@ -18,7 +18,7 @@ Not measured yet; see the placeholder in [Is Automaton for you?](./is-automaton-
 No, but Automaton is designed around one. The CLI generates an `AGENTS.md` and checks so a coding agent can build, validate, deploy and verify an app. You can also write the app yourself.
 
 ## What can I run?
-Static sites, APIs and long-running servers in containers, and finite jobs called Actions. See [Build an Automaton App](./build-an-automaton-app).
+Static sites, APIs and long-running servers in containers, and finite jobs called Actions. See [Build an Automaton app](./build-an-automaton-app).
 
 ## What can I not run?
 Apps that need WebSockets or streamed responses; see [Current limitations](./limitations).
@@ -30,10 +30,10 @@ No. Self sign-up is disabled. An administrator creates or invites each user.
 On your servers. Studio, the API, the database and every app run on machines you install them on.
 
 ## How do updates work?
-Run `sudo bash /opt/automaton-server/update.sh`. It verifies the release, makes a local backup and replaces the services, with a brief interruption. See [Install your server](./install-server#update).
+Run `automaton server update --wait` or use Admin → Installation → Update in Studio. See [Update the server](./update-server).
 
 ## How are backups handled?
-Nightly local backups of the database and keys (not your apps' data files) are kept for 7 days. Restoring onto a different clean server is not yet proven. Also use your hosting provider's snapshots and copy backups elsewhere. See [Install your server](./install-server#backups).
+Nightly local backups of the database and keys are kept for 7 days. See [Back up and restore](./backup-restore).
 
 ## Can I use more than one server?
 Yes. Install a Runner on each machine. With one Runner, `automaton deploy` uses it automatically; with several, you pick one per app (`automaton set-runner`). There is no automatic balancing or failover.

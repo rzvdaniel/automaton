@@ -214,12 +214,54 @@ function readPublicBootstrap() {
   return fs.readFileSync(bootstrapPath, 'utf-8').trim()
 }
 
+const siteOrigin = 'https://automaton.monster'
+const websiteDocsRoot = path.resolve(__dirname, 'docs')
+
+// Key documentation pages, in reading order. llms.txt lists them and llms-full.txt contains them,
+// both built from the Markdown source at build time so they cannot go stale.
+const keyDocs: Array<{ file: string; url: string }> = [
+  'install-server',
+  'first-admin',
+  'deploy-runner',
+  'getting-started',
+  'build-an-automaton-app',
+  'deploy',
+  'update-server',
+  'backup-restore',
+  'secrets-and-permissions',
+  'automaton-cli',
+  'automaton-json',
+  'troubleshooting',
+  'limitations',
+].map(slug => ({ file: path.join(websiteDocsRoot, `${slug}.md`), url: `${siteOrigin}/docs/${slug}` }))
+keyDocs.push({
+  file: path.resolve(__dirname, '../../docs/security/overview.md'),
+  url: 'https://github.com/rzvdaniel/automaton/blob/main/docs/security/overview.md',
+})
+
+function readKeyDoc(doc: { file: string }) {
+  const raw = fs.readFileSync(doc.file, 'utf-8').replace(/\r\n/g, '\n')
+  const match = /^---\n([\s\S]*?)\n---\n/.exec(raw)
+  const field = (name: string) => new RegExp(`^${name}: *(.+)$`, 'm').exec(match?.[1] ?? '')?.[1].trim() ?? ''
+  const body = (match ? raw.slice(match[0].length) : raw).trim()
+  const title = field('title') || /^# (.+)$/m.exec(body)?.[1] || ''
+  const firstLine = body.split('\n').find(line => line.length > 0 && !line.startsWith('#')) ?? ''
+  return { title, description: field('description') || firstLine, body }
+}
+
 function buildPublicLlmsAssets() {
   const bootstrap = readPublicBootstrap()
   const basePrompt = readSharedBasePrompt()
   const guidanceDocuments = listSeedGuidanceDocuments()
+  const docs = keyDocs.map(doc => ({ ...doc, ...readKeyDoc(doc) }))
   const llmsTextLines = [
     bootstrap,
+    '',
+    '## Documentation',
+    '',
+    ...docs.map(doc => `- [${doc.title}](${doc.url}): ${doc.description}`),
+    '',
+    `All of these pages in one file: ${siteOrigin}/llms-full.txt`,
     '',
     basePrompt,
     '',
@@ -230,6 +272,7 @@ function buildPublicLlmsAssets() {
 
   const llmsFullSections = [
     llmsTextLines.join('\n').trim(),
+    ...docs.flatMap(doc => ['', '---', '', `Source: ${doc.url}`, '', doc.body]),
     ...guidanceDocuments.map(document => fs.readFileSync(document.filePath, 'utf-8').trim()).flatMap(content => ['', '---', '', content]),
   ]
 

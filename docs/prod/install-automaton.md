@@ -1,4 +1,6 @@
-# Install Automaton on your server
+# Install Automaton on your server: operator reference
+
+This is the detailed reference for operators and maintainers (custom paths, protected settings, adopted installations, recovery, publishing a release). For the short task pages use the website docs: [install](../../src/automaton-vue/docs/install-server.md), [first administrator](../../src/automaton-vue/docs/first-admin.md), [update](../../src/automaton-vue/docs/update-server.md), [backup and restore](../../src/automaton-vue/docs/backup-restore.md). Those pages are the source for the quick path; this page is the source for everything beyond it.
 
 The server release installs API, Studio, the public app store, Worker, PostgreSQL 16, RabbitMQ and Traefik together with Docker Compose. The installer supports **Ubuntu 24.04 or newer on x86_64** with public DNS. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. When installing Docker, the installer uses Docker's Ubuntu apt repository, which must publish packages for the host's Ubuntu codename. HTTPS uses HTTP validation by default; Cloudflare DNS validation is optional for wildcard certificates. It uses prebuilt images, generates unique credentials and stores configuration outside any Git checkout.
 

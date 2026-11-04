@@ -6,6 +6,9 @@ This folder contains an Automaton app. The local workflow is in
 Read that skill before changing the app. It is the complete local workflow;
 this file is only the entry point.
 Use the CLI's documented commands and preserve the user's chosen technology.
+Documentation for every task (deploy, publish, secrets, troubleshooting) is indexed at
+https://automaton.monster/llms.txt, and all key pages are in one file at
+https://automaton.monster/llms-full.txt.
 
 `automaton.json` is the deployment contract. Automaton does not prescribe a
 language, framework, package manager, source layout, or application architecture.

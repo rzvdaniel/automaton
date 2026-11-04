@@ -24,13 +24,7 @@ an AI conversation.
 
 ## Install a Runner
 
-After login, install a Machine Management Runner on an Ubuntu host with Docker running:
-
-```bash
-automaton runners install --name main --ssh user@host
-```
-
-Use `--local` on the host (the Ubuntu host needs Docker running), or `--print-command` to run the one-time command yourself before its printed expiry. Without a mode, an interactive terminal prints the command. The CLI asks you to acknowledge that the trusted Runner has Docker access on its host; `--yes` provides that acknowledgement for automation (required when not interactive). The installer command goes to SSH or sudo over standard input and is not passed as a process argument. The installer step times out after 900 seconds. The CLI waits up to 300 seconds for a connection (`--timeout` changes this), prints the Runner ID, and can add the connected Runner to a project with `--project NAME`. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
+`automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. Steps, options and errors: [Add a Runner](./deploy-runner).
 
 ## Several servers
 
@@ -99,9 +93,13 @@ deployed URL.
 ```bash
 automaton sync-ai
 automaton pull
+automaton apps                  # your apps: ID, name, Runner, status, public URL
+automaton installation-status   # server version, counts, last backup
 automaton runners
+automaton project runners       # list, add or remove a project's Runners
 automaton project list
-automaton publish
+automaton publish --yes --slug NAME
+automaton delete --yes          # permanently delete the linked remote app
 automaton listing show
 ```
 
@@ -109,14 +107,14 @@ automaton listing show
 source. `runners` lists available Runners. `project create|list|add-app` manages projects with an API key; adding an app to a project lets it use the project secret vault. To move a deployed Live environment to another Runner, run `automaton set-runner <runner> --cleanup-runtime`, then `automaton deploy`; a published static site stays published. `publish` makes the latest deployment
 public and requires explicit user approval. `listing` sets the app's marketplace
 summary, description, category, tags, cover and screenshots; see
-[Publish](./publish#marketplace-listing).
+[Deploy and publish an app](./deploy#marketplace-listing).
 
 System administrators of a self-hosted server can update it from the CLI:
 `automaton server update --wait` installs the latest release (or `--version
 server-vX.Y.Z`), then checks `/health` and the installed version and exits
-nonzero on failure with the log tail and recovery backup;
+nonzero on failure with the log tail and recovery backup (an older release needs `--allow-downgrade`);
 `automaton server update-status` shows the last run. See
-[Update an installed server](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md#update-an-installed-server).
+[Update an installed server](./update-server).
 
 The optional positional argument to `automaton deploy` selects a remote
 deployment target. Its `--env <name>` option instead selects a local project

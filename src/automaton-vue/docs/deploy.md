@@ -1,68 +1,72 @@
 ---
-title: Deploy an App
-description: Deploy your Automaton app with the CLI using automaton deploy.
+title: Deploy and publish an app
+description: Validate, deploy and publish an Automaton app from the CLI, check its status, set a marketplace listing, and delete it.
 ---
 
-# Deploy
+# Deploy and publish an app
 
-`automaton deploy` uploads your app runtime to Automaton.
+This page ships an app to a Runner and makes it public. Deploy and publish are separate: deploy builds and starts the app, publish gives it a public URL.
 
-For most users, deploy means:
+## Prerequisites
+
+- An app folder with `automaton.json` ([Create your first app](./getting-started)).
+- At least one online Runner ([Add a Runner](./deploy-runner)).
+
+## Steps
+
+1. Validate and deploy. The deployment is asynchronous; wait for `Succeeded`.
+
+   ```bash
+   automaton validate
+   automaton deploy
+   ```
+
+   With one online Runner it is assigned automatically. With several, add `--runner NAME`. `automaton deploy <target-slug>` selects a remote deployment target; `--env NAME` selects a local project profile, not a remote target.
+
+2. Check the result.
+
+   ```bash
+   automaton status
+   automaton logs
+   automaton apps
+   ```
+
+3. Publish when it is within what was asked for. `--yes` skips the prompt (use it for automation after approval); `--slug` sets the public URL name. Publishing waits for the TLS certificate before it reports success.
+
+   ```bash
+   automaton publish --yes --slug my-app
+   ```
+
+   `automaton deploy --publish` deploys and publishes in one step.
+
+## Verify it worked
+
+Open the printed URL and check the app's real behavior, not only that the deployment succeeded. `automaton installation-status` shows the server version, counts and last backup.
+
+## Marketplace listing
+
+A published app is listed in your server's app store by default. Set how it appears:
 
 ```bash
-automaton deploy
+automaton listing set --summary "A bluffing game about real words" --category Games --tags "game,multiplayer"
+automaton listing cover cover.png
+automaton listing add-screenshot lobby.png
+automaton listing show
 ```
 
-## What deploy does
+Summary up to 200 characters, description up to 500. Images are PNG, JPG, WEBP or GIF up to 2 MB: one cover and up to 8 screenshots. Remove one with `automaton listing remove-screenshot <id>`. The same settings are in Studio under the app's Settings.
 
-- Uploads the configured public runtime
-- Uploads optional server runtime code when configured
-- Starts server execution automatically when an execution target is available
-
-Any app with an HTTP/public endpoint needs an execution target for its runtime,
-including static apps. Deploy can still upload that runtime before a target
-exists.
-
-## If no execution target exists yet
-
-Deploy can still succeed.
-
-In that case, the CLI explains that:
-
-- the app was deployed
-- server runtime was uploaded
-- server execution is not active yet
-
-The public URL becomes available only after the application-owned runtime starts
-on a Runner. A build output directory alone does not create a public web app.
-
-Then it tells you the next step.
-
-Most users do not need to think about infrastructure details first. Just run deploy and follow the CLI output.
-
-## Common commands
+## Delete an app
 
 ```bash
-automaton deploy
-automaton deploy --publish
-automaton deploy --publish --non-interactive
-automaton deploy --runner my-runner
+automaton delete --yes
 ```
 
-If the Live environment has no Runner yet, `automaton deploy` assigns the only
-online Machine Management Runner and reports it. With several online Runners,
-choose one with `--runner`.
+This permanently deletes the linked remote app, its runtime and its data.
 
-Use `automaton deploy <target-slug>` to select a remote deployment target. The
-`--env <name>` option selects the local project profile that contains the app
-link and credentials; it is not a remote target selector. Use
-`automaton deploy --publish` to publish after deployment, or standalone
-`automaton publish --yes` as the explicit non-interactive publish confirmation.
+## Common errors
 
-## Recommended mental model
-
-- `deploy` = ship the current app
-- `publish` = make it public
-- AI/CI/scripts should use explicit publish flags instead of relying on follow-up prompts
-
-That is the important distinction.
+- **No Runner available.** Deploy can upload but cannot start the app. Add or start a Runner, then deploy again.
+- **Health check fails.** The app must listen on `AUTOMATON_PORT` and answer the path in `application.health.path`. Read `automaton logs`.
+- **Secrets missing.** See [Secrets and permissions](./secrets-and-permissions).
+- More: [Troubleshooting](./troubleshooting).
