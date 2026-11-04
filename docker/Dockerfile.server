@@ -40,6 +40,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:8080
+ARG SERVER_VERSION
+ENV Installation__Version=${SERVER_VERSION}
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \

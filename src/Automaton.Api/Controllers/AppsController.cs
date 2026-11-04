@@ -35,6 +35,7 @@ public class AppsController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<ActionResult<IReadOnlyList<AppListItemDto>>> Get([FromQuery] Guid? projectId = null, CancellationToken cancellationToken = default)
     {
         return Ok(await appsService.ListAsync(projectId, cancellationToken));

@@ -2,6 +2,8 @@ using Automaton.Api.Application.Commands;
 using Automaton.Api.Data;
 using Automaton.Api.Enums;
 using Automaton.Api.Services;
+using Automaton.Core.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +24,19 @@ public class InstallController(InstallService installService, IConfiguration con
             UserSignUp = configuration.GetValue<bool>("AppConfig:UserSignUp"),
             SetupTokenRequired = !environment.IsDevelopment() || !string.IsNullOrWhiteSpace(configuration["Bootstrap:Token"])
         });
+
+    [HttpGet("summary")]
+    [Authorize(Policy = "DeveloperApiAccess", Roles = UserRole.SystemAdministrator)]
+    public async Task<ActionResult<InstallationSummary>> GetSummary(CancellationToken token)
+    {
+        var backups = await InstallationBackups.ReadAsync(configuration, token);
+        return Ok(new InstallationSummary(
+            configuration["Installation:Version"],
+            await db.Users.CountAsync(token),
+            await db.WebApps.CountAsync(token),
+            await db.Runners.CountAsync(token),
+            backups.LastSuccessAt));
+    }
 
     [HttpPost("checks")]
     [AllowAnonymous]

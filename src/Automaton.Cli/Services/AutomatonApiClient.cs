@@ -178,6 +178,17 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    internal async Task<IReadOnlyList<AppInventoryItem>> ListAppInventoryAsync(CancellationToken ct = default)
+        => (await ListAppsAsync(ct)).Deserialize<AppInventoryItem[]>(JsonOptions) ?? [];
+
+    internal async Task<InstallationSummary> GetInstallationSummaryAsync(CancellationToken ct = default)
+    {
+        using var response = await _http.GetAsync("api/install/summary", ct);
+        await EnsureSuccessAsync(response);
+        return (await ReadJsonAsync(response, ct)).Deserialize<InstallationSummary>(JsonOptions)
+            ?? throw new InvalidOperationException("Installation summary response was empty.");
+    }
+
     public async Task<JsonElement> RunAppActionAsync(string appId, string actionKey, JsonElement input, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { input }, JsonOptions);

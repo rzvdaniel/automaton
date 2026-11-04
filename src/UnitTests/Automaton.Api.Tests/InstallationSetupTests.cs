@@ -77,6 +77,19 @@ public sealed class InstallationCompletionTests
 public sealed class InstallationEndpointTests
 {
     [Test]
+    public async Task SummaryReturnsCountsAndNullWhenBackupIsUnavailable()
+    {
+        await using var db = Database();
+        db.Users.Add(new ApplicationUser { Id = Guid.NewGuid(), UserName = "operator", PublicUsername = "operator" });
+        await db.SaveChangesAsync();
+
+        var result = await Controller(db).GetSummary(CancellationToken.None);
+
+        Assert.That(((OkObjectResult)result.Result!).Value,
+            Is.EqualTo(new Automaton.Core.Models.InstallationSummary(null, 1, 0, 0, null)));
+    }
+
+    [Test]
     public async Task InvalidTokenCannotCreateAdministratorOrReadChecks()
     {
         await using var db = Database();
