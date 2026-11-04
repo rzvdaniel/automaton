@@ -348,7 +348,7 @@ public class ProjectResourceService
 
         if (runner == null)
         {
-            throw new InvalidOperationException("Runner not found or access denied");
+            throw new KeyNotFoundException("Runner not found");
         }
 
         if (!RunnerProfileRules.IsValid(runner.Purpose, runner.ApplicationProfile))

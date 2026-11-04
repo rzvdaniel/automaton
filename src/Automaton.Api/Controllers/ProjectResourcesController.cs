@@ -218,6 +218,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpGet("runners")]
     [Authorize(Policy = "ProjectMember")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<IEnumerable<ProjectRunnerDto>>> ListProjectRunners(Guid projectId)
     {
         try
@@ -242,13 +243,15 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpPost("runners/{runnerId}")]
     [Authorize(Policy = "ProjectResourceManager")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectRunnerDto>> AddRunnerToProject(Guid projectId, Guid runnerId)
     {
+        if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();
         try
         {
             var projectRunner = await resourceService.AddRunnerToProjectAsync(projectId, runnerId);
-            
-            return Ok(projectRunner);
+
+            return projectRunner is null ? Forbid() : Ok(projectRunner);
         }
         catch (UnauthorizedAccessException)
         {
@@ -257,6 +260,10 @@ public class ProjectResourcesController : BaseController
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { message = "Runner not found" });
         }
         catch (Exception ex)
         {
@@ -272,8 +279,10 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpDelete("runners/{runnerId}")]
     [Authorize(Policy = "ProjectResourceManager")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult> RemoveRunnerFromProject(Guid projectId, Guid runnerId)
     {
+        if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();
         try
         {
             var success = await resourceService.RemoveRunnerFromProjectAsync(projectId, runnerId);

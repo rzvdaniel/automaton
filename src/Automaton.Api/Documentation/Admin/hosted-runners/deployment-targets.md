@@ -146,6 +146,8 @@ Changing a deployed target's Runner requires confirmation because the selected t
 
 Every new workload needs a Machine Management Runner. When an app's Live environment has none and exactly one online Machine Management Runner is available in the app's scope (personal or project), `automaton deploy` assigns it and reports the assignment. Otherwise, assign one explicitly. Existing Hosted Runner records remain historical and cannot be managed through Studio.
 
+A project member with a Developer API key can use `automaton project runners list|add|remove` to manage a project's Runner links from the CLI. Add and remove require the project's ProjectAdmin or Developer role; adding also requires ownership of the Runner. Use `--project <name-or-id>` outside a linked project app folder. To delete a project app, first run `automaton project remove-app` as a ProjectAdmin or Developer, then `automaton delete --yes` as its owner. The latter deletes the remote app and runtime/data under the same rules as Studio; local source files remain.
+
 A failed package/runtime application, or a result accepted by no Runner, is a failed CLI deployment with a nonzero exit code. Inspect the reported failure and target/Runner logs before retrying. A failed replacement can leave the previous healthy runtime serving; that availability does not make the attempted deployment successful. Restore-point warnings remain distinct from runtime failure.
 
 ## Recover an interrupted whole-app deletion

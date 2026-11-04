@@ -66,6 +66,17 @@ public class CommandJsonShapeTests
     }
 
     [Test]
+    public async Task DeleteCommandRequiresExplicitConfirmationBeforeCredentialsOrNetwork()
+    {
+        var projectRoot = CreateProjectRoot();
+        var output = await InvokeAndCaptureAsync(DeleteCommand.Build(new ConfigService()), projectRoot, ["--json"]);
+
+        using var document = JsonDocument.Parse(output);
+        Assert.That(document.RootElement.GetProperty("success").GetBoolean(), Is.False);
+        Assert.That(document.RootElement.GetProperty("error").GetString(), Does.Contain("--yes"));
+    }
+
+    [Test]
     public async Task PublishCommand_WhenProjectIsMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();

@@ -14,6 +14,8 @@ public static class ProjectCommand
         command.AddCommand(BuildCreate(config));
         command.AddCommand(BuildList(config));
         command.AddCommand(BuildAddApp(config));
+        command.AddCommand(BuildRemoveApp(config));
+        command.AddCommand(ProjectRunnersCommand.Build(config));
         return command;
     }
 
@@ -72,6 +74,28 @@ public static class ProjectCommand
             var (id, display) = PickProject(projects, projectRef);
             await client.AddAppToProjectAsync(id, appId);
             Report(asJson, new { success = true, projectId = id, appId }, $"Added this app to project {Markup.Escape(display)}.");
+        }), project, json);
+        return command;
+    }
+
+    private static Command BuildRemoveApp(ConfigService config)
+    {
+        var project = new Argument<string?>("project", () => null, "Project name or id; defaults to the linked app's project");
+        var json = JsonOption();
+        var command = new Command("remove-app", "Remove the current app from its project so its owner can delete it") { project, json };
+        command.SetHandler((string? projectRef, bool asJson) => RunAsync(asJson, async () =>
+        {
+            var (server, apiKey, appId) = ResolveLinkedApp(config);
+            using var client = new AutomatonApiClient(server, apiKey);
+            var app = await client.GetAppAsync(appId);
+            var linkedProjectId = Text(app, "projectId");
+            if (string.IsNullOrWhiteSpace(linkedProjectId))
+                throw new InvalidOperationException("This app is not in a project.");
+            var (id, display) = PickProject(await client.ListProjectsAsync(), projectRef ?? linkedProjectId);
+            if (id != linkedProjectId)
+                throw new InvalidOperationException("This app is linked to a different project.");
+            await client.RemoveAppFromProjectAsync(id, appId);
+            Report(asJson, new { success = true, projectId = id, appId }, $"Removed this app from project {Markup.Escape(display)}.");
         }), project, json);
         return command;
     }

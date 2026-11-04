@@ -1,4 +1,5 @@
 ﻿using Automaton.Api.Models;
+using Automaton.Api.Authentication;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Scripting.Engines;
@@ -41,10 +42,12 @@ public class RunnersController : BaseController
     }
 
     [HttpDelete("{id}")]
-    [Authorize]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken,
         [FromQuery] bool hostCleanupConfirmed = false)
     {
+        if (!AppChangeKeyScope.IsAllowed(User))
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot delete Runners. Use a key with the Developer scope." });
         try
         {
             await runnersService.Delete(id, cancellationToken, hostCleanupConfirmed);
@@ -62,10 +65,12 @@ public class RunnersController : BaseController
     }
 
     [HttpPost("{id}/removal")]
-    [Authorize]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> PrepareRemoval(Guid id, [FromServices] RunnerRemovalService removal,
         CancellationToken cancellationToken)
     {
+        if (!AppChangeKeyScope.IsAllowed(User))
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot prepare Runner removal. Use a key with the Developer scope." });
         try { return Ok(await removal.PrepareAsync(id, cancellationToken)); }
         catch (UnauthorizedAccessException) { return Forbid(); }
         catch (InvalidOperationException exception) { return Conflict(new { message = exception.Message }); }

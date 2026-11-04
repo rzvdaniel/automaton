@@ -15,7 +15,25 @@ public class ProjectCommandTests
     [Test]
     public void ExposesTheProjectSubcommands() =>
         Assert.That(ProjectCommand.Build(new ConfigService()).Subcommands.Select(item => item.Name),
-            Is.EquivalentTo(new[] { "create", "list", "add-app" }));
+            Is.EquivalentTo(new[] { "create", "list", "add-app", "remove-app", "runners" }));
+
+    [Test]
+    public void ExposesRunnerAndDeleteCommands()
+    {
+        Assert.That(ProjectRunnersCommand.Build(new ConfigService()).Subcommands.Select(item => item.Name),
+            Is.EquivalentTo(new[] { "list", "add", "remove" }));
+        Assert.That(RunnersCommand.Build(new ConfigService()).Subcommands.Select(item => item.Name), Does.Contain("delete"));
+        Assert.That(DeleteCommand.Build(new ConfigService()).Options.Select(item => item.Name), Does.Contain("yes"));
+    }
+
+    [Test]
+    public void RunnerReferencesResolveOnlyWithinTheReturnedScope()
+    {
+        var runners = Projects("""[{"id":"11111111-1111-1111-1111-111111111111","name":"Mine"}]""");
+        Assert.That(RunnerReferenceResolver.Pick(runners, "MINE", "id", "name"),
+            Is.EqualTo("11111111-1111-1111-1111-111111111111"));
+        Assert.Throws<InvalidOperationException>(() => RunnerReferenceResolver.Pick(runners, "Other", "id", "name"));
+    }
 
     [Test]
     public void PicksTheOnlyProjectWhenNoneIsNamed() =>

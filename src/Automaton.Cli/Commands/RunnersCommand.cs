@@ -14,6 +14,7 @@ public static class RunnersCommand
             jsonOption
         };
         command.SetHandler((bool asJson) => RunnersCommandHandler.HandleAsync(config, asJson), jsonOption);
+        command.AddCommand(RunnersDeleteCommand.Build(config));
         return command;
     }
 }

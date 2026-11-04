@@ -68,6 +68,12 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task DeleteAppAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{Uri.EscapeDataString(appId)}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     public async Task<JsonElement> GetAppByIdOrSlugAsync(string identifier, CancellationToken ct = default)
     {
         var value = identifier.Trim();
@@ -567,6 +573,31 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(resp);
     }
 
+    public async Task RemoveAppFromProjectAsync(string projectId, string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/projects/{Uri.EscapeDataString(projectId)}/apps/{Uri.EscapeDataString(appId)}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public async Task<JsonElement> ListProjectRunnersAsync(string projectId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/projects/{Uri.EscapeDataString(projectId)}/runners", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task AddRunnerToProjectAsync(string projectId, string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/projects/{Uri.EscapeDataString(projectId)}/runners/{Uri.EscapeDataString(runnerId)}", "{}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public async Task RemoveRunnerFromProjectAsync(string projectId, string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/projects/{Uri.EscapeDataString(projectId)}/runners/{Uri.EscapeDataString(runnerId)}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     // ── Runners ───────────────────────────────────────────────────────────────
 
     public Task<JsonElement> ListRunnersAsync(CancellationToken ct = default)
@@ -581,6 +612,19 @@ public class AutomatonApiClient : IDisposable
         using var resp = await _http.GetAsync(path, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> PrepareRunnerRemovalAsync(string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/runners/{Uri.EscapeDataString(runnerId)}/removal", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task DeleteRunnerAsync(string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/runners/{Uri.EscapeDataString(runnerId)}?hostCleanupConfirmed=true", ct);
+        await EnsureSuccessAsync(resp);
     }
 
     // ── Marketplace listing ───────────────────────────────────────────────────

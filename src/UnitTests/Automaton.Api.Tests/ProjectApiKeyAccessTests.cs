@@ -17,6 +17,9 @@ public class ProjectApiKeyAccessTests
     [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.ListProjectApps), "ProjectMember")]
     [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.AddAppToProject), "ProjectResourceManager")]
     [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.RemoveAppFromProject), "ProjectResourceManager")]
+    [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.ListProjectRunners), "ProjectMember")]
+    [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.AddRunnerToProject), "ProjectResourceManager")]
+    [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.RemoveRunnerFromProject), "ProjectResourceManager")]
     [TestCase(typeof(ProjectMembersController), nameof(ProjectMembersController.ListMembers), "ProjectMember")]
     public void AutomatableProjectEndpointsAcceptApiKeysAndKeepTheirProjectPolicy(Type controller, string action, string? projectPolicy)
     {
@@ -57,6 +60,8 @@ public class ProjectApiKeyAccessTests
             (await projects.UpdateProject(Guid.NewGuid(), new())).Result,
             (await resources.AddAppToProject(Guid.NewGuid(), Guid.NewGuid())).Result,
             await resources.RemoveAppFromProject(Guid.NewGuid(), Guid.NewGuid()) as IActionResult,
+            (await resources.AddRunnerToProject(Guid.NewGuid(), Guid.NewGuid())).Result,
+            await resources.RemoveRunnerFromProject(Guid.NewGuid(), Guid.NewGuid()) as IActionResult,
         };
 
         Assert.That(results.Select(result => (result as ObjectResult)?.StatusCode), Has.All.EqualTo(StatusCodes.Status403Forbidden));

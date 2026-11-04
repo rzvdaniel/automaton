@@ -22,6 +22,7 @@ internal static class CliCommandCatalog
         root.AddCommand(LogoutCommand.Build(config));
         root.AddCommand(WhoAmICommand.Build(config));
         root.AddCommand(CreateCommand.Build(config));
+        root.AddCommand(DeleteCommand.Build(config));
         root.AddCommand(StatusCommand.Build(config));
         root.AddCommand(CurrentRunnerCommand.Build(config));
         root.AddCommand(ValidateCommand.Build(config));
