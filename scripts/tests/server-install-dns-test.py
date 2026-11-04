@@ -11,7 +11,6 @@ from check_dns import check_dns
 
 class InstallDnsTests(unittest.TestCase):
     expected = {ipaddress.ip_address('203.0.113.20')}
-    proxy_networks = [ipaddress.ip_network('104.16.0.0/13'), ipaddress.ip_network('2606:4700::/32')]
 
     def check(self, address_by_host):
         def resolve(host, *args, **kwargs):
@@ -22,7 +21,7 @@ class InstallDnsTests(unittest.TestCase):
             return [(None, None, None, None, (value, 0)) for value in address]
 
         with patch('socket.getaddrinfo', side_effect=resolve) as resolver:
-            check_dns('example.com', self.expected, self.proxy_networks)
+            check_dns('example.com', self.expected)
             return [call.args[0] for call in resolver.call_args_list]
 
     def test_resolves_four_hosts_and_an_app_wildcard_sample(self):
