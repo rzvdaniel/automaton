@@ -6,6 +6,8 @@ bundle=$(realpath "${1:?Pass a release bundle directory}")
 fixture=$(mktemp -d)
 project="automaton-install-smoke-$$"
 export CONFIG_DIR="$fixture/config"
+export BACKUP_DIR="$fixture/backups"
+mkdir -p "$BACKUP_DIR/nightly"
 export AUTOMATON_CLOUDFLARE_TOKEN=isolated-test-token-not-a-real-credential
 runner_image=$(sed -n 's/^RUNNER_IMAGE=//p' "$bundle/release.env")
 python3 "$bundle/configure.py" --config-dir "$CONFIG_DIR" --domain example.invalid --email admin@example.invalid --runner-image "$runner_image"
