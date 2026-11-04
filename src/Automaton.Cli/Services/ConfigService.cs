@@ -143,6 +143,11 @@ public class ConfigService
 
     public void SaveProjectLocalConfig(string directory, GlobalConfig config)
     {
+        if (IsSharedConfigPath(GetProjectLocalConfigPath(directory)))
+        {
+            throw new InvalidOperationException(
+                "This folder's .automaton/config.json is the shared CLI configuration; run this command inside an app folder.");
+        }
         var configDir = Path.Combine(directory, ProjectConfigDirName);
         Directory.CreateDirectory(configDir);
         WriteJsonAtomically(GetProjectLocalConfigPath(directory), config);
@@ -178,7 +183,7 @@ public class ConfigService
     public bool ClearProjectLocalConfig(string directory)
     {
         var path = GetProjectLocalConfigPath(directory);
-        if (!File.Exists(path)) return false;
+        if (IsSharedConfigPath(path) || !File.Exists(path)) return false;
 
         File.Delete(path);
         return true;
@@ -778,6 +783,17 @@ public class ConfigService
         return reader.ReadToEnd();
     }
 
+    // File.Replace needs to delete/rename the destination, which a concurrent CLI run, an antivirus scan or the
+    // search indexer can briefly prevent on Windows. The temp file is already complete, so retrying is safe.
+    private static void ReplaceWithRetry(string tempPath, string path)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try { File.Replace(tempPath, path, null); return; }
+            catch (IOException) when (attempt < 6) { Thread.Sleep(20 * attempt * attempt); }
+        }
+    }
+
     private static void WriteJsonAtomically<T>(string path, T value, bool overwrite = true)
     {
         var directory = Path.GetDirectoryName(path);
@@ -810,7 +826,7 @@ public class ConfigService
             {
                 if (OperatingSystem.IsWindows())
                 {
-                    File.Replace(tempPath, path, null);
+                    ReplaceWithRetry(tempPath, path);
                 }
                 else
                 {

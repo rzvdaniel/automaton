@@ -100,6 +100,20 @@ public class CliProfilesConfigTests
     }
 
     [Test]
+    public void LocalLoginAndLogoutNeverTouchTheSharedConfigFile()
+    {
+        // When the CLI is run from the folder that holds the shared ~/.automaton/config.json, "--local" must not write or delete it.
+        var shared = Path.Combine(root, ".automaton", "config.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(shared)!);
+        File.WriteAllText(shared, "{\"version\":2,\"profiles\":{}}");
+        var sharedConfig = new ConfigService(shared);
+
+        Assert.Throws<InvalidOperationException>(() => sharedConfig.SaveProjectLocalConfig(root, new GlobalConfig()));
+        Assert.That(sharedConfig.ClearProjectLocalConfig(root), Is.False);
+        Assert.That(File.Exists(shared), Is.True);
+    }
+
+    [Test]
     public void ExplicitProfileWithEnvironmentCredentialsIsAnError()
     {
         config.SaveProfile("one", new GlobalConfig { Server = "https://api.one.test", ApiKey = "ak_one" });
