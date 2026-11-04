@@ -181,6 +181,9 @@ public sealed class InstallUpdateTests
     [TestCase("0.2.10", "server-v0.2.9", true)]
     [TestCase("0.2.4", "latest", false)]
     [TestCase(null, "server-v0.2.3", false)]
+    [TestCase("0.2.4", "server-v99999999999.0.0", false)]
+    [TestCase("server-vserver-v0.2.4", "server-v0.2.3", false)]
+    [TestCase("v0.2.4", "server-v0.2.3", false)]
     public void IsDowngradeUnderstandsThePlainInstalledVersion(string? installed, string requested, bool expected)
         => Assert.That(InstallationUpdate.IsDowngrade(installed, requested), Is.EqualTo(expected));
 

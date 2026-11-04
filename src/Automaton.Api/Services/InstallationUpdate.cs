@@ -136,7 +136,7 @@ public static partial class InstallationUpdate
     {
         if (tag is null) return null;
         var plain = tag.StartsWith("server-v", StringComparison.Ordinal) ? tag["server-v".Length..] : tag;
-        return VersionPattern().IsMatch("server-v" + plain) ? Version.Parse(plain) : null;
+        return VersionPattern().IsMatch("server-v" + plain) && Version.TryParse(plain, out var version) ? version : null;
     }
 
     private static string RequestsDirectory(IConfiguration configuration)
