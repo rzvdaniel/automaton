@@ -38,7 +38,7 @@ public sealed class SelfHostedRunnerInstallationService(
         if (RunnerApplicationProfiles.Normalize(request.ApplicationProfile) != RunnerApplicationProfiles.MachineManagement)
             throw new ArgumentException("Only Machine Management Runners can be installed.");
         if (!request.AcknowledgeHostAccess)
-            throw new UnauthorizedAccessException("Host access must be explicitly acknowledged for this Runner profile.");
+            throw new ArgumentException("Acknowledge Docker host access for the Machine Management profile.");
         const string profile = RunnerApplicationProfiles.MachineManagement;
         var now = DateTime.UtcNow;
         var expiresAtUtc = now.AddMinutes(Math.Clamp(enrollmentOptions.Value.TokenLifetimeMinutes, 1, 60));
