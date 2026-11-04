@@ -330,7 +330,12 @@ if [[ -n "$postgres_override_arg" ]]; then
     fi
     postgres_extra=(-f "$postgres_override_arg")
 fi
-new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$install_dir/.env" -f "$bundle/compose.yaml" "${postgres_extra[@]}")
+# The new Compose file mounts nightly backups read-only. Older installs only have CONFIG_DIR in .env;
+# add the default backup path to a temporary candidate env without changing the live installation in plan mode.
+candidate_env="$working/postgres.env"
+cp -- "$install_dir/.env" "$candidate_env"
+if ! grep -q '^BACKUP_DIR=' "$candidate_env"; then printf 'BACKUP_DIR=%s/backups\n' "$install_dir" >> "$candidate_env"; fi
+new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$candidate_env" -f "$bundle/compose.yaml" "${postgres_extra[@]}")
 # Validate the resolved stack without showing environment values or secrets.
 "${new_compose[@]}" config --format json | python3 -c '
 import json, re, sys
@@ -433,6 +438,7 @@ finish_switch() {
     echo 'Installing the release files.'
     install -m 0600 "$bundle/release.env" "$install_dir/release.env"
     install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
+    if ! grep -q '^BACKUP_DIR=' "$install_dir/.env"; then printf 'BACKUP_DIR=%s/backups\n' "$install_dir" >> "$install_dir/.env"; fi
     [[ ! -f "$recovery/postgres-override.yaml" ]] || install -m 0644 "$recovery/postgres-override.yaml" "$override"
     install -m 0644 "$bundle/version" "$install_dir/version"
     for script in update.sh install.sh backup.sh restore.sh; do
