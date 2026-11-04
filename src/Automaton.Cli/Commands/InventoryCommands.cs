@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Automaton.Cli.Services;
 
 namespace Automaton.Cli.Commands;
@@ -12,34 +13,34 @@ internal static class InventoryCommands
         => Build(config, "installation-status", "Show server version, resource counts and last backup", WriteInstallationAsync);
 
     private static Command Build(
-        ConfigService config, string name, string description, Func<AutomatonApiClient, string, bool, Task> write)
+        ConfigService config, string name, string description, Func<AutomatonApiClient, string, bool, CancellationToken, Task> write)
     {
         var json = new Option<bool>("--json", "Print the result as JSON");
         var command = new Command(name, description) { json };
-        command.SetHandler(async (bool asJson) =>
+        command.SetHandler(async (InvocationContext context) =>
         {
+            var asJson = context.ParseResult.GetValueForOption(json);
             try
             {
                 var (server, apiKey) = config.ResolveCredentials(directory: Directory.GetCurrentDirectory());
                 if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
                     throw new InvalidOperationException("Run automaton login to connect to your server.");
                 using var client = new AutomatonApiClient(server, apiKey);
-                await write(client, server, asJson);
-                Environment.ExitCode = 0;
+                await write(client, server, asJson, context.GetCancellationToken());
             }
             catch (Exception exception)
             {
                 if (asJson) CliJson.Write(new { success = false, error = exception.Message });
                 else Console.Error.WriteLine(exception.Message);
-                Environment.ExitCode = 1;
+                context.ExitCode = 1;
             }
-        }, json);
+        });
         return command;
     }
 
-    private static async Task WriteAppsAsync(AutomatonApiClient client, string server, bool asJson)
+    private static async Task WriteAppsAsync(AutomatonApiClient client, string server, bool asJson, CancellationToken cancellationToken)
     {
-        var inventory = await client.ListAppInventoryAsync();
+        var inventory = await client.ListAppInventoryAsync(cancellationToken);
         var apps = inventory.Select(app => new
         {
             app.Id,
@@ -60,9 +61,9 @@ internal static class InventoryCommands
             Console.WriteLine($"{app.Id}\t{app.Name}\t{app.runner ?? "-"}\t{app.status}\t{app.publicUrl ?? "-"}");
     }
 
-    private static async Task WriteInstallationAsync(AutomatonApiClient client, string server, bool asJson)
+    private static async Task WriteInstallationAsync(AutomatonApiClient client, string server, bool asJson, CancellationToken cancellationToken)
     {
-        var status = await client.GetInstallationSummaryAsync();
+        var status = await client.GetInstallationSummaryAsync(cancellationToken);
         if (asJson)
         {
             CliJson.Write(status);
