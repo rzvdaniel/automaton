@@ -168,9 +168,10 @@ fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
 import re, sys
-required={'API_IMAGE','STUDIO_IMAGE','STORE_IMAGE','WORKER_IMAGE','POSTGRES_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE','AGE_IMAGE'}
+required={'API_IMAGE','STUDIO_IMAGE','WORKER_IMAGE','POSTGRES_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE'}
+optional={'STORE_IMAGE','AGE_IMAGE'}
 entries=dict(line.strip().split('=',1) for line in open(sys.argv[1]) if line.strip() and not line.startswith('#'))
-if set(entries) != required or any(not re.fullmatch(r'[a-zA-Z0-9_./:@-]+',v) for v in entries.values()):
+if not required <= set(entries) or set(entries) - required - optional or any(not re.fullmatch(r'[a-zA-Z0-9_./:@-]+',v) for v in entries.values()):
     raise SystemExit('Invalid release image manifest.')
 if any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
     raise SystemExit('Every release image must be pinned by a SHA-256 digest.')

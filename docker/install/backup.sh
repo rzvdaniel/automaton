@@ -29,7 +29,6 @@ backup_root="$install_dir/backups/nightly"
 config_dir=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" | cut -d= -f2-)
 config_dir=${config_dir:-/etc/automaton}
 age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
-[[ "$age_image" =~ @sha256:[0-9a-f]{64}$ ]] || { echo 'The release manifest has no pinned age image.' >&2; exit 1; }
 recipient_file="$config_dir/backup-recipient"
 identity_file="$config_dir/secrets/backup-key"
 status_dir="$config_dir/status"
@@ -65,17 +64,25 @@ if os.path.isdir(root):
         size = sum(os.path.getsize(os.path.join(path, f)) for f in os.listdir(path))
         created = datetime.strptime(name[len('automaton-'):], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
         archive = os.path.join(root, name + '.tar.age')
-        archive_size = os.path.getsize(archive) if os.path.isfile(archive) else None
+        archive_size = None
         archive_hash = None
-        if archive_size is not None:
-            import hashlib
-            digest = hashlib.sha256()
-            with open(archive, 'rb') as source:
-                for block in iter(lambda: source.read(1024 * 1024), b''):
-                    digest.update(block)
-            archive_hash = digest.hexdigest()
+        archive_mtime_ns = None
+        if os.path.isfile(archive):
+            stat = os.stat(archive)
+            archive_size = stat.st_size
+            archive_mtime_ns = stat.st_mtime_ns
+            cached = next((item for item in previous.get('backups', []) if item.get('name') == name), {})
+            if cached.get('archiveSizeBytes') == archive_size and cached.get('archiveMtimeNs') == archive_mtime_ns:
+                archive_hash = cached.get('archiveSha256')
+            else:
+                import hashlib
+                digest = hashlib.sha256()
+                with open(archive, 'rb') as source:
+                    for block in iter(lambda: source.read(1024 * 1024), b''):
+                        digest.update(block)
+                archive_hash = digest.hexdigest()
         backups.append({'name': name, 'createdAt': created.isoformat().replace('+00:00', 'Z'), 'sizeBytes': size,
-                        'archiveSizeBytes': archive_size, 'archiveSha256': archive_hash})
+                        'archiveSizeBytes': archive_size, 'archiveSha256': archive_hash, 'archiveMtimeNs': archive_mtime_ns})
 now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
 status = {
     'lastAttemptAt': now,
@@ -125,12 +132,13 @@ UNIT
 }
 
 initialize_backup_key() {
+    docker pull --quiet "$age_image" >/dev/null 2>&1 || { echo 'Could not pull the pinned age image.' >&2; return 1; }
     install -d -m 0700 "$config_dir/secrets"
     if [[ ! -e "$recipient_file" && ! -e "$identity_file" ]]; then
         local generated recipient temporary_identity="$config_dir/secrets/.backup-key.partial"
         generated=$(docker run --rm -v "$config_dir/secrets:/keys" "$age_image" age-keygen -o /keys/.backup-key.partial 2>&1 >/dev/null)
-        [[ "$generated" =~ ^Public\ key:\ age1[0-9a-z]+$ ]] || { rm -f -- "$temporary_identity"; echo 'Could not initialize the encrypted backup key.' >&2; return 1; }
-        recipient=${generated#Public key: }
+        recipient=$(sed -n 's/^Public key: //p' <<< "$generated")
+        [[ "$recipient" =~ ^age1[0-9a-z]+$ ]] || { rm -f -- "$temporary_identity"; echo 'Could not initialize the encrypted backup key.' >&2; return 1; }
         chmod 0600 "$temporary_identity"
         mv -- "$temporary_identity" "$identity_file"
         printf '%s\n' "$recipient" > "$recipient_file"
@@ -150,7 +158,6 @@ initialize_backup_key() {
 
 take_backup() {
     install -d -m 0700 "$install_dir/backups" "$backup_root"
-    initialize_backup_key
     local name="automaton-$(date -u +%Y%m%dT%H%M%SZ)"
     local working="$backup_root/.$name.partial"
     rm -rf -- "$working"
@@ -168,13 +175,19 @@ take_backup() {
     cp "$install_dir/version" "$working/version" 2>/dev/null || true
     (cd "$working" && sha256sum database.dump api-keys.tar.gz worker-keys.tar.gz > SHA256SUMS && sha256sum -c --quiet SHA256SUMS)
     mv -- "$working" "$backup_root/$name"
-    local archive="$backup_root/$name.tar.age" temporary="$backup_root/.$name.tar.age.partial"
-    if ! tar -C "$backup_root" -cf - "$name" | docker run --rm -i "$age_image" age -r "$(cat "$recipient_file")" > "$temporary"; then
-        rm -f -- "$temporary"
-        return 1
+    if [[ -n "$age_image" ]]; then
+        [[ "$age_image" =~ @sha256:[0-9a-f]{64}$ ]] || { echo 'The release manifest has an invalid pinned age image.' >&2; return 1; }
+        initialize_backup_key
+        local archive="$backup_root/$name.tar.age" temporary="$backup_root/.$name.tar.age.partial"
+        if ! tar -C "$backup_root" -cf - "$name" | docker run --rm -i "$age_image" age -r "$(cat "$recipient_file")" > "$temporary"; then
+            rm -f -- "$temporary"
+            return 1
+        fi
+        chmod 0600 "$temporary"
+        mv -- "$temporary" "$archive"
+    else
+        echo 'Warning: the release has no pinned age image; this backup is not encrypted.' >&2
     fi
-    chmod 0600 "$temporary"
-    mv -- "$temporary" "$archive"
     echo "Backup saved: $backup_root/$name ($(du -sh "$backup_root/$name" | cut -f1))"
     # Rotate only backups this script created.
     list_backups | tail -n +"$((keep + 1))" | while read -r old; do
@@ -186,7 +199,7 @@ case "$mode" in
     timer) install_timer ;;
     list) list_backups ;;
     backup)
-        exec 9>/run/lock/automaton-backup.lock
+        exec 9>"${AUTOMATON_BACKUP_LOCK_FILE:-/run/lock/automaton-backup.lock}"
         flock -n 9 || { echo 'Another backup is running.' >&2; exit 1; }
         if take_backup; then
             write_status true ''

@@ -138,6 +138,25 @@ esac
         self.assertEqual((backup / 'release.env').read_text(), manifest('1', store=False, age=False))
         self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
 
+    def test_backup_without_age_image_keeps_plain_backup_and_list_works(self):
+        backup_script = REPO / 'docker/install/backup.sh'
+        lock_file = self.root / 'backup.lock'
+        environment = self.environment | {'AUTOMATON_BACKUP_LOCK_FILE': str(lock_file)}
+
+        listed = subprocess.run(['bash', str(backup_script), '--install-dir', str(self.install), '--list'],
+                                env=environment, capture_output=True, text=True)
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+
+        result = subprocess.run(['bash', str(backup_script), '--install-dir', str(self.install)],
+                                env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('not encrypted', result.stderr)
+        nightly = self.install / 'backups/nightly'
+        folders = list(nightly.glob('automaton-*'))
+        self.assertEqual(len(folders), 1)
+        self.assertTrue((folders[0] / 'SHA256SUMS').is_file())
+        self.assertFalse(list(nightly.glob('*.tar.age')))
+
     def test_enables_updates_from_studio_before_the_api_is_recreated(self):
         log = self.root / 'docker.log'
         # The new release mounts the update directories into the API; the compose-change rules accept it.

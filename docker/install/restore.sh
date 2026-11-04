@@ -32,6 +32,8 @@ install -d -m 0700 "$install_dir/backups"
 if [[ -n "$archive" || -n "$key" ]]; then
     [[ -n "$archive" && -n "$key" ]] || { echo 'Specify both --archive and --key.' >&2; exit 2; }
     [[ -f "$archive" && -f "$key" ]] || { echo 'Archive or key file not found.' >&2; exit 1; }
+    python3 -c 'import inspect, tarfile; raise SystemExit(0 if "filter" in inspect.signature(tarfile.TarFile.extractall).parameters else 1)' \
+        || { echo 'Encrypted archive restore requires Python 3.12 or a security-backported tarfile extraction filter.' >&2; exit 1; }
     working=$(mktemp -d "$install_dir/backups/.restore.XXXXXX")
     trap 'rm -rf -- "$working"' EXIT
     age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
