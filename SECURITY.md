@@ -26,4 +26,4 @@ Automaton is in early access. Only the latest release receives security fixes:
 
 ## Scope
 
-The [security overview](docs/security/overview.md) describes the isolation model, how secrets and app permissions work, and what is out of scope (for example, mutually untrusted tenants on one machine). Reports about out-of-scope behaviour are still welcome but may be treated as hardening rather than vulnerabilities.
+The [security overview](src/automaton-vue/docs/security.md) describes the isolation model, how secrets and app permissions work, and what is out of scope (for example, mutually untrusted tenants on one machine). Reports about out-of-scope behaviour are still welcome but may be treated as hardening rather than vulnerabilities.

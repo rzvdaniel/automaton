@@ -27,4 +27,4 @@ Automaton is open source and self-hosted: you run your own Studio, API and Runne
 - [Troubleshooting](/troubleshooting)
 - [Current limitations](/limitations)
 - [FAQ](/faq)
-- [Security overview](https://github.com/rzvdaniel/automaton/blob/main/docs/security/overview.md)
+- [Security overview](/security)

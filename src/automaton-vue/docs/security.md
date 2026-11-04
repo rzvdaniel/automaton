@@ -1,6 +1,11 @@
+---
+title: Security overview
+description: How an Automaton installation isolates apps, protects secrets and app permissions, audits changes, and what is out of scope.
+---
+
 # Security overview
 
-How an Automaton installation protects apps, secrets and administrator control today. This page describes current behaviour, not plans. To report a problem, see [SECURITY.md](../../SECURITY.md).
+How an Automaton installation protects apps, secrets and administrator control today. This page describes current behaviour, not plans. To report a problem, see [SECURITY.md](https://github.com/rzvdaniel/automaton/blob/main/SECURITY.md).
 
 ## Who runs what
 
@@ -41,4 +46,4 @@ Secret changes and uses (names, scopes and versions, never values) are recorded 
 - Public multi-tenant hosting: letting strangers run code on a shared machine.
 - Protection against someone with root on your server or Runner machines, or with an administrator account.
 - Your hosting provider, DNS and domain, and the apps you deploy (their code, dependencies and authentication).
-- Off-server backups: nightly backups stay on the server; copies elsewhere are yours to arrange (see [backups and restore](../prod/install-automaton.md#backups-and-restore)).
+- Off-server backups: nightly backups stay on the server; copies elsewhere are yours to arrange (see [backups and restore](./backup-restore)).

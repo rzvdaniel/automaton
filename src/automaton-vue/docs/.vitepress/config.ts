@@ -52,6 +52,7 @@ export default defineConfig({
           { text: 'Automaton CLI', link: '/automaton-cli' },
           { text: 'automaton.json', link: '/automaton-json' },
           { text: 'Troubleshooting', link: '/troubleshooting' },
+          { text: 'Security overview', link: '/security' },
           { text: 'Current limitations', link: '/limitations' },
           { text: 'FAQ', link: '/faq' },
         ],

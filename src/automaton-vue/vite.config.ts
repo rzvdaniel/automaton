@@ -233,11 +233,8 @@ const keyDocs: Array<{ file: string; url: string }> = [
   'automaton-json',
   'troubleshooting',
   'limitations',
+  'security',
 ].map(slug => ({ file: path.join(websiteDocsRoot, `${slug}.md`), url: `${siteOrigin}/docs/${slug}` }))
-keyDocs.push({
-  file: path.resolve(__dirname, '../../docs/security/overview.md'),
-  url: 'https://github.com/rzvdaniel/automaton/blob/main/docs/security/overview.md',
-})
 
 function readKeyDoc(doc: { file: string }) {
   const raw = fs.readFileSync(doc.file, 'utf-8').replace(/\r\n/g, '\n')

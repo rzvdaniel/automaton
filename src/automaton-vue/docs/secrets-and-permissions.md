@@ -5,7 +5,7 @@ description: Give an app its credentials with automaton secrets and request plat
 
 # Secrets and permissions
 
-This page covers how an app gets credentials (secrets) and platform access (permissions). The field reference is in [automaton.json](./automaton-json#app-secrets); the security model is in the [security overview](https://github.com/rzvdaniel/automaton/blob/main/docs/security/overview.md).
+This page covers how an app gets credentials (secrets) and platform access (permissions). The field reference is in [automaton.json](./automaton-json#app-secrets); the security model is in the [security overview](./security).
 
 ## Prerequisites
 
