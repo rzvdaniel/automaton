@@ -10,7 +10,10 @@ vi.mock('../services/install.service', () => ({
   installService: { getUpdate: vi.fn(), startUpdate: vi.fn() },
 }))
 
-const idle: InstallationUpdateStatus = { currentVersion: 'server-v0.1.1', triggerAvailable: true, run: null, log: null }
+const idle: InstallationUpdateStatus = {
+  currentVersion: 'server-v0.1.1', triggerAvailable: true, run: null, log: null,
+  stale: false, requestPending: false, requestAgeSeconds: null, hint: null,
+}
 const run = (state: 'running' | 'succeeded' | 'failed', extra = {}): InstallationUpdateStatus => ({
   ...idle,
   run: {

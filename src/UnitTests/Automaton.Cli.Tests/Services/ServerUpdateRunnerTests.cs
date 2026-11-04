@@ -34,7 +34,7 @@ public class ServerUpdateRunnerTests
         var outcome = await RunAsync(server, "latest", wait: false);
 
         Assert.That(outcome.Success, Is.True);
-        Assert.That(server.Posted.Single(), Is.EqualTo("""{"version":"latest"}"""));
+        Assert.That(server.Posted.Single(), Is.EqualTo("""{"version":"latest","allowDowngrade":false}"""));
     }
 
     [Test]
@@ -107,6 +107,52 @@ public class ServerUpdateRunnerTests
     }
 
     [Test]
+    public async Task RefusesToStartWhileAnUpdateIsStarting()
+    {
+        var server = new FakeServer().On(Update, Run("starting"));
+
+        var outcome = await RunAsync(server, "latest", wait: false);
+
+        Assert.That(outcome.Success, Is.False);
+        Assert.That(server.Posted, Is.Empty);
+    }
+
+    [Test]
+    public async Task StartsAgainWhenTheRunningStatusIsMarkedStaleByTheServer()
+    {
+        var stale = Run("running").Replace("\"triggerAvailable\":true", "\"triggerAvailable\":true,\"stale\":true");
+        var server = new FakeServer().On(Update, stale);
+
+        var outcome = await RunAsync(server, "latest", wait: false);
+
+        Assert.That(outcome.Success, Is.True, outcome.Message);
+        Assert.That(server.Posted, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task WaitFailsEarlyWithTheHintWhenTheHostDoesNotPickTheRequestUp()
+    {
+        var hint = "The server has not picked up the update request. On the server, check: systemctl status automaton-update.path";
+        var pending = OldRun.Replace("\"triggerAvailable\":true", $"\"triggerAvailable\":true,\"requestPending\":true,\"requestAgeSeconds\":400,\"hint\":\"{hint}\"");
+        var server = new FakeServer().On(Update, OldRun, pending);
+
+        var outcome = await RunAsync(server, "latest", wait: true);
+
+        Assert.That(outcome.Success, Is.False);
+        Assert.That(outcome.Message, Does.Contain("systemctl status automaton-update.path"));
+    }
+
+    [Test]
+    public async Task AllowDowngradeIsSentToTheServer()
+    {
+        var server = new FakeServer().On(Update, OldRun);
+
+        await RunAsync(server, "server-v0.1.0", wait: false, allowDowngrade: true);
+
+        Assert.That(server.Posted.Single(), Does.Contain("\"allowDowngrade\":true"));
+    }
+
+    [Test]
     public async Task WaitTimesOutWhenTheHostNeverReportsAFinishedRun()
     {
         var server = new FakeServer().On(Update, OldRun);
@@ -138,12 +184,12 @@ public class ServerUpdateRunnerTests
         Assert.That(command.Parse("update-status --json").Errors, Is.Empty);
     }
 
-    private static async Task<ServerUpdateOutcome> RunAsync(FakeServer server, string version, bool wait, TimeSpan? timeout = null)
+    private static async Task<ServerUpdateOutcome> RunAsync(FakeServer server, string version, bool wait, TimeSpan? timeout = null, bool allowDowngrade = false)
     {
         using var http = new HttpClient(server) { BaseAddress = new Uri("https://api.example.test/") };
         using var client = new AutomatonApiClient(http, "ak_test");
         var runner = new ServerUpdateRunner(client, (_, _) => Task.CompletedTask, _ => { }, TimeSpan.FromMilliseconds(100));
-        return await runner.RunAsync(version, wait, timeout ?? TimeSpan.FromSeconds(30), CancellationToken.None);
+        return await runner.RunAsync(version, wait, timeout ?? TimeSpan.FromSeconds(30), CancellationToken.None, allowDowngrade);
     }
 
     /// <summary>Answers each route from its script; the last scripted answer repeats.</summary>

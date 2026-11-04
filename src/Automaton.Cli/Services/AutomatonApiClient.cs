@@ -203,9 +203,9 @@ public class AutomatonApiClient : IDisposable
             ?? throw new InvalidOperationException("Server update response was empty.");
     }
 
-    internal async Task StartServerUpdateAsync(string version, CancellationToken ct = default)
+    internal async Task StartServerUpdateAsync(string version, bool allowDowngrade = false, CancellationToken ct = default)
     {
-        using var response = await PostJsonAsync("api/install/update", JsonSerializer.Serialize(new { version }, JsonOptions), ct);
+        using var response = await PostJsonAsync("api/install/update", JsonSerializer.Serialize(new { version, allowDowngrade }, JsonOptions), ct);
         await EnsureSuccessAsync(response);
     }
 

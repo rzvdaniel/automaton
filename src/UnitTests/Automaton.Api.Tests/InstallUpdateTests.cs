@@ -114,6 +114,80 @@ public sealed class InstallUpdateTests
     }
 
     [Test]
+    public async Task PostTreatsAStartingUpdateLikeARunningOne()
+    {
+        await File.WriteAllTextAsync(Path.Combine(status, "status.json"),
+            JsonSerializer.Serialize(new { state = "starting", startedAtUtc = DateTimeOffset.UtcNow }));
+
+        var result = await Controller(new RecordingAudit(), Guid.NewGuid(), null).Post(new("latest"), default);
+
+        Assert.That(result, Is.InstanceOf<ConflictObjectResult>());
+    }
+
+    [Test]
+    public async Task GetFlagsAStaleRunningStatus()
+    {
+        await File.WriteAllTextAsync(Path.Combine(status, "status.json"),
+            JsonSerializer.Serialize(new { state = "running", startedAtUtc = DateTimeOffset.UtcNow.AddHours(-4) }));
+
+        var result = (await Controller(new RecordingAudit(), Guid.NewGuid(), null).Get(default)).Result as OkObjectResult;
+
+        Assert.That(((InstallationUpdateStatus)result!.Value!).Stale, Is.True);
+    }
+
+    [Test]
+    public async Task GetReportsAPendingRequestAndHintsWhenTheHostDoesNotPickItUp()
+    {
+        var path = Path.Combine(requests, "request.json");
+        await File.WriteAllTextAsync(path, "{}");
+
+        var fresh = (InstallationUpdateStatus)((OkObjectResult)(await Controller(new RecordingAudit(), Guid.NewGuid(), null).Get(default)).Result!).Value!;
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-5));
+        var old = (InstallationUpdateStatus)((OkObjectResult)(await Controller(new RecordingAudit(), Guid.NewGuid(), null).Get(default)).Result!).Value!;
+
+        Assert.That(fresh.RequestPending, Is.True);
+        Assert.That(fresh.Hint, Is.Null);
+        Assert.That(old.RequestAgeSeconds, Is.GreaterThan(240));
+        Assert.That(old.Hint, Does.Contain("systemctl status automaton-update.path"));
+    }
+
+    [Test]
+    public async Task PostReturns503WhenTheRequestPathIsNotARegularFile()
+    {
+        Directory.CreateDirectory(Path.Combine(requests, "request.json"));
+
+        var result = await Controller(new RecordingAudit(), Guid.NewGuid(), null).Post(new("latest"), default);
+
+        Assert.That(((ObjectResult)result).StatusCode, Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+    }
+
+    [Test]
+    public async Task PostRefusesAnOlderReleaseUnlessADowngradeIsAllowed()
+    {
+        var refused = await Controller(new RecordingAudit(), Guid.NewGuid(), null).Post(new("server-v0.1.0"), default);
+        Assert.That(refused, Is.InstanceOf<BadRequestObjectResult>());
+        Assert.That(File.Exists(Path.Combine(requests, "request.json")), Is.False);
+
+        var allowed = await Controller(new RecordingAudit(), Guid.NewGuid(), null).Post(new("server-v0.1.0", true), default);
+        Assert.That(allowed, Is.InstanceOf<AcceptedResult>());
+        using var request = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(requests, "request.json")));
+        Assert.That(request.RootElement.GetProperty("allowDowngrade").GetBoolean(), Is.True);
+    }
+
+    [Test]
+    public async Task PostAuditsTheAuthenticationSchemeAndApiKey()
+    {
+        var audit = new RecordingAudit();
+
+        await Controller(audit, Guid.NewGuid(), null, apiKey: true).Post(new("latest"), default);
+
+        var metadata = JsonSerializer.Serialize(audit.Requests.Single().Metadata);
+        Assert.That(metadata, Does.Contain("\"ApiKeyScope\":\"Developer\""));
+        Assert.That(metadata, Does.Contain("\"ApiKeyId\":\"key-1\""));
+        Assert.That(metadata, Does.Contain("\"AuthenticationType\":\"test\""));
+    }
+
+    [Test]
     public async Task GetReportsTheCurrentVersionStatusAndLog()
     {
         await File.WriteAllTextAsync(Path.Combine(status, "status.json"), """
@@ -154,7 +228,7 @@ public sealed class InstallUpdateTests
         Assert.That(((InstallationUpdateStatus)result!.Value!).Run!.State, Is.EqualTo("unknown"));
     }
 
-    private InstallUpdateController Controller(RecordingAudit audit, Guid userId, string? email)
+    private InstallUpdateController Controller(RecordingAudit audit, Guid userId, string? email, bool apiKey = false)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -164,6 +238,7 @@ public sealed class InstallUpdateTests
         }).Build();
         List<Claim> claims = [new(ClaimTypes.NameIdentifier, userId.ToString())];
         if (email is not null) claims.Add(new(ClaimTypes.Email, email));
+        if (apiKey) claims.AddRange([new("api_key_scope", "Developer"), new("api_key_id", "key-1")]);
         return new InstallUpdateController(configuration, audit)
         {
             ControllerContext = new() { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test")) } }

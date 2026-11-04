@@ -190,7 +190,7 @@ done
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
 if [[ -f "$install_dir/update-from-request.sh" ]] && ! $configure_only; then
     bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
-        || echo "Warning: updates from Studio could not be enabled. Run: sudo bash $install_dir/update-from-request.sh --install-units" >&2
+        || { echo "Updates from Studio could not be enabled; nothing was changed. Fix it, then rerun: sudo bash $install_dir/update-from-request.sh --install-units" >&2; exit 1; }
 fi
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.

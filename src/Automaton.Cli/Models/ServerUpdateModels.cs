@@ -13,4 +13,6 @@ internal sealed record ServerUpdateRun(
     string? RequestedBy,
     string? Message);
 
-internal sealed record ServerUpdateStatus(string? CurrentVersion, bool TriggerAvailable, ServerUpdateRun? Run, string? Log);
+internal sealed record ServerUpdateStatus(
+    string? CurrentVersion, bool TriggerAvailable, ServerUpdateRun? Run, string? Log,
+    bool Stale = false, bool RequestPending = false, int? RequestAgeSeconds = null, string? Hint = null);

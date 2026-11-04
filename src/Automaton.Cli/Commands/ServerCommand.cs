@@ -21,8 +21,9 @@ internal static class ServerCommand
         var version = new Option<string?>("--version", "Release to install: latest (default), server-vX.Y.Z or X.Y.Z");
         var wait = new Option<bool>("--wait", "Wait for the update to finish, then verify /health and the installed version");
         var timeout = new Option<int>("--timeout", () => 1800, "Seconds to wait with --wait");
+        var downgrade = new Option<bool>("--allow-downgrade", "Allow installing a release older than the installed one");
         var json = new Option<bool>("--json", "Print the result as JSON");
-        var command = new Command("update", "Update the server to the latest release or a given version") { version, wait, timeout, json };
+        var command = new Command("update", "Update the server to the latest release or a given version") { version, wait, timeout, downgrade, json };
         command.SetHandler(context => RunAsync(context, config, async (client, asJson, ct) =>
         {
             var requested = ServerUpdateRunner.NormalizeVersion(context.ParseResult.GetValueForOption(version))
@@ -30,7 +31,8 @@ internal static class ServerCommand
             var seconds = context.ParseResult.GetValueForOption(timeout);
             if (seconds < 1) throw new InvalidOperationException("--timeout must be 1 or more seconds.");
             var runner = new ServerUpdateRunner(client, Task.Delay, text => (asJson ? Console.Error : Console.Out).WriteLine(text));
-            var outcome = await runner.RunAsync(requested, context.ParseResult.GetValueForOption(wait), TimeSpan.FromSeconds(seconds), ct);
+            var outcome = await runner.RunAsync(requested, context.ParseResult.GetValueForOption(wait), TimeSpan.FromSeconds(seconds), ct,
+                context.ParseResult.GetValueForOption(downgrade));
             WriteOutcome(outcome, asJson);
             return outcome.Success;
         }, json));

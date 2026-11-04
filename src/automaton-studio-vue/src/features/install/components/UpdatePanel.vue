@@ -20,7 +20,8 @@ const reconnecting = ref(false)
 let timer: ReturnType<typeof setTimeout> | undefined
 
 const run = computed(() => status.value?.run ?? null)
-const running = computed(() => run.value?.state === 'running' || waitingForRun.value !== undefined)
+const running = computed(() =>
+  ((run.value?.state === 'running' || run.value?.state === 'starting') && !status.value?.stale) || waitingForRun.value !== undefined)
 
 onMounted(() => load())
 onBeforeUnmount(() => clearTimeout(timer))
@@ -32,6 +33,7 @@ async function load() {
     loadError.value = null
     reconnecting.value = false
     if (waitingForRun.value !== undefined && next.run && next.run.startedAtUtc !== waitingForRun.value) waitingForRun.value = undefined
+    if (next.hint) waitingForRun.value = undefined // the host did not pick the request up; stop waiting
   } catch {
     // The API restarts while an update replaces its container; keep polling in that case.
     if (running.value) reconnecting.value = true
@@ -61,7 +63,7 @@ async function start() {
 }
 
 function stateLabel(state: string) {
-  return { running: 'Running', succeeded: 'Succeeded', failed: 'Failed', unknown: 'Unknown' }[state] ?? state
+  return { starting: 'Starting', running: 'Running', succeeded: 'Succeeded', failed: 'Failed', unknown: 'Unknown' }[state] ?? state
 }
 </script>
 
@@ -80,6 +82,7 @@ function stateLabel(state: string) {
         server once to enable it.
       </Message>
       <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
+      <Message v-if="status.hint" severity="warn" :closable="false">{{ status.hint }}</Message>
       <Message v-if="reconnecting" severity="info" :closable="false">
         Waiting for the server to restart. This page reconnects automatically.
       </Message>

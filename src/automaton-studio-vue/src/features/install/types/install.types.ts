@@ -70,7 +70,7 @@ export interface InstallationBackup {
 }
 
 export interface InstallationUpdateRun {
-  state: 'running' | 'succeeded' | 'failed' | 'unknown'
+  state: 'starting' | 'running' | 'succeeded' | 'failed' | 'unknown'
   requestedVersion: string | null
   fromVersion: string | null
   toVersion: string | null
@@ -87,6 +87,10 @@ export interface InstallationUpdateStatus {
   triggerAvailable: boolean
   run: InstallationUpdateRun | null
   log: string | null
+  stale: boolean
+  requestPending: boolean
+  requestAgeSeconds: number | null
+  hint: string | null
 }
 
 export interface InstallationBackupStatus {

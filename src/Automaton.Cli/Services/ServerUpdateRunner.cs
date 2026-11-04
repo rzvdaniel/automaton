@@ -25,14 +25,15 @@ internal sealed partial class ServerUpdateRunner(
         return PlainVersion().IsMatch(version) ? "server-v" + version : null;
     }
 
-    internal async Task<ServerUpdateOutcome> RunAsync(string version, bool wait, TimeSpan timeout, CancellationToken ct)
+    internal async Task<ServerUpdateOutcome> RunAsync(
+        string version, bool wait, TimeSpan timeout, CancellationToken ct, bool allowDowngrade = false)
     {
         var before = await client.GetServerUpdateAsync(ct);
-        if (before.Run is { State: "running" })
+        if (before.Run is { State: "running" or "starting" } && !before.Stale)
             return Failure("An update is already running. Use automaton server update-status to follow it.", version, before);
         var previousStart = before.Run?.StartedAtUtc;
 
-        await client.StartServerUpdateAsync(version, ct);
+        await client.StartServerUpdateAsync(version, allowDowngrade, ct);
         progress($"Update to {version} requested.");
         if (!wait)
             return new(true, "Update requested. Follow it with: automaton server update-status", version, null, null, false);
@@ -40,6 +41,13 @@ internal sealed partial class ServerUpdateRunner(
         var finished = await WaitForRunAsync(previousStart, timeout, ct);
         if (finished is null)
             return new(false, $"The update did not finish within {timeout.TotalSeconds:0} seconds. Check: automaton server update-status", version, null, null, true);
+        return await EvaluateAsync(finished, version, ct);
+    }
+
+    private async Task<ServerUpdateOutcome> EvaluateAsync(ServerUpdateStatus finished, string version, CancellationToken ct)
+    {
+        if (finished.RequestPending && finished.Hint is not null)
+            return Failure("The update was not started. " + finished.Hint, version, finished);
         if (finished.Run is not { State: "succeeded" } run)
             return Failure(FailureMessage(finished), version, finished);
 
@@ -64,6 +72,7 @@ internal sealed partial class ServerUpdateRunner(
             {
                 var status = await client.GetServerUpdateAsync(ct);
                 wait = PollInterval;
+                if (status.RequestPending && status.Hint is not null) return status; // the host never picked the request up
                 // A status from an earlier run is not ours: it started at the time we saw before requesting.
                 if (status.Run is { } run && run.StartedAtUtc != previousStart)
                 {

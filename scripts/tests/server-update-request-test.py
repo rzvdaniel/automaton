@@ -17,6 +17,10 @@ FAKE_UPDATER = '''#!/usr/bin/env bash
 echo "$@" > "$FAKE_ARGS"
 echo "Creating protected recovery backup at /opt/test/backups/server-v0.2.0-backup"
 echo "login password=hunter2 and token: abc123"
+echo "Authorization: Bearer eyJsecret.value-1 and Basic dXNlcjpwYXNz"
+echo '{"password": "quoted secret", "apiKey":"k-123456", "name": "visible"}'
+[[ -z "${FAKE_STATUS:-}" ]] || cp "$FAKE_STATUS" "$FAKE_SEEN"
+[[ ! -e "${FAKE_REQUEST:-/nonexistent}" ]] || echo request-still-present > "$FAKE_SEEN.request"
 [[ -z "${FAKE_LINES:-}" ]] || seq 1 "$FAKE_LINES"
 if [[ "${FAKE_FAIL:-}" == 1 ]]; then echo 'Update did not reach healthy state.' >&2; exit 3; fi
 echo server-v0.2.0 > "$(dirname "$0")/version"
@@ -57,12 +61,18 @@ class UpdateFromRequestTests(unittest.TestCase):
 
     def test_installs_root_only_request_directory_and_units(self):
         self.assertEqual(stat.S_IMODE((self.update / 'requests').stat().st_mode), 0o700)
-        self.assertEqual(stat.S_IMODE((self.update / 'status').stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((self.update / 'status').stat().st_mode), 0o750)
         path_unit = (self.systemd / 'automaton-update.path').read_text()
         self.assertIn(f'PathExists={self.update}/requests/request.json', path_unit)
         self.assertIn('Unit=automaton-update.service', path_unit)
         service = (self.systemd / 'automaton-update.service').read_text()
         self.assertIn('Type=oneshot', service)
+        self.assertIn('PrivateTmp=yes', service)
+        self.assertIn('ProtectHome=read-only', service)
+        self.assertIn('Wants=docker.service', service)
+        self.assertNotIn('Requires=docker.service', service)
+        self.assertIn('StartLimitIntervalSec=0', service)
+        self.assertIn('TriggerLimitIntervalSec=0', path_unit)
         self.assertIn(f'update-from-request.sh --install-dir {self.install}', service)
 
     def test_runs_the_installed_updater_for_latest_and_reports_success(self):
@@ -108,6 +118,11 @@ class UpdateFromRequestTests(unittest.TestCase):
         self.run_script()
         log = (self.update / 'status/update.log').read_text()
         self.assertIn('password=***', log)
+        self.assertNotIn('eyJsecret', log)
+        self.assertNotIn('dXNlcjpwYXNz', log)
+        self.assertNotIn('quoted secret', log)
+        self.assertNotIn('k-123456', log)
+        self.assertIn('"name": "visible"', log)
         self.assertNotIn('hunter2', log)
         self.assertNotIn('abc123', log)
 
@@ -149,6 +164,72 @@ class UpdateFromRequestTests(unittest.TestCase):
         self.assertIn('already running', result.stderr)
         self.assertFalse(request.exists())
         self.assertFalse(self.args.exists())
+
+    def test_status_files_are_not_world_readable(self):
+        self.request({'version': 'latest'})
+        self.run_script()
+        for name in ('status.json', 'update.log'):
+            self.assertEqual(stat.S_IMODE((self.update / 'status' / name).stat().st_mode), 0o640)
+
+    def test_a_starting_status_exists_before_the_request_is_consumed(self):
+        self.request({'version': 'latest', 'requestedBy': 'admin@example.com'})
+        seen = Path(self.temporary.name) / 'seen.json'
+        self.run_script(extra={'FAKE_STATUS': str(self.update / 'status/status.json'), 'FAKE_SEEN': str(seen),
+                                       'FAKE_REQUEST': str(self.update / 'requests/request.json')})
+        # The updater runs after the request was moved aside, and status then says running (starting came first).
+        self.assertEqual(json.loads(seen.read_text())['state'], 'running')
+        self.assertFalse(Path(str(seen) + '.request').exists())
+
+    def test_directory_as_request_is_removed_and_reported(self):
+        directory = self.update / 'requests/request.json'
+        directory.mkdir()
+        (directory / 'inner').write_text('x')
+        self.assertEqual(self.run_script().returncode, 1)
+        self.assertFalse(directory.exists())
+        self.assertEqual(self.status()['state'], 'failed')
+        self.assertFalse(self.args.exists())
+
+    def test_fifo_as_request_does_not_block_and_is_removed(self):
+        fifo = self.update / 'requests/request.json'
+        os.mkfifo(fifo)
+        result = subprocess.run(['bash', str(SCRIPT), '--install-dir', str(self.install)], env=self.environment,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(fifo.exists())
+        self.assertFalse(self.args.exists())
+
+    def test_symlink_in_the_work_directory_is_never_followed(self):
+        target = Path(self.temporary.name) / 'victim.txt'
+        target.write_text('keep')
+        (self.update / 'work/request.json').symlink_to(target)
+        self.request({'version': 'latest'})
+        self.assertEqual(self.run_script().returncode, 0)
+        self.assertEqual(target.read_text(), 'keep')
+
+    def test_parse_errors_are_not_echoed_into_the_status(self):
+        self.request('{"version": "SECRET-MARKER" ')
+        self.run_script()
+        self.assertEqual(self.status()['message'], 'The update request is invalid.')
+
+    def test_missing_status_directory_is_recreated_instead_of_stranding_the_request(self):
+        shutil.rmtree(self.update / 'status')
+        request = self.request({'version': 'latest'})
+        self.assertEqual(self.run_script().returncode, 0)
+        self.assertFalse(request.exists())
+        self.assertEqual(self.status()['state'], 'succeeded')
+
+    def test_older_release_needs_an_explicit_downgrade(self):
+        (self.install / 'version').write_text('server-v0.2.0\n')
+        request = self.request({'version': 'server-v0.1.0'})
+        self.assertEqual(self.run_script().returncode, 1)
+        self.assertFalse(request.exists())
+        self.assertFalse(self.args.exists())
+        self.assertIn('older', self.status()['message'])
+        self.request({'version': 'server-v0.1.0', 'allowDowngrade': True})
+        self.assertEqual(self.run_script().returncode, 0)
+        self.assertIn('--allow-downgrade', self.args.read_text().split())
+        self.request({'version': 'server-v0.1.0', 'allowDowngrade': 'yes'})
+        self.assertEqual(self.run_script().returncode, 1)
 
     def test_no_request_does_nothing(self):
         self.assertEqual(self.run_script().returncode, 0)

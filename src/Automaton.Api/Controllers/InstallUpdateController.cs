@@ -21,7 +21,7 @@ public class InstallUpdateController(IConfiguration configuration, IAuditEventSe
 {
     [HttpGet]
     public async Task<ActionResult<InstallationUpdateStatus>> Get(CancellationToken token)
-        => Ok(await InstallationUpdate.ReadAsync(configuration, token));
+        => Ok(await InstallationUpdate.ReadAsync(configuration, DateTimeOffset.UtcNow, token));
 
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] StartInstallationUpdateRequest? request, CancellationToken token)
@@ -29,6 +29,7 @@ public class InstallUpdateController(IConfiguration configuration, IAuditEventSe
         var version = string.IsNullOrWhiteSpace(request?.Version) ? InstallationUpdate.Latest : request.Version.Trim();
         if (!InstallationUpdate.IsValidVersion(version))
             return BadRequest(new { message = "The version must be \"latest\" or a release tag such as server-v0.2.0." });
+        var allowDowngrade = request?.AllowDowngrade == true;
 
         _ = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId);
         var email = User.FindFirstValue(ClaimTypes.Email);
@@ -42,14 +43,29 @@ public class InstallUpdateController(IConfiguration configuration, IAuditEventSe
             EntityType = AuditEntityTypes.ServerInstallation,
             ActorUserId = userId == Guid.Empty ? null : userId,
             Message = "A server update was requested",
-            Metadata = new { RequestedVersion = version },
+            Metadata = new
+            {
+                RequestedVersion = version,
+                AllowDowngrade = allowDowngrade,
+                AuthenticationType = User.Identity?.AuthenticationType,
+                ApiKeyScope = User.FindFirstValue("api_key_scope"),
+                ApiKeyId = User.FindFirstValue("api_key_id")
+            },
             FailOnError = true
         }, token);
 
-        return await InstallationUpdate.RequestAsync(configuration, version, requestedBy, DateTimeOffset.UtcNow, token) switch
+        return await InstallationUpdate.RequestAsync(configuration, version, allowDowngrade, requestedBy, DateTimeOffset.UtcNow, token) switch
         {
             InstallationUpdateRequestResult.Accepted => Accepted(new { requestedVersion = version }),
-            InstallationUpdateRequestResult.InProgress => Conflict(new { message = "An update is already running." }),
+            InstallationUpdateRequestResult.InProgress => Conflict(new { message = "An update is already running or requested." }),
+            InstallationUpdateRequestResult.Downgrade => BadRequest(new
+            {
+                message = "That release is older than the installed one. Request a downgrade explicitly with allowDowngrade (CLI: --allow-downgrade)."
+            }),
+            InstallationUpdateRequestResult.TriggerBlocked => StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "The update request directory on the server cannot be used. Check /var/lib/automaton/update/requests: it must be writable and must not contain a request.json that is not a regular file."
+            }),
             _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
                 message = "This server cannot update itself from Studio yet. Run sudo bash /opt/automaton-server/update.sh once on the server to enable it."
@@ -58,4 +74,4 @@ public class InstallUpdateController(IConfiguration configuration, IAuditEventSe
     }
 }
 
-public sealed record StartInstallationUpdateRequest(string? Version);
+public sealed record StartInstallationUpdateRequest(string? Version, bool AllowDowngrade = false);
