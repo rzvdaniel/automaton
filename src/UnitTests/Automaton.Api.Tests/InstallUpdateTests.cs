@@ -174,6 +174,16 @@ public sealed class InstallUpdateTests
         Assert.That(request.RootElement.GetProperty("allowDowngrade").GetBoolean(), Is.True);
     }
 
+    // Installation:Version is the plain form on real servers (set from the image's SERVER_VERSION).
+    [TestCase("0.2.4", "server-v0.2.3", true)]
+    [TestCase("server-v0.2.4", "server-v0.2.3", true)]
+    [TestCase("0.2.4", "server-v0.2.10", false)]
+    [TestCase("0.2.10", "server-v0.2.9", true)]
+    [TestCase("0.2.4", "latest", false)]
+    [TestCase(null, "server-v0.2.3", false)]
+    public void IsDowngradeUnderstandsThePlainInstalledVersion(string? installed, string requested, bool expected)
+        => Assert.That(InstallationUpdate.IsDowngrade(installed, requested), Is.EqualTo(expected));
+
     [Test]
     public async Task PostAuditsTheAuthenticationSchemeAndApiKey()
     {

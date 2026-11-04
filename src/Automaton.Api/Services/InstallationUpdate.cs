@@ -131,8 +131,13 @@ public static partial class InstallationUpdate
 
     private static bool IsActive(InstallationUpdateRun? run) => run?.State is "starting" or "running";
 
+    // Installation:Version holds the plain form (0.2.4); requests use the tag form (server-v0.2.4).
     private static Version? Parse(string? tag)
-        => tag is not null && VersionPattern().IsMatch(tag) ? Version.Parse(tag["server-v".Length..]) : null;
+    {
+        if (tag is null) return null;
+        var plain = tag.StartsWith("server-v", StringComparison.Ordinal) ? tag["server-v".Length..] : tag;
+        return VersionPattern().IsMatch("server-v" + plain) ? Version.Parse(plain) : null;
+    }
 
     private static string RequestsDirectory(IConfiguration configuration)
         => configuration["Installation:UpdateRequestsDirectory"] ?? DefaultRequestsDirectory;
