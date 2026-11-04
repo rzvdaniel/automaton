@@ -35,7 +35,9 @@ status_dir="$config_dir/status"
 name_pattern='^automaton-[0-9]{8}T[0-9]{6}Z$'
 
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
-[[ -f "$install_dir/compose.override.yaml" ]] && compose+=(-f "$install_dir/compose.override.yaml")
+if [[ -f "$install_dir/compose.override.yaml" ]]; then
+    compose+=(-f "$install_dir/compose.override.yaml")
+fi
 
 list_backups() {
     [[ -d "$backup_root" ]] || return 0
