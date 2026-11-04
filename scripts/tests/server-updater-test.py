@@ -142,17 +142,21 @@ esac
         backup_script = REPO / 'docker/install/backup.sh'
         lock_file = self.root / 'backup.lock'
         environment = self.environment | {'AUTOMATON_BACKUP_LOCK_FILE': str(lock_file)}
+        nightly = self.install / 'backups/nightly'
+        nightly.mkdir(parents=True)
+        legacy_backup = nightly / 'automaton-20260101T000000Z'
+        legacy_backup.mkdir()
 
         listed = subprocess.run(['bash', str(backup_script), '--install-dir', str(self.install), '--list'],
                                 env=environment, capture_output=True, text=True)
-        self.assertEqual(listed.returncode, 0, listed.stderr)
+        self.assertEqual(listed.returncode, 0, f'{listed.stdout}\n{listed.stderr}')
+        self.assertEqual(listed.stdout.strip(), legacy_backup.name)
 
         result = subprocess.run(['bash', str(backup_script), '--install-dir', str(self.install)],
                                 env=environment, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('not encrypted', result.stderr)
-        nightly = self.install / 'backups/nightly'
-        folders = list(nightly.glob('automaton-*'))
+        folders = [path for path in nightly.glob('automaton-*') if path.name != legacy_backup.name]
         self.assertEqual(len(folders), 1)
         self.assertTrue((folders[0] / 'SHA256SUMS').is_file())
         self.assertFalse(list(nightly.glob('*.tar.age')))
