@@ -95,6 +95,20 @@ public sealed class AppSecretVaultTests
     }
 
     [Test]
+    public async Task DeletedProjectVaultIsNotReportedAsPresent()
+    {
+        var fixture = Fixture.Create();
+        var app = fixture.AddProjectApp(Declare("STRIPE_KEY"));
+        await fixture.Service.SetAsync(app, fixture.Developer, AppSecretScopes.Project, "STRIPE_KEY", "value", null, None);
+        fixture.Db.Projects.Single().IsActive = false;
+        await fixture.Db.SaveChangesAsync();
+
+        var status = await fixture.Service.StatusAsync(app, fixture.Developer, [Declare("STRIPE_KEY")], None);
+        Assert.That(status.Single().Present, Is.False);
+        Assert.That(status.Single().Problem, Does.Contain("deleted"));
+    }
+
+    [Test]
     public async Task OnlyProjectDevelopersChangeTheProjectVault()
     {
         var fixture = Fixture.Create();
