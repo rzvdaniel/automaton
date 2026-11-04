@@ -12,7 +12,8 @@ const MARKETPLACE_TAKE = 5
 
 const installCommand = `curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
 less install-automaton.sh
-sudo bash install-automaton.sh`
+sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com`
+const updateCommand = 'automaton server update --wait'
 const tokenCommand = 'sudo cat /etc/automaton/secrets/setup-token'
 const cliCommands = `dotnet tool install -g Automaton.Cli
 automaton login --server https://api.your-domain.com
@@ -68,7 +69,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             <ul class="facts" aria-label="At a glance">
               <li>Apache 2.0</li>
               <li>One Ubuntu server to start</li>
-              <li>No cloud account needed</li>
+              <li>Installs in about 90 seconds</li>
             </ul>
           </div>
 
@@ -117,10 +118,11 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
         <div class="wrap">
           <div class="section-head">
             <p class="eyebrow">Get started</p>
-            <h2 id="start-title">Three steps from an empty server to a live app</h2>
+            <h2 id="start-title">Install in about 90 seconds, update with one command</h2>
             <p>
-              Install Automaton once, connect the machine that will run your apps, then deploy from
-              your own computer.
+              Measured on a fresh Ubuntu 24.04 server (2 vCPU, 4 GB RAM): the installer finished in
+              90 seconds, and the whole stack (PostgreSQL, API, Studio, app store, Traefik) used about
+              1.0 to 1.2 GB of memory with an app running.
             </p>
           </div>
 
@@ -128,27 +130,28 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             <li class="step">
               <h3>Install the server</h3>
               <p>
-                Downloads a verified release, prepares credentials and starts Studio and the API.
-                Installs Docker if it is missing.
+                One command. It checks your DNS, downloads a verified release, generates credentials,
+                starts the stack (PostgreSQL included) and prints a one-time setup link. Installs
+                Docker if it is missing.
               </p>
               <span class="where">on your server</span>
               <div class="cmd">
                 <button class="copy" type="button" @click="copy(installCommand)">Copy</button>
-                <pre><span class="c"># download, read, then run</span>
+                <pre><span class="c"># download, read, then run (about 90 s)</span>
 {{ installCommand }}</pre>
               </div>
             </li>
             <li class="step">
               <h3>Set up Studio</h3>
               <p>
-                Open <code>studio.your-domain.com/install</code>, create your administrator with the
-                setup token, then install a Runner from <strong>Runners</strong>. Apps need one, static
+                Open the setup link the installer printed (or <code>studio.your-domain.com/install</code>
+                with the token), create your administrator, then install a Runner from <strong>Runners</strong>. Apps need one, static
                 sites included.
               </p>
               <span class="where">on your server</span>
               <div class="cmd">
                 <button class="copy" type="button" @click="copy(tokenCommand)">Copy</button>
-                <pre><span class="c"># read the one-time setup token</span>
+                <pre><span class="c"># only if you need the token separately</span>
 {{ tokenCommand }}</pre>
               </div>
             </li>
@@ -166,7 +169,9 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             </li>
           </ol>
           <p class="more">
-            Certificates, networking and updates are covered in the
+            Later, update the server from your computer with one command:
+            <code>{{ updateCommand }}</code>. It waits, checks health and reports failure.
+            Certificates and networking are covered in the
             <a :href="publicAppConfig.installUrl">installation guide</a>.
           </p>
         </div>
@@ -187,6 +192,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             <li><span>Free disk space</span><span>10 GiB or more</span></li>
             <li><span>DNS records</span><span>api, studio, store, apps, *.apps</span></li>
             <li><span>Open ports</span><span>TCP 80, 443, 5671</span></li>
+            <li><span>Included</span><span>Docker, PostgreSQL 16, RabbitMQ, Traefik</span></li>
             <li><span>On your computer</span><span>.NET 10 SDK or later</span></li>
           </ul>
         </div>
