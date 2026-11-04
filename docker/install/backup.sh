@@ -28,7 +28,7 @@ done
 backup_root="$install_dir/backups/nightly"
 config_dir=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" | cut -d= -f2-)
 config_dir=${config_dir:-/etc/automaton}
-age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
+age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2- || true)
 recipient_file="$config_dir/backup-recipient"
 identity_file="$config_dir/secrets/backup-key"
 status_dir="$config_dir/status"
