@@ -53,6 +53,13 @@ public class ProjectResourceService
             return null;
         }
 
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        // A no-op update holds the project row lock until the link is saved. Deletion updates the same row.
+        if (transaction is not null)
+            await dbContext.Projects.Where(project => project.Id == projectId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(project => project.Updated, project => project.Updated), cancellationToken);
         if (!await dbContext.Projects.AnyAsync(project => project.Id == projectId && project.IsActive, cancellationToken))
             throw new InvalidOperationException("This project was deleted.");
 
@@ -89,6 +96,7 @@ public class ProjectResourceService
         app.ProjectId = projectId;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
 
         await auditEventService.WriteAsync(
