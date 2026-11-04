@@ -92,3 +92,7 @@ Refresh mode safety rules:
 ## Learn more
 
 - Documentation: https://automaton.monster/cli
+
+## Upgrading
+
+The shared `~/.automaton/config.json` now stores named server profiles (file format version 2). The CLI upgrades an older file automatically, but older CLI versions cannot read the new format. Update every machine that uses the file: `dotnet tool update -g Automaton.Cli`. Set `AUTOMATON_CONFIG_DIR` to keep the file in a different directory.

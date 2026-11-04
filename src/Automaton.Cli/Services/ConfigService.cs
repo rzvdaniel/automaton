@@ -32,8 +32,20 @@ public class ConfigService
 
     public ConfigService(string? globalConfigPath = null)
     {
-        globalConfigFile = globalConfigPath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton", "config.json");
+        globalConfigFile = globalConfigPath ?? DefaultGlobalConfigPath();
+    }
+
+    /// <summary>
+    /// The shared config location: AUTOMATON_CONFIG_DIR/config.json when that variable is set
+    /// (tests and isolated environments), otherwise ~/.automaton/config.json.
+    /// </summary>
+    public static string DefaultGlobalConfigPath()
+    {
+        var overrideDir = Environment.GetEnvironmentVariable("AUTOMATON_CONFIG_DIR");
+        var directory = string.IsNullOrWhiteSpace(overrideDir)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton")
+            : overrideDir;
+        return Path.Combine(directory, "config.json");
     }
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -205,6 +217,8 @@ public class ConfigService
         foreach (var current in EnumerateDirectoryAndParents(directory))
         {
             var candidate = GetProjectLocalConfigPath(current);
+            // ~/.automaton/config.json is the shared profiles file, not a project-local config.
+            if (IsSharedConfigPath(candidate)) continue;
             if (File.Exists(candidate))
             {
                 return candidate;
@@ -212,6 +226,14 @@ public class ConfigService
         }
 
         return null;
+    }
+
+    private bool IsSharedConfigPath(string candidate)
+    {
+        var full = Path.GetFullPath(candidate);
+        var userDefault = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton", "config.json");
+        return new[] { globalConfigFile, DefaultGlobalConfigPath(), userDefault }
+            .Any(shared => string.Equals(Path.GetFullPath(shared), full, StringComparison.OrdinalIgnoreCase));
     }
 
     public string? FindNearestProjectEnvironmentConfigPath(string directory, string environmentName)
@@ -311,31 +333,76 @@ public class ConfigService
     {
         if (!File.Exists(globalConfigFile)) return new CliProfilesConfig();
         var json = File.ReadAllText(globalConfigFile);
-        using var document = JsonDocument.Parse(json);
-        if (document.RootElement.TryGetProperty("version", out var version) && version.GetInt32() == 2)
+        JsonElement root;
+        try { root = JsonDocument.Parse(json).RootElement; }
+        catch (JsonException error)
         {
-            var profiles = JsonSerializer.Deserialize<CliProfilesConfig>(json, SerializerOptions) ?? new();
-            profiles.Profiles = new Dictionary<string, GlobalConfig>(profiles.Profiles ?? [], StringComparer.OrdinalIgnoreCase);
-            return profiles;
+            throw new InvalidOperationException(
+                $"{globalConfigFile} is not valid JSON ({error.Message}); the file was not changed.");
         }
-        if (document.RootElement.TryGetProperty("version", out _))
-            throw new InvalidOperationException("Unsupported CLI config version; no credentials were changed.");
-        var legacy = JsonSerializer.Deserialize<GlobalConfig>(json, SerializerOptions) ?? new();
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("version", out var version))
+        {
+            if (version.ValueKind != JsonValueKind.Number || version.GetInt32() != 2)
+                throw new InvalidOperationException("Unsupported CLI config version; no credentials were changed.");
+            return NormalizeProfiles(JsonSerializer.Deserialize<CliProfilesConfig>(json, SerializerOptions));
+        }
+        return MigrateLegacy(json);
+    }
+
+    private static CliProfilesConfig NormalizeProfiles(CliProfilesConfig? profiles)
+    {
+        profiles ??= new CliProfilesConfig();
+        profiles.Profiles = new Dictionary<string, GlobalConfig>(profiles.Profiles ?? [], StringComparer.OrdinalIgnoreCase);
+        return profiles;
+    }
+
+    private CliProfilesConfig MigrateLegacy(string json)
+    {
+        GlobalConfig legacy;
+        try { legacy = JsonSerializer.Deserialize<GlobalConfig>(json, SerializerOptions) ?? new(); }
+        catch (JsonException error)
+        {
+            throw new InvalidOperationException(
+                $"{globalConfigFile} could not be read ({error.Message}); the file was not changed.");
+        }
         var migrated = new CliProfilesConfig();
         if (string.IsNullOrWhiteSpace(legacy.Server) && !string.IsNullOrWhiteSpace(legacy.ApiKey))
             throw new InvalidOperationException("Legacy CLI config has a key but no server; no credentials were changed.");
         if (!string.IsNullOrWhiteSpace(legacy.Server))
         {
-            var name = ProfileNameFromServer(legacy.Server);
+            var name = TryProfileName(legacy.Server) ?? throw new InvalidOperationException(
+                $"Legacy CLI config server '{legacy.Server}' is not a valid URL (include https://). " +
+                $"Fix it with `automaton login --server <url>`; {globalConfigFile} was not changed.");
             migrated.Profiles[name] = legacy;
             migrated.Current = name;
         }
-        SaveProfilesConfig(migrated);
+        TrySaveMigrated(migrated);
         return migrated;
     }
 
+    private void TrySaveMigrated(CliProfilesConfig profiles)
+    {
+        try { SaveProfilesConfig(profiles); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine(
+                $"Warning: could not upgrade {globalConfigFile} to the profiles format ({error.Message}). " +
+                "The file was left unchanged; using it as is for this command.");
+        }
+    }
+
+    private static string? TryProfileName(string? server)
+        => IsHttpServer(server) ? ProfileNameFromServer(server) : null;
+
+    private static bool IsHttpServer(string? server)
+        => Uri.TryCreate(server, UriKind.Absolute, out var uri)
+           && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && uri.Host.Length > 0;
+
     public void SaveProfilesConfig(CliProfilesConfig profiles)
-        => WriteJsonAtomically(globalConfigFile, profiles);
+    {
+        profiles.Version = 2;
+        WriteJsonAtomically(globalConfigFile, profiles);
+    }
 
     public void SaveProfile(string name, GlobalConfig profile)
     {
@@ -351,16 +418,30 @@ public class ConfigService
         var profiles = LoadProfilesConfig();
         if (!profiles.Profiles.Remove(name)) return false;
         if (string.Equals(profiles.Current, name, StringComparison.OrdinalIgnoreCase))
-            profiles.Current = profiles.Profiles.Keys.Order(StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+            profiles.Current = null; // never switch silently; the user picks with `automaton profiles use`
         SaveProfilesConfig(profiles);
         return true;
     }
 
-    public bool RemoveSelectedProfile()
+    public bool RemoveSelectedProfile(string? directory = null)
     {
         var profiles = LoadProfilesConfig();
-        var name = SelectedProfileName(profiles);
+        var name = ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE");
+        if (name == null && directory != null && FindNearestProjectRoot(directory) != null)
+        {
+            var linked = ResolveLinkedServer(directory);
+            name = profiles.Profiles.FirstOrDefault(pair => SameServer(pair.Value.Server, linked)).Key;
+        }
+        name ??= profiles.Current;
         return name != null && RemoveProfile(name);
+    }
+
+    private string? ResolveLinkedServer(string cwd)
+    {
+        if (FindNearestProjectRoot(cwd) == null) return null;
+        var local = LoadProjectLocalConfig(cwd);
+        var named = LoadResolvedEnvironment(cwd, ResolveEnvironmentName(cwd, null), allowMissing: true);
+        return named.Server ?? local.Server;
     }
 
     public void UseProfile(string name)
@@ -373,8 +454,8 @@ public class ConfigService
 
     public static string ProfileNameFromServer(string? server)
     {
-        if (!Uri.TryCreate(server, UriKind.Absolute, out var uri)) throw new ArgumentException("A valid server URL is required.");
-        var host = uri.Host;
+        if (!IsHttpServer(server)) throw new ArgumentException("A valid server URL is required.");
+        var host = new Uri(server!).Host;
         return host.StartsWith("api.", StringComparison.OrdinalIgnoreCase) ? host[4..] : host;
     }
 
@@ -465,7 +546,7 @@ public class ConfigService
         var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
         var (profileName, global) = ResolveGlobalProfile(linkedServer);
         if (explicitProfile != null)
-            return new CredentialSelection(profileName, global.Server, global.ApiKey, CliCredentialSource.Global, global);
+            return SelectExplicitProfile(linkedServer, profileName, global, envServer, envApiKey);
         if (linkedServer != null && profileName != null && envApiKey == null && envServer == null)
             return new CredentialSelection(profileName, global.Server, global.ApiKey, CliCredentialSource.Global, global);
 
@@ -473,7 +554,32 @@ public class ConfigService
         var server = envServer ?? namedEnvironment.Server ?? local.Server ?? global.Server;
         var apiKey = envApiKey ?? selected.ApiKey;
         ValidateCredentialPair(linkedServer, profileName, selected, server, envApiKey);
+        RequireServerForLocalKey(source, selected, envServer);
         return new CredentialSelection(profileName, server, apiKey, source, selected);
+    }
+
+    private static CredentialSelection SelectExplicitProfile(string? linkedServer, string? profileName,
+        GlobalConfig global, string? envServer, string? envApiKey)
+    {
+        // An explicit profile and the AUTOMATON_SERVER/AUTOMATON_API_KEY override are ambiguous together.
+        if (envServer != null || envApiKey != null)
+            throw new InvalidOperationException(
+                "A profile (--profile or AUTOMATON_PROFILE) cannot be combined with AUTOMATON_SERVER or AUTOMATON_API_KEY; unset one of them.");
+        if (linkedServer != null && !SameServer(global.Server, linkedServer))
+            throw new InvalidOperationException(
+                $"This app is on {linkedServer}, but profile '{profileName}' is on {global.Server}. " +
+                $"Omit --profile or run `automaton login --server {linkedServer}`.");
+        return new CredentialSelection(profileName, global.Server, global.ApiKey, CliCredentialSource.Global, global);
+    }
+
+    // A key stored in an app folder is never paired with a server from somewhere else.
+    private static void RequireServerForLocalKey(CliCredentialSource source, GlobalConfig selected, string? envServer)
+    {
+        if (source is CliCredentialSource.NamedEnvironment or CliCredentialSource.ProjectLocal
+            && !string.IsNullOrWhiteSpace(selected.ApiKey) && string.IsNullOrWhiteSpace(selected.Server) && envServer == null)
+            throw new InvalidOperationException(
+                "The project-local credentials have an API key but no server. " +
+                "Run `automaton login --local --server <url>` to save both.");
     }
 
     private static void ValidateCredentialPair(string? linkedServer, string? profileName,
@@ -686,7 +792,13 @@ public class ConfigService
 
         try
         {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            var options = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None,
+                BufferSize = 4096, Options = FileOptions.WriteThrough
+            };
+            if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            using (var stream = new FileStream(tempPath, options))
             using (var writer = new StreamWriter(stream))
             {
                 writer.Write(contents);
@@ -710,10 +822,6 @@ public class ConfigService
                 File.Move(tempPath, path);
             }
 
-            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
-            {
-                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
         }
         finally
         {

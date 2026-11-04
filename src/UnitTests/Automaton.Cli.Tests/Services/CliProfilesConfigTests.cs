@@ -72,18 +72,18 @@ public class CliProfilesConfigTests
         Assert.That((matched.ProfileName, matched.Server, matched.ApiKey),
             Is.EqualTo(("two", "https://api.two.test", "ak_two")));
 
-        Environment.SetEnvironmentVariable("AUTOMATON_PROFILE", "one");
-        var envSelected = config.ResolveContext(directory: app);
-        Assert.That((envSelected.ProfileName, envSelected.Server, envSelected.ApiKey),
-            Is.EqualTo(("one", "https://api.one.test", "ak_one")));
-
         config.ProfileOverride = "two";
         var explicitSelected = config.ResolveContext(directory: app);
         Assert.That(explicitSelected.ProfileName, Is.EqualTo("two"));
+
+        config.ProfileOverride = null;
+        Environment.SetEnvironmentVariable("AUTOMATON_PROFILE", "one");
+        var error = Assert.Throws<InvalidOperationException>(() => config.ResolveContext(directory: app));
+        Assert.That(error!.Message, Does.Contain("This app is on https://api.two.test"));
     }
 
     [Test]
-    public void ExplicitProfileOnAnotherServerDoesNotReuseLinkedAppId()
+    public void ExplicitProfileOnAnotherServerThanLinkedAppIsRejected()
     {
         config.SaveProfile("one", new GlobalConfig { Server = "https://api.one.test", ApiKey = "ak_one" });
         var app = Path.Combine(root, "app");
@@ -95,10 +95,57 @@ public class CliProfilesConfigTests
         });
         config.ProfileOverride = "one";
 
-        var resolved = config.ResolveContext(directory: app);
+        var error = Assert.Throws<InvalidOperationException>(() => config.ResolveContext(directory: app));
+        Assert.That(error!.Message, Does.Contain("This app is on https://api.two.test"));
+    }
 
-        Assert.That(resolved.Server, Is.EqualTo("https://api.one.test"));
-        Assert.That(resolved.AppId, Is.Null);
+    [Test]
+    public void ExplicitProfileWithEnvironmentCredentialsIsAnError()
+    {
+        config.SaveProfile("one", new GlobalConfig { Server = "https://api.one.test", ApiKey = "ak_one" });
+        config.ProfileOverride = "one";
+        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "ak_env");
+        Assert.Throws<InvalidOperationException>(() => config.ResolveContext(directory: root));
+    }
+
+    [Test]
+    public void ProjectLocalKeyWithoutServerIsRejected()
+    {
+        config.SaveProfile("two", new GlobalConfig { Server = "https://api.two.test", ApiKey = "ak_two" });
+        var app = Path.Combine(root, "app");
+        Directory.CreateDirectory(app);
+        File.WriteAllText(Path.Combine(app, "automaton.json"), "{}");
+        config.SaveNamedEnvironmentConfig(app, "live", new GlobalConfig { ApiKey = "ak_local" });
+        var error = Assert.Throws<InvalidOperationException>(() => config.ResolveContext(directory: app));
+        Assert.That(error!.Message, Does.Contain("no server"));
+    }
+
+    [Test]
+    public void MalformedLegacyServerReportsClearErrorAndKeepsFile()
+    {
+        var path = Path.Combine(root, "config.json");
+        var original = "{\"server\":\"localhost:7091\",\"apiKey\":\"ak_one\"}";
+        File.WriteAllText(path, original);
+        var error = Assert.Throws<InvalidOperationException>(() => config.LoadProfilesConfig());
+        Assert.That(error!.Message, Does.Contain("not a valid URL"));
+        Assert.That(File.ReadAllText(path), Is.EqualTo(original));
+    }
+
+    [Test]
+    public void LogoutInsideAppRemovesMatchingProfile()
+    {
+        config.SaveProfile("one", new GlobalConfig { Server = "https://api.one.test", ApiKey = "ak_one" });
+        config.SaveProfile("two", new GlobalConfig { Server = "https://api.two.test", ApiKey = "ak_two" });
+        var app = Path.Combine(root, "app");
+        Directory.CreateDirectory(app);
+        File.WriteAllText(Path.Combine(app, "automaton.json"), "{}");
+        config.SaveNamedEnvironmentConfig(app, "live", new GlobalConfig { Server = "https://api.two.test" });
+
+        Assert.That(config.RemoveSelectedProfile(app), Is.True);
+
+        var profiles = config.LoadProfilesConfig();
+        Assert.That(profiles.Profiles.Keys, Is.EquivalentTo(new[] { "one" }));
+        Assert.That(profiles.Current, Is.EqualTo("one"));
     }
 
     [Test]
@@ -158,7 +205,7 @@ public class CliProfilesConfigTests
     }
 
     [Test]
-    public void LogoutOfSelectedProfileRetainsOthersAndMovesCurrent()
+    public void LogoutOfCurrentProfileRetainsOthersAndClearsCurrent()
     {
         config.SaveProfile("one", new GlobalConfig { Server = "https://api.one.test", ApiKey = "ak_one" });
         config.SaveProfile("two", new GlobalConfig { Server = "https://api.two.test", ApiKey = "ak_two" });
@@ -167,8 +214,8 @@ public class CliProfilesConfigTests
 
         var profiles = config.LoadProfilesConfig();
         Assert.That(profiles.Profiles.Keys, Is.EquivalentTo(new[] { "two" }));
-        Assert.That(profiles.Current, Is.EqualTo("two"));
-        Assert.That(config.ResolveContext(directory: root).ApiKey, Is.EqualTo("ak_two"));
+        Assert.That(profiles.Current, Is.Null);
+        Assert.That(config.ResolveContext(directory: root).ApiKey, Is.Null);
     }
 
     [Test]

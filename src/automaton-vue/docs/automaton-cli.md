@@ -31,6 +31,7 @@ automaton runners install --name main --ssh user@host
 ```
 
 Use `--local` on the host (the Ubuntu host needs Docker running), or `--print-command` to run the one-time command yourself before its printed expiry. Without a mode, an interactive terminal prints the command. The CLI asks you to acknowledge that the trusted Runner has Docker access on its host; `--yes` provides that acknowledgement for automation (required when not interactive). The installer command goes to SSH or sudo over standard input and is not passed as a process argument. The installer step times out after 900 seconds. The CLI waits up to 300 seconds for a connection (`--timeout` changes this), prints the Runner ID, and can add the connected Runner to a project with `--project NAME`. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
+
 ## Several servers
 
 Log in to each server once. The CLI stores each server and its key together in a named profile:
@@ -44,7 +45,11 @@ automaton --profile second whoami
 automaton logout --profile second
 ```
 
-Without `--profile`, login names a profile after the server host, dropping an initial `api.`. `automaton profiles` shows the server, current selection and a key fingerprint, never the key. `automaton whoami` shows the chosen profile and server. For any command, `--profile` takes precedence over `AUTOMATON_PROFILE`; otherwise an app folder chooses the profile matching the server recorded in its selected `.automaton` environment, then falls back to the current profile outside an app folder. Existing project-local credentials for that same server remain usable. If an app's server has no matching profile or local credential, log in to that server before deploying. `automaton logout` removes only the selected profile and leaves other logins intact.
+Without `--profile`, login names a profile after the server host, dropping an initial `api.`. `automaton profiles` shows the server, current selection and a key fingerprint, never the key. `automaton whoami` shows the chosen profile and server. For any command, `--profile` takes precedence over `AUTOMATON_PROFILE`; otherwise an app folder chooses the profile matching the server recorded in its selected `.automaton` environment, then falls back to the current profile outside an app folder. Existing project-local credentials for that same server remain usable. If an app's server has no matching profile or local credential, log in to that server before deploying. `automaton logout` removes only one profile and leaves other logins intact: the `--profile` or `AUTOMATON_PROFILE` selection, else (inside an app folder) the profile matching the app's server, else the current profile. After the current profile is removed no profile is current until you run `automaton profiles use NAME` or log in again; the CLI never switches silently.
+
+`--profile` (or `AUTOMATON_PROFILE`) inside an app folder whose server differs from the profile's is an error ("This app is on ..."). It cannot be combined with `AUTOMATON_SERVER` or `AUTOMATON_API_KEY`; without a profile those variables still override stored credentials. A project-local key must be stored with its server (`automaton login --local --server URL`); a key without a server is refused. `automaton config --global --server URL` saves (or updates) the profile named after that server instead of a single global server.
+
+The shared file `~/.automaton/config.json` changed format (version 2, with a `profiles` map and the `current` profile). The CLI upgrades an older file on first use, keeping its credentials. Older CLI versions cannot read the new format, so update them everywhere you use the file: `dotnet tool update -g Automaton.Cli`. Set `AUTOMATON_CONFIG_DIR` to keep the file in another directory (`$AUTOMATON_CONFIG_DIR/config.json`); the CLI test suite uses it so tests never touch your real login.
 
 ## Create or link
 
