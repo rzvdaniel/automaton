@@ -83,6 +83,8 @@ automaton publish --slug <development-slug> --public --yes --json --non-interact
 automaton open --public
 ```
 
+For HTTPS app URLs, `automaton publish` and `automaton deploy --publish` wait up to 60 seconds for the published hostname to present a trusted certificate. If the check is still pending, the publish remains recorded and the CLI prints the URL and a retry hint. With `--json`, check `certificatePending` before opening the URL.
+
 The demonstrated app used an explicit runtime image, HTTP health check and data
 directory. It wrote a marker only under `AUTOMATON_APP_DATA_DIR`. Changing its response
 and redeploying preserved that marker. An intentionally failing replacement kept

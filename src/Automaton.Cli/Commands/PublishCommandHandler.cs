@@ -87,7 +87,7 @@ internal static class PublishCommandHandler
 
     private static void OpenPublishedResult(PublishResult result, bool open)
     {
-        if (result.Success && open && !string.IsNullOrWhiteSpace(result.Url))
+        if (result.Success && !result.CertificatePending && open && !string.IsNullOrWhiteSpace(result.Url))
         {
             CliBrowserService.OpenUrl(result.Url);
         }

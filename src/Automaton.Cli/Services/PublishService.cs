@@ -51,7 +51,7 @@ public sealed class PublishService
                 listing.Tags,
                 resolved.Settings.IsForkable,
                 cancellationToken);
-            return CreatePublishSuccess(context, resolved.Settings, checks);
+            return await CreatePublishSuccessAsync(context, resolved.Settings, checks, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -198,21 +198,32 @@ public sealed class PublishService
             IsForkable = settings.IsForkable
         };
 
-    private static PublishResult CreatePublishSuccess(
+    private static async Task<PublishResult> CreatePublishSuccessAsync(
         PublishContext context,
         PublishSettings settings,
-        IEnumerable<CommandDiagnosticCheck> checks)
+        IEnumerable<CommandDiagnosticCheck> checks,
+        CancellationToken cancellationToken)
     {
         var publishedUrl = CliAppUrlBuilder.BuildPublishedUrl(context.Server, settings.Slug);
+        var certificatePending = true;
+        try
+        {
+            certificatePending = !await PublishedCertificate.WaitAsync(new Uri(publishedUrl), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Publication already succeeded. Only the certificate check was cancelled.
+        }
         var resultChecks = checks.ToList();
         resultChecks.Add(new CommandDiagnosticCheck(
             CommandDiagnosticCheckNames.Publish, true, $"published at {publishedUrl}"));
         return new PublishResult
         {
             Success = true,
-            Summary = "Publish complete",
+            Summary = certificatePending ? "Published, certificate pending" : "Publish complete",
+            CertificatePending = certificatePending,
             Checks = resultChecks,
-            NextSteps = [],
+            NextSteps = certificatePending ? ["Retry opening the public URL in a minute"] : [],
             AppId = context.AppId,
             AppName = context.AppConfig.Name,
             Slug = settings.Slug,

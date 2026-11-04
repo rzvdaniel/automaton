@@ -4,6 +4,8 @@ public sealed class PublishResult
 {
     public bool Success { get; init; }
 
+    public bool CertificatePending { get; init; }
+
     public bool Cancelled { get; init; }
 
     public string Summary { get; init; } = string.Empty;

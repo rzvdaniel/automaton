@@ -293,7 +293,7 @@ internal static class DeployCommandHandler
             DeployCommand.WriteResult(result, arguments.AsJson, arguments.Verbose, nonInteractive);
             PublishCommand.WriteResult(published, arguments.AsJson, nonInteractive);
         }
-        if (published.Success && arguments.Open && !string.IsNullOrWhiteSpace(published.Url))
+        if (published.Success && !published.CertificatePending && arguments.Open && !string.IsNullOrWhiteSpace(published.Url))
         {
             CliBrowserService.OpenUrl(published.Url);
         }

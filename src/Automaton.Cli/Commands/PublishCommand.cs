@@ -50,6 +50,7 @@ public static class PublishCommand
             {
                 success = result.Success,
                 cancelled = result.Cancelled,
+                certificatePending = result.CertificatePending,
                 summary = result.Summary,
                 checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
                 nextSteps = result.NextSteps,
@@ -80,18 +81,20 @@ public static class PublishCommand
         {
             if (!string.IsNullOrWhiteSpace(result.Url))
             {
-                Console.WriteLine("Publish complete.");
+                Console.WriteLine(result.Summary + ".");
                 Console.WriteLine();
                 Console.WriteLine($"Public app: {result.Url}");
+                if (result.CertificatePending) Console.WriteLine(result.NextSteps[0] + ".");
             }
             return;
         }
 
         if (!string.IsNullOrWhiteSpace(result.Url))
         {
-            AnsiConsole.MarkupLine("[green bold]Publish complete.[/]");
+            AnsiConsole.MarkupLine(result.CertificatePending ? "[yellow bold]Published, certificate pending.[/]" : "[green bold]Publish complete.[/]");
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine($"[bold]Public app:[/] {result.Url}");
+            if (result.CertificatePending) AnsiConsole.WriteLine(result.NextSteps[0] + ".");
         }
     }
 }

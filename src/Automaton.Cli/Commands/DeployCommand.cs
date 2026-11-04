@@ -485,10 +485,12 @@ public static class DeployCommand
         CliJson.Write(new
         {
             success = deployResult.Success && publishResult.Success,
-            summary = publishResult.Success ? "Deploy and publish complete" : "Deploy complete, publish failed",
+            summary = publishResult.CertificatePending ? "Deployed and published, certificate pending"
+                : publishResult.Success ? "Deploy and publish complete" : "Deploy complete, publish failed",
             deployed = deployResult.Success,
             published = publishResult.Success,
-            hasWarnings = deployResult.HasWarnings,
+            certificatePending = publishResult.CertificatePending,
+            hasWarnings = deployResult.HasWarnings || publishResult.CertificatePending,
             appId = deployResult.AppId,
             appName = deployResult.AppName,
             target = deployResult.TargetSlug,
@@ -500,9 +502,7 @@ public static class DeployCommand
             deployDirectory = deployResult.DeployDirectory,
             clean = deployResult.Clean,
             checks = deployResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
-            nextSteps = publishResult.Success
-                ? deployResult.NextSteps
-                : deployResult.NextSteps.Concat(publishResult.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase),
+            nextSteps = deployResult.NextSteps.Concat(publishResult.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase),
             sourceUploaded = deployResult.SourceUploaded,
             runtimeUploaded = deployResult.RuntimeUploaded,
             runtime = deployResult.Runtime,
