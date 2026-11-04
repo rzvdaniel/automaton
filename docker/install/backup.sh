@@ -28,6 +28,10 @@ done
 backup_root="$install_dir/backups/nightly"
 config_dir=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" | cut -d= -f2-)
 config_dir=${config_dir:-/etc/automaton}
+age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
+[[ "$age_image" =~ @sha256:[0-9a-f]{64}$ ]] || { echo 'The release manifest has no pinned age image.' >&2; exit 1; }
+recipient_file="$config_dir/backup-recipient"
+identity_file="$config_dir/secrets/backup-key"
 status_dir="$config_dir/status"
 name_pattern='^automaton-[0-9]{8}T[0-9]{6}Z$'
 
@@ -43,10 +47,10 @@ list_backups() {
 write_status() {
     local ok="$1" error="$2"
     install -d -m 0755 "$status_dir"
-    python3 - "$backup_root" "$status_dir/backup.json" "$ok" "$error" "$keep" <<'PY'
-import json, os, sys, tempfile
+    python3 - "$backup_root" "$status_dir/backup.json" "$ok" "$error" "$keep" "$recipient_file" <<'PY'
+import json, os, shlex, sys, tempfile
 from datetime import datetime, timezone
-root, target, ok, error, keep = sys.argv[1:]
+root, target, ok, error, keep, recipient_file = sys.argv[1:]
 previous = {}
 try:
     previous = json.load(open(target))
@@ -60,7 +64,18 @@ if os.path.isdir(root):
             continue
         size = sum(os.path.getsize(os.path.join(path, f)) for f in os.listdir(path))
         created = datetime.strptime(name[len('automaton-'):], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
-        backups.append({'name': name, 'createdAt': created.isoformat().replace('+00:00', 'Z'), 'sizeBytes': size})
+        archive = os.path.join(root, name + '.tar.age')
+        archive_size = os.path.getsize(archive) if os.path.isfile(archive) else None
+        archive_hash = None
+        if archive_size is not None:
+            import hashlib
+            digest = hashlib.sha256()
+            with open(archive, 'rb') as source:
+                for block in iter(lambda: source.read(1024 * 1024), b''):
+                    digest.update(block)
+            archive_hash = digest.hexdigest()
+        backups.append({'name': name, 'createdAt': created.isoformat().replace('+00:00', 'Z'), 'sizeBytes': size,
+                        'archiveSizeBytes': archive_size, 'archiveSha256': archive_hash})
 now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
 status = {
     'lastAttemptAt': now,
@@ -68,6 +83,8 @@ status = {
     'lastError': None if ok == 'true' else error,
     'keep': int(keep),
     'directory': root,
+    'backupRecipient': open(recipient_file).read().strip() if os.path.isfile(recipient_file) else None,
+    'backupKeyCommand': 'sudo cat ' + shlex.quote(os.path.join(os.path.dirname(recipient_file), 'secrets', 'backup-key')),
     'backups': backups,
 }
 fd, temporary = tempfile.mkstemp(dir=os.path.dirname(target))
@@ -107,8 +124,33 @@ UNIT
     echo "Nightly backups enabled (automaton-backup.timer); keeping the newest $keep in $backup_root."
 }
 
+initialize_backup_key() {
+    install -d -m 0700 "$config_dir/secrets"
+    if [[ ! -e "$recipient_file" && ! -e "$identity_file" ]]; then
+        local generated recipient temporary_identity="$config_dir/secrets/.backup-key.partial"
+        generated=$(docker run --rm -v "$config_dir/secrets:/keys" "$age_image" age-keygen -o /keys/.backup-key.partial 2>&1 >/dev/null)
+        [[ "$generated" =~ ^Public\ key:\ age1[0-9a-z]+$ ]] || { rm -f -- "$temporary_identity"; echo 'Could not initialize the encrypted backup key.' >&2; return 1; }
+        recipient=${generated#Public key: }
+        chmod 0600 "$temporary_identity"
+        mv -- "$temporary_identity" "$identity_file"
+        printf '%s\n' "$recipient" > "$recipient_file"
+        chmod 0644 "$recipient_file"
+    elif [[ -s "$identity_file" && ! -e "$recipient_file" ]]; then
+        local recipient
+        recipient=$(docker run --rm -v "$config_dir/secrets:/keys:ro" "$age_image" age-keygen -y /keys/backup-key)
+        [[ "$recipient" =~ ^age1[0-9a-z]+$ ]] || { echo 'Could not read the encrypted backup recipient.' >&2; return 1; }
+        printf '%s\n' "$recipient" > "$recipient_file"
+        chmod 0644 "$recipient_file"
+    fi
+    [[ -s "$recipient_file" && -s "$identity_file" && ! -L "$recipient_file" && ! -L "$identity_file" ]] || {
+        echo 'The encrypted backup key pair is incomplete.' >&2
+        return 1
+    }
+}
+
 take_backup() {
     install -d -m 0700 "$install_dir/backups" "$backup_root"
+    initialize_backup_key
     local name="automaton-$(date -u +%Y%m%dT%H%M%SZ)"
     local working="$backup_root/.$name.partial"
     rm -rf -- "$working"
@@ -126,10 +168,17 @@ take_backup() {
     cp "$install_dir/version" "$working/version" 2>/dev/null || true
     (cd "$working" && sha256sum database.dump api-keys.tar.gz worker-keys.tar.gz > SHA256SUMS && sha256sum -c --quiet SHA256SUMS)
     mv -- "$working" "$backup_root/$name"
+    local archive="$backup_root/$name.tar.age" temporary="$backup_root/.$name.tar.age.partial"
+    if ! tar -C "$backup_root" -cf - "$name" | docker run --rm -i "$age_image" age -r "$(cat "$recipient_file")" > "$temporary"; then
+        rm -f -- "$temporary"
+        return 1
+    fi
+    chmod 0600 "$temporary"
+    mv -- "$temporary" "$archive"
     echo "Backup saved: $backup_root/$name ($(du -sh "$backup_root/$name" | cut -f1))"
     # Rotate only backups this script created.
     list_backups | tail -n +"$((keep + 1))" | while read -r old; do
-        [[ "$old" =~ $name_pattern ]] && rm -rf -- "${backup_root:?}/$old" && echo "Removed old backup: $old"
+        [[ "$old" =~ $name_pattern ]] && rm -rf -- "${backup_root:?}/$old" "${backup_root:?}/$old.tar.age" && echo "Removed old backup: $old"
     done
 }
 

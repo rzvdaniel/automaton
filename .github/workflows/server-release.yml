@@ -20,7 +20,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        component: [server, worker, studio, store]
+        component: [server, worker, studio, store, age]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -82,6 +82,14 @@ jobs:
           IMAGE: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}@${{ steps.image.outputs.digest }}
           COMPONENT: ${{ matrix.component }}
         run: printf '%s\n' "$IMAGE" > "$COMPONENT.image"
+      - name: Smoke test age tool image
+        if: matrix.component == 'age'
+        env:
+          IMAGE: ghcr.io/${{ steps.repository.outputs.name }}-age:${{ github.sha }}
+        run: |
+          docker pull "$IMAGE"
+          docker run --rm "$IMAGE" age --version
+          docker run --rm "$IMAGE" age-keygen --help >/dev/null
       - uses: actions/upload-artifact@v4
         with:
           name: image-${{ matrix.component }}
@@ -122,6 +130,7 @@ jobs:
             echo "WORKER_IMAGE=$(cat worker.image)"
             echo "STUDIO_IMAGE=$(cat studio.image)"
             echo "STORE_IMAGE=$(cat store.image)"
+            echo "AGE_IMAGE=$(cat age.image)"
             resolve() {
               docker pull "$2" >&2
               printf '%s=%s\n' "$1" "$(docker image inspect --format '{{index .RepoDigests 0}}' "$2")"
@@ -154,8 +163,8 @@ jobs:
           trap 'rm -rf "$public_config"' EXIT
           while IFS= read -r reference; do
             docker --config "$public_config" pull "$reference"
-          # A new GHCR package starts private; make it public, then rerun, if this fails for store.
-          done < <(cat server.image worker.image studio.image store.image)
+          # A new GHCR package starts private; make it public, then rerun, if this fails for a release image.
+          done < <(cat server.image worker.image studio.image store.image age.image)
       - name: Smoke test isolated installation
         run: |
           sudo apt-get update

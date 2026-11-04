@@ -55,6 +55,16 @@ public class InstallController(InstallService installService, IConfiguration con
     public async Task<IActionResult> GetBackups(CancellationToken token)
         => Ok(await InstallationBackups.ReadAsync(configuration, token));
 
+    [HttpGet("backups/{name}/archive")]
+    [Authorize(Policy = Automaton.Api.Authentication.AppPermissionAuthenticationOptions.BackupsReadPolicy)]
+    public async Task<IActionResult> GetBackupArchive(string name, CancellationToken token)
+    {
+        var status = await InstallationBackups.ReadAsync(configuration, token);
+        var path = InstallationBackups.GetArchivePath(configuration, status, name);
+        if (path is null) return NotFound();
+        return PhysicalFile(path, "application/octet-stream", name + ".tar.age", enableRangeProcessing: true);
+    }
+
     [HttpPost]
     [AllowAnonymous]
     public async Task<IActionResult> Post(InstallCommand command, CancellationToken cancellationToken)

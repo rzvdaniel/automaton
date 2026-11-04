@@ -11,18 +11,58 @@ umask 077
 
 install_dir=/opt/automaton-server
 name=''
+archive=''
+key=''
 confirm=''
 while (($#)); do
     case "$1" in
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --confirm) confirm="${2:?Missing domain}"; shift 2 ;;
+        --archive) archive="${2:?Missing archive file}"; shift 2 ;;
+        --key) key="${2:?Missing age identity file}"; shift 2 ;;
         --help) sed -n '2,8p' "$0"; exit 0 ;;
         -*) echo "Unknown option: $1" >&2; exit 2 ;;
         *) name="$1"; shift ;;
     esac
 done
 [[ $EUID -eq 0 ]] || { echo 'Run as root (sudo).' >&2; exit 1; }
+[[ -z "$archive" || -z "$name" ]] || { echo 'Choose either a backup name or --archive, not both.' >&2; exit 2; }
 backup_root="$install_dir/backups/nightly"
+install -d -m 0700 "$install_dir/backups"
+if [[ -n "$archive" || -n "$key" ]]; then
+    [[ -n "$archive" && -n "$key" ]] || { echo 'Specify both --archive and --key.' >&2; exit 2; }
+    [[ -f "$archive" && -f "$key" ]] || { echo 'Archive or key file not found.' >&2; exit 1; }
+    working=$(mktemp -d "$install_dir/backups/.restore.XXXXXX")
+    trap 'rm -rf -- "$working"' EXIT
+    age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
+    [[ "$age_image" =~ @sha256:[0-9a-f]{64}$ ]] || { echo 'The release manifest has no pinned age image.' >&2; exit 1; }
+    docker run --rm -i -v "$key:/identity:ro" "$age_image" age --decrypt -i /identity < "$archive" > "$working/backup.tar"
+    python3 - "$working/backup.tar" "$working" <<'PY'
+import pathlib, re, sys, tarfile
+archive, destination = sys.argv[1:]
+with tarfile.open(archive, 'r:') as source:
+    members = source.getmembers()
+    roots = set()
+    for member in members:
+        path = pathlib.PurePosixPath(member.name)
+        if path.is_absolute() or '..' in path.parts or not path.parts:
+            raise SystemExit('Archive contains an unsafe path.')
+        if not re.fullmatch(r'automaton-[0-9]{8}T[0-9]{6}Z', path.parts[0]):
+            raise SystemExit('Archive contains an invalid backup path.')
+        roots.add(path.parts[0])
+        if not (member.isdir() or member.isfile()) or getattr(member, 'sparse', None):
+            raise SystemExit('Archive contains an unsupported file type.')
+    if len(roots) != 1:
+        raise SystemExit('Archive must contain exactly one backup directory.')
+    source.extractall(destination, members=members, filter='data')
+PY
+    rm "$working/backup.tar"
+    mapfile -t restored < <(find "$working" -mindepth 1 -maxdepth 1 -type d -name 'automaton-*' -printf '%f\n')
+    [[ ${#restored[@]} == 1 ]] || { echo 'Archive must contain exactly one backup directory.' >&2; exit 1; }
+    name=${restored[0]}
+    [[ "$name" =~ ^automaton-[0-9]{8}T[0-9]{6}Z$ ]] || { echo 'Archive contains an invalid backup name.' >&2; exit 1; }
+    backup="$working/$name"
+else
 if [[ -z "$name" ]]; then
     echo 'Choose a backup to restore:' >&2
     bash "$install_dir/backup.sh" --install-dir "$install_dir" --list >&2
@@ -32,6 +72,7 @@ fi
 [[ "$name" =~ ^automaton-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "Not a backup name: $name" >&2; exit 2; }
 backup="$backup_root/$name"
 [[ -d "$backup" ]] || { echo "Backup not found: $backup" >&2; exit 1; }
+fi
 [[ -f "$backup/database.dump" ]] || { echo 'This is not a PostgreSQL backup (no database.dump); nothing was restored.' >&2; exit 1; }
 (cd "$backup" && sha256sum -c --quiet SHA256SUMS) || { echo 'The backup failed its checksum verification; it was not restored.' >&2; exit 1; }
 

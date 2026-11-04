@@ -73,6 +73,12 @@ async function copy(command: string) {
           <Column header="Size">
             <template #body="{ data }">{{ formatSize(data.sizeBytes) }}</template>
           </Column>
+          <Column header="Encrypted archive">
+            <template #body="{ data }">
+              <span v-if="data.archiveSizeBytes !== null">{{ formatSize(data.archiveSizeBytes) }}</span>
+              <span v-else class="text-color-secondary">Not available</span>
+            </template>
+          </Column>
           <Column header="Restore command">
             <template #body="{ data }">
               <div class="flex align-items-center gap-2">
@@ -98,9 +104,16 @@ async function copy(command: string) {
           />
         </div>
       </template>
+      <Message v-if="status.backupRecipient" severity="warn" :closable="false">
+        Encrypted archives cannot be restored without the backup key. Save the recipient in your backup configuration
+        and store the private key in a password manager now. The key remains on this server:
+        <code>{{ status.backupKeyCommand }}</code>
+        <div class="mt-2"><code>{{ status.backupRecipient }}</code></div>
+      </Message>
       <Message severity="info" :closable="false">
-        These backups live on the same server. Also turn on your hosting provider's server backups (snapshots), and copy
-        the backup folder and /etc/automaton to storage elsewhere.
+        These backups live on the same server. Copy the encrypted archive and private key to separate off-site storage,
+        and keep a protected copy of /etc/automaton for the other server credentials. Also turn on your hosting provider's
+        server backups (snapshots).
       </Message>
     </template>
   </div>

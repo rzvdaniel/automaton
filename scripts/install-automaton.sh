@@ -168,7 +168,7 @@ fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
 import re, sys
-required={'API_IMAGE','STUDIO_IMAGE','STORE_IMAGE','WORKER_IMAGE','POSTGRES_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE'}
+required={'API_IMAGE','STUDIO_IMAGE','STORE_IMAGE','WORKER_IMAGE','POSTGRES_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE','AGE_IMAGE'}
 entries=dict(line.strip().split('=',1) for line in open(sys.argv[1]) if line.strip() and not line.startswith('#'))
 if set(entries) != required or any(not re.fullmatch(r'[a-zA-Z0-9_./:@-]+',v) for v in entries.values()):
     raise SystemExit('Invalid release image manifest.')
@@ -194,7 +194,7 @@ if [[ -f "$install_dir/update-from-request.sh" ]] && ! $configure_only; then
 fi
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.
-printf 'CONFIG_DIR=%s\n' "$config_dir" > "$install_dir/.env"
+printf 'CONFIG_DIR=%s\nBACKUP_DIR=%s/backups\n' "$config_dir" "$install_dir" > "$install_dir/.env"
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 "${compose[@]}" config --quiet
 printf 'DNS must resolve api.%s, studio.%s, store.%s, apps.%s and *.apps.%s to this server. Allow inbound TCP 80, 443 and 5671.\n' "$domain" "$domain" "$domain" "$domain" "$domain"

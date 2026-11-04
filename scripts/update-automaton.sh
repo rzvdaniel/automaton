@@ -44,6 +44,7 @@ for file in "$install_dir/release.env" "$install_dir/compose.yaml" "$install_dir
     [[ -f "$file" && ! -L "$file" ]] || { echo "Existing installation is incomplete: $file. Restore it from backup." >&2; exit 1; }
 done
 grep -Fxq "CONFIG_DIR=$config_dir" "$install_dir/.env" || { echo 'The installation uses another configuration directory.' >&2; exit 1; }
+if ! grep -q '^BACKUP_DIR=' "$install_dir/.env"; then printf 'BACKUP_DIR=%s/backups\n' "$install_dir" >> "$install_dir/.env"; fi
 command -v docker >/dev/null && docker compose version >/dev/null && docker info >/dev/null
 command -v python3 >/dev/null && command -v curl >/dev/null && command -v sha256sum >/dev/null
 if [[ -z "$version" ]]; then
@@ -109,7 +110,7 @@ ensure_backups() {
     done
     [[ -f "$install_dir/backup.sh" ]] || return 0
     if bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer \
-        && { [[ -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then
+        && { [[ -s "$config_dir/secrets/backup-key" && -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then
         return 0
     fi
     echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
@@ -149,8 +150,8 @@ import re, sys
 def read(path):
     entries = dict(line.strip().split('=', 1) for line in open(path) if line.strip())
     required = {'API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'POSTGRES_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE', 'RUNNER_IMAGE'}
-    # STORE_IMAGE was added after the first releases; older installed manifests do not have it.
-    if set(entries) not in (required, required | {'STORE_IMAGE'}) or any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
+    # STORE_IMAGE and AGE_IMAGE were added after the first releases.
+    if set(entries) not in (required, required | {'STORE_IMAGE'}, required | {'AGE_IMAGE'}, required | {'STORE_IMAGE', 'AGE_IMAGE'}) or any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
         raise SystemExit('Invalid release image manifest.')
     return entries
 old, new = read(sys.argv[1]), read(sys.argv[2])
@@ -297,7 +298,7 @@ def read(path):
     return dict(line.strip().split('=', 1) for line in open(path) if line.strip())
 old, new = read(sys.argv[1]), read(sys.argv[2])
 current = set(new.values())
-for name in ('API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'STORE_IMAGE'):
+for name in ('API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'STORE_IMAGE', 'AGE_IMAGE'):
     if old.get(name) and old[name] not in current:
         print(old[name])
 PY

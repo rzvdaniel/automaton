@@ -1,5 +1,7 @@
 using Automaton.Api.Services;
+using Automaton.Api.Controllers;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Automaton.Api.Tests;
 
@@ -14,7 +16,7 @@ public sealed class InstallationBackupsTests
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "backup.json"), """
             {"lastAttemptAt":"2026-11-01T03:10:00Z","lastSuccessAt":"2026-11-01T03:10:00Z","lastError":null,"keep":7,
              "directory":"/opt/automaton-server/backups/nightly",
-             "backups":[{"name":"automaton-20261101T031000Z","createdAt":"2026-11-01T03:10:00Z","sizeBytes":2048},
+             "backupRecipient":"age1recipient","backups":[{"name":"automaton-20261101T031000Z","createdAt":"2026-11-01T03:10:00Z","sizeBytes":2048,"archiveSizeBytes":4096,"archiveSha256":"abcd"},
                         {"name":"automaton-x; rm -rf /","createdAt":"2026-11-01T03:10:00Z","sizeBytes":1}]}
             """);
 
@@ -23,7 +25,51 @@ public sealed class InstallationBackupsTests
         Assert.That(status.Available, Is.True);
         Assert.That(status.Backups, Has.Count.EqualTo(1));
         Assert.That(status.Backups[0].RestoreCommand, Is.EqualTo("sudo bash /opt/automaton-server/restore.sh automaton-20261101T031000Z"));
+        Assert.That(status.BackupRecipient, Is.EqualTo("age1recipient"));
         Assert.That(InstallationBackups.ToCheck(status, Now).Status, Is.EqualTo("configured"));
+    }
+
+    [Test]
+    public async Task ArchivePathRequiresAListedSafeNameAndRejectsSymlinks()
+    {
+        using var directory = new AppAuthorizationTestData.TemporaryDirectory();
+        var name = "automaton-20261101T031000Z";
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "backup.json"), $$"""
+            {"backups":[{"name":"{{name}}","createdAt":"2026-11-01T03:10:00Z","sizeBytes":1}]}
+            """);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Installation:StatusDirectory"] = directory.Path,
+            ["Installation:BackupDirectory"] = directory.Path
+        }).Build();
+        var status = await InstallationBackups.ReadAsync(config, CancellationToken.None);
+        var archive = Path.Combine(directory.Path, name + ".tar.age");
+        await File.WriteAllBytesAsync(archive, [1, 2]);
+
+        Assert.That(InstallationBackups.GetArchivePath(config, status, name), Is.EqualTo(archive));
+        Assert.That(InstallationBackups.GetArchivePath(config, status, "../backup.json"), Is.Null);
+        Assert.That(InstallationBackups.GetArchivePath(config, status, "automaton-20261102T031000Z"), Is.Null);
+
+        var link = Path.Combine(directory.Path, "automaton-20261101T031001Z.tar.age");
+        try { File.CreateSymbolicLink(link, Path.Combine(directory.Path, "backup.json")); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException) { return; }
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "backup.json"), $$"""
+            {"backups":[{"name":"{{name}}","createdAt":"2026-11-01T03:10:00Z","sizeBytes":1},
+                         {"name":"automaton-20261101T031001Z","createdAt":"2026-11-01T03:10:01Z","sizeBytes":1}]}
+            """);
+        status = await InstallationBackups.ReadAsync(config, CancellationToken.None);
+        Assert.That(InstallationBackups.GetArchivePath(config, status, "automaton-20261101T031001Z"), Is.Null);
+    }
+
+    [Test]
+    public void ArchiveDownloadUsesTheSameScopedPermissionAsTheBackupList()
+    {
+        var list = typeof(InstallController).GetMethod(nameof(InstallController.GetBackups))!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();
+        var archive = typeof(InstallController).GetMethod(nameof(InstallController.GetBackupArchive))!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();
+
+        Assert.That(archive.Policy, Is.EqualTo(list.Policy));
     }
 
     [Test]
@@ -39,9 +85,9 @@ public sealed class InstallationBackupsTests
     [Test]
     public void FailedOrStaleBackupsAreErrors()
     {
-        var failed = new InstallationBackupStatus(true, Now, Now.AddHours(-2), "The last backup failed.", 7, null, "", []);
-        var stale = new InstallationBackupStatus(true, Now, Now.AddDays(-3), null, 7, null, "", []);
-        var never = new InstallationBackupStatus(true, Now, null, null, 7, null, "", []);
+        var failed = new InstallationBackupStatus(true, Now, Now.AddHours(-2), "The last backup failed.", 7, null, "", null, "", []);
+        var stale = new InstallationBackupStatus(true, Now, Now.AddDays(-3), null, 7, null, "", null, "", []);
+        var never = new InstallationBackupStatus(true, Now, null, null, 7, null, "", null, "", []);
 
         Assert.That(InstallationBackups.ToCheck(failed, Now).Status, Is.EqualTo("error"));
         Assert.That(InstallationBackups.ToCheck(stale, Now).Detail, Does.Contain("older than 36 hours"));

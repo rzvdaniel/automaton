@@ -67,6 +67,8 @@ export interface InstallationBackup {
   createdAt: string
   sizeBytes: number
   restoreCommand: string
+  archiveSizeBytes: number | null
+  archiveSha256: string | null
 }
 
 export interface InstallationUpdateRun {
@@ -101,5 +103,7 @@ export interface InstallationBackupStatus {
   keep: number
   directory: string | null
   backupNowCommand: string
+  backupRecipient: string | null
+  backupKeyCommand: string
   backups: InstallationBackup[]
 }

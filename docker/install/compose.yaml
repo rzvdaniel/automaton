@@ -55,6 +55,7 @@ services:
       - api-keys:/app/data-protection-keys
       - ${CONFIG_DIR:?}/dynamic:/app/AppData/traefik-dynamic
       - ${CONFIG_DIR:?}/status:/app/installation-status:ro
+      - ${BACKUP_DIR:?}/nightly:/app/installation-backups:ro
       - /var/lib/automaton/update/requests:/app/update-requests
       - /var/lib/automaton/update/status:/app/update-status:ro
     healthcheck:

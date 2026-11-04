@@ -11,12 +11,14 @@ import tempfile
 import unittest
 
 REPO = Path(__file__).resolve().parents[2]
-IMAGES = ('API', 'WORKER', 'STUDIO', 'POSTGRES', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
-APPLICATION_IMAGES = ('API', 'WORKER', 'STUDIO', 'STORE')
+IMAGES = ('API', 'WORKER', 'STUDIO', 'POSTGRES', 'RABBITMQ', 'TRAEFIK', 'RUNNER', 'AGE')
+APPLICATION_IMAGES = ('API', 'WORKER', 'STUDIO', 'STORE', 'AGE')
 
 
-def manifest(app_digit, infrastructure_digit='0', store=True):
+def manifest(app_digit, infrastructure_digit='0', store=True, age=True):
     names = IMAGES + (('STORE',) if store else ())
+    if not age:
+        names = tuple(name for name in names if name != 'AGE')
     return ''.join(f'{name}_IMAGE=example.invalid/{name.lower()}@sha256:{(app_digit if name in APPLICATION_IMAGES else infrastructure_digit) * 64}\n'
                    for name in names)
 
@@ -44,7 +46,7 @@ class ServerUpdaterTests(unittest.TestCase):
         self.config = self.root / 'config'
         self.install.mkdir()
         self.config.mkdir()
-        (self.install / 'release.env').write_text(manifest('1', store=False))
+        (self.install / 'release.env').write_text(manifest('1', store=False, age=False))
         (self.install / 'compose.yaml').write_text(compose(store=False))
         (self.install / '.env').write_text(f'CONFIG_DIR={self.config}\n')
         (self.install / 'version').write_text('server-v0.1.1\n')
@@ -133,7 +135,7 @@ esac
         backup, = (self.install / 'backups').iterdir()
         for name in ('database.dump', 'config.tar.gz', 'api-keys.tar.gz', 'worker-keys.tar.gz', 'api-data.tar.gz', 'release.env', 'SHA256SUMS'):
             self.assertTrue((backup / name).is_file(), name)
-        self.assertEqual((backup / 'release.env').read_text(), manifest('1', store=False))
+        self.assertEqual((backup / 'release.env').read_text(), manifest('1', store=False, age=False))
         self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
 
     def test_enables_updates_from_studio_before_the_api_is_recreated(self):
@@ -164,7 +166,7 @@ esac
         self.assertTrue((self.systemd_dir / 'automaton-update.path').is_file())
 
     def test_stops_on_mysql_installation_without_changes(self):
-        legacy = manifest('1', store=False).replace('POSTGRES_IMAGE', 'MYSQL_IMAGE')
+        legacy = manifest('1', store=False, age=False).replace('POSTGRES_IMAGE', 'MYSQL_IMAGE')
         (self.install / 'release.env').write_text(legacy)
         result = self.update(*self.bundle())
         self.assertNotEqual(result.returncode, 0)
@@ -239,13 +241,13 @@ esac
         self.assertIn('Cors.AllowedOrigins as a list', result.stderr)
         self.assertIn('config.tar.gz', result.stderr)
         self.assertFalse(any('up' in json.loads(line) for line in log.read_text().splitlines()))
-        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False, age=False))
 
     def test_compose_infrastructure_change_preserves_installation(self):
         result = self.update(*self.bundle(compose_file=compose(postgres_image='postgres-next')))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('changes postgres', result.stderr)
-        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False, age=False))
         self.assertFalse((self.install / 'backups').exists())
 
     def old_backups(self, count):
@@ -304,13 +306,13 @@ esac
         result = self.update(archive, checksum)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('reviewed infrastructure migration', result.stderr)
-        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False, age=False))
         self.assertFalse((self.install / 'backups').exists())
 
     def test_failed_service_update_keeps_previous_manifest_and_backup(self):
         result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1'})
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False, age=False))
         backup, = (self.install / 'backups').iterdir()
         self.assertTrue((backup / 'database.dump').is_file())
 

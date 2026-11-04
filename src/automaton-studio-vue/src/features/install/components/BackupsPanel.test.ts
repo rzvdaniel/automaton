@@ -19,11 +19,15 @@ describe('BackupsPanel', () => {
       keep: 7,
       directory: '/opt/automaton-server/backups/nightly',
       backupNowCommand: 'sudo bash /opt/automaton-server/backup.sh',
+      backupRecipient: 'age1recipient',
+      backupKeyCommand: 'sudo cat /etc/automaton/secrets/backup-key',
       backups: [{
         name: 'automaton-20261101T031000Z',
         createdAt: '2026-11-01T03:10:00Z',
         sizeBytes: 2 * 1024 * 1024,
         restoreCommand: 'sudo bash /opt/automaton-server/restore.sh automaton-20261101T031000Z',
+        archiveSizeBytes: 1024,
+        archiveSha256: 'abcd',
       }],
     })
     const wrapper = mountPanel()
@@ -32,6 +36,8 @@ describe('BackupsPanel', () => {
     expect(wrapper.text()).toContain('sudo bash /opt/automaton-server/restore.sh automaton-20261101T031000Z')
     expect(wrapper.text()).toContain('2.0 MB')
     expect(wrapper.text()).toContain('sudo bash /opt/automaton-server/backup.sh')
+    expect(wrapper.text()).toContain('age1recipient')
+    expect(wrapper.text()).toContain('sudo cat /etc/automaton/secrets/backup-key')
     expect(wrapper.text()).not.toContain('older than')
   })
 
@@ -39,6 +45,7 @@ describe('BackupsPanel', () => {
     vi.mocked(installService.getBackups).mockResolvedValueOnce({
       available: false, lastAttemptAt: null, lastSuccessAt: null, lastError: null, keep: 0, directory: null,
       backupNowCommand: 'sudo bash /opt/automaton-server/backup.sh', backups: [],
+      backupRecipient: null, backupKeyCommand: 'sudo cat /etc/automaton/secrets/backup-key',
     })
     const wrapper = mountPanel()
     await flushPromises()
