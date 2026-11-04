@@ -33,7 +33,18 @@ async function loadStatus() {
   } catch { statusError.value = 'Studio cannot reach the API. Check the server and retry.' }
   finally { checking.value = false }
 }
-onMounted(loadStatus)
+onMounted(() => {
+  const url = new URL(window.location.href)
+  const fragment = new URLSearchParams(url.hash.slice(1))
+  const token = fragment.get('token')
+  if (token) {
+    setupToken.value = token.trim()
+    fragment.delete('token')
+    url.hash = fragment.toString()
+    window.history.replaceState(window.history.state, '', url)
+  }
+  loadStatus()
+})
 async function submit() {
   error.value = ''
   if (!ready.value) { error.value = 'Check the installation before continuing.'; return }
@@ -78,7 +89,7 @@ async function submit() {
             <small class="text-color-secondary">Use the setup token saved by the installer on your server. It grants access only until administrator setup is complete.</small>
           </div>
           <SetupChecks :setup-token="setupToken" @ready="ready = $event" />
-          <Message severity="info" :closable="false">Read the setup token on the server with <code>sudo cat /etc/automaton/secrets/setup-token; echo</code>. Studio never displays it. Public DNS (api, studio, store, apps and *.apps) and inbound TCP 80, 443 and 5671 cannot be verified from this server; check them from another network.</Message>
+          <Message severity="info" :closable="false">Read the setup token on the server with <code>sudo cat /etc/automaton/secrets/setup-token</code>. Studio never displays it. Public DNS (api, studio, store, apps and *.apps) and inbound TCP 80, 443 and 5671 cannot be verified from this server; check them from another network.</Message>
           <Message severity="info" :closable="false">Email delivery is optional during setup. Use an address you control; configure SMTP later for invitations and password recovery.</Message>
           <div class="flex flex-column gap-2">
             <label for="admin-name">Your name</label>

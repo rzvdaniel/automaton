@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Validate the installer entrypoint against disposable paths without starting services."""
 import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -10,6 +11,20 @@ import unittest
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+class InstallerSecretTests(unittest.TestCase):
+    def test_setup_token_ends_with_newline_and_is_reused(self):
+        spec = importlib.util.spec_from_file_location('configure', REPO / 'docker/install/configure.py')
+        assert spec and spec.loader
+        configure = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(configure)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'secrets').mkdir()
+            token = configure.secret(root, 'setup-token')
+            self.assertEqual((root / 'secrets/setup-token').read_text(), token + '\n')
+            self.assertEqual(configure.secret(root, 'setup-token'), token)
 
 
 @unittest.skipUnless(os.geteuid() == 0, 'Requires root and existing Docker/Compose on Ubuntu 24.04; never installs Docker.')
@@ -93,6 +108,9 @@ urllib.request.urlopen = release_page
             environment = os.environ | {'AUTOMATON_RELEASE_DIR': str(bundle)}
             first = subprocess.run(command, env=environment, capture_output=True, text=True)
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            setup_token = (root / 'config/secrets/setup-token').read_bytes()
+            self.assertEqual(len(setup_token), 65)
+            self.assertTrue(setup_token.endswith(b'\n'))
             def snapshot():
                 return {p.relative_to(root): hashlib.sha256(p.read_bytes()).hexdigest()
                         for p in root.rglob('*') if p.is_file()}

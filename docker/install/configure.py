@@ -113,7 +113,7 @@ def update_runner_image(root, previous, current):
 
 def secret(root, name, length=32):
     path = root / 'secrets' / name
-    write_new(path, secrets.token_hex(length))
+    write_new(path, secrets.token_hex(length) + ('\n' if name == 'setup-token' else ''))
     return path.read_text().strip()
 
 

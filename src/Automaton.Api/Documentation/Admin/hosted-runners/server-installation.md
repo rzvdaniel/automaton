@@ -7,7 +7,7 @@ order: 1
 
 A server release installs the API, Studio, the public app store, Worker, PostgreSQL, RabbitMQ and Traefik. The installer supports Ubuntu 24.04 or newer on x86_64 with public DNS. It installs a missing Docker Compose plugin automatically. It requires a published server release; it does not change an existing blue/green production installation.
 
-After the installer finishes, open `/install`, enter the server setup token read locally on the host, and select **Check installation**. Studio never displays the saved token. Resolve any failing service checks, then create the first system administrator. Email delivery is optional at this stage. The setup token stops working when administrator creation commits. Sign in afterward.
+After the installer finishes, open the one-time setup link printed by the installer and select **Check installation**. The link fills the token field and Studio removes it from the address bar. Studio never displays the saved token. Resolve any failing service checks, then create the first system administrator. Email delivery is optional at this stage. The setup token stops working when administrator creation commits. Sign in afterward.
 
 System administrators can open **Admin → Installation** and select **Check installation** to inspect database/broker connections and configuration presence. **Verified** means a connection check succeeded; **configured** means a setting is present; **unverified** requires a manual or external check. Public DNS and inbound ports cannot be confirmed from inside the server. The page returns no saved secret values.
 

@@ -69,15 +69,15 @@ For offline preparation with an already downloaded bundle, extract `automaton-se
 
 ## Create your administrator in Studio
 
-Open `https://studio.example.com/install`. Read the setup token locally:
+Open the one-time setup link printed at the end of installation. If you need the token separately, read it locally:
 
 ```bash
-sudo cat /etc/automaton/secrets/setup-token; echo
+sudo cat /etc/automaton/secrets/setup-token
 ```
 
-Paste it into **Server setup token**, select **Check installation**, and create the administrator with your name, email and password. Use at least 12 characters, including uppercase, lowercase, a number and a symbol. Sign in when setup completes.
+Paste it into **Server setup token** when opening `/install` without the link, select **Check installation**, and create the administrator with your name, email and password. Use at least 12 characters, including uppercase, lowercase, a number and a symbol. Sign in when setup completes.
 
-The setup page and **Admin → Installation** distinguish **verified** live connection checks from **configured** saved settings. Public DNS and inbound ports stay **unverified** in Studio because checks made from inside the server cannot establish external reachability. Check them from another network. The token is read locally on the server and entered into Studio; the page never reveals its stored value.
+The setup page and **Admin → Installation** distinguish **verified** live connection checks from **configured** saved settings. Public DNS and inbound ports stay **unverified** in Studio because checks made from inside the server cannot establish external reachability. Check them from another network. The setup link fills the token field and Studio removes it from the address bar; the page never reveals its stored value.
 
 The setup token stops authorizing access after setup is committed. The initial administrator's email is confirmed through this server-owner setup flow, so SMTP is not required to get started. The durable completion marker prevents setup from reopening if accounts are later removed. Existing installations with a system administrator remain installed even without this marker.
 

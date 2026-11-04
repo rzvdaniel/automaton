@@ -200,15 +200,20 @@ fi
 "${compose[@]}" pull
 "${compose[@]}" up -d --wait --wait-timeout 600
 # Validate actual public HTTPS/API routing as well as container health.
-echo 'Waiting for HTTPS certificates. Certificate errors printed while they are issued are expected and retried.'
+echo 'Waiting for HTTPS certificates…'
 # Older bundles use /healthz and predate the public /health check.
 if grep -Fq 'http://127.0.0.1:8080/health]' "$install_dir/compose.yaml"; then
-    api_health=$(curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health")
+    api_health=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health" 2>/dev/null) \
+        || { echo "The API HTTPS health check failed at https://api.$domain/health." >&2; exit 1; }
     [[ "$api_health" == ok ]] || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
 fi
-curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response'
-curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null
-curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
+studio_status=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" 2>/dev/null) \
+    || { echo "The Studio installation status check failed at https://studio.$domain/api/install/status." >&2; exit 1; }
+python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response' <<< "$studio_status" 2>/dev/null \
+    || { echo 'The Studio installation status response was invalid.' >&2; exit 1; }
+curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null \
+    || { echo "The Studio HTTPS check failed at https://studio.$domain/." >&2; exit 1; }
+curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
     || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
 python3 - "$domain" <<'PYBROKER'
 import socket, ssl, sys
@@ -217,7 +222,9 @@ with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
         broker.sendall(b'AMQP\x00\x00\x09\x01')
         if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
 PYBROKER
-printf '\nOpen https://studio.%s/install and enter the setup token from:\n  sudo cat %s/secrets/setup-token; echo\n' "$domain" "$config_dir"
+setup_token=$(tr -d '\r\n' < "$config_dir/secrets/setup-token")
+printf '\nHTTPS certificates are ready. Open the first-administrator setup link:\nhttps://studio.%s/install#token=%s\n' "$domain" "$setup_token"
+printf 'For an older release that cannot open the link, visit https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
 # Nightly database and key backups are on by default; take the first one now.
 if [[ -f "$install_dir/backup.sh" ]]; then
     bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && bash "$install_dir/backup.sh" --install-dir "$install_dir" \
