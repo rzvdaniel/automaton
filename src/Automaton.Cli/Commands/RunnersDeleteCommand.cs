@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Automaton.Cli.Services;
 using Spectre.Console;
 
@@ -13,8 +14,11 @@ public static class RunnersDeleteCommand
         var confirmed = new Option<bool>("--host-cleanup-confirmed", "Confirm the uninstall command completed on the Runner host");
         var json = new Option<bool>("--json", "Print the result as JSON");
         var command = new Command("delete", "Prepare Runner removal, then confirm host cleanup to delete its registration") { runner, confirmed, json };
-        command.SetHandler(async (string reference, bool hostCleanupConfirmed, bool asJson) =>
+        command.SetHandler(async (InvocationContext context) =>
         {
+            var reference = context.ParseResult.GetValueForArgument(runner);
+            var hostCleanupConfirmed = context.ParseResult.GetValueForOption(confirmed);
+            var asJson = context.ParseResult.GetValueForOption(json);
             try
             {
                 var (server, apiKey) = config.RequireCredentials(directory: Directory.GetCurrentDirectory());
@@ -38,15 +42,15 @@ public static class RunnersDeleteCommand
                         AnsiConsole.MarkupLine($"Then run [bold]automaton runners delete {Markup.Escape(runnerId)} --host-cleanup-confirmed[/].");
                     }
                 }
-                Environment.ExitCode = 0;
+                context.ExitCode = 0;
             }
             catch (Exception exception)
             {
                 if (asJson) CliJson.Write(new { success = false, error = exception.Message });
                 else AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(exception.Message)}");
-                Environment.ExitCode = 1;
+                context.ExitCode = 1;
             }
-        }, runner, confirmed, json);
+        });
         return command;
     }
 }

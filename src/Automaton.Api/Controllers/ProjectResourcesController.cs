@@ -218,7 +218,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpGet("runners")]
     [Authorize(Policy = "ProjectMember")]
-    [Authorize(Policy = "AllowApiKey")]
+    [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<ActionResult<IEnumerable<ProjectRunnerDto>>> ListProjectRunners(Guid projectId)
     {
         try
@@ -243,7 +243,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpPost("runners/{runnerId}")]
     [Authorize(Policy = "ProjectResourceManager")]
-    [Authorize(Policy = "AllowApiKey")]
+    [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<ActionResult<ProjectRunnerDto>> AddRunnerToProject(Guid projectId, Guid runnerId)
     {
         if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();
@@ -279,7 +279,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpDelete("runners/{runnerId}")]
     [Authorize(Policy = "ProjectResourceManager")]
-    [Authorize(Policy = "AllowApiKey")]
+    [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<ActionResult> RemoveRunnerFromProject(Guid projectId, Guid runnerId)
     {
         if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();

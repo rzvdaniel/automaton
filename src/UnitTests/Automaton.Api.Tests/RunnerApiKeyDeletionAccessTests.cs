@@ -16,15 +16,18 @@ public sealed class RunnerApiKeyDeletionAccessTests
             var policies = typeof(RunnersController).GetMethod(action)!
                 .GetCustomAttributes(typeof(AuthorizeAttribute), true)
                 .Cast<AuthorizeAttribute>().Select(attribute => attribute.Policy);
-            Assert.That(policies, Does.Contain("AllowApiKey"));
+            Assert.That(policies, Does.Contain("DeveloperApiAccess"));
         }
     }
 
-    [Test]
-    public async Task ReadOnlyKeyCannotPrepareOrDeleteRunner()
+    [TestCase("ReadOnly")]
+    [TestCase("Runner")]
+    [TestCase("WebApp")]
+    [TestCase("AppPermission")]
+    public async Task OtherKeyScopesCannotPrepareOrDeleteRunner(string scope)
     {
         var user = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim("api_key_scope", "ReadOnly")], "ApiKey"));
+            [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim("api_key_scope", scope)], "ApiKey"));
         var controller = new RunnersController(null!)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } }

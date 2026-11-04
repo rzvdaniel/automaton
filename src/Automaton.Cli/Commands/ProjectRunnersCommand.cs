@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text.Json;
 using Automaton.Cli.Services;
 using Spectre.Console;
@@ -22,9 +23,11 @@ public static class ProjectRunnersCommand
         var project = new Option<string?>("--project", "Project ID or name; defaults to the linked app's project");
         var json = new Option<bool>("--json", "Print the result as JSON");
         var command = new Command("list", "List Runners linked to a project") { project, json };
-        command.SetHandler((string? projectRef, bool asJson) => RunAsync(asJson, async () =>
+        command.SetHandler((InvocationContext context) => RunAsync(context, context.ParseResult.GetValueForOption(json), async () =>
         {
             using var client = CreateClient(config);
+            var projectRef = context.ParseResult.GetValueForOption(project);
+            var asJson = context.ParseResult.GetValueForOption(json);
             var (id, name) = await ResolveProjectAsync(config, client, projectRef);
             var runners = await client.ListProjectRunnersAsync(id);
             if (asJson) CliJson.Write(new { success = true, projectId = id, runners });
@@ -35,7 +38,7 @@ public static class ProjectRunnersCommand
                     table.AddRow(Markup.Escape(Text(runner, "runnerName")), Text(runner, "runnerId"));
                 AnsiConsole.Write(table);
             }
-        }), project, json);
+        }));
         return command;
     }
 
@@ -46,9 +49,12 @@ public static class ProjectRunnersCommand
         var json = new Option<bool>("--json", "Print the result as JSON");
         var verb = add ? "add" : "remove";
         var command = new Command(verb, $"{(add ? "Add a personal Runner to" : "Remove a Runner from")} a project") { runner, project, json };
-        command.SetHandler((string runnerRef, string? projectRef, bool asJson) => RunAsync(asJson, async () =>
+        command.SetHandler((InvocationContext context) => RunAsync(context, context.ParseResult.GetValueForOption(json), async () =>
         {
             using var client = CreateClient(config);
+            var runnerRef = context.ParseResult.GetValueForArgument(runner);
+            var projectRef = context.ParseResult.GetValueForOption(project);
+            var asJson = context.ParseResult.GetValueForOption(json);
             var (projectId, _) = await ResolveProjectAsync(config, client, projectRef);
             var available = add ? await client.ListRunnersAsync() : await client.ListProjectRunnersAsync(projectId);
             var runnerId = RunnerReferenceResolver.Pick(available, runnerRef, add ? "id" : "runnerId", add ? "name" : "runnerName");
@@ -56,7 +62,7 @@ public static class ProjectRunnersCommand
             else await client.RemoveRunnerFromProjectAsync(projectId, runnerId);
             if (asJson) CliJson.Write(new { success = true, projectId, runnerId, action = verb });
             else AnsiConsole.MarkupLine($"[green]Runner {Markup.Escape(runnerId)} {(add ? "added to" : "removed from")} project.[/]");
-        }), runner, project, json);
+        }));
         return command;
     }
 
@@ -81,14 +87,14 @@ public static class ProjectRunnersCommand
         return new AutomatonApiClient(server, apiKey);
     }
 
-    private static async Task RunAsync(bool asJson, Func<Task> action)
+    private static async Task RunAsync(InvocationContext context, bool asJson, Func<Task> action)
     {
-        try { await action(); Environment.ExitCode = 0; }
+        try { await action(); context.ExitCode = 0; }
         catch (Exception exception)
         {
             if (asJson) CliJson.Write(new { success = false, error = exception.Message });
             else AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(exception.Message)}");
-            Environment.ExitCode = 1;
+            context.ExitCode = 1;
         }
     }
 

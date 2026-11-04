@@ -17,9 +17,6 @@ public class ProjectApiKeyAccessTests
     [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.ListProjectApps), "ProjectMember")]
     [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.AddAppToProject), "ProjectResourceManager")]
     [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.RemoveAppFromProject), "ProjectResourceManager")]
-    [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.ListProjectRunners), "ProjectMember")]
-    [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.AddRunnerToProject), "ProjectResourceManager")]
-    [TestCase(typeof(ProjectResourcesController), nameof(ProjectResourcesController.RemoveRunnerFromProject), "ProjectResourceManager")]
     [TestCase(typeof(ProjectMembersController), nameof(ProjectMembersController.ListMembers), "ProjectMember")]
     public void AutomatableProjectEndpointsAcceptApiKeysAndKeepTheirProjectPolicy(Type controller, string action, string? projectPolicy)
     {
@@ -28,6 +25,36 @@ public class ProjectApiKeyAccessTests
 
         Assert.That(policies, Does.Contain("AllowApiKey"));
         if (projectPolicy != null) Assert.That(policies, Does.Contain(projectPolicy), "the project role check stays");
+    }
+
+    [TestCase(nameof(ProjectResourcesController.ListProjectRunners), "ProjectMember")]
+    [TestCase(nameof(ProjectResourcesController.AddRunnerToProject), "ProjectResourceManager")]
+    [TestCase(nameof(ProjectResourcesController.RemoveRunnerFromProject), "ProjectResourceManager")]
+    public void ProjectRunnerActionsRequireDeveloperKeyAndProjectRole(string action, string projectPolicy)
+    {
+        var policies = typeof(ProjectResourcesController).GetMethod(action)!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>()
+            .Select(attribute => attribute.Policy).ToList();
+        Assert.That(policies, Does.Contain("DeveloperApiAccess"));
+        Assert.That(policies, Does.Contain(projectPolicy));
+    }
+
+    [TestCase("ReadOnly")]
+    [TestCase("Runner")]
+    [TestCase("WebApp")]
+    [TestCase("AppPermission")]
+    public async Task OtherKeyScopesCannotChangeProjectRunners(string scope)
+    {
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim("api_key_scope", scope)], "ApiKey"));
+        var resources = new ProjectResourcesController(null!, NullLogger<ProjectResourcesController>.Instance)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } }
+        };
+        var added = (await resources.AddRunnerToProject(Guid.NewGuid(), Guid.NewGuid())).Result;
+        var removed = await resources.RemoveRunnerFromProject(Guid.NewGuid(), Guid.NewGuid());
+        Assert.That((added as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
+        Assert.That((removed as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
     }
 
     [Test]

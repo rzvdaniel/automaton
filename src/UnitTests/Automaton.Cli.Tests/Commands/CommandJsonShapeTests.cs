@@ -74,6 +74,18 @@ public class CommandJsonShapeTests
         using var document = JsonDocument.Parse(output);
         Assert.That(document.RootElement.GetProperty("success").GetBoolean(), Is.False);
         Assert.That(document.RootElement.GetProperty("error").GetString(), Does.Contain("--yes"));
+        Assert.That(await InvokeInDirectoryAsync(new CommandLineBuilder(new RootCommand { DeleteCommand.Build(new ConfigService()) }).Build(), projectRoot, ["delete", "--json"]), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ProjectAndRunnerCleanupFailuresReturnNonzeroExitCode()
+    {
+        var projectRoot = CreateProjectRoot();
+        var root = new RootCommand { ProjectCommand.Build(new ConfigService()), RunnersCommand.Build(new ConfigService()) };
+        var parser = new CommandLineBuilder(root).Build();
+        Assert.That(await InvokeInDirectoryAsync(parser, projectRoot, ["project", "remove-app", "--json"]), Is.EqualTo(1));
+        Assert.That(await InvokeInDirectoryAsync(parser, projectRoot, ["project", "runners", "list", "--json"]), Is.EqualTo(1));
+        Assert.That(await InvokeInDirectoryAsync(parser, projectRoot, ["runners", "delete", Guid.NewGuid().ToString(), "--json"]), Is.EqualTo(1));
     }
 
     [Test]

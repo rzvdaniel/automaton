@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text.Json;
 using Automaton.Cli.Services;
 using Spectre.Console;
@@ -26,12 +27,14 @@ public static class ProjectCommand
         var name = new Argument<string>("name", "Project name");
         var json = JsonOption();
         var command = new Command("create", "Create a project; you become its administrator") { name, json };
-        command.SetHandler((string projectName, bool asJson) => RunAsync(asJson, async () =>
+        command.SetHandler((InvocationContext context) => RunAsync(context, context.ParseResult.GetValueForOption(json), async () =>
         {
+            var projectName = context.ParseResult.GetValueForArgument(name);
             using var client = CreateClient(config);
+            var asJson = context.ParseResult.GetValueForOption(json);
             var project = await client.CreateProjectAsync(projectName);
             Report(asJson, new { success = true, project }, $"Created project {Markup.Escape(projectName)} ({Text(project, "id")}).");
-        }), name, json);
+        }));
         return command;
     }
 
@@ -39,8 +42,9 @@ public static class ProjectCommand
     {
         var json = JsonOption();
         var command = new Command("list", "List the projects you belong to") { json };
-        command.SetHandler((bool asJson) => RunAsync(asJson, async () =>
+        command.SetHandler((InvocationContext context) => RunAsync(context, context.ParseResult.GetValueForOption(json), async () =>
         {
+            var asJson = context.ParseResult.GetValueForOption(json);
             using var client = CreateClient(config);
             var projects = await client.ListProjectsAsync();
             if (asJson)
@@ -57,7 +61,7 @@ public static class ProjectCommand
             foreach (var item in projects.EnumerateArray())
                 table.AddRow(Markup.Escape(Text(item, "displayName")), Text(item, "id"), Text(item, "role"));
             AnsiConsole.Write(table);
-        }), json);
+        }));
         return command;
     }
 
@@ -66,15 +70,17 @@ public static class ProjectCommand
         var project = new Argument<string?>("project", () => null, "Project name or id (optional when you belong to exactly one project)");
         var json = JsonOption();
         var command = new Command("add-app", "Add the current app to a project") { project, json };
-        command.SetHandler((string? projectRef, bool asJson) => RunAsync(asJson, async () =>
+        command.SetHandler((InvocationContext context) => RunAsync(context, context.ParseResult.GetValueForOption(json), async () =>
         {
+            var projectRef = context.ParseResult.GetValueForArgument(project);
+            var asJson = context.ParseResult.GetValueForOption(json);
             var (server, apiKey, appId) = ResolveLinkedApp(config);
             using var client = new AutomatonApiClient(server, apiKey);
             var projects = await client.ListProjectsAsync();
             var (id, display) = PickProject(projects, projectRef);
             await client.AddAppToProjectAsync(id, appId);
             Report(asJson, new { success = true, projectId = id, appId }, $"Added this app to project {Markup.Escape(display)}.");
-        }), project, json);
+        }));
         return command;
     }
 
@@ -83,8 +89,10 @@ public static class ProjectCommand
         var project = new Argument<string?>("project", () => null, "Project name or id; defaults to the linked app's project");
         var json = JsonOption();
         var command = new Command("remove-app", "Remove the current app from its project so its owner can delete it") { project, json };
-        command.SetHandler((string? projectRef, bool asJson) => RunAsync(asJson, async () =>
+        command.SetHandler((InvocationContext context) => RunAsync(context, context.ParseResult.GetValueForOption(json), async () =>
         {
+            var projectRef = context.ParseResult.GetValueForArgument(project);
+            var asJson = context.ParseResult.GetValueForOption(json);
             var (server, apiKey, appId) = ResolveLinkedApp(config);
             using var client = new AutomatonApiClient(server, apiKey);
             var app = await client.GetAppAsync(appId);
@@ -96,7 +104,7 @@ public static class ProjectCommand
                 throw new InvalidOperationException("This app is linked to a different project.");
             await client.RemoveAppFromProjectAsync(id, appId);
             Report(asJson, new { success = true, projectId = id, appId }, $"Removed this app from project {Markup.Escape(display)}.");
-        }), project, json);
+        }));
         return command;
     }
 
@@ -139,18 +147,18 @@ public static class ProjectCommand
         return (resolved.Server, resolved.ApiKey, resolved.AppId);
     }
 
-    private static async Task RunAsync(bool asJson, Func<Task> action)
+    private static async Task RunAsync(InvocationContext context, bool asJson, Func<Task> action)
     {
         try
         {
             await action();
-            Environment.ExitCode = 0;
+            context.ExitCode = 0;
         }
         catch (Exception exception)
         {
             if (asJson) CliJson.Write(new { success = false, error = exception.Message });
             else AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(exception.Message)}");
-            Environment.ExitCode = 1;
+            context.ExitCode = 1;
         }
     }
 

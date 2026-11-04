@@ -42,7 +42,7 @@ public class RunnersController : BaseController
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Policy = "AllowApiKey")]
+    [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken,
         [FromQuery] bool hostCleanupConfirmed = false)
     {
@@ -65,7 +65,7 @@ public class RunnersController : BaseController
     }
 
     [HttpPost("{id}/removal")]
-    [Authorize(Policy = "AllowApiKey")]
+    [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<IActionResult> PrepareRemoval(Guid id, [FromServices] RunnerRemovalService removal,
         CancellationToken cancellationToken)
     {

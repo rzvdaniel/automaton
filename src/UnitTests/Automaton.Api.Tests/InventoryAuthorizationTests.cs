@@ -43,6 +43,25 @@ public sealed class InventoryAuthorizationTests
         Assert.That(response.StatusCode, Is.EqualTo(expected));
     }
 
+    [TestCase("GET", "/api/projects/00000000-0000-0000-0000-000000000001/runners")]
+    [TestCase("POST", "/api/projects/00000000-0000-0000-0000-000000000001/runners/00000000-0000-0000-0000-000000000002")]
+    [TestCase("DELETE", "/api/projects/00000000-0000-0000-0000-000000000001/runners/00000000-0000-0000-0000-000000000002")]
+    [TestCase("POST", "/api/runners/00000000-0000-0000-0000-000000000002/removal")]
+    [TestCase("DELETE", "/api/runners/00000000-0000-0000-0000-000000000002")]
+    public async Task RunnerManagementRejectsNonDeveloperApiKeys(string method, string path)
+    {
+        await using var host = BuildHost();
+        await host.StartAsync();
+        using var client = host.GetTestClient();
+        foreach (var scope in new[] { "ReadOnly", "Runner", "WebApp" })
+        {
+            using var request = new HttpRequestMessage(new HttpMethod(method), path);
+            request.Headers.Add("X-Test-Scope", scope);
+            using var response = await client.SendAsync(request);
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden), $"{scope} {method} {path}");
+        }
+    }
+
     private static WebApplication BuildHost()
     {
         var builder = WebApplication.CreateBuilder();
