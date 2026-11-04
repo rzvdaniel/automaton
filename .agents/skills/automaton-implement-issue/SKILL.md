@@ -48,7 +48,7 @@ as you go; the task is not done until step 8 is.
    - anything the owner said to hold.
 7. **Deliver and verify.** Release, upgrade the test server and verify as real users (`verify.md`). Several small,
    independent changes may share one release; risky ones (Runner, migrations, install or update scripts) go alone.
-8. **Close out.** The PR's `Closes #N` closes the issue on merge. Comment the end-to-end results (pass or fail per
+8. **Close out.** The PR's `Closes #N` closes the issue on merge. Attach the `proof` artifact (`verify.md`), comment the end-to-end results (pass or fail per
    check) and every administrator action on the PR, and link that comment from the issue. Remove the `e2e-` items you
    created (`verify.md`), set the board Status to Done, open issues for gaps you found (`issue.md`), and tell the
    owner what is left for them, with links. If testing showed the docs are wrong, or the issue completes a roadmap

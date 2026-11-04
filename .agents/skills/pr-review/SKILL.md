@@ -31,6 +31,8 @@ not check, for example "the scripts were not run".
 - Read **all** reviews and conversation comments on the PR, including ones that arrived after your own review
   started. One that is newer than the last commit, or one that requests changes, blocks the merge until it is
   answered.
+- A PR that changes behaviour has a `proof` artifact (see the implement-issue `verify.md`). The reviewer checks it
+  against the issue's done criteria; a missing or failing criterion blocks the merge.
 - The checks on the final commit pass, and the last review found nothing above low.
 - If a PR was merged with open findings, say so on the PR, fix them in a follow-up PR with its own review, and hold
   any release that would ship the problem until the follow-up is merged.

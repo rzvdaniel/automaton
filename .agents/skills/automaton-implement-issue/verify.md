@@ -58,7 +58,18 @@ and `ab-shot.sh` log in and take screenshots), following the studio-design visua
 action (a button, a form), do it by clicking in Studio with `agent-browser`, not through the API. Record what passed
 and what you could not check.
 
-Screenshots for a PR: GitHub has no upload API, so push them to the orphan branch `pr-screenshots` under `pr-<N>/`
+Proof on the PR: attach one HTML artifact named `proof` to the PR (GitHub issue artifacts; a PR is an issue):
+
+```bash
+gh api -X POST repos/rzvdaniel/automaton/issues/<N>/artifacts   -f name=proof -f type=embedded_html -f body=@proof.html
+```
+
+It lists each done criterion from the issue, the evidence for it (the command and what came back, or a screenshot)
+and pass, fail or not checked with the reason. Update it by deleting it
+(`gh api -X DELETE .../issues/<N>/artifacts/<number>`) and creating it again. Add a `link` artifact to the issue that
+points to the PR. Artifact types are `generic` (Markdown), `link`, `plan` and `embedded_html`.
+
+Screenshots: GitHub has no image upload API, so push them to the orphan branch `pr-screenshots` under `pr-<N>/`
 (create the branch with `git switch --orphan pr-screenshots` if it does not exist; never merge it) and embed them in
 the PR comment as `![name](https://raw.githubusercontent.com/rzvdaniel/automaton/pr-screenshots/pr-<N>/name.png)`.
 The repository is public: use only `e2e-` test data and no passwords, tokens or keys in the shot.
