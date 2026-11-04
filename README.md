@@ -18,7 +18,7 @@ Automaton is a self-hosted platform where you or your AI agent build, deploy and
 
 ## Quickstart
 
-1. **Install the server** on x86_64 Ubuntu 24.04+ with a domain ([install-server](https://automaton.monster/docs/install-server)). DNS only: two wildcard records (`*.your-domain.com`, `*.apps.your-domain.com`) or five named records (`api`, `studio`, `store`, `apps`, `*.apps`). Open TCP 80, 443 and 5671. Review the script before running it if you like (`less install-automaton.sh`).
+1. **Install the server** on x86_64 Ubuntu 24.04+ with a domain ([install-server](https://automaton.monster/docs/install-server)). DNS only: three records (`*.your-domain.com`, `apps.your-domain.com` and `*.apps.your-domain.com`; the second is needed because the third hides `apps` from the first) or five named records (`api`, `studio`, `store`, `apps`, `*.apps`). Open TCP 80, 443 and 5671. Review the script before running it if you like (`less install-automaton.sh`).
 
    ```bash
    curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh && sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com
