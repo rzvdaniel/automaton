@@ -14,6 +14,7 @@ dotnet tool install --global Automaton.Cli
 automaton login
 automaton login --local
 automaton login --device
+automaton runners install --name main --ssh user@host --yes
 automaton new "My App"
 automaton pull
 automaton pull my-remixed-app

@@ -83,7 +83,9 @@ The setup token stops authorizing access after setup is committed. The initial a
 
 Under **Admin → Installation**, a system administrator can check database and broker connectivity and see whether public URLs, signing credentials, persistent keys and optional SMTP configuration are present. Configured means presence was checked; it is not proof of delivery, durable storage or a working backup.
 
-Install a **Machine Management Runner** through the existing Studio Runner installation flow when you are ready to deploy applications. You may choose the same host or another machine. This installer does not enroll a Runner automatically or assign apps. Follow [Self-hosted Runners](self-hosted-runners.md) for that separate trust/enrollment step.
+### Add a Runner
+
+After creating an administrator and approving `automaton login --server https://api.your-domain.com`, install a **Machine Management Runner** on the server with `automaton runners install --name main --local --yes`. From another machine, use `--ssh user@host --yes` to install on an Ubuntu host with Docker Engine running. Omit `--yes` to confirm the Docker host access interactively. `--print-command` displays a one-time secret for manual installation; keep it private and run it before the printed expiry. The CLI waits for the Runner to connect and can add it to a project with `--project NAME`. You can also install through Studio. Follow [Self-hosted Runners](self-hosted-runners.md) for host requirements and the trust boundary.
 
 ## Configuration and secrets
 

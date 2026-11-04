@@ -600,6 +600,21 @@ public class AutomatonApiClient : IDisposable
 
     // ── Runners ───────────────────────────────────────────────────────────────
 
+    public async Task<JsonElement> CreateRunnerInstallationAsync(string name, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { runnerName = name, applicationProfile = "machine-management", acknowledgeHostAccess = true }, JsonOptions);
+        using var resp = await PostJsonAsync("api/self-hosted-runners/installations", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> GetRunnerInstallationStatusAsync(string installationId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/self-hosted-runners/installations/{Uri.EscapeDataString(installationId)}/status", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public Task<JsonElement> ListRunnersAsync(CancellationToken ct = default)
         => ListRunnersAsync(projectId: null, ct);
 

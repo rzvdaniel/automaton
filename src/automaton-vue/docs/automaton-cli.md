@@ -22,6 +22,16 @@ For unattended use, configure `AUTOMATON_API_KEY` in the process environment and
 use the command's non-interactive option where available. Do not paste keys into
 an AI conversation.
 
+## Install a Runner
+
+After login, install a Machine Management Runner on an Ubuntu host with Docker Engine running:
+
+```bash
+automaton runners install --name main --ssh user@host --yes
+```
+
+Use `--local` on the host, or `--print-command` to run the one-time command yourself before its printed expiry. Without a mode, an interactive terminal prints the command. The CLI asks you to acknowledge that the trusted Runner has Docker access on its host; `--yes` provides that acknowledgement for automation. The installer command goes to SSH or sudo over standard input and is not passed as a process argument. The CLI waits up to 300 seconds for a connection (`--timeout` changes this), prints the Runner ID, and can add the connected Runner to a project with `--project NAME`. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
+
 ## Create or link
 
 ```bash
