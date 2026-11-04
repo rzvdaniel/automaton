@@ -42,7 +42,7 @@ public class ProjectService
         var projects = await (
             from membership in dbContext.ProjectMembers
             join project in dbContext.Projects on membership.ProjectId equals project.Id
-            where membership.UserId == UserId && membership.IsActive
+            where membership.UserId == UserId && membership.IsActive && project.IsActive
             select new ProjectListItem
             {
                 Id = project.Id,

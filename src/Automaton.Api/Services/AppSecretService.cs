@@ -236,12 +236,14 @@ public sealed class AppSecretService(
 
     private async Task<AppVaults> VaultsAsync(Guid appId, CancellationToken token)
     {
-        var projects = await db.ProjectApps.Where(link => link.WebAppId == appId).Select(link => link.ProjectId).Distinct().ToListAsync(token);
+        var projects = await db.ProjectApps.Where(link => link.WebAppId == appId)
+            .Select(link => new { link.ProjectId, IsActive = link.Project != null && link.Project.IsActive })
+            .Distinct().ToListAsync(token);
         var owners = await db.WebAppUsers.Where(user => user.WebAppId == appId).Select(user => user.UserId).Distinct().ToListAsync(token);
-        var project = projects.Count == 1 ? new SecretOwner(SecretOwnerTypes.Project, projects[0]) : null;
+        var project = projects.Count == 1 && projects[0].IsActive ? new SecretOwner(SecretOwnerTypes.Project, projects[0].ProjectId) : null;
         var user = projects.Count == 0 && owners.Count == 1 ? new SecretOwner(SecretOwnerTypes.User, owners[0]) : null;
         return new(new SecretOwner(SecretOwnerTypes.App, appId), project, user,
-            projects.Count switch { 0 => "the app is not in a project", 1 => null, _ => "the app is in more than one project" },
+            projects.Count switch { 0 => "the app is not in a project", 1 when !projects[0].IsActive => "the project was deleted", 1 => null, _ => "the app is in more than one project" },
             projects.Count > 0 ? "user vaults apply only to personal apps, not project apps"
                 : owners.Count == 1 ? null : "user vaults apply only to apps with a single owner");
     }
@@ -282,6 +284,7 @@ public sealed class AppSecretService(
             var problem = scope == AppSecretScopes.Project ? vaults.ProjectProblem : vaults.UserProblem;
             return (null, problem ?? $"{name} is not set in the {scope} vault");
         }
+        if (vaults.ProjectProblem == "the project was deleted") return (null, vaults.ProjectProblem);
         return (null, "not set");
     }
 

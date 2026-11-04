@@ -53,6 +53,9 @@ public class ProjectResourceService
             return null;
         }
 
+        if (!await dbContext.Projects.AnyAsync(project => project.Id == projectId && project.IsActive, cancellationToken))
+            throw new InvalidOperationException("This project was deleted.");
+
         // Check if app exists and user has access
         var app = await dbContext.WebApps
             .FirstOrDefaultAsync(a => a.Id == appId && a.WebAppUsers.Any(u => u.UserId == UserId), cancellationToken);

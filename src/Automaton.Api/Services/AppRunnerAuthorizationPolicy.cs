@@ -71,6 +71,10 @@ public sealed class AppRunnerAuthorizationPolicy(
             RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) != RunnerApplicationProfiles.MachineManagement)
             throw new InvalidOperationException("Only Machine Management Runners can run applications.");
 
+        if (app.ProjectId is Guid projectId &&
+            !await dbContext.Projects.AnyAsync(project => project.Id == projectId && project.IsActive, cancellationToken))
+            throw new UnauthorizedAccessException("This project was deleted.");
+
         var runnerIsVisible = await authorizationService
             .GetRunnersQueryByContext(app.ProjectId, userId)
             .AnyAsync(item => item.Id == runnerId, cancellationToken);
