@@ -38,6 +38,7 @@ compose=(docker compose --project-directory "$install_dir" --env-file "$install_
 [[ -f "$install_dir/compose.override.yaml" ]] && compose+=(-f "$install_dir/compose.override.yaml")
 
 list_backups() {
+    [[ -d "$backup_root" ]] || return 0
     find "$backup_root" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex ".*/automaton-[0-9]{8}T[0-9]{6}Z" \
         -printf '%f\n' 2>/dev/null | sort -r
 }
