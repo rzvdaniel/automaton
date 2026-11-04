@@ -43,6 +43,33 @@ public sealed class InventoryAuthorizationTests
         Assert.That(response.StatusCode, Is.EqualTo(expected));
     }
 
+    [TestCase("GET", "/api/install/update", null, null, HttpStatusCode.Unauthorized)]
+    [TestCase("POST", "/api/install/update", null, null, HttpStatusCode.Unauthorized)]
+    [TestCase("GET", "/api/install/update", "Developer", UserRole.User, HttpStatusCode.Forbidden)]
+    [TestCase("POST", "/api/install/update", "Developer", UserRole.User, HttpStatusCode.Forbidden)]
+    [TestCase("POST", "/api/install/update", "Developer", UserRole.Administrator, HttpStatusCode.Forbidden)]
+    [TestCase("GET", "/api/install/update", "Developer", UserRole.Administrator, HttpStatusCode.Forbidden)]
+    [TestCase("POST", "/api/install/update", "ReadOnly", UserRole.SystemAdministrator, HttpStatusCode.Forbidden)]
+    [TestCase("POST", "/api/install/update", "Runner", UserRole.SystemAdministrator, HttpStatusCode.Forbidden)]
+    [TestCase("POST", "/api/install/update", "WebApp", UserRole.SystemAdministrator, HttpStatusCode.Forbidden)]
+    [TestCase("GET", "/api/install/update", "WebApp", UserRole.SystemAdministrator, HttpStatusCode.Forbidden)]
+    [TestCase("POST", "/api/install/update", "Developer", UserRole.SystemAdministrator, HttpStatusCode.OK)]
+    [TestCase("GET", "/api/install/update", "Developer", UserRole.SystemAdministrator, HttpStatusCode.OK)]
+    public async Task ServerUpdateIsLimitedToSystemAdministratorsWithDeveloperAccess(
+        string method, string path, string? scope, string? role, HttpStatusCode expected)
+    {
+        await using var host = BuildHost();
+        await host.StartAsync();
+        using var client = host.GetTestClient();
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        if (scope is not null) request.Headers.Add("X-Test-Scope", scope);
+        if (role is not null) request.Headers.Add("X-Test-Role", role);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.That(response.StatusCode, Is.EqualTo(expected));
+    }
+
     [TestCase("GET", "/api/projects/00000000-0000-0000-0000-000000000001/runners")]
     [TestCase("POST", "/api/projects/00000000-0000-0000-0000-000000000001/runners/00000000-0000-0000-0000-000000000002")]
     [TestCase("DELETE", "/api/projects/00000000-0000-0000-0000-000000000001/runners/00000000-0000-0000-0000-000000000002")]

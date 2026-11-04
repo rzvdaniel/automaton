@@ -82,6 +82,13 @@ public and requires explicit user approval. `listing` sets the app's marketplace
 summary, description, category, tags, cover and screenshots; see
 [Publish](./publish#marketplace-listing).
 
+System administrators of a self-hosted server can update it from the CLI:
+`automaton server update --wait` installs the latest release (or `--version
+server-vX.Y.Z`), then checks `/health` and the installed version and exits
+nonzero on failure with the log tail and recovery backup;
+`automaton server update-status` shows the last run. See
+[Update an installed server](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md#update-an-installed-server).
+
 The optional positional argument to `automaton deploy` selects a remote
 deployment target. Its `--env <name>` option instead selects a local project
 profile for credentials and app linkage.

@@ -21,10 +21,14 @@ def manifest(app_digit, infrastructure_digit='0', store=True):
                    for name in names)
 
 
-def compose(store=True, postgres_image='postgres'):
+def compose(store=True, postgres_image='postgres', update_mounts=False):
     # JSON is valid YAML; the fake docker prints it for `compose config --format json`.
     services = {name: {'image': name} for name in ('postgres', 'rabbitmq', 'api', 'worker', 'studio', 'traefik')}
     services['postgres']['image'] = postgres_image
+    if update_mounts:
+        services['api']['volumes'] = [
+            {'type': 'bind', 'source': '/var/lib/automaton/update/requests', 'target': '/app/update-requests'},
+            {'type': 'bind', 'source': '/var/lib/automaton/update/status', 'target': '/app/update-status', 'read_only': True}]
     if store:
         services['store'] = {'image': 'store'}
     return json.dumps({'services': services, 'volumes': {'postgres-data': {}}})
@@ -89,9 +93,15 @@ esac
         (self.bin / 'df').write_text('#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 29000000 4%% /\\n"\n')
         for tool in self.bin.iterdir():
             tool.chmod(0o755)
-        self.environment = os.environ | {'PATH': str(self.bin) + ':' + os.environ['PATH']}
+        self.update_dir = self.root / 'update'
+        self.systemd_dir = self.root / 'systemd'
+        self.systemd_dir.mkdir()
+        # Never touch the host's systemd units or /var/lib/automaton.
+        self.environment = os.environ | {'PATH': str(self.bin) + ':' + os.environ['PATH'],
+                                         'AUTOMATON_UPDATE_TEST': '1', 'AUTOMATON_UPDATE_DIR': str(self.update_dir),
+                                         'AUTOMATON_SYSTEMD_DIR': str(self.systemd_dir)}
 
-    def bundle(self, target=None, compose_file=None):
+    def bundle(self, target=None, compose_file=None, with_update_trigger=True):
         source = self.root / 'bundle-source' / 'automaton-server'
         source.mkdir(parents=True, exist_ok=True)
         (source / 'release.env').write_text(target or manifest('2'))
@@ -100,6 +110,8 @@ esac
         (source / 'version').write_text('server-v0.1.2\n')
         shutil.copy2(REPO / 'scripts/update-automaton.sh', source / 'update.sh')
         shutil.copy2(REPO / 'scripts/install-automaton.sh', source / 'install.sh')
+        if with_update_trigger:
+            shutil.copy2(REPO / 'docker/install/update-from-request.sh', source / 'update-from-request.sh')
         archive = self.root / 'automaton-server.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
             tar.add(source, arcname='automaton-server')
@@ -123,6 +135,33 @@ esac
             self.assertTrue((backup / name).is_file(), name)
         self.assertEqual((backup / 'release.env').read_text(), manifest('1', store=False))
         self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
+
+    def test_enables_updates_from_studio_before_the_api_is_recreated(self):
+        log = self.root / 'docker.log'
+        # The new release mounts the update directories into the API; the compose-change rules accept it.
+        result = self.update(*self.bundle(compose_file=compose(update_mounts=True)), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((self.install / 'update-from-request.sh').is_file())
+        self.assertEqual((self.install / 'update-from-request.sh').stat().st_mode & 0o777, 0o700)
+        self.assertEqual((self.update_dir / 'requests').stat().st_mode & 0o777, 0o700)
+        self.assertTrue((self.update_dir / 'status').is_dir())
+        self.assertIn('PathExists=', (self.systemd_dir / 'automaton-update.path').read_text())
+        self.assertIn('Type=oneshot', (self.systemd_dir / 'automaton-update.service').read_text())
+        # Directories exist before `up` recreates the API with the bind mounts.
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        self.assertTrue(any(args[0] == 'compose' and 'up' in args for args in calls))
+
+    def test_update_without_the_trigger_script_still_succeeds(self):
+        result = self.update(*self.bundle(with_update_trigger=False))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((self.install / 'update-from-request.sh').exists())
+
+    def test_already_installed_release_still_enables_updates_from_studio(self):
+        (self.install / 'release.env').write_text(manifest('2'))
+        result = self.update(*self.bundle())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('already installed', result.stdout)
+        self.assertTrue((self.systemd_dir / 'automaton-update.path').is_file())
 
     def test_stops_on_mysql_installation_without_changes(self):
         legacy = manifest('1', store=False).replace('POSTGRES_IMAGE', 'MYSQL_IMAGE')

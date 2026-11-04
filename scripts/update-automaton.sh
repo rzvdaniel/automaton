@@ -112,6 +112,14 @@ ensure_backups() {
     fi
     echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
 }
+# Updates requested from Studio or the CLI run through a root systemd path unit. Installs its script, directories and
+# units; the directories must exist before the API container is recreated with them mounted. Failures only warn.
+ensure_update_trigger() {
+    if [[ -f "$bundle/update-from-request.sh" ]]; then install -m 0700 "$bundle/update-from-request.sh" "$install_dir/update-from-request.sh"; fi
+    [[ -f "$install_dir/update-from-request.sh" ]] || return 0
+    bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
+        || echo "Warning: updates from Studio could not be enabled. Run: sudo bash $install_dir/update-from-request.sh --install-units" >&2
+}
 # Releases run on PostgreSQL. An installation that still runs MySQL must not be switched silently:
 # its data has to be migrated first, and the old backup and restore scripts stay in place until then.
 if grep -q '^MYSQL_IMAGE=' "$install_dir/release.env"; then
@@ -122,6 +130,7 @@ fi
 if cmp -s "$bundle/release.env" "$install_dir/release.env"; then
     echo 'This release is already installed.'
     ensure_backups
+    ensure_update_trigger
     exit 0
 fi
 if [[ -f "$install_dir/version" ]]; then
@@ -242,6 +251,7 @@ if [[ "$old_runner_image" != "$new_runner_image" ]]; then
     fi
     recreate=(--force-recreate)  # API reads the updated settings file only at startup.
 fi
+ensure_update_trigger
 echo 'Backup verified. Pulling release images.'
 "${new_compose[@]}" pull "${application_services[@]}"
 echo "Updating ${application_services[*]}."

@@ -115,7 +115,20 @@ Preserve generated encryption/signing keys and Data Protection volumes. Back up 
 
 **Servers installed before PostgreSQL (MySQL-based).** Releases that use PostgreSQL are not applied to a MySQL server. `update.sh` and the installer stop with a message and change nothing; move the data first with `migrate-to-postgresql.sh`, which copies and verifies it and can roll back; see [Migrate a server from MySQL to PostgreSQL](migrate-to-postgresql.md) (issue #587). Stay on your current release until you have.
 
-Run the updater that the installer placed beside the Compose file. Without a version, it selects the newest stable server distribution available publicly on GHCR:
+**From Studio or the CLI (no SSH).** A system administrator can update from **Admin → Installation → Update** (an **Update to the latest release** button with a confirmation, live status and log), or with an admin CLI login:
+
+```bash
+automaton server update --wait            # latest release; add --version server-vX.Y.Z for a specific one
+automaton server update-status            # last run, log tail and recovery backup
+```
+
+`--wait` follows the update (the API restarts during it), then checks `/health` and that `installation-status` reports the new version; it exits nonzero on failure and prints the log tail and the recovery backup. Options: `--timeout SECONDS` (default 1800) and `--json`.
+
+How it works: the API never runs as root. It writes a request file (`version` and who asked) into `/var/lib/automaton/update/requests/`, which is mounted into the API. The systemd path unit `automaton-update.path` notices it and starts `automaton-update.service`, which runs `/opt/automaton-server/update-from-request.sh` as root. That script accepts only `latest` or `server-vX.Y.Z` from the request, runs the installed `update.sh` (so the checksum check, recovery backup and health checks apply unchanged) and writes `/var/lib/automaton/update/status/status.json` and `update.log` (the last 200 lines, mounted read-only into the API). One update runs at a time; a second request gets HTTP 409. Every request is audited. A failed update keeps the previous release and the recovery backup; the log names the backup, and the recovery steps are the same as for an SSH update.
+
+Servers installed before this feature get the units and directories the first time `update.sh` runs from SSH (the first update that includes it); until then Studio and the CLI report that updates from Studio are not enabled. Check the trigger with `systemctl status automaton-update.path`. Automatic (unattended) updates are not part of this feature.
+
+**From SSH.** Run the updater that the installer placed beside the Compose file. Without a version, it selects the newest stable server distribution available publicly on GHCR:
 
 ```bash
 sudo bash /opt/automaton-server/update.sh

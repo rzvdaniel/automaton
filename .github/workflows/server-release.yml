@@ -105,7 +105,7 @@ jobs:
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]]
           mkdir automaton-server
-          cp docker/install/{compose.yaml,configure.py,check_dns.py,backup.sh,restore.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
+          cp docker/install/{compose.yaml,configure.py,check_dns.py,backup.sh,restore.sh,update-from-request.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
           cp scripts/install-automaton.sh automaton-server/install.sh
           cp scripts/update-automaton.sh automaton-server/update.sh
           cp docs/prod/install-automaton.md automaton-server/README.md
@@ -162,9 +162,11 @@ jobs:
           sudo apt-get install -y python3-cryptography
           sudo python3 scripts/tests/server-installer-config-test.py
           sudo python3 scripts/tests/server-updater-test.py
+          python3 scripts/tests/server-update-request-test.py
           python3 scripts/tests/mysql-to-postgres-conversion-test.py
           python3 scripts/tests/postgres-migration-override-test.py
           bash -n automaton-server/migrate-to-postgresql.sh
+          bash -n automaton-server/update-from-request.sh
           sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-install-smoke.sh "$PWD/automaton-server"
       - name: Package release
         run: |

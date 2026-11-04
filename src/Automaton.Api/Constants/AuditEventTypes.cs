@@ -79,4 +79,5 @@ public static class AuditEventTypes
     public const string AiGuidanceDisabled = "AiGuidanceDisabled";
     public const string AiGuidanceResetToDefault = "AiGuidanceResetToDefault";
     public const string AiGuidanceDeleted = "AiGuidanceDeleted";
+    public const string ServerUpdateRequested = "ServerUpdateRequested";
 }

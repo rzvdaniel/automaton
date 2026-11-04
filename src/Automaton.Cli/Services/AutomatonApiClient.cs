@@ -195,6 +195,27 @@ public class AutomatonApiClient : IDisposable
             ?? throw new InvalidOperationException("Installation summary response was empty.");
     }
 
+    internal async Task<ServerUpdateStatus> GetServerUpdateAsync(CancellationToken ct = default)
+    {
+        using var response = await _http.GetAsync("api/install/update", ct);
+        await EnsureSuccessAsync(response);
+        return (await ReadJsonAsync(response, ct)).Deserialize<ServerUpdateStatus>(JsonOptions)
+            ?? throw new InvalidOperationException("Server update response was empty.");
+    }
+
+    internal async Task StartServerUpdateAsync(string version, CancellationToken ct = default)
+    {
+        using var response = await PostJsonAsync("api/install/update", JsonSerializer.Serialize(new { version }, JsonOptions), ct);
+        await EnsureSuccessAsync(response);
+    }
+
+    internal async Task<string> GetHealthAsync(CancellationToken ct = default)
+    {
+        using var response = await _http.GetAsync("health", ct);
+        await EnsureSuccessAsync(response);
+        return (await response.Content.ReadAsStringAsync(ct)).Trim();
+    }
+
     public async Task<JsonElement> RunAppActionAsync(string appId, string actionKey, JsonElement input, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { input }, JsonOptions);

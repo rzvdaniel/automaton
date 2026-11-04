@@ -184,9 +184,14 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh restore.sh; do
+for script in backup.sh restore.sh update-from-request.sh; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
+# Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
+if [[ -f "$install_dir/update-from-request.sh" ]] && ! $configure_only; then
+    bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
+        || echo "Warning: updates from Studio could not be enabled. Run: sudo bash $install_dir/update-from-request.sh --install-units" >&2
+fi
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.
 printf 'CONFIG_DIR=%s\n' "$config_dir" > "$install_dir/.env"

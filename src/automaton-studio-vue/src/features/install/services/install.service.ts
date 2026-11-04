@@ -1,5 +1,5 @@
 import apiClient from '@/shared/services/api/axios-instance'
-import type { InstallCommand, InstallationStatusResponse, InstallationCheck, InstallationBackupStatus } from '../types/install.types'
+import type { InstallCommand, InstallationStatusResponse, InstallationCheck, InstallationBackupStatus, InstallationUpdateStatus } from '../types/install.types'
 
 class InstallService {
   async getStatus(): Promise<InstallationStatusResponse> {
@@ -17,6 +17,15 @@ class InstallService {
   async getBackups(): Promise<InstallationBackupStatus> {
     const { data } = await apiClient.get<InstallationBackupStatus>('/api/install/backups')
     return data
+  }
+
+  async getUpdate(): Promise<InstallationUpdateStatus> {
+    const { data } = await apiClient.get<InstallationUpdateStatus>('/api/install/update')
+    return data
+  }
+
+  async startUpdate(version = 'latest'): Promise<void> {
+    await apiClient.post('/api/install/update', { version })
   }
 
   async install(command: InstallCommand, setupToken: string): Promise<void> {

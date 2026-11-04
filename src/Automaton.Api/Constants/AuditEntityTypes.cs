@@ -22,4 +22,5 @@ public static class AuditEntityTypes
     public const string ProjectSecretVault = "ProjectSecretVault";
     public const string UserSecretVault = "UserSecretVault";
     public const string AppPermission = "AppPermission";
+    public const string ServerInstallation = "ServerInstallation";
 }
