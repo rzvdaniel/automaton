@@ -1,21 +1,24 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
+using System.CommandLine.Invocation;
 
 namespace Automaton.Cli.Commands;
 
 internal static class NewCommandHandler
 {
     internal static async Task HandleAsync(
-        ConfigService config, string? argumentName, string? optionName, bool asJson, string? environmentName)
+        ConfigService config, InvocationContext context, string? argumentName, string? optionName,
+        bool asJson, string? environmentName, string? templateName)
     {
         var cwd = Directory.GetCurrentDirectory();
         var (server, apiKey) = config.ResolveCredentials(
             directory: cwd, environmentName: environmentName, allowMissingEnvironment: true);
         var name = ResolveName(argumentName, optionName, asJson);
         var result = await new NewAppService(config).CreateAsync(
-            cwd, name, server, apiKey, environmentName);
+            cwd, name, server, apiKey, environmentName, context.GetCancellationToken(), templateName);
         WriteResult(result, cwd, asJson);
+        context.ExitCode = result.Success ? 0 : 1;
     }
 
     private static string? ResolveName(string? argumentName, string? optionName, bool asJson)
@@ -34,17 +37,14 @@ internal static class NewCommandHandler
         if (asJson)
         {
             WriteJson(result);
-            Environment.ExitCode = result.Success ? 0 : 1;
             return;
         }
         if (!result.Success)
         {
             WriteFailure(result);
-            Environment.ExitCode = 1;
             return;
         }
         WriteSuccess(result, directory);
-        Environment.ExitCode = 0;
     }
 
     private static void WriteJson(NewAppResult result)

@@ -25,6 +25,48 @@ public class NewAppServiceTests
         _tempDirectories.Clear();
     }
 
+    [TestCase("node", "server.mjs", "node")]
+    [TestCase("python", "server.py", "python")]
+    [TestCase("dotnet", "App.csproj", "dotnet")]
+    [TestCase("static", "index.html", null)]
+    public async Task CreateAsync_WithTemplate_WritesRunnableContract(string template, string entryFile, string? runtime)
+    {
+        var root = CreateProjectRoot();
+        var result = await CreateSuccessfulService().CreateAsync(
+            root, "Starter", "https://api.example.com", "ak_test", templateName: template);
+
+        Assert.That(result.Success, Is.True, result.Checks.LastOrDefault()?.Message);
+        var contract = new ConfigService().LoadProjectConfig(root).Application;
+        Assert.Multiple(() =>
+        {
+            Assert.That(contract.Health.Path, Is.EqualTo("/health"));
+            Assert.That(contract.Runtime.Command?.Executable, Is.EqualTo(runtime));
+            Assert.That(contract.IsStaticSite, Is.EqualTo(template == "static"));
+            Assert.That(File.Exists(Path.Combine(root, entryFile)), Is.True);
+        });
+    }
+
+    [TestCase("server.py")]
+    [TestCase("automaton.json")]
+    public async Task CreateAsync_WithTemplate_DoesNotOverwriteExistingFiles(string name)
+    {
+        var root = CreateProjectRoot();
+        var existingFile = Path.Combine(root, name);
+        var config = new ConfigService();
+        if (name == "automaton.json")
+            config.SaveProjectConfig(root, new AutomatonConfig { Name = "Existing app" });
+        else
+            File.WriteAllText(existingFile, "existing content");
+        var original = File.ReadAllText(existingFile);
+        var service = new NewAppService(config, (_, _, _, _) => throw new AssertionException("No API call expected"));
+
+        var result = await service.CreateAsync(root, "Starter", "https://api.example.com", "ak_test", templateName: "python");
+
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.Checks.Last().Message, Does.Contain("would overwrite"));
+        Assert.That(File.ReadAllText(existingFile), Is.EqualTo(original));
+    }
+
     [Test]
     public async Task CreateAsync_WhenNameAndCredentialsArePresent_CreatesAppAndWritesProjectFiles()
     {

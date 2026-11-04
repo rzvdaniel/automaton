@@ -29,7 +29,8 @@ public sealed class NewAppService
         string? server,
         string? apiKey,
         string? environmentName = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? templateName = null)
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -45,12 +46,9 @@ public sealed class NewAppService
         var validatedServer = server!;
         var validatedApiKey = apiKey!;
 
-        var configPath = Path.Combine(directory, "automaton.json");
-        var existingConfig = _config.TryLoadProjectConfig(directory);
-
         try
         {
-            _config.SaveProjectConfig(directory, BuildProjectConfig(existingConfig, validatedName));
+            WriteScaffold(directory, validatedName, templateName);
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.LocalScaffold,
                 true,
@@ -127,6 +125,20 @@ public sealed class NewAppService
                     : null
             };
         }
+    }
+
+    private void WriteScaffold(string directory, string name, string? templateName)
+    {
+        if (templateName is null)
+        {
+            var existing = _config.TryLoadProjectConfig(directory);
+            _config.SaveProjectConfig(directory, BuildProjectConfig(existing, name));
+            return;
+        }
+
+        var template = NewAppTemplate.Create(templateName);
+        template.Write(directory, () => _config.SaveProjectConfig(
+            directory, new AutomatonConfig { Name = name, Application = template.Contract }, overwrite: false));
     }
 
     private NewAppResult? ValidateRequest(

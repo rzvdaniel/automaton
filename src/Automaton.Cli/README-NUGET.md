@@ -34,6 +34,8 @@ During device authorization, the CLI waits through HTTP 429 responses using the
 server's `Retry-After` header (60 seconds when absent), within the request's
 authorization lifetime. A temporary rate limit does not require another approval.
 
+To generate a runnable starter in a fresh project directory, use `automaton new "My App" --template node`. The available templates are `node`, `python`, `dotnet`, and `static`. Each includes a hello page and `/health`. Assign a Runner if needed, then run `automaton deploy`. Omit `--template` to create the standard scaffold or link an existing local application.
+
 ## Pull modes
 
 Static sites declare `application.build.command`, an explicit build image and

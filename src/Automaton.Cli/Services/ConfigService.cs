@@ -98,11 +98,14 @@ public class ConfigService
     }
 
     public void SaveProjectConfig(string directory, AutomatonConfig config)
+        => SaveProjectConfig(directory, config, overwrite: true);
+
+    internal void SaveProjectConfig(string directory, AutomatonConfig config, bool overwrite)
     {
         var path = Path.Combine(directory, ProjectConfigFileName);
-        WriteJsonAtomically(path, config);
-
-        EnsureProjectIgnoreFile(directory);
+        if (!overwrite) EnsureProjectIgnoreFile(directory);
+        WriteJsonAtomically(path, config, overwrite);
+        if (overwrite) EnsureProjectIgnoreFile(directory);
     }
 
     public GlobalConfig LoadProjectLocalConfig(string directory)
@@ -553,7 +556,7 @@ public class ConfigService
         return reader.ReadToEnd();
     }
 
-    private static void WriteJsonAtomically<T>(string path, T value)
+    private static void WriteJsonAtomically<T>(string path, T value, bool overwrite = true)
     {
         var directory = Path.GetDirectoryName(path);
         if (string.IsNullOrWhiteSpace(directory))
@@ -575,7 +578,7 @@ public class ConfigService
                 stream.Flush(flushToDisk: true);
             }
 
-            if (File.Exists(path))
+            if (overwrite && File.Exists(path))
             {
                 if (OperatingSystem.IsWindows())
                 {
