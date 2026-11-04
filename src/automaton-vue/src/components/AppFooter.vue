@@ -40,7 +40,7 @@ import logoUrl from '@/assets/logo.svg'
         <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="footer-link"
           >llms.txt</a
         >
-        <a href="/docs/cli-ai-tools" class="footer-link">Build with AI</a>
+        <a href="/docs/getting-started" class="footer-link">Build with AI</a>
       </div>
 
       <div class="footer-col">

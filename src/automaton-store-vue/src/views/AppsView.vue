@@ -19,7 +19,7 @@ const { apps, categories, loading, error, loadApps, loadCategories } = useMarket
 
 useSiteTheme()
 
-const publishDocsUrl = 'https://automaton.monster/docs/publish'
+const publishDocsUrl = 'https://automaton.monster/docs/deploy#marketplace-listing'
 
 // Older links used ?category=Featured or "Live Apps" to mean every app; keep them working.
 const activeCategory = computed(() => {

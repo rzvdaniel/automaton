@@ -90,6 +90,29 @@ for (const entry of scanned) {
   }
 }
 
+// Links to website docs written in application source (footers, "how to" links, CLI output) must point at a page that exists.
+const sourceRoots = ['src/automaton-vue/src', 'src/automaton-store-vue/src', 'src/automaton-studio-vue/src', 'src/Automaton.Cli']
+const sourceFiles = function* (dir) {
+  const full = path.join(root, dir)
+  if (!fs.existsSync(full)) return
+  for (const item of fs.readdirSync(full, { withFileTypes: true })) {
+    const child = path.join(dir, item.name)
+    if (item.isDirectory()) { if (!['node_modules', 'bin', 'obj', 'dist'].includes(item.name)) yield* sourceFiles(child) }
+    else if (/\.(vue|ts|cs)$/.test(item.name)) yield child
+  }
+}
+for (const dir of sourceRoots) {
+  for (const rel of sourceFiles(dir)) {
+    const text = fs.readFileSync(path.join(root, rel), 'utf8')
+    for (const m of text.matchAll(/(?:https:\/\/automaton\.monster)?(\/docs\/[a-z0-9-]+)(?:#([a-z0-9-]+))?/g)) {
+      checked++
+      const target = resolveTarget(path.join(websiteDocs, 'index.md'), m[1])
+      if (!target) problems.push(`${rel}: links to missing website page ${m[1]}`)
+      else if (m[2] && target.endsWith('.md') && !anchorsOf(target).has(m[2])) problems.push(`${rel}: ${m[1]} has no heading #${m[2]}`)
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error(`${problems.length} broken documentation link(s):`)
   for (const problem of problems) console.error(`  ${problem}`)
