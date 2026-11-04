@@ -69,6 +69,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             <ul class="facts" aria-label="At a glance">
               <li>Apache 2.0</li>
               <li>One Ubuntu server to start</li>
+              <li>No cloud account needed</li>
               <li>Installs in about 90 seconds</li>
             </ul>
           </div>
@@ -121,8 +122,8 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             <h2 id="start-title">Install in about 90 seconds, update with one command</h2>
             <p>
               Measured on a fresh Ubuntu 24.04 server (2 vCPU, 4 GB RAM): the installer finished in
-              90 seconds, and the whole stack (PostgreSQL, API, Studio, app store, Traefik) used about
-              1.0 to 1.2 GB of memory with an app running.
+              90 seconds, and a first public app was live about 10 minutes after the server was created.
+              At idle with one small app, the server and a Runner used about 1.2 GB of memory.
             </p>
           </div>
 
