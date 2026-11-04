@@ -104,7 +104,7 @@ internal sealed partial class ServerUpdateRunner(
                 var health = await client.GetHealthAsync(ct);
                 var summary = await client.GetInstallationSummaryAsync(ct);
                 if (health != "ok") problem = $"The API health check returned \"{health}\".";
-                else if (expectedVersion is not null && summary.Version != expectedVersion)
+                else if (expectedVersion is not null && NormalizeVersion(summary.Version) != NormalizeVersion(expectedVersion))
                     problem = $"installation-status reports {summary.Version ?? "no version"} instead of {expectedVersion}.";
                 else return null;
             }

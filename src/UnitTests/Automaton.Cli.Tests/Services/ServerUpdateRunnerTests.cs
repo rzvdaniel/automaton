@@ -57,6 +57,20 @@ public class ServerUpdateRunnerTests
     }
 
     [Test]
+    public async Task WaitAcceptsThePlainVersionThatInstallationStatusReports()
+    {
+        // The real API reports "0.2.0" in /api/install/summary while the update status says "server-v0.2.0".
+        var server = new FakeServer()
+            .On(Update, OldRun, Run("succeeded", "server-v0.2.0", 0))
+            .On(Health, "ok")
+            .On(Summary, """{"version":"0.2.0"}""");
+
+        var outcome = await RunAsync(server, "latest", wait: true);
+
+        Assert.That(outcome.Success, Is.True, outcome.Message);
+    }
+
+    [Test]
     public async Task WaitReportsFailureWithLogAndRecoveryBackup()
     {
         var server = new FakeServer().On(Update, OldRun,
