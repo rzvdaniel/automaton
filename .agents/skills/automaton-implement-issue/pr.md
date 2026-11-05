@@ -7,7 +7,7 @@ What the change does for people, in the imperative: "Let app owners delete apps 
 ## Body
 
 ```markdown
-Closes #<issue>.
+Refs #<issue>.
 
 - **<behaviour>:** what changed and why, one line each.
 - **Docs:** which Admin or architecture docs were updated, or why none were needed.
@@ -16,7 +16,8 @@ Closes #<issue>.
 **Not in this PR:** anything from the issue left for later, with the follow-up issue number.
 ```
 
-Use `Part of #N` instead of `Closes #N` when the PR delivers only part of the issue.
+Never write `Closes #N` or `Fixes #N`: an issue closes only when its change is live on production (step 8). Use
+`Part of #N` when the PR delivers only part of the issue.
 
 ## Documentation
 

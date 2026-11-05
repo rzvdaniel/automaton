@@ -32,8 +32,8 @@ not check, for example "the scripts were not run".
   started. One that is newer than the last commit, or one that requests changes, blocks the merge until it is
   answered.
 - The reviewer checks the tests and the diff before merge. The `proof` artifact comes after merge: release, update the
-  test server, verify as real users, then attach it to the issue and label the issue `verified` or
-  `verification-failed` (implement-issue steps 7-8). A failing proof means fix forward with a follow-up PR (revert
+  test server, verify as real users, then attach it to the issue and label the issue `verified` (left open until it is live on
+  production) or `verification-failed` (implement-issue steps 7-8). A failing proof means fix forward with a follow-up PR (revert
   only if the fix is not quick).
 - The checks on the final commit pass, and the last review found nothing above low.
 - If a PR was merged with open findings, say so on the PR, fix them in a follow-up PR with its own review, and hold
