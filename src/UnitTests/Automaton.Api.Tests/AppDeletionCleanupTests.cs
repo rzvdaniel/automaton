@@ -51,6 +51,25 @@ public sealed class AppDeletionCleanupTests
     }
 
     [Test]
+    public async Task AppDeletion_RemovesItsActionSchedulesAndKeepsOtherApps()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        var otherAppId = Guid.NewGuid();
+        foreach (var appId in new[] { fixture.App.Id, otherAppId })
+            fixture.Db.ActionSchedules.Add(new ActionSchedule
+            {
+                Id = Guid.NewGuid(), OwnerUserId = fixture.UserId, ApplicationId = appId, ActionKey = "backup",
+                Name = "Nightly", IntervalSeconds = 300
+            });
+        await fixture.Db.SaveChangesAsync();
+
+        await DeleteAppAsync(fixture, false);
+
+        var remaining = await fixture.Db.ActionSchedules.AsNoTracking().Select(x => x.ApplicationId).ToListAsync();
+        Assert.That(remaining, Is.EqualTo(new[] { otherAppId }));
+    }
+
+    [Test]
     public async Task WholeAppCleanup_OfflineAssignedRunnerPreventsStorageDeletionEvenWithoutRuntime()
     {
         await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);

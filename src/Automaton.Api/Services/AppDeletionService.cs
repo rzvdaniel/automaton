@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
@@ -54,6 +55,8 @@ public sealed class AppDeletionService(
             await fileStorageService.DeleteAppAsync(ownerId, appId);
             await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
             await AppSecretService.RemoveAllForAppAsync(dataContext, appId, CancellationToken.None);
+            dataContext.ActionSchedules.RemoveRange(await dataContext.ActionSchedules
+                .Where(schedule => schedule.ApplicationId == appId).ToListAsync());
             dataContext.WebApps.Remove(app);
             await dataContext.SaveChangesAsync();
         }
