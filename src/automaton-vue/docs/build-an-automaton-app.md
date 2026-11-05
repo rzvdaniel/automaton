@@ -20,15 +20,15 @@ Build files, no server process. `automaton new "My Site" --template static` crea
   "name": "My Site",
   "application": {
     "build": {
-      "command": { "executable": "sh", "arguments": ["-c", "mkdir -p dist && cp index.html health dist/"] },
+      "command": { "executable": "sh", "arguments": ["-c", "mkdir -p dist && cp index.html health.txt dist/"] },
       "outputDirectory": "dist"
     },
-    "health": { "path": "/health" }
+    "health": { "path": "/health.txt" }
   }
 }
 ```
 
-Runners serve static output from one shared static server. Static sites cannot use [secrets](./secrets-and-permissions).
+Publishing allows only public file types (such as `.html`, `.css`, `.js`, `.txt`), so the health file is `health.txt`. Runners serve static output from one shared static server. Static sites cannot use [secrets](./secrets-and-permissions).
 
 ## Server with a runtime
 

@@ -39,10 +39,23 @@ public class NewAppServiceTests
         var contract = new ConfigService().LoadProjectConfig(root).Application;
         Assert.Multiple(() =>
         {
-            Assert.That(contract.Health.Path, Is.EqualTo("/health"));
+            Assert.That(contract.Health.Path, Is.EqualTo(template == "static" ? "/health.txt" : "/health"));
             Assert.That(contract.Runtime.Command?.Executable, Is.EqualTo(runtime));
             Assert.That(contract.IsStaticSite, Is.EqualTo(template == "static"));
             Assert.That(File.Exists(Path.Combine(root, entryFile)), Is.True);
+        });
+    }
+
+    [Test]
+    public void StaticTemplate_HealthFileAndAllFilesAreAllowedToPublish()
+    {
+        var template = NewAppTemplate.Create("static");
+        var health = template.Contract.Health.Path!.TrimStart('/');
+        Assert.Multiple(() =>
+        {
+            Assert.That(template.Files.Keys, Does.Contain(health));
+            Assert.That(template.Files.Keys.All(PublishedStaticOutputFilePolicy.IsAllowedFilePath), Is.True);
+            Assert.That(template.Contract.Build!.Command!.Arguments.Last(), Does.Contain(health));
         });
     }
 

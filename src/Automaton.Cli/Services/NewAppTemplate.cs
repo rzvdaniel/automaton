@@ -83,10 +83,10 @@ internal sealed record NewAppTemplate(ApplicationContract Contract, IReadOnlyDic
         Build = new ApplicationBuildSpec
         {
             Image = "alpine:3.22",
-            Command = Command("sh", "-c", "mkdir -p dist && cp index.html health dist/"),
+            Command = Command("sh", "-c", "mkdir -p dist && cp index.html health.txt dist/"),
             OutputDirectory = "dist"
         },
-        Health = new ApplicationHealthSpec { Path = "/health" }
+        Health = new ApplicationHealthSpec { Path = "/health.txt" }
     }, new Dictionary<string, string>
     {
         ["index.html"] = """
@@ -97,7 +97,7 @@ internal sealed record NewAppTemplate(ApplicationContract Contract, IReadOnlyDic
             <h1>Hello from Automaton!</h1>
             </html>
             """,
-        ["health"] = "ok"
+        ["health.txt"] = "ok"
     });
 
     private static ApplicationCommandSpec Command(string executable, params string[] arguments)
