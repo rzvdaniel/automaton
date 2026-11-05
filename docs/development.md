@@ -41,7 +41,7 @@ docker compose -f docker-compose.dev.yml up -d postgres
 docker compose -f docker-compose.rabbitmq.yml up -d
 ```
 
-Configure the backend connection string. Replace `<your-POSTGRES_PASSWORD>` with the `POSTGRES_PASSWORD` the PostgreSQL container starts with: set it in a local, untracked `.env` in the repo root (start from `.env.example`) before the first `docker compose up`. If you set nothing, the compose files fall back to a local-only default (see `docker-compose.postgres.yml`); never use that default on a machine reachable from a network.
+Configure the backend connection string. Replace `<your-POSTGRES_PASSWORD>` with the `POSTGRES_PASSWORD` the PostgreSQL container starts with: set it in a local, untracked `.env` in the repo root (start from `.env.example`) before the first `docker compose up`. The compose files refuse to start without it (also set `RABBITMQ_PASSWORD` for RabbitMQ), so no password is committed to the repository; the Worker reads `RabbitMq__Password` and `ConnectionStrings__PostgreSqlConnection` from user secrets or environment variables.
 
 ```bash
 cd src/Automaton.Api

@@ -6,7 +6,7 @@
 #
 # Default credentials (can be overridden with environment variables):
 #   - Username: automaton
-#   - Password: AutomatonRabbit123!
+#   - Password: from RABBITMQ_PASSWORD (required, set in .env)
 #
 # Local connections:
 #   - AMQP:       localhost:5672
@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-automaton}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-AutomatonRabbit123!}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"

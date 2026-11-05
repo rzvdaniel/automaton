@@ -70,7 +70,7 @@ http://localhost:15672
 
 Default login values come from `.env`:
 - username: `automaton`
-- password: `AutomatonRabbit123!`
+- password: the `RABBITMQ_PASSWORD` value from `.env`
 
 ### 5. Configure Automaton.Api
 
@@ -80,7 +80,7 @@ Update your `appsettings.Development.json` or use .NET user secrets:
 ```json
 {
   "ConnectionStrings": {
-    "PostgreSqlConnection": "Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=AutomatonPass123!"
+    "PostgreSqlConnection": "Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=<your-POSTGRES_PASSWORD>"
   }
 }
 ```
@@ -88,10 +88,10 @@ Update your `appsettings.Development.json` or use .NET user secrets:
 **Option B: User Secrets (Recommended)**
 ```bash
 cd src/Automaton.Api
-dotnet user-secrets set "ConnectionStrings:PostgreSqlConnection" "Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=AutomatonPass123!"
+dotnet user-secrets set "ConnectionStrings:PostgreSqlConnection" "Host=localhost;Port=5432;Database=automaton;Username=automaton_user;Password=<your-POSTGRES_PASSWORD>"
 dotnet user-secrets set "RabbitMq:Host" "localhost"
 dotnet user-secrets set "RabbitMq:Username" "automaton"
-dotnet user-secrets set "RabbitMq:Password" "AutomatonRabbit123!"
+dotnet user-secrets set "RabbitMq:Password" "<your-RABBITMQ_PASSWORD>"
 ```
 
 ### 6. Start the Server

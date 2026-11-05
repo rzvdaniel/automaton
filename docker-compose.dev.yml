@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DATABASE:-automaton}
       POSTGRES_USER: ${POSTGRES_USER:-automaton_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AutomatonPass123!}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-automaton}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-automaton}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
@@ -48,7 +48,7 @@ services:
   #   environment:
   #     - ASPNETCORE_ENVIRONMENT=Development
   #     - ASPNETCORE_URLS=https://+:7091
-  #     - ConnectionStrings__PostgreSqlConnection=Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:-AutomatonPass123!}
+  #     - ConnectionStrings__PostgreSqlConnection=Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
   #   depends_on:
   #     postgres:
   #       condition: service_healthy
@@ -68,12 +68,12 @@ services:
   #   restart: unless-stopped
   #   environment:
   #     - DOTNET_ENVIRONMENT=Development
-  #     - ConnectionStrings__PostgreSqlConnection=Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:-AutomatonPass123!}
+  #     - ConnectionStrings__PostgreSqlConnection=Host=postgres;Port=5432;Database=${POSTGRES_DATABASE:-automaton};Username=${POSTGRES_USER:-automaton_user};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
   #     - AppConfig__WebsiteUrl=http://host.docker.internal:5173
   #     - AppConfig__ApiUrl=https://host.docker.internal:7091
   #     - RabbitMq__Host=rabbitmq
   #     - RabbitMq__Username=${RABBITMQ_USER:-automaton}
-  #     - RabbitMq__Password=${RABBITMQ_PASSWORD:-automaton}
+  #     - RabbitMq__Password=${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
   #     - Logging__File__Path=/app/logs
   #   depends_on:
   #     postgres:

@@ -50,7 +50,7 @@ services:
     environment:
       POSTGRES_DB: ${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton}
       POSTGRES_USER: ${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user}
-      POSTGRES_PASSWORD: ${LOCAL_RUNTIME_POSTGRES_PASSWORD:-AutomatonPass123!}
+      POSTGRES_PASSWORD: ${LOCAL_RUNTIME_POSTGRES_PASSWORD:?set LOCAL_RUNTIME_POSTGRES_PASSWORD in .env}
     ports:
       - "${LOCAL_RUNTIME_POSTGRES_PORT:-5435}:5432"
     volumes:
@@ -71,7 +71,7 @@ services:
     logging: *default-logging
     environment:
       RABBITMQ_DEFAULT_USER: ${LOCAL_RUNTIME_RABBITMQ_USER:-automaton}
-      RABBITMQ_DEFAULT_PASS: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:-automaton}
+      RABBITMQ_DEFAULT_PASS: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:?set LOCAL_RUNTIME_RABBITMQ_PASSWORD in .env}
     ports:
       - "${LOCAL_RUNTIME_RABBITMQ_PORT:-5672}:5672"
       - "${LOCAL_RUNTIME_RABBITMQ_MANAGEMENT_PORT:-15673}:15672"
@@ -108,7 +108,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton};Username=${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user};Password=${LOCAL_RUNTIME_POSTGRES_PASSWORD:-AutomatonPass123!}
+      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton};Username=${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user};Password=${LOCAL_RUNTIME_POSTGRES_PASSWORD:?set LOCAL_RUNTIME_POSTGRES_PASSWORD in .env}
       Cors__AllowedOrigins__0: https://${LOCAL_RUNTIME_STUDIO_DOMAIN:-studio.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       Cors__AllowedOrigins__1: https://${LOCAL_RUNTIME_WEBSITE_DOMAIN:-website.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       JwtOptions__Issuer: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
@@ -116,7 +116,7 @@ services:
       RabbitMq__Host: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__Username: ${LOCAL_RUNTIME_RABBITMQ_USER:-automaton}
-      RabbitMq__Password: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:-automaton}
+      RabbitMq__Password: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:?set LOCAL_RUNTIME_RABBITMQ_PASSWORD in .env}
       EmailConfig__EmailHost: smtp4dev
       EmailConfig__EmailPort: 25
       EmailConfig__EmailUseSsl: "false"
@@ -161,13 +161,13 @@ services:
     logging: *default-logging
     environment:
       DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton};Username=${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user};Password=${LOCAL_RUNTIME_POSTGRES_PASSWORD:-AutomatonPass123!}
+      ConnectionStrings__PostgreSqlConnection: Host=postgres;Port=5432;Database=${LOCAL_RUNTIME_POSTGRES_DATABASE:-automaton};Username=${LOCAL_RUNTIME_POSTGRES_USER:-automaton_user};Password=${LOCAL_RUNTIME_POSTGRES_PASSWORD:?set LOCAL_RUNTIME_POSTGRES_PASSWORD in .env}
       AppConfig__WebsiteUrl: https://${LOCAL_RUNTIME_WEBSITE_DOMAIN:-website.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       AppConfig__ApiUrl: http://api:8080
       RabbitMq__Host: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__Username: ${LOCAL_RUNTIME_RABBITMQ_USER:-automaton}
-      RabbitMq__Password: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:-automaton}
+      RabbitMq__Password: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:?set LOCAL_RUNTIME_RABBITMQ_PASSWORD in .env}
       EmailConfig__EmailHost: smtp4dev
       EmailConfig__EmailPort: 25
       EmailConfig__EmailUseSsl: "false"
