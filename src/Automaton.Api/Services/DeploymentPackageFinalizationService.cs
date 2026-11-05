@@ -29,17 +29,17 @@ public sealed class DeploymentPackageFinalizationService(
         CancellationToken cancellationToken,
         Guid? deploymentOperationId = null)
     {
+        // Source and managed artifacts belong to the project owner for project apps, where Studio deploy
+        // reads them even when a project editor ran the deploy (forking still reads the first linked user).
+        var sourceOwnerId = await ResolveSourceOwnerIdAsync(appId, ownerId, cancellationToken);
         await connectedFlowArtifactService.SynchronizeAsync(
             appId,
             deploymentTargetId,
-            ownerId,
+            sourceOwnerId,
             [runner],
             cancellationToken,
             deploymentOperationId);
         await DeployPackageContractService.PersistAsync(dataContext, appId, packageApplication, cancellationToken);
-        // Source is stored under the project owner for project apps, where Studio deploy reads it
-        // even when a project editor ran the deploy (forking still reads the first linked user).
-        var sourceOwnerId = await ResolveSourceOwnerIdAsync(appId, ownerId, cancellationToken);
         await PersistSourceAsync(appId, sourceOwnerId, file, cancellationToken);
         await fileStorageService.UpdateAppStorageMetadataAsync(sourceOwnerId, appId, metadata =>
         {
