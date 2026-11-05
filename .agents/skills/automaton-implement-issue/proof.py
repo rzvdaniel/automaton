@@ -3,45 +3,29 @@
 
 Usage: python3 proof.py <issue-number> proof.html [--repo owner/name]
 
-Images in proof.html may be local paths or https URLs (for example the pr-screenshots branch).
-GitHub's artifact preview blocks images from other sites, so every <img src> is embedded as a
-data: URI, and clicking an image enlarges it (CSS only; click outside it to close).
-An existing `proof` artifact on the issue is replaced. Requires the gh CLI.
+Screenshots live on the `pr-screenshots` branch and the proof links to them: GitHub's artifact
+preview does not load images from other sites. Any <img src="https://..."> left in the page is
+turned into a link to that image. An existing `proof` artifact on the issue is replaced.
+Requires the gh CLI.
 """
-import base64
 import json
-import mimetypes
-import pathlib
 import re
 import subprocess
 import sys
 import tempfile
-import urllib.request
+from pathlib import Path
 
-ZOOM_STYLE = """<style id="proof-zoom">
-img[tabindex]{cursor:zoom-in;max-width:100%}
-img[tabindex]:focus{position:fixed;inset:0;margin:auto;max-width:96vw;max-height:96vh;width:auto;height:auto;
-z-index:1000;cursor:zoom-out;box-shadow:0 0 0 100vmax rgba(0,0,0,.8);outline:none}
-</style>"""
-LIMIT = 8 * 1024 * 1024  # keep pages small enough to load quickly; shrink screenshots if this trips
+LIMIT = 1024 * 1024  # a proof is text and links; embedded images do not belong here
 
 
-def embed(html: str, base: pathlib.Path) -> str:
+def link_images(html: str) -> str:
     def replace(match: re.Match) -> str:
-        src = match.group(2)
-        if src.startswith("data:"):
-            return match.group(0)
-        if src.startswith(("http://", "https://")):
-            with urllib.request.urlopen(src, timeout=30) as response:
-                data = response.read()
-                kind = response.headers.get_content_type()
-        else:
-            path = (base / src).resolve()
-            data = path.read_bytes()
-            kind = mimetypes.guess_type(path.name)[0] or "image/png"
-        return f'{match.group(1)}data:{kind};base64,{base64.b64encode(data).decode()}"'
+        tag, src = match.group(0), match.group(1)
+        alt = re.search(r'\balt="([^"]*)"', tag)
+        label = alt.group(1) if alt and alt.group(1) else src.rsplit("/", 1)[-1]
+        return f'<a href="{src}" target="_blank" rel="noopener">{label}</a>'
 
-    return re.sub(r'(<img\b[^>]*?\bsrc=")([^"]+)"', replace, html)
+    return re.sub(r'<img\b[^>]*?\bsrc="(https?://[^"]+)"[^>]*>', replace, html)
 
 
 def gh(*args: str) -> str:
@@ -52,11 +36,12 @@ def main() -> int:
     if len(sys.argv) < 3:
         print(__doc__, file=sys.stderr)
         return 2
-    issue, page = sys.argv[1], pathlib.Path(sys.argv[2])
+    issue, page = sys.argv[1], Path(sys.argv[2])
     repo = sys.argv[sys.argv.index("--repo") + 1] if "--repo" in sys.argv else "rzvdaniel/automaton"
-    html = embed(page.read_text(encoding="utf-8"), page.parent)
-    if len(html.encode()) > LIMIT:
-        print(f"Proof page is {len(html.encode())} bytes; shrink the screenshots (limit {LIMIT}).", file=sys.stderr)
+    html = link_images(page.read_text(encoding="utf-8"))
+    if "data:image" in html or len(html.encode()) > LIMIT:
+        print("Proof page embeds images or is over 1 MB; link screenshots on the pr-screenshots branch instead.",
+              file=sys.stderr)
         return 1
     base = f"repos/{repo}/issues/{issue}/artifacts"
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as handle:
