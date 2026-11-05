@@ -218,7 +218,7 @@
               &lt;center&gt;
                 &lt;a href="{{ LoginUrl }}" class="button"&gt;Sign in&lt;/a&gt;
               &lt;/center&gt;
-              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ LoginUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ LoginUrl }}&lt;/a&gt;&lt;/p&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button does not work, copy this link into your browser: &lt;a href="{{ LoginUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ LoginUrl }}&lt;/a&gt;&lt;/p&gt;
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;Questions? Write to &lt;a href="mailto:{{ SupportEmail }}" style="color: #4F46E5; text-decoration: none;"&gt;{{ SupportEmail }}&lt;/a&gt;.&lt;/p&gt;
             &lt;/td&gt;
@@ -289,7 +289,7 @@
               &lt;center&gt;
                 &lt;a href="{{ ConfirmationUrl }}" class="button"&gt;Confirm email&lt;/a&gt;
               &lt;/center&gt;
-              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ ConfirmationUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ ConfirmationUrl }}&lt;/a&gt;&lt;/p&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button does not work, copy this link into your browser: &lt;a href="{{ ConfirmationUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ ConfirmationUrl }}&lt;/a&gt;&lt;/p&gt;
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;Already confirmed? Sign in at &lt;a href="{{ LoginUrl }}" style="color: #4F46E5; text-decoration: none;"&gt;{{ LoginUrl }}&lt;/a&gt;&lt;/p&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;Questions? Write to &lt;a href="mailto:{{ SupportEmail }}" style="color: #4F46E5; text-decoration: none;"&gt;{{ SupportEmail }}&lt;/a&gt;.&lt;/p&gt;
@@ -363,10 +363,11 @@
                 &lt;p&gt;&lt;strong&gt;Project:&lt;/strong&gt; {{ ProjectName }}&lt;/p&gt;
               &lt;/div&gt;
               &lt;p&gt;Click the button to accept. The link is valid for {{ ExpirationHours }} hours.&lt;/p&gt;
+              {% if SetupPasswordUrl %}&lt;p&gt;You do not have a password yet. &lt;a href="{{ SetupPasswordUrl }}" style="color: #4F46E5;"&gt;Create your password&lt;/a&gt; first, then accept the invitation.&lt;/p&gt;{% endif %}
               &lt;center&gt;
                 &lt;a href="{{ InviteUrl }}" class="button"&gt;Accept invitation&lt;/a&gt;
               &lt;/center&gt;
-              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ InviteUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ InviteUrl }}&lt;/a&gt;&lt;/p&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button does not work, copy this link into your browser: &lt;a href="{{ InviteUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ InviteUrl }}&lt;/a&gt;&lt;/p&gt;
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;Not expecting this? You can ignore this email; nothing changes until you accept.&lt;/p&gt;
             &lt;/td&gt;
@@ -441,21 +442,21 @@
               &lt;p&gt;&lt;strong&gt;{{ InviterName }}&lt;/strong&gt; invited you to join the organization {{ OrganizationName }} on Automaton.&lt;/p&gt;
               &lt;div class="highlight-box"&gt;
                 &lt;p&gt;&lt;strong&gt;Organization:&lt;/strong&gt; {{ OrganizationName }}&lt;/p&gt;
-                &lt;p&gt;&lt;strong&gt;Your Role:&lt;/strong&gt; {{ Role }}&lt;/p&gt;
+                &lt;p&gt;&lt;strong&gt;Role:&lt;/strong&gt; {{ Role }}&lt;/p&gt;
               &lt;/div&gt;
               {% if SetupPasswordUrl %}
               &lt;p&gt;Create your password to get started:&lt;/p&gt;
               &lt;center&gt;
                 &lt;a href="{{ SetupPasswordUrl }}" class="button-secondary"&gt;Create password&lt;/a&gt;
               &lt;/center&gt;
-              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ SetupPasswordUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ SetupPasswordUrl }}&lt;/a&gt;&lt;/p&gt;
-              &lt;p style="font-size: 14px; color: #6b7280; margin-top: 20px;"&gt;&lt;strong&gt;After creating your password:&lt;/strong&gt; You'll be automatically logged in and can then accept the invitation to join &lt;strong&gt;{{ OrganizationName }}&lt;/strong&gt; from your dashboard.&lt;/p&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button does not work, copy this link into your browser: &lt;a href="{{ SetupPasswordUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ SetupPasswordUrl }}&lt;/a&gt;&lt;/p&gt;
+              &lt;p style="font-size: 14px; color: #6b7280; margin-top: 20px;"&gt;&lt;strong&gt;After creating your password:&lt;/strong&gt; You will be signed in and can accept the invitation to join &lt;strong&gt;{{ OrganizationName }}&lt;/strong&gt; from your dashboard.&lt;/p&gt;
               {% else %}
               &lt;p&gt;Accept the invitation to join:&lt;/p&gt;
               &lt;center&gt;
                 &lt;a href="{{ InvitationUrl }}" class="button"&gt;Accept invitation&lt;/a&gt;
               &lt;/center&gt;
-              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ InvitationUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ InvitationUrl }}&lt;/a&gt;&lt;/p&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button does not work, copy this link into your browser: &lt;a href="{{ InvitationUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ InvitationUrl }}&lt;/a&gt;&lt;/p&gt;
               {% endif %}
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;This invitation expires in {{ ExpirationHours }} hours. Not expecting it? You can ignore this email.&lt;/p&gt;
@@ -524,7 +525,7 @@
               &lt;p&gt;Someone asked to reset the password of your Automaton account.&lt;/p&gt;
               &lt;p&gt;Click the button to choose a new password:&lt;/p&gt;
               &lt;center&gt;
-                &lt;a href="{{ResetPasswordUrl}}" class="button"&gt;Reset Password&lt;/a&gt;
+                &lt;a href="{{ResetPasswordUrl}}" class="button"&gt;Reset password&lt;/a&gt;
               &lt;/center&gt;
               &lt;div class="security-notice"&gt;
                 &lt;p&gt;This link is valid for 24 hours.&lt;/p&gt;
@@ -601,7 +602,6 @@
               &lt;/div&gt;
               &lt;p&gt;You can now sign in with the new password.&lt;/p&gt;
               &lt;div class="warning-box"&gt;
-                &lt;p&gt;&lt;strong&gt;Not you?&lt;/strong&gt; Write to us right away.&lt;/p&gt;
               &lt;/div&gt;
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;Not you? Write to &lt;a href="mailto:{{SupportEmail}}" style="color: #10b981; text-decoration: none;"&gt;{{SupportEmail}}&lt;/a&gt; right away.&lt;/p&gt;

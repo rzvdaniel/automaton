@@ -28,4 +28,21 @@ public sealed class EmailTemplateWordingTests
         Assert.That(body, Does.Not.Contain("exciting project"));
         Assert.That(body, Does.Not.Contain("All rights reserved"));
     }
+
+    [TestCase("Jane", "Jane invited you to the project Demo")]
+    [TestCase("", "You are invited to the project Demo")]
+    public async Task ProjectInvitation_renders_inviter_expiry_and_link(string inviter, string expected)
+    {
+        Assert.That(new FluidParser().TryParse(Templates.GetString("AutomatonProjectInvitation.Body")!, out var t, out _));
+        var ctx = new TemplateContext(new Dictionary<string, object?>
+        {
+            ["Name"] = "A", ["ProjectName"] = "Demo", ["InviterName"] = inviter,
+            ["InviteUrl"] = "https://studio.test/invite/x", ["ExpirationHours"] = "24"
+        });
+        var html = await t.RenderAsync(ctx);
+
+        Assert.That(html, Does.Contain(expected));
+        Assert.That(html, Does.Contain("valid for 24 hours"));
+        Assert.That(html, Does.Contain("https://studio.test/invite/x"));
+    }
 }
