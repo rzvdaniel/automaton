@@ -182,6 +182,7 @@ public sealed class AppForkingService(
 
         dataContext.WebApps.Add(entity);
         dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
+        if (request.RunnerId.HasValue) await runnerAssignmentPolicy.AssignAsync(entity, request.RunnerId, UserId);
 
         foreach (var screenshot in source.WebAppScreenshots.OrderBy(s => s.SortOrder))
         {

@@ -72,6 +72,9 @@ public class AppModel
 public class ForkAppRequest
 {
     public string? Name { get; set; }
+
+    /// <summary>Runner for the new app's Live target; the caller must be allowed to use it. Without one the app stays unassigned.</summary>
+    public Guid? RunnerId { get; set; }
 }
 
 public class ForkAppSourceModel

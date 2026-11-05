@@ -7,9 +7,12 @@ import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
+import Select from 'primevue/select'
 import { appsService } from '../services/apps.service'
 import { actionSchedulesService } from '../services/action-schedules.service'
 import { adminAppsService } from '@/features/admin/services/adminAppsService'
+import { runnersService } from '@/features/runners/services/runners.service'
+import { getDeploymentTargetRunnerOptions } from '../utils/deployment-target-runner'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { InstallManifest, InstallSource } from '../types/apps.types'
 
@@ -25,6 +28,8 @@ const settings = reactive<Record<string, string>>({})
 const secrets = reactive<Record<string, string>>({})
 const schedules = reactive<Record<string, boolean>>({})
 const approvePermissions = ref(true)
+const runnerOptions = ref<Array<{ label: string; value: string; disabled: boolean }>>([])
+const runnerId = ref<string | null>(null)
 const steps = ref<Array<{ label: string; state: 'running' | 'done' | 'failed' | 'skipped'; detail?: string }>>([])
 const installing = ref(false)
 const installedAppId = ref<string | null>(null)
@@ -41,6 +46,12 @@ const missingRequired = computed(() => [
 onMounted(async () => {
   try {
     source.value = await appsService.getInstallSource(sourceId)
+    try {
+      runnerOptions.value = getDeploymentTargetRunnerOptions(await runnersService.list())
+      runnerId.value = runnerOptions.value.find((option) => !option.disabled)?.value ?? null
+    } catch {
+      runnerOptions.value = []
+    }
     name.value = source.value.name
     for (const item of manifest.value.settings ?? []) settings[item.name] = item.default ?? ''
     for (const item of manifest.value.schedules ?? []) schedules[item.name] = true
@@ -108,7 +119,7 @@ async function install() {
   steps.value = []
   installing.value = true
   try {
-    const app = await step('Create your copy of the app', () => appsService.install(sourceId, name.value.trim()))
+    const app = await step('Create your copy of the app', () => appsService.install(sourceId, name.value.trim(), runnerId.value ?? undefined))
     installedAppId.value = app.id
     const values = [
       // A setting left at its default is not saved, so the app keeps following the default.
@@ -153,6 +164,21 @@ async function install() {
       <div class="flex flex-column gap-1">
         <label for="install-name">Name of your install</label>
         <InputText id="install-name" v-model="name" :disabled="installing || !!installedAppId" maxlength="200" />
+      </div>
+
+      <div class="flex flex-column gap-1">
+        <label for="install-runner">Runner</label>
+        <Select
+          v-model="runnerId"
+          input-id="install-runner"
+          :options="runnerOptions"
+          option-label="label"
+          option-value="value"
+          option-disabled="disabled"
+          placeholder="Choose where the app runs"
+          :disabled="installing || !!installedAppId"
+        />
+        <small v-if="!runnerOptions.length" class="text-color-secondary">No Runner is available to you yet; connect one first.</small>
       </div>
 
       <section v-if="manifest.settings?.length" class="flex flex-column gap-2" aria-labelledby="install-settings">
@@ -219,7 +245,7 @@ async function install() {
           label="Install"
           icon="pi pi-download"
           :loading="installing"
-          :disabled="installing || !name.trim() || missingRequired.length > 0"
+          :disabled="installing || !name.trim() || !runnerId || missingRequired.length > 0"
           @click="install"
         />
         <Button v-if="installedAppId && !installing" :label="error ? 'Open the app to fix it' : 'Open the installed app'" @click="router.push({ name: 'app-editor', params: { id: installedAppId } })" />

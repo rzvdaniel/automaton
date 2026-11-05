@@ -226,8 +226,8 @@ class AppsService {
   }
 
   /** Installs a published app as a new app of the current user (a fork on the same server). */
-  async install(sourceAppId: string, name: string): Promise<App> {
-    const { data } = await apiClient.post<App>(`/api/apps/${sourceAppId}/fork`, { name })
+  async install(sourceAppId: string, name: string, runnerId?: string): Promise<App> {
+    const { data } = await apiClient.post<App>(`/api/apps/${sourceAppId}/fork`, { name, runnerId })
     return data
   }
 

@@ -14,8 +14,12 @@ vi.mock('../services/apps.service', () => ({
     getInstallSource: vi.fn(), install: vi.fn(), setSecret: vi.fn(), deployStoredSource: vi.fn(), getDeploymentOperation: vi.fn(),
   },
 }))
+vi.mock('@/features/runners/services/runners.service', () => ({ runnersService: { list: vi.fn().mockResolvedValue([{ id: 'r1', name: 'Runner', status: 'Online', purpose: 'MachineManagement', applicationProfile: 'MachineManagement' }]) } }))
+vi.mock('../utils/deployment-target-runner', () => ({ getDeploymentTargetRunnerOptions: () => [{ label: 'Runner', value: 'r1', disabled: false }] }))
 vi.mock('../services/action-schedules.service', () => ({ actionSchedulesService: { create: vi.fn() } }))
 vi.mock('@/features/admin/services/adminAppsService', () => ({ adminAppsService: { setPermission: vi.fn() } }))
+
+window.matchMedia ??= (() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })) as never
 
 describe('InstallAppView', () => {
   it('installs with settings, secrets, approval and a schedule, in order', async () => {
@@ -40,7 +44,7 @@ describe('InstallAppView', () => {
     await install().trigger('click')
     await flushPromises()
 
-    expect(appsService.install).toHaveBeenCalledWith('src-1', 'Off-site Backup')
+    expect(appsService.install).toHaveBeenCalledWith('src-1', 'Off-site Backup', 'r1')
     expect(appsService.setSecret).not.toHaveBeenCalledWith('new-1', 'S3_REGION', expect.anything()) // default is not pinned
     expect(appsService.setSecret).toHaveBeenCalledWith('new-1', 'S3_SECRET_ACCESS_KEY', 'shh')
     expect(adminAppsService.setPermission).toHaveBeenCalledWith('new-1', 'backups:read', true)
