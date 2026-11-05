@@ -387,7 +387,7 @@ onUnmounted(() => {
     <div v-else-if="viewMode === 'grid'" class="runners-grid">
       <Card v-for="runner in visibleRunners" :key="runner.id" class="runner-card">
         <template #content>
-          <div class="flex align-items-start justify-content-between">
+          <div class="flex align-items-start justify-content-between flex-wrap gap-2">
             <div class="flex align-items-center gap-3">
               <!-- Status Indicator -->
               <div
@@ -428,7 +428,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Actions Menu -->
-            <div class="flex gap-1">
+            <div class="flex gap-1 flex-shrink-0">
               <Button
                 v-if="canUpgrade(runner)"
                 :label="runner.upgradeAvailable ? 'Upgrade' : undefined"
