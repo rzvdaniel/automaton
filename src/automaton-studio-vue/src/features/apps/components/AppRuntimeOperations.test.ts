@@ -216,4 +216,38 @@ describe('AppRuntimeOperations', () => {
     await button(wrapper, 'Deploy').trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('no stored source'))
   })
+
+  it('keeps polling after a dropped status request instead of reporting a failed deploy', async () => {
+    vi.spyOn(appsService, 'deployStoredSource').mockResolvedValue({ operationId: 'op-1', status: 'Pending' })
+    vi.spyOn(appsService, 'getDeploymentOperation')
+      .mockRejectedValueOnce(new Error('Network Error'))
+      .mockResolvedValue({ operationId: 'op-1', status: 'Succeeded', success: true })
+    const wrapper = mountRuntime([target()])
+
+    await button(wrapper, 'Deploy').trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Deployed from the stored source.'), { timeout: 5000 })
+    expect(wrapper.text()).not.toContain('Network Error')
+  })
+
+  it('reports an error when the status request keeps failing', async () => {
+    vi.spyOn(appsService, 'deployStoredSource').mockResolvedValue({ operationId: 'op-1', status: 'Pending' })
+    vi.spyOn(appsService, 'getDeploymentOperation').mockRejectedValue(new Error('Network Error'))
+    vi.mocked(appsService.getDeploymentOperation).mockClear()
+    const wrapper = mountRuntime([target()])
+
+    await button(wrapper, 'Deploy').trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Network Error'), { timeout: 20000 })
+    expect(appsService.getDeploymentOperation).toHaveBeenCalledTimes(5)
+  }, 25000)
+
+  it('reports an HTTP error from the status request at once', async () => {
+    vi.spyOn(appsService, 'deployStoredSource').mockResolvedValue({ operationId: 'op-1', status: 'Pending' })
+    vi.spyOn(appsService, 'getDeploymentOperation').mockRejectedValue({ response: { status: 404, data: { message: 'gone' } } })
+    vi.mocked(appsService.getDeploymentOperation).mockClear()
+    const wrapper = mountRuntime([target()])
+
+    await button(wrapper, 'Deploy').trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('gone'))
+    expect(appsService.getDeploymentOperation).toHaveBeenCalledTimes(1)
+  })
 })

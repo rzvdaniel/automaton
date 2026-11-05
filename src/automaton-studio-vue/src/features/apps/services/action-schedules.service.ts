@@ -97,4 +97,7 @@ export const actionSchedulesService = {
   async getLogs(appId: string, executionId: string): Promise<{ available: boolean; content?: string; message?: string }> {
     return (await apiClient.get(`/api/apps/${appId}/action-executions/${executionId}/logs`)).data
   },
+  async getResult(appId: string, executionId: string): Promise<{ available: boolean; content?: string; message?: string }> {
+    return (await apiClient.get(`/api/apps/${appId}/action-executions/${executionId}/result`)).data
+  },
 }

@@ -19,6 +19,7 @@ import {
 } from '../services/action-schedules.service'
 import { localInputToUtc, utcToLocalInput } from '../utils/schedule-time'
 import { isCurrentScheduleLoad } from '../utils/schedule-load'
+import { composeExecutionOutput } from '../utils/execution-output'
 
 const props = defineProps<{ appId: string }>()
 const confirm = useConfirm()
@@ -174,8 +175,11 @@ function remove(schedule: ActionSchedule) {
 
 async function showLogs(execution: ActionExecution) {
   try {
-    const result = await actionSchedulesService.getLogs(props.appId, execution.id)
-    logsContent.value = result.available ? result.content || 'No log output.' : result.message || 'Logs are unavailable.'
+    const [logs, result] = await Promise.all([
+      actionSchedulesService.getLogs(props.appId, execution.id),
+      actionSchedulesService.getResult(props.appId, execution.id).catch(() => null),
+    ])
+    logsContent.value = composeExecutionOutput(logs, result)
   } catch (reason: any) {
     logsContent.value = reason?.response?.data?.message || 'Logs could not be loaded.'
   }
@@ -242,7 +246,7 @@ watch(
         <div v-for="execution in executions" :key="execution.id" class="row execution">
           <div><strong>{{ execution.moduleKey }}</strong><span>Triggered {{ formatDate(execution.createdAtUtc) }} · Duration: {{ execution.startedAtUtc && execution.completedAtUtc ? `${Math.max(0, new Date(execution.completedAtUtc).getTime() - new Date(execution.startedAtUtc).getTime()) / 1000}s` : '—' }}</span><small v-if="execution.failureSummary">{{ execution.failureSummary }}</small></div>
           <span class="status">{{ execution.status }}</span>
-          <Button icon="pi pi-file" text rounded aria-label="View execution logs" @click="showLogs(execution)" />
+          <Button icon="pi pi-file" text rounded aria-label="View execution output" @click="showLogs(execution)" />
         </div>
       </section>
     </template>
@@ -266,7 +270,7 @@ watch(
       </div>
       <template #footer><Button label="Cancel" text :disabled="pending" @click="dialogVisible = false" /><Button label="Save" :loading="pending" :disabled="pending" @click="save" /></template>
     </Dialog>
-    <Dialog v-model:visible="logsVisible" modal header="Execution logs" class="schedule-dialog">
+    <Dialog v-model:visible="logsVisible" modal header="Execution output" class="schedule-dialog">
       <pre class="logs">{{ logsContent }}</pre>
     </Dialog>
   </div>

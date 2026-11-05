@@ -207,6 +207,8 @@ function selectTarget(slug: string | null | undefined): void {
 }
 
 const DEPLOY_POLL_MS = 2000
+// The deploy itself was accepted; a status request can still be dropped while the server reloads its routes.
+const MAX_DROPPED_POLLS = 5
 const deployState = ref<'idle' | 'running' | 'succeeded' | 'failed'>('idle')
 const deployMessage = ref('')
 let deployTimer: ReturnType<typeof setTimeout> | null = null
@@ -226,14 +228,14 @@ async function deployStoredSource(): Promise<void> {
   deployMessage.value = 'Deploy requested…'
   try {
     const operation = await appsService.deployStoredSource(props.app.id, slug)
-    await pollDeployment(operation.operationId)
+    await pollDeployment(operation.operationId, 0)
   } catch (error) {
     deployState.value = 'failed'
     deployMessage.value = errorText(error)
   }
 }
 
-async function pollDeployment(operationId: string): Promise<void> {
+async function pollDeployment(operationId: string, droppedPolls: number): Promise<void> {
   try {
     const operation = await appsService.getDeploymentOperation(props.app.id, operationId)
     if (operation.status === 'Succeeded' || operation.status === 'Failed') {
@@ -246,8 +248,12 @@ async function pollDeployment(operationId: string): Promise<void> {
       return
     }
     deployMessage.value = `Deploy ${operation.status.toLowerCase()}…`
-    deployTimer = setTimeout(() => void pollDeployment(operationId), DEPLOY_POLL_MS)
+    deployTimer = setTimeout(() => void pollDeployment(operationId, 0), DEPLOY_POLL_MS)
   } catch (error) {
+    if (!(error as { response?: unknown }).response && droppedPolls + 1 < MAX_DROPPED_POLLS) {
+      deployTimer = setTimeout(() => void pollDeployment(operationId, droppedPolls + 1), DEPLOY_POLL_MS)
+      return
+    }
     deployState.value = 'failed'
     deployMessage.value = errorText(error)
   }
