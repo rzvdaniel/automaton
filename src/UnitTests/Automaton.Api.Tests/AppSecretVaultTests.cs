@@ -56,6 +56,8 @@ public sealed class AppSecretVaultTests
         Assert.That(one.ContainsKey("S3_PREFIX"), Is.False);
         Assert.That(one["AUTOMATON_APP_ID"], Is.EqualTo(first.ToString()));
         Assert.That(two["AUTOMATON_APP_ID"], Is.EqualTo(second.ToString()));
+        Assert.That((await fixture.Service.ResolveForDispatchAsync(first, None)).PlainNames,
+            Is.EquivalentTo(new[] { "S3_REGION", "S3_PREFIX", "AUTOMATON_APP_ID" }));
     }
 
     [Test]

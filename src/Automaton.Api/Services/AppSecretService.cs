@@ -141,7 +141,7 @@ public sealed class AppSecretService(
     }
 
     /// <summary>Secret values and what was delivered, for a caller that records the delivery after its own save.</summary>
-    public sealed record ResolvedSecrets(Dictionary<string, string> Values, IReadOnlyList<SecretDelivery> Delivered);
+    public sealed record ResolvedSecrets(Dictionary<string, string> Values, IReadOnlyList<SecretDelivery> Delivered, IReadOnlyList<string> PlainNames);
 
     /// <summary>
     /// Resolves secrets without writing the audit log. The audit write saves the shared DbContext, so callers
@@ -149,8 +149,8 @@ public sealed class AppSecretService(
     /// </summary>
     public async Task<ResolvedSecrets> ResolveForDispatchAsync(Guid appId, CancellationToken token)
     {
-        var (values, delivered) = await ResolveAsync(appId, token);
-        return new(values, delivered);
+        var (values, delivered, plain) = await ResolveAsync(appId, token);
+        return new(values, delivered, plain);
     }
 
     public Task RecordDeliveryAsync(Guid appId, ResolvedSecrets resolved, DeliveryActor actor, CancellationToken token)
@@ -175,7 +175,7 @@ public sealed class AppSecretService(
         return auditLog is null ? [] : await auditLog.HistoryAsync(owner, token);
     }
 
-    private async Task<(Dictionary<string, string> Values, List<SecretDelivery> Delivered)> ResolveAsync(Guid appId, CancellationToken token)
+    private async Task<(Dictionary<string, string> Values, List<SecretDelivery> Delivered, List<string> PlainNames)> ResolveAsync(Guid appId, CancellationToken token)
     {
         var vaults = await VaultsAsync(appId, token);
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -200,9 +200,10 @@ public sealed class AppSecretService(
                 values[setting.Name] = fallback;
         // Lets an app keep per-install data apart (for example a storage prefix); AUTOMATON_ names cannot be declared.
         values["AUTOMATON_APP_ID"] = appId.ToString();
+        var plain = (contract.Settings ?? []).Select(setting => setting.Name).Append("AUTOMATON_APP_ID").ToList();
         var wanted = (contract.Secrets ?? []).Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
         if (wanted.Count > 0) await AddVaultSecretsAsync(vaults, wanted, values, delivered, token);
-        return (values, delivered);
+        return (values, delivered, plain);
     }
 
     private async Task AddVaultSecretsAsync(AppVaults vaults, List<ApplicationSecretDeclaration> wanted,

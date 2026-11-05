@@ -202,7 +202,9 @@ internal static class AppActionProcessExecutor
     }
 
     private static IReadOnlyCollection<string> GetSecretValues(ExecuteAppActionModuleRequest request)
-        => request.Secrets.Values
+        => request.Secrets
+            .Where(pair => !request.PlainValueNames.Contains(pair.Key))
+            .Select(pair => pair.Value)
             .Where(value => !string.IsNullOrEmpty(value))
             .Distinct(StringComparer.Ordinal)
             .OrderByDescending(value => value.Length)

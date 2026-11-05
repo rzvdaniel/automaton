@@ -51,6 +51,8 @@ public sealed class ExecuteAppActionModuleRequest
     public int? TimeoutSeconds { get; set; }
     public JsonElement Input { get; set; }
     public Dictionary<string, string> Secrets { get; set; } = [];
+    /// <summary>Names in <see cref="Secrets"/> that are plain settings, not secrets; the Runner does not redact their values.</summary>
+    public List<string> PlainValueNames { get; set; } = [];
     public ActionContainerPolicy? ContainerPolicy { get; set; }
 }
 

@@ -157,6 +157,7 @@ public sealed class AppActionExecutionService
         {
             resolved = await appSecrets.ResolveForDispatchAsync(appId, cancellationToken);
             request.Secrets = resolved.Values;
+            request.PlainValueNames = [.. resolved.PlainNames];
         }
         if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
         {

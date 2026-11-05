@@ -120,7 +120,7 @@ From the app's folder:
 
 ## Install manifest: settings and default schedules
 
-Anyone can install a published app from Studio. The installer is asked for what `automaton.json` declares, so an app needs no README steps:
+Anyone can install a published app that allows forking from Studio. The installer is asked for what `automaton.json` declares, so an app needs no README steps:
 
 ```json
 "settings": [
@@ -132,13 +132,13 @@ Anyone can install a published app from Studio. The installer is asked for what 
 ]
 ```
 
-- **`settings`** are plain, non-secret values (`name` as for secrets, optional `description`, `default`, `required`). The installer fills them in; they reach Actions and the running app as environment variables, like secrets, and a `default` applies until a value is saved. Anything sensitive belongs in `secrets`, not here.
+- **`settings`** are plain, non-secret values (`name` as for secrets, optional `description`, `default`, `required`). The installer fills them in; they reach Actions and the running app as environment variables, like secrets, and a `default` applies until a value is saved. Unlike secrets, their values are not redacted from Action output, but they are write-only in Studio like secrets. Anything sensitive belongs in `secrets`, not here.
 - **`schedules`** are offered to the installer, who accepts or skips each; accepted ones become ordinary Action schedules of the installed app. `action` is an Action key; give exactly one of `cron` (five fields) or `intervalSeconds`; `input` is an object.
 - **`secrets`** and **`permissions`** work as above. Infrastructure permissions still need a system administrator's approval.
 
 Every installed app also receives `AUTOMATON_APP_ID`, its own app ID. Use it (or the install's name) in a storage prefix so two installs of one app never share data.
 
-`automaton validate` checks all of these.
+`automaton validate` checks the shape of all of these (names, cron fields, one of cron or interval); a cron value or interval the server rejects only shows when the schedule is created.
 
 ## Create or link
 
