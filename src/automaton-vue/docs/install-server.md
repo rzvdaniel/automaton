@@ -48,7 +48,7 @@ Options: `--version server-vX.Y.Z` pins a release; `--public-ip ADDRESS` is for 
 curl -fsS https://api.example.com/health
 ```
 
-Expected: HTTP 200 with JSON such as `{"status":"ok","version":"0.2.22"}` (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
+Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-v0.2.22"}` (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
 
 ## Common errors
 
