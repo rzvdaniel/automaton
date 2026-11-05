@@ -485,3 +485,27 @@ export interface DeploymentOperation {
   error?: string | null
   result?: { message?: string | null } | null
 }
+
+export interface InstallSource {
+  id: string
+  name: string
+  summary?: string | null
+  description?: string | null
+  creatorDisplayName: string
+  application?: InstallManifest | null
+}
+
+export interface InstallManifest {
+  settings?: Array<{ name: string; description?: string | null; default?: string | null; required?: boolean }>
+  secrets?: Array<{ name: string; description?: string | null; from?: string | null }>
+  permissions?: string[]
+  schedules?: Array<{
+    name: string
+    action: string
+    description?: string | null
+    cron?: string | null
+    intervalSeconds?: number | null
+    timeZone?: string
+    input?: Record<string, unknown> | null
+  }>
+}

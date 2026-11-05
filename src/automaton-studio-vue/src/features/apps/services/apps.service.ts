@@ -4,6 +4,7 @@
  */
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
+  InstallSource,
   DeploymentOperation,
   AppPermissionsResponse,
   AppSecretSummary,
@@ -216,6 +217,18 @@ class AppsService {
    */
   async unpublish(id: string): Promise<void> {
     await apiClient.post(`/api/apps/${id}/unpublish`)
+  }
+
+  /** What a published app needs from an installer: settings, secrets, permissions and default schedules. */
+  async getInstallSource(sourceAppId: string): Promise<InstallSource> {
+    const { data } = await apiClient.get<InstallSource>(`/api/apps/${sourceAppId}/fork-source`)
+    return data
+  }
+
+  /** Installs a published app as a new app of the current user (a fork on the same server). */
+  async install(sourceAppId: string, name: string): Promise<App> {
+    const { data } = await apiClient.post<App>(`/api/apps/${sourceAppId}/fork`, { name })
+    return data
   }
 
   /** Deploys the app from the source the server stores for it; returns the pending operation. */

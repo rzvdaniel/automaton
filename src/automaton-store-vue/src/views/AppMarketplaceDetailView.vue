@@ -39,6 +39,7 @@ const gallery = computed<GalleryImage[]>(() => {
 const selectedImage = computed(() => gallery.value[selectedIndex.value] ?? null)
 
 const launchUrl = computed(() => (app.value?.canLaunch && app.value.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : ''))
+const installUrl = computed(() => (app.value?.canRemix && publicAppConfig.studioUrl ? `${publicAppConfig.studioUrl}apps/install/${app.value.id}` : ''))
 const creatorName = computed(() => app.value?.creatorDisplayName || app.value?.creatorPublicUsername || '')
 const summary = computed(() => app.value?.summary || app.value?.description || 'A public Automaton app.')
 const description = computed(() => app.value?.description || app.value?.summary || '')
@@ -193,6 +194,7 @@ onBeforeUnmount(() => {
                 <button v-if="launchUrl" class="btn primary" type="button" @click="launchApp">
                   Open app <span class="arrow" aria-hidden="true">↗</span>
                 </button>
+                <a v-if="installUrl" class="btn" :href="installUrl">Install on your server</a>
                 <button class="btn" type="button" @click="shareApp">Share</button>
               </div>
               <p v-if="!launchUrl" class="note">This app has a private runtime. Its screenshots show what it does.</p>

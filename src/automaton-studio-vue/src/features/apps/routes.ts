@@ -18,6 +18,11 @@ export const appsRoutes: RouteRecordRaw[] = [
     redirect: { name: 'apps' },
   },
   {
+    path: '/apps/install/:sourceAppId',
+    name: 'app-install',
+    component: () => import('./views/InstallAppView.vue'),
+  },
+  {
     path: '/apps/:id',
     name: 'app-editor',
     component: () => import('./views/AppEditorView.vue'),
