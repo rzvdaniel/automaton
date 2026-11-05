@@ -211,14 +211,17 @@ if [[ -n "$runner_ref" ]]; then
     for pinned in "$runner_ref" "$(grep -m1 '^RUNNER_IMAGE=' "$bundle/release.env" 2>/dev/null | cut -d= -f2- || true)"; do
         [[ -z "$pinned" ]] || protected_ids+="$(docker image inspect -f '{{.Id}}' "$pinned" 2>/dev/null || true) "
     done
+    # Sort candidates by creation time (newest first) instead of trusting the listing order.
+    candidates=$(docker image ls --no-trunc --format '{{.ID}} {{.Repository}} {{.Tag}}' 2>/dev/null         | while read -r image_id image_repository image_tag; do
+            [[ "$image_repository" == "$runner_repository" && "$image_tag" == '<none>' ]] || continue
+            docker image inspect -f '{{.Created}} {{.Id}}' "$image_id" 2>/dev/null || true
+        done | sort -r || true)
     kept_newest_untagged=0
-    while read -r image_id image_repository image_tag; do
-        [[ "$image_repository" == "$runner_repository" && "$image_tag" == '<none>' ]] || continue
-        full_id=$(docker image inspect -f '{{.Id}}' "$image_id" 2>/dev/null || true)
-        [[ "$protected_ids" != *" $full_id "* ]] || continue
+    while read -r _created full_id; do
+        [[ -n "$full_id" && "$protected_ids" != *" $full_id "* ]] || continue
         if (( kept_newest_untagged == 0 )); then kept_newest_untagged=1; continue; fi
-        docker image rm "$image_id" >/dev/null 2>&1 && echo "Removed unused Runner image: $image_id" || echo "Kept Runner image still in use: $image_id"
-    done < <(docker image ls --no-trunc --format '{{.ID}} {{.Repository}} {{.Tag}}' 2>/dev/null || true)
+        docker image rm "$full_id" >/dev/null 2>&1 && echo "Removed unused Runner image: $full_id" || echo "Kept Runner image (in use or not removable): $full_id"
+    done <<< "$candidates"
 fi
 disk_path=$backup_root
 while [[ ! -d "$disk_path" ]]; do disk_path=$(dirname -- "$disk_path"); done
