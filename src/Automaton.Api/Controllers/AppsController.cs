@@ -201,6 +201,14 @@ public class AppsController : BaseController
         {
             return NotFound(new { message = ex.Message });
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "[AppsController] Error forking app {AppId}", id);

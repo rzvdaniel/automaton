@@ -182,7 +182,7 @@ public sealed class AppForkingService(
 
         dataContext.WebApps.Add(entity);
         dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
-        if (request.RunnerId.HasValue) await runnerAssignmentPolicy.AssignAsync(entity, request.RunnerId, UserId);
+        if (request.RunnerId.HasValue) await AssignRunnerAsync(entity, request.RunnerId.Value);
 
         foreach (var screenshot in source.WebAppScreenshots.OrderBy(s => s.SortOrder))
         {
@@ -209,6 +209,13 @@ public sealed class AppForkingService(
         var forked = AppsService.MapToModel(newEntity, null, UserId);
         AppsService.ApplyStorageMetadata(forked, await fileStorageService.GetAppStorageMetadataAsync(UserId, newId));
         return forked;
+    }
+
+    private async Task AssignRunnerAsync(Entities.WebApp fork, Guid runnerId)
+    {
+        try { await runnerAssignmentPolicy.AssignAsync(fork, runnerId, UserId); }
+        // A Runner that cannot be used is a bad request, not a missing source app.
+        catch (InvalidOperationException ex) { throw new ArgumentException(ex.Message, nameof(runnerId), ex); }
     }
 
     private async Task<ForkSourceInfo> LoadForkSourceAsync(Guid sourceAppId)
