@@ -29,8 +29,7 @@ public sealed class ManagedApplicationArtifactGateway(ApplicationDbContext db, R
     {
         var target = await db.AppDeploymentTargets.AsNoTracking().Include(t => t.ExecutionRunner)
             .SingleOrDefaultAsync(t => t.Id == request.DeploymentTargetId && t.WebAppId == request.AppId, token);
-        if (target?.ExecutionRunnerId != runnerId
-            || !await db.WebAppUsers.AnyAsync(u => u.WebAppId == request.AppId && u.UserId == ownerId, token))
+        if (target?.ExecutionRunnerId != runnerId || !await OwnsAppAsync(request.AppId, ownerId, token))
             throw new UnauthorizedAccessException("Managed artifacts do not belong to this owner and assigned Runner.");
         var runner = target.ExecutionRunner!;
         RunnerProtocolCompatibilityPolicy.EnsureSupportsManagedApplicationArtifacts(runner);
@@ -38,6 +37,12 @@ public sealed class ManagedApplicationArtifactGateway(ApplicationDbContext db, R
             || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold)
             throw new InvalidOperationException("The assigned Runner is unavailable.");
     }
+
+    // A project app belongs to its project's owner as well as to the users linked to it.
+    private async Task<bool> OwnsAppAsync(Guid appId, Guid ownerId, CancellationToken token)
+        => await db.WebAppUsers.AnyAsync(u => u.WebAppId == appId && u.UserId == ownerId, token)
+            || await db.WebApps.AnyAsync(app => app.Id == appId
+                && db.Projects.Any(project => project.Id == app.ProjectId && project.OwnerId == ownerId), token);
 
     internal static Guid OperationIdentity(Guid deploymentOperationId, Guid runnerId)
         => new(SHA256.HashData(Encoding.UTF8.GetBytes($"managed-artifacts:{deploymentOperationId:N}:{runnerId:N}"))
