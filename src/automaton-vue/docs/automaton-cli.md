@@ -10,13 +10,24 @@ Automaton. Read `automaton.json` and the generated local guidance before editing
 
 ## Install and authenticate
 
-Use the API URL from [your server installation](./install-server) or your team administrator. The NuGet CLI requires the .NET 10 SDK or later.
+Use the API URL from [your server installation](./install-server) or your team administrator. The NuGet CLI requires the .NET 10 SDK or later. Ubuntu 22.04 has no .NET 10 package in apt; install the SDK per user:
+
+```bash
+curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+bash dotnet-install.sh --channel 10.0
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
+```
+
+Add the two `export` lines to your shell profile so `automaton` is found in new sessions.
 
 ```bash
 dotnet tool install -g Automaton.Cli
 automaton --help
 automaton login --server https://api.your-domain.com
 ```
+
+`automaton login` prints the approval URL and a code, then notices your approval within about five seconds. On a server without a browser it prints the URL; open it on another device. Use `--device` to skip the browser attempt.
 
 For unattended use, configure `AUTOMATON_API_KEY` in the process environment and
 use the command's non-interactive option where available. Do not paste keys into

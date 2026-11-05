@@ -9,7 +9,7 @@ This page creates the administrator of a freshly installed server. Self sign-up 
 
 ## Prerequisites
 
-A server installed with [Install the server](./install-server) (`/health` returns `ok`).
+A server installed with [Install the server](./install-server) (`/health` returns HTTP 200 with `"status":"ok"`).
 
 ## Steps
 

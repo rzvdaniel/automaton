@@ -38,7 +38,7 @@ Private-only, offline and ARM installs are not supported.
    sudo bash install-automaton.sh --domain example.com --email owner@example.com
    ```
 
-3. Wait for it to finish. It installs Docker if missing, downloads the latest stable release, verifies its checksum, starts the stack and prints a one-time first-administrator setup link. Open that link in the next step.
+3. Wait for it to finish. It installs Docker if missing, downloads the latest stable release, verifies its checksum, starts the stack and prints a one-time first-administrator setup link. Open that link in the next step. The link contains a live setup token: do not paste the terminal output into chats, tickets or logs.
 
 Options: `--version server-vX.Y.Z` pins a release; `--public-ip ADDRESS` is for servers behind NAT (repeat for IPv6); `--tls-mode cloudflare` uses a Cloudflare wildcard certificate (enter the DNS token only at the hidden prompt). Never pass secrets as command arguments.
 
@@ -48,7 +48,7 @@ Options: `--version server-vX.Y.Z` pins a release; `--public-ip ADDRESS` is for 
 curl -fsS https://api.example.com/health
 ```
 
-Expected: `ok` with HTTP 200. Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
+Expected: HTTP 200 with JSON such as `{"status":"ok","version":"0.2.22"}` (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
 
 ## Common errors
 

@@ -38,7 +38,7 @@ You can also use Studio: **Runners → Install Machine Management Runner**.
 automaton runners
 ```
 
-Expected: your Runner listed as online. Studio shows the same under **Runners**.
+Expected: your Runner listed as online. (Studio says "online"; the CLI says "connected" right after installing a Runner. Both mean the Runner is reachable.) Studio shows the same under **Runners**.
 
 With exactly one online Runner, `automaton deploy` uses it automatically. With several, choose with `automaton deploy --runner NAME` or `automaton set-runner NAME`. List a project's Runners with `automaton project runners`.
 
