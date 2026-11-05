@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createApp, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { vi } from 'vitest'
 import MarketplaceAppRow from './MarketplaceAppRow.vue'
+
+vi.mock('@/config/publicAppConfig', () => ({ publicAppConfig: { studioUrl: 'https://studio.test/' } }))
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
 describe('MarketplaceAppRow', () => {
@@ -34,5 +37,34 @@ describe('MarketplaceAppRow', () => {
       app.unmount()
       container.remove()
     }
+  })
+
+  async function render(app: Partial<MarketplaceAppCard>) {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:p(.*)*', component: { render: () => null } }] })
+    await router.push('/')
+    const vue = createApp({ render: () => h(MarketplaceAppRow, { app: { id: 'x', name: 'X', canLaunch: true, ...app } as MarketplaceAppCard }) })
+    vue.use(router)
+    const container = document.createElement('div')
+    vue.mount(container)
+    return { text: container.textContent ?? '', buttons: [...container.querySelectorAll('a.btn')].map((a) => a.textContent), vue }
+  }
+
+  it('shows only Install for a forkable app without a web page', async () => {
+    const { text, buttons, vue } = await render({ isForkable: true, hasWebPage: false })
+    expect(buttons).toEqual(['Install'])
+    expect(text).toContain('Installable')
+    expect(text).not.toContain('Open to use')
+    vue.unmount()
+  })
+
+  it('shows Open and Install for a forkable web app, and only Open for a plain one', async () => {
+    const web = await render({ isForkable: true, hasWebPage: true })
+    expect(web.buttons).toEqual(['Open', 'Install'])
+    expect(web.text).toContain('Open to use')
+    web.vue.unmount()
+    const plain = await render({ isForkable: false, hasWebPage: true })
+    expect(plain.buttons).toEqual(['Open'])
+    expect(plain.text).not.toContain('Installable')
+    plain.vue.unmount()
   })
 })

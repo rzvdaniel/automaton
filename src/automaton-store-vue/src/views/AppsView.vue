@@ -34,6 +34,12 @@ const chips = computed(() => {
   return apps.value.some((app) => app.isFeatured) ? [FEATURED, ...list] : list
 })
 
+const installableOnly = computed(() => route.query.installable === '1')
+
+function matchesInstallable(app: MarketplaceAppCard) {
+  return !installableOnly.value || app.isForkable
+}
+
 function matchesCategory(app: MarketplaceAppCard) {
   if (!activeCategory.value) return true
   if (activeCategory.value === FEATURED) return Boolean(app.isFeatured)
@@ -50,16 +56,21 @@ function matchesQuery(app: MarketplaceAppCard) {
     .includes(text)
 }
 
-const visibleApps = computed(() => apps.value.filter((app) => matchesCategory(app) && matchesQuery(app)))
-const isFiltered = computed(() => Boolean(activeCategory.value || query.value.trim()))
+const visibleApps = computed(() => apps.value.filter((app) => matchesCategory(app) && matchesInstallable(app) && matchesQuery(app)))
+const isFiltered = computed(() => Boolean(activeCategory.value || installableOnly.value || query.value.trim()))
 const countLabel = computed(() => {
   const count = visibleApps.value.length
   return `${count} ${count === 1 ? 'app' : 'apps'}`
 })
 
 function categoryLink(category: string) {
-  return { path: '/', query: category ? { category } : {} }
+  return { path: '/', query: { ...(category ? { category } : {}), ...(installableOnly.value ? { installable: '1' } : {}) } }
 }
+
+const installableLink = computed(() => ({
+  path: '/',
+  query: { ...(activeCategory.value ? { category: activeCategory.value } : {}), ...(installableOnly.value ? {} : { installable: '1' }) },
+}))
 
 function clearSearch() {
   query.value = ''
@@ -98,7 +109,14 @@ onMounted(async () => {
               autocomplete="off"
             />
           </label>
-          <nav v-if="chips.length" class="chips" aria-label="Categories">
+          <nav v-if="chips.length || apps.some((app) => app.isForkable)" class="chips" aria-label="Categories">
+            <RouterLink
+              v-if="apps.some((app) => app.isForkable)"
+              :to="installableLink"
+              class="chip"
+              :class="{ active: installableOnly }"
+              :aria-pressed="installableOnly"
+            >Installable</RouterLink>
             <RouterLink :to="categoryLink('')" class="chip" :class="{ active: !activeCategory }">All</RouterLink>
             <RouterLink
               v-for="category in chips"

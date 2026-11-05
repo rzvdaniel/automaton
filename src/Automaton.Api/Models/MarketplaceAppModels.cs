@@ -21,6 +21,8 @@ public class MarketplaceAppCardDto
     public DateTime? PublishedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public bool HasApplicationSource { get; set; }
+    /// <summary>The app declares a runtime or static site; an Actions-only app has no web page to open.</summary>
+    public bool HasWebPage { get; set; }
     public bool IsFeatured { get; set; }
     public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
 }

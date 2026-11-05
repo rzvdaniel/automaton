@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
+import { publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
 const props = defineProps<{ app: MarketplaceAppCard }>()
@@ -9,6 +10,12 @@ const props = defineProps<{ app: MarketplaceAppCard }>()
 const initial = computed(() => [...props.app.name.trim()][0]?.toUpperCase() ?? '?')
 const thumbnail = computed(() => resolveMarketplaceAssetUrl(props.app.thumbnailUrl))
 const creator = computed(() => props.app.creatorDisplayName || props.app.creatorPublicUsername || '')
+const installUrl = computed(() =>
+  props.app.isForkable && publicAppConfig.studioUrl ? `${publicAppConfig.studioUrl}apps/install/${props.app.id}` : '',
+)
+// An Actions-only app has no web page, so the only useful action is Install.
+const showOpen = computed(() => props.app.hasWebPage !== false || !installUrl.value)
+const openToUse = computed(() => props.app.hasWebPage !== false && props.app.canLaunch)
 const summary = computed(() => props.app.summary || props.app.description || 'A public Automaton app')
 </script>
 
@@ -20,6 +27,8 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
       <div class="app-title">
         <RouterLink class="app-name" :to="`/apps/${app.id}`">{{ app.name }}</RouterLink>
         <span v-if="app.isFeatured" class="badge">Featured</span>
+        <span v-if="app.isForkable" class="badge badge-quiet">Installable</span>
+        <span v-if="openToUse" class="badge badge-quiet">Open to use</span>
       </div>
       <p class="app-summary">{{ summary }}</p>
       <p v-if="creator || app.category" class="app-by">
@@ -32,7 +41,10 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
         <template v-if="app.category">{{ app.category }}</template>
       </p>
     </div>
-    <RouterLink class="btn small" :to="`/apps/${app.id}`" :aria-label="`View ${app.name} details`">Open</RouterLink>
+    <div class="app-actions">
+      <RouterLink v-if="showOpen" class="btn small" :to="`/apps/${app.id}`" :aria-label="`View ${app.name} details`">Open</RouterLink>
+      <a v-if="installUrl" class="btn small" :class="{ primary: !showOpen }" :href="installUrl" :aria-label="`Install ${app.name}`">Install</a>
+    </div>
   </article>
 </template>
 
@@ -89,6 +101,15 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
   background: var(--signal);
   color: var(--on-signal);
 }
+.badge-quiet {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+}
+.app-actions {
+  display: flex;
+  gap: 8px;
+}
 .app-summary,
 .app-by {
   color: var(--ink-soft);
@@ -103,7 +124,7 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
   .app-row {
     grid-template-columns: 48px minmax(0, 1fr);
   }
-  .app-row .btn {
+  .app-row .app-actions {
     grid-column: 2;
     justify-self: start;
   }

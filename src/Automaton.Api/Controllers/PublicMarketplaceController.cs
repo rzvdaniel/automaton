@@ -361,6 +361,12 @@ public class PublicMarketplaceController : ControllerBase
         return Guid.TryParse(userIdString, out var userId) ? userId : null;
     }
 
+    private static bool HasWebPage(string contractJson)
+    {
+        var contract = Core.Models.ApplicationContractSerialization.Deserialize(contractJson);
+        return contract.Runtime.Command is not null || contract.Compose is not null || contract.IsStaticSite;
+    }
+
     private async Task PopulateApplicationSourceFlagsAsync(IEnumerable<MarketplaceAppCardDto> apps)
     {
         var appList = apps.ToList();
@@ -380,8 +386,16 @@ public class PublicMarketplaceController : ControllerBase
             })
             .ToDictionaryAsync(x => x.AppId, x => x.OwnerUserId);
 
+        var appIds = appList.Select(app => app.Id).ToList();
+        var contracts = await _dbContext.WebApps
+            .AsNoTracking()
+            .Where(webApp => appIds.Contains(webApp.Id))
+            .Select(webApp => new { webApp.Id, webApp.ApplicationContractJson })
+            .ToDictionaryAsync(x => x.Id, x => x.ApplicationContractJson);
+
         foreach (var app in appList)
         {
+            app.HasWebPage = contracts.TryGetValue(app.Id, out var contractJson) && HasWebPage(contractJson);
             app.HasApplicationSource = ownerIdsByAppId.TryGetValue(app.Id, out var ownerUserId) &&
                 ownerUserId != Guid.Empty &&
                 _appFileStorageService.HasAnySourceEntries(ownerUserId, app.Id);
