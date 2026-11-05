@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Core.Models;
 
@@ -23,6 +24,10 @@ public sealed class ApplicationContract
 
     /// <summary>Platform capabilities the app requests for administrator approval.</summary>
     public List<string> Permissions { get; set; } = [];
+
+    /// <summary>Fields this version does not know; kept so older tools never drop a newer contract field.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 
     public bool IsStaticSite => Runtime.Command is null
         && Compose is null

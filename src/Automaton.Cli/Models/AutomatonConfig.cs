@@ -1,5 +1,7 @@
 namespace Automaton.Cli.Models;
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Automaton.Core.Models;
 
 /// <summary>
@@ -17,6 +19,10 @@ public class AutomatonConfig
     public ApplicationContract Application { get; set; } = ApplicationContractDefaults.Create();
 
     public DeployScopeConfig? Source { get; set; }
+
+    /// <summary>Fields this CLI does not know (written by a newer CLI or by hand); kept when the file is rewritten.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class DeployScopeConfig
