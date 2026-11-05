@@ -140,6 +140,8 @@ Every installed app also receives `AUTOMATON_APP_ID`, its own app ID. Use it (or
 
 `automaton validate` checks the shape of all of these (names, cron fields, one of cron or interval); a cron value or interval the server rejects only shows when the schedule is created.
 
+**Installing.** On a published app's store page, **Install on your server** opens Studio's install page (`/apps/install/<app id>`; the app must allow forking). It asks for a name, the settings and secrets, shows the permissions (a system administrator can approve them right there; otherwise one must approve them on the app page) and lists the schedules. Install creates your own copy, saves the values, deploys it and creates the schedules you kept. Installing the same app again makes an independent copy with its own name, values, approvals and schedules.
+
 ## Create or link
 
 Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`
