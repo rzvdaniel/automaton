@@ -86,10 +86,16 @@ public sealed class DeploymentPackageFinalizationService(
         catch (System.Text.Json.JsonException) { return; }
         var declarations = packageApplication.Secrets ?? [];
         var permissions = packageApplication.Permissions ?? [];
+        var settings = packageApplication.Settings ?? [];
+        var schedules = packageApplication.Schedules ?? [];
         if (System.Text.Json.JsonSerializer.Serialize(stored.Secrets) == System.Text.Json.JsonSerializer.Serialize(declarations)
-            && System.Text.Json.JsonSerializer.Serialize(stored.Permissions) == System.Text.Json.JsonSerializer.Serialize(permissions)) return;
+            && System.Text.Json.JsonSerializer.Serialize(stored.Permissions) == System.Text.Json.JsonSerializer.Serialize(permissions)
+            && System.Text.Json.JsonSerializer.Serialize(stored.Settings) == System.Text.Json.JsonSerializer.Serialize(settings)
+            && System.Text.Json.JsonSerializer.Serialize(stored.Schedules) == System.Text.Json.JsonSerializer.Serialize(schedules)) return;
         stored.Secrets = declarations;
         stored.Permissions = permissions;
+        stored.Settings = settings;
+        stored.Schedules = schedules;
         var removedApprovals = await dataContext.AppPermissionApprovals
             .Where(approval => approval.AppId == appId && !permissions.Contains(approval.Permission))
             .ToListAsync(cancellationToken);

@@ -25,7 +25,9 @@ public sealed class SecretDeclarationPersistenceTests
         {
             Runtime = { Port = 9090 },
             Secrets = [new() { Name = "STRIPE_KEY" }],
-            Permissions = ["backups:read"]
+            Permissions = ["backups:read"],
+            Settings = [new() { Name = "S3_REGION", Default = "us-east-1" }],
+            Schedules = [new() { Name = "Nightly", Action = "upload", Cron = "30 3 * * *" }]
         }, CancellationToken.None);
 
         var stored = ApplicationContractSerialization.Deserialize((await db.WebApps.SingleAsync(item => item.Id == appId)).ApplicationContractJson);
@@ -33,6 +35,8 @@ public sealed class SecretDeclarationPersistenceTests
         {
             Assert.That(stored.Secrets.Select(secret => secret.Name), Is.EqualTo(new[] { "STRIPE_KEY" }));
             Assert.That(stored.Permissions, Is.EqualTo(new[] { "backups:read" }));
+            Assert.That(stored.Settings.Single().Default, Is.EqualTo("us-east-1"));
+            Assert.That(stored.Schedules.Single().Cron, Is.EqualTo("30 3 * * *"));
             Assert.That(stored.Runtime.Port, Is.EqualTo(8080), "the rest of the contract changes only when the deployment succeeds");
         });
     }
