@@ -17,7 +17,7 @@ A live deployment requires an explicit user request. Use the versioned installer
 5. Adopted installations can retain a reviewed `compose.override.yaml`; the updater must apply and back up the same override for the installed and candidate release. Do not silently upgrade their pinned database/broker versions.
 6. Verify container state, origin and public API/Studio/app routes, installation status and the certificate-validated Runner broker connection. Verify requested application behavior separately from deployment health.
 7. Close out: list `gh issue list --label verified --state open`, and close each issue whose change is in this release with a comment `Live on production in <version>` (this sets the board Status to Done). Leave the others open.
-7. Report the installed release, updated services, verification results and any unavailable check. The marketing website remains separate from the standalone server bundle.
+8. Report the installed release, updated services, verification results and any unavailable check. The marketing website remains separate from the standalone server bundle.
 
 The updater's protected recovery directory is the rollback record. Image rollback after a migration may be unsafe; assess the database before restoring an earlier manifest. Retain backups unless the user explicitly authorizes their removal. Never delete live volumes as deployment cleanup.
 
