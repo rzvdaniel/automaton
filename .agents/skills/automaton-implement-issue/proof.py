@@ -27,7 +27,11 @@ def link_images(html: str) -> str:
         label = alt.group(1) if alt and alt.group(1) else src.rsplit("/", 1)[-1]
         return f'<a href="{src}" target="_blank" rel="noopener">{label}</a>'
 
-    return re.sub(r'<img\b[^>]*?\bsrc="(https?://[^"]+)"[^>]*>', replace, html)
+    html = re.sub(r'<img\b[^>]*?\bsrc="(https?://[^"]+)"[^>]*>', replace, html)
+    if "<a " in html and 'id="proof-hint"' not in html:
+        body = re.search(r"<body[^>]*>", html)
+        html = html[:body.end()] + HINT + html[body.end():] if body else HINT + html
+    return html
 
 
 def gh(*args: str) -> str:
