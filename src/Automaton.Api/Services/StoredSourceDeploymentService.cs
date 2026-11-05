@@ -37,7 +37,19 @@ public sealed class StoredSourceDeploymentService(
         if (!File.Exists(configPath))
             throw new InvalidDataException("This app has no stored source to deploy. Deploy it once with the CLI first.");
 
-        using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+        try
+        {
+            return CreatePackage(appId, sourceDirectory, File.ReadAllText(configPath));
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException("The stored automaton.json is not valid: " + exception.Message, exception);
+        }
+    }
+
+    private static Stream CreatePackage(Guid appId, string sourceDirectory, string configJson)
+    {
+        using var document = JsonDocument.Parse(configJson);
         var root = document.RootElement;
         var application = root.TryGetProperty("application", out var applicationElement)
             ? ApplicationContractSerialization.Deserialize(applicationElement.GetRawText())

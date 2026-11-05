@@ -53,6 +53,16 @@ public sealed class StoredSourceDeploymentServiceTests
     }
 
     [Test]
+    public async Task AnInvalidStoredConfigIsRejectedWithAReason()
+    {
+        await using var fixture = await ApplicationDeploymentServiceTests.DeploymentFixture.CreateAsync();
+        WriteSource(fixture, "{ not json");
+
+        Assert.ThrowsAsync<InvalidDataException>(() => Service(fixture).AcceptAsync(
+            fixture.AppId, fixture.OwnerId, fixture.OwnerId, null, false, CancellationToken.None));
+    }
+
+    [Test]
     public async Task AStrangerSeesNoApp()
     {
         await using var fixture = await ApplicationDeploymentServiceTests.DeploymentFixture.CreateAsync();
