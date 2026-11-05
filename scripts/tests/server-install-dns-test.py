@@ -6,10 +6,15 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'docker/install'))
-from check_dns import check_dns
+from check_dns import check_dns, public_addresses
 
 
 class InstallDnsTests(unittest.TestCase):
+    def test_public_addresses_skip_addr_info_entries_without_local(self):
+        output = b'[{"ifname":"eth0","addr_info":[{"family":"inet","local":"8.8.8.8"},{},{"family":"inet6","local":"2001:4860:4860::8888"}]}]'
+        with patch('subprocess.check_output', return_value=output):
+            self.assertEqual(public_addresses(None), {ipaddress.ip_address("8.8.8.8"), ipaddress.ip_address("2001:4860:4860::8888")})
+
     expected = {ipaddress.ip_address('203.0.113.20')}
 
     def check(self, address_by_host):

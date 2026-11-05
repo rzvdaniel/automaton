@@ -339,7 +339,7 @@ public static class LoginCommand
         AnsiConsole.MarkupLine($"[green]✓[/] Signed in as [bold]{Markup.Escape(displayName)}[/]");
         AnsiConsole.MarkupLine("[green]✓[/] Automaton CLI authorized");
         AnsiConsole.MarkupLine(global
-            ? "[grey]✓ Credential saved securely to ~/.automaton/config.json[/]"
+            ? $"[grey]✓ Credential saved securely to {Markup.Escape(ConfigService.DefaultGlobalConfigPath())}[/]"
             : "[grey]✓ Credential saved securely to ./.automaton/config.json[/]");
     }
 

@@ -44,6 +44,28 @@ public sealed class AutomatonApiClientCleanupTests
         }));
     }
 
+    [Test]
+    public async Task RunnerInstallationSendsAProfileTheServerAccepts()
+    {
+        string? body = null;
+        using var http = new HttpClient(new Handler(request =>
+        {
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}", Encoding.UTF8, "application/json")
+            };
+        })) { BaseAddress = new Uri("https://api.example.test/") };
+        using var client = new AutomatonApiClient(http, "key");
+
+        await client.CreateRunnerInstallationAsync("e2e-runner");
+
+        var profile = System.Text.Json.JsonDocument.Parse(body!).RootElement.GetProperty("applicationProfile").GetString();
+        Assert.That(Automaton.Core.Enums.RunnerApplicationProfiles.TryNormalize(profile, out _), Is.True);
+        Assert.That(profile, Is.EqualTo("MachineManagement"));
+        Assert.That(Automaton.Core.Enums.RunnerApplicationProfiles.Normalize("machine-management"), Is.EqualTo("MachineManagement"));
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)

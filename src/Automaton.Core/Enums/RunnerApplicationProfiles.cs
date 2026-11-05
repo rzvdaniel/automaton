@@ -7,7 +7,9 @@ public static class RunnerApplicationProfiles
 
     public static bool TryNormalize(string? profile, out string normalized)
     {
-        if (string.Equals(profile, MachineManagement, StringComparison.OrdinalIgnoreCase))
+        // Older CLIs sent the kebab form.
+        if (string.Equals(profile, MachineManagement, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(profile, "machine-management", StringComparison.OrdinalIgnoreCase))
         {
             normalized = MachineManagement;
             return true;

@@ -46,7 +46,7 @@ def public_addresses(overrides):
             raise ValueError('--public-ip requires a public IPv4 or IPv6 address.')
         return addresses
     interfaces = json.loads(subprocess.check_output(['ip', '-j', 'address', 'show', 'scope', 'global']))
-    addresses = {ipaddress.ip_address(info['local']) for interface in interfaces for info in interface['addr_info']}
+    addresses = {ipaddress.ip_address(info['local']) for interface in interfaces for info in interface['addr_info'] if 'local' in info}
     return {address for address in addresses if is_public_unicast(address)}
 
 

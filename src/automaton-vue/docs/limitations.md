@@ -22,7 +22,6 @@ Automaton is early. These are the specific things to know before you rely on it.
 - **Updates cause brief interruptions.** An update replaces the API, Worker, Studio and the app store; they can be unavailable for a short time.
 - **Updates are not fully automatic.** Infrastructure changes and Runner-machine upgrades are separate steps you run.
 - **Backups stay on the same server.** Nightly backups of the database and keys (not your apps' data files) are kept for 7 days on the server. Off-server copies and your hosting provider's snapshots are yours to arrange; a built-in off-site backup is planned ([#486](https://github.com/rzvdaniel/automaton/issues/486)).
-- **Restoring on a different, clean server is unverified.** The restore command exists and the steps are documented, but a restore onto a freshly installed second server has not been proven yet ([#524](https://github.com/rzvdaniel/automaton/issues/524)).
 
 ## Security and teams
 

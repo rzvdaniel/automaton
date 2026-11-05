@@ -623,7 +623,7 @@ public class AutomatonApiClient : IDisposable
 
     public async Task<JsonElement> CreateRunnerInstallationAsync(string name, CancellationToken ct = default)
     {
-        var payload = JsonSerializer.Serialize(new { runnerName = name, applicationProfile = "machine-management", acknowledgeHostAccess = true }, JsonOptions);
+        var payload = JsonSerializer.Serialize(new { runnerName = name, applicationProfile = Automaton.Core.Enums.RunnerApplicationProfiles.MachineManagement, acknowledgeHostAccess = true }, JsonOptions);
         using var resp = await PostJsonAsync("api/self-hosted-runners/installations", payload, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);

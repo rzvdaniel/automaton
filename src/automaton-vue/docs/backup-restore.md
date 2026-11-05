@@ -37,6 +37,22 @@ It verifies checksums, asks you to type the server's domain (for automation, `--
 
 To move to a new server, install the same release there, copy a backup folder into `/opt/automaton-server/backups/nightly/`, restore it, and copy `/etc/automaton` if existing sessions and Runners must keep working.
 
+## Restore on a clean second server from an off-site archive
+
+Proven on a fresh server: install the same release (or newer) there, then:
+
+1. Download the newest `.tar.age` archive from your off-site storage.
+2. Decrypt it with the backup key (`/etc/automaton/secrets/backup-key` on the old server, which you saved separately) using the release's age image:
+
+   ```bash
+   AGE_IMAGE=$(grep -m1 '^AGE_IMAGE=' /opt/automaton-server/release.env | cut -d= -f2-)
+   docker run --rm -v "$PWD":/data "$AGE_IMAGE" -d -i /data/backup-key -o /data/backup.tar /data/automaton-YYYYMMDDTHHMMSSZ.tar.age
+   ```
+3. Extract it into the backups folder: `sudo tar -xf backup.tar -C /opt/automaton-server/backups/nightly/`. It then shows in `backup.sh --list`.
+4. Restore it: `sudo bash /opt/automaton-server/restore.sh automaton-YYYYMMDDTHHMMSSZ --confirm your-domain`.
+
+Users, projects, Runners and secrets come back, and new deployments work. Runners installed before the backup stay attached to the old server until you re-enroll them.
+
 ## Verify it worked
 
 ```bash
@@ -44,7 +60,7 @@ curl -fsS https://api.example.com/health
 automaton installation-status
 ```
 
-Expected: `ok`, and your users and apps are counted. Restoring onto a clean second server is not yet proven; see [Current limitations](./limitations).
+Expected: `ok`, and your users and apps are counted.
 
 ## Common errors
 
