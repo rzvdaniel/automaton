@@ -46,6 +46,9 @@ public sealed class ApplicationSecretDeclaration
 
     /// <summary>Optional source in a vault under another name: <c>project:NAME</c> or <c>user:NAME</c>.</summary>
     public string? From { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 /// <summary>Names and sources of declared secrets.</summary>
@@ -81,6 +84,9 @@ public sealed class ApplicationComposeSpec
     public string PublicService { get; set; } = string.Empty;
     public List<ApplicationComposeService> Services { get; set; } = [];
     public List<string> Volumes { get; set; } = [];
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationComposeService
@@ -94,6 +100,9 @@ public sealed class ApplicationComposeService
     public Dictionary<string, string> Environment { get; set; } = new(StringComparer.Ordinal);
     public List<string> DependsOn { get; set; } = [];
     public List<ApplicationComposeVolumeMount> Mounts { get; set; } = [];
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationComposeVolumeMount
@@ -101,6 +110,9 @@ public sealed class ApplicationComposeVolumeMount
     public string Name { get; set; } = string.Empty;
     public string Target { get; set; } = string.Empty;
     public bool ReadOnly { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationBuildSpec
@@ -113,6 +125,9 @@ public sealed class ApplicationBuildSpec
     public ApplicationCommandSpec? Command { get; set; }
     public string? OutputDirectory { get; set; }
     public int TimeoutSeconds { get; set; } = 900;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationRuntimeSpec
@@ -123,6 +138,9 @@ public sealed class ApplicationRuntimeSpec
     public string? User { get; set; }
     public ApplicationCommandSpec? Command { get; set; }
     public int Port { get; set; } = 8080;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationHealthSpec
@@ -130,12 +148,18 @@ public sealed class ApplicationHealthSpec
     public string? Path { get; set; }
     public int? Port { get; set; }
     public int StartupTimeoutSeconds { get; set; } = 60;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationStorageSpec
 {
     public string DataDirectory { get; set; } = "data";
     public List<ApplicationStorageMount> Mounts { get; set; } = [];
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationStorageMount
@@ -143,6 +167,9 @@ public sealed class ApplicationStorageMount
     public string Name { get; set; } = string.Empty;
     public string RelativePath { get; set; } = string.Empty;
     public bool ReadOnly { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public sealed class ApplicationCommandSpec
@@ -157,6 +184,9 @@ public sealed class ApplicationCommandSpec
     /// shell expansion. Structured execution remains the default.
     /// </summary>
     public bool UseShell { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public static class ApplicationContractDefaults

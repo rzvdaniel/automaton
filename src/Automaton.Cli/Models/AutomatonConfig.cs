@@ -30,4 +30,7 @@ public sealed class DeployScopeConfig
     public List<string>? Include { get; set; }
 
     public List<string>? Exclude { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }

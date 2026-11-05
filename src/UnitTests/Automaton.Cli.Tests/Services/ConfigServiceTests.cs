@@ -41,6 +41,41 @@ public class ConfigServiceTests
     }
 
     [Test]
+    public void SaveProjectConfig_KeepsFieldsThisVersionDoesNotKnow()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), """
+            {
+              "name": "demo",
+              "futureTopLevel": { "a": [1, 2] },
+              "application": {
+                "futureContractField": "keep-me",
+                "build": { "futureBuildField": 7 },
+                "runtime": { "command": { "executable": "x", "futureCmd": true } },
+                "secrets": [ { "name": "API_KEY", "futureSecretField": "s" } ]
+              }
+            }
+            """);
+
+        var loaded = configService.LoadProjectConfig(projectRoot);
+        loaded.Name = "renamed";
+        configService.SaveProjectConfig(projectRoot, loaded);
+
+        using var saved = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(projectRoot, "automaton.json")));
+        var root = saved.RootElement;
+        Assert.That(root.GetProperty("name").GetString(), Is.EqualTo("renamed"));
+        Assert.That(root.GetProperty("futureTopLevel").GetProperty("a").GetArrayLength(), Is.EqualTo(2));
+        var application = root.GetProperty("application");
+        Assert.That(application.GetProperty("futureContractField").GetString(), Is.EqualTo("keep-me"));
+        Assert.That(application.GetProperty("build").GetProperty("futureBuildField").GetInt32(), Is.EqualTo(7));
+        Assert.That(application.GetProperty("runtime").GetProperty("command").GetProperty("futureCmd").GetBoolean(), Is.True);
+        var secret = application.GetProperty("secrets")[0];
+        Assert.That(secret.GetProperty("name").GetString(), Is.EqualTo("API_KEY"));
+        Assert.That(secret.GetProperty("futureSecretField").GetString(), Is.EqualTo("s"));
+    }
+
+    [Test]
     public void SaveProjectConfig_PersistsAndLoadsTheStackNeutralApplicationContract()
     {
         var projectRoot = CreateTempDirectory();
