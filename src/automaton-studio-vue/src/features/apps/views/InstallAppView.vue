@@ -61,7 +61,7 @@ onMounted(async () => {
 })
 
 function message(failure: unknown, fallback: string) {
-  return isAxiosError(failure) ? failure.response?.data?.message ?? failure.response?.data?.error ?? fallback : fallback
+  return isAxiosError(failure) ? failure.response?.data?.detail ?? failure.response?.data?.message ?? failure.response?.data?.error ?? fallback : fallback
 }
 
 async function step<T>(label: string, work: () => Promise<T>): Promise<T> {
