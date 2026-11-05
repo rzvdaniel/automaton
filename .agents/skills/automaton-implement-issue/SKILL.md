@@ -48,10 +48,9 @@ as you go; the task is not done until step 8 is.
    - anything the owner said to hold.
 7. **Deliver and verify.** Release, upgrade the test server and verify as real users (`verify.md`). Several small,
    independent changes may share one release; risky ones (Runner, migrations, install or update scripts) go alone.
-   Testing on a real server happens here, after merge: there is no separate pre-merge server build. If a check fails,
-   fix forward: a small follow-up PR (same review and CI), a new release and a re-check. Revert instead only when the
-   fix is not quick or the failure blocks other work on the test server. Hold production until the proof passes. Production is updated only after the
-   proof passes, and only when the owner asks.
+   Real-server testing happens here, after merge. If a check fails, fix forward: a small follow-up PR (same review and
+   CI), a new release and a re-check. Revert instead only when the fix is not quick or the failure blocks other work on
+   the test server. Production is updated only after the proof passes, and only when the owner asks.
 8. **Close out.** The PR's `Closes #N` closes the issue on merge. Attach the `proof` artifact (`verify.md`), comment
    the end-to-end results (pass or fail per check) and every administrator action on the PR, and link that comment from
    the issue. Remove the `e2e-` items you created (`verify.md`), set the board Status to Done, open issues for gaps you
