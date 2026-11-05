@@ -21,7 +21,9 @@ public sealed partial class HostContainerExecutionService
         try { hostAddress = HostContainerRuntimeEndpoint.GetPrivateRuntimeHostAddress(); }
         catch (InvalidOperationException ex) { return Failure("runtime_address", ex.Message); }
         var name = $"automaton-app-{scope.AppId:N}-{scope.DeploymentTargetId:N}-{request.CandidateId:N}";
-        var existing = await InspectExistingApplicationCandidateAsync(request, name, cancellationToken);
+        var environment = BuildApplicationEnvironment(request);
+        var environmentHash = HashEnvironment(environment);
+        var existing = await InspectExistingApplicationCandidateAsync(request, name, environmentHash, cancellationToken);
         if (existing is not null) return existing;
         var resolved = await ResolveImageAsync(request, cancellationToken);
         if (!resolved.Success || string.IsNullOrWhiteSpace(resolved.ResolvedImage))
@@ -55,20 +57,14 @@ public sealed partial class HostContainerExecutionService
         args.Add($"automaton.requested-image={request.RequestedImage}");
         args.Add("--label");
         args.Add($"automaton.resolved-image={resolved.ResolvedImage}");
-        var environment = new Dictionary<string, string>(request.Command!.Environment, StringComparer.Ordinal);
-        foreach (var pair in request.Environment)
-            environment[pair.Key] = pair.Value;
-        environment["AUTOMATON_PORT"] = request.ContainerPort.ToString(CultureInfo.InvariantCulture);
-        environment["AUTOMATON_APP_DATA_DIR"] = "/automaton/data";
-        environment["AUTOMATON_APP_ID"] = scope.AppId.ToString();
-        environment["AUTOMATON_DEPLOYMENT_TARGET_ID"] = scope.DeploymentTargetId.ToString();
-        foreach (var mount in request.Storage.Mounts)
+        args.Add("--label");
+        args.Add($"{EnvironmentHashLabel}={environmentHash}");
+        foreach (var mount in request.Storage!.Mounts)
         {
             args.Add("--mount");
             args.Add(VolumeMount(volume,
                 RunnerWorkspaceService.GetApplicationDataVolumeSubpath(scope.AppId, mount.RelativePath),
                 $"/automaton/data/{mount.Name}", readOnly: false));
-            environment[$"AUTOMATON_STORAGE_{mount.Name.ToUpperInvariant()}"] = $"/automaton/data/{mount.Name}";
         }
         try
         {
@@ -95,9 +91,38 @@ public sealed partial class HostContainerExecutionService
         };
     }
 
+    internal const string EnvironmentHashLabel = "automaton.environment-hash";
+
+    private static Dictionary<string, string> BuildApplicationEnvironment(HostContainerExecutionRequest request)
+    {
+        var scope = request.Scope;
+        var environment = new Dictionary<string, string>(request.Command!.Environment, StringComparer.Ordinal);
+        foreach (var pair in request.Environment)
+            environment[pair.Key] = pair.Value;
+        environment["AUTOMATON_PORT"] = request.ContainerPort.ToString(CultureInfo.InvariantCulture);
+        environment["AUTOMATON_APP_DATA_DIR"] = "/automaton/data";
+        environment["AUTOMATON_APP_ID"] = scope.AppId.ToString();
+        environment["AUTOMATON_DEPLOYMENT_TARGET_ID"] = scope.DeploymentTargetId.ToString();
+        foreach (var mount in request.Storage!.Mounts)
+            environment[$"AUTOMATON_STORAGE_{mount.Name.ToUpperInvariant()}"] = $"/automaton/data/{mount.Name}";
+        return environment;
+    }
+
+    // Only this digest is stored on the container; the values never leave the environment.
+    private static string HashEnvironment(Dictionary<string, string> environment)
+    {
+        var builder = new System.Text.StringBuilder();
+        foreach (var pair in environment.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            builder.Append(pair.Key.Length).Append(':').Append(pair.Key).Append('=')
+                .Append(pair.Value.Length).Append(':').Append(pair.Value).Append(';');
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(builder.ToString()))).ToLowerInvariant();
+    }
+
     private async Task<HostContainerExecutionResponse?> InspectExistingApplicationCandidateAsync(
         HostContainerExecutionRequest request,
         string name,
+        string environmentHash,
         CancellationToken cancellationToken)
     {
         var existing = await InspectOwnedContainerAsync(name, request.Scope, cancellationToken, discoverEndpoint: false);
@@ -105,6 +130,13 @@ public sealed partial class HostContainerExecutionService
         if (!existing.Labels!.TryGetValue("automaton.requested-image", out var requestedImage)
             || requestedImage != request.RequestedImage)
             return Failure("container_operation_conflict", "The existing candidate container was created from a different image request.");
+        if (!existing.Running
+            && (!existing.Labels.TryGetValue(EnvironmentHashLabel, out var storedHash) || storedHash != environmentHash))
+        {
+            // A stopped container keeps the environment it was created with; recreate it so current secrets apply.
+            var removed = await executor(["docker", "rm", "-f", existing.ContainerId], RuntimeOperationTimeout, cancellationToken);
+            return removed.Success ? null : Failure("container_operation", "Docker could not remove the stale application container.");
+        }
         var resolvedImage = existing.Labels.TryGetValue("automaton.resolved-image", out var image) ? image : string.Empty;
         return existing with { RequestedImage = request.RequestedImage!, ResolvedImage = resolvedImage };
     }

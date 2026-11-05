@@ -125,6 +125,63 @@ public sealed class HostContainerRuntimeTests
 
     private static JsonArray Bindings(string port) => new(new JsonObject { ["HostIp"] = "172.17.0.1", ["HostPort"] = port });
 
+    private async Task<(string Hash, HostContainerExecutionRequest Request)> CreatedCandidateAsync()
+    {
+        var request = CreateRequest() with { Environment = new Dictionary<string, string> { ["SECRET"] = "old" } };
+        await Service().ExecuteAsync(request);
+        var create = calls.Single(arguments => arguments.Count > 1 && arguments[1] == "create");
+        var label = create.Single(argument => argument.StartsWith(HostContainerExecutionService.EnvironmentHashLabel + "=", StringComparison.Ordinal));
+        
+        calls.Clear();
+        return (label[(label.IndexOf('=') + 1)..], request);
+    }
+
+    private Func<IReadOnlyList<string>, InfrastructureCommandResponse> StoppedCandidate(string? hash, HostContainerExecutionRequest request)
+    {
+        var removed = false;
+        return args =>
+        {
+            if (args.Count > 3 && args[1] == "container" && args[2] == "inspect"
+                && args[^1].StartsWith("automaton-app-", StringComparison.Ordinal))
+            {
+                if (removed) return new() { Success = false, Error = $"Error: No such object: {args[^1]}" };
+                var state = Inspection(running: false);
+                var labels = (JsonObject)state["Config"]!["Labels"]!;
+                labels["automaton.requested-image"] = Digest;
+                labels["automaton.resolved-image"] = Digest;
+                if (hash is not null) labels[HostContainerExecutionService.EnvironmentHashLabel] = hash;
+                return new() { Success = true, Output = state.ToJsonString() };
+            }
+            if (args[1] == "rm") { removed = true; return new() { Success = true }; }
+            return args[1] == "volume" ? new() { Success = true, Output = VolumeLabels() }
+                : args[1] == "image" ? new() { Success = true, Output = Digest }
+                : args[1] == "create" ? new() { Success = true, Output = ContainerId }
+                : new() { Success = true, Output = Inspection().ToJsonString() };
+        };
+    }
+
+    [Test]
+    public async Task StoppedCandidateWithMatchingEnvironmentIsReused()
+    {
+        var (hash, request) = await CreatedCandidateAsync();
+        var result = await Service(StoppedCandidate(hash, request)).ExecuteAsync(request);
+        Assert.That(result.Success, Is.True, result.Error);
+        Assert.That(calls.Any(call => call[1] is "rm" or "create"), Is.False);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task StoppedCandidateWithChangedOrUnlabeledEnvironmentIsRecreated(bool labeled)
+    {
+        var (hash, request) = await CreatedCandidateAsync();
+        var changed = request with { Environment = new Dictionary<string, string> { ["SECRET"] = "new" } };
+        var result = await Service(StoppedCandidate(labeled ? hash : null, changed)).ExecuteAsync(changed);
+        Assert.That(result.Success, Is.True, result.Error);
+        Assert.That(calls.Any(call => call[1] == "rm" && call[2] == "-f"), Is.True);
+        var create = calls.Single(call => call[1] == "create");
+        Assert.That(string.Join(' ', create), Does.Not.Contain(hash));
+    }
+
     [Test]
     public async Task CreateUsesOnlyScopedVolumeSubpathsAndSandboxedImmutableCommand()
     {
