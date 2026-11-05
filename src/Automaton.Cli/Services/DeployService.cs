@@ -112,7 +112,7 @@ public sealed class DeployService
                 Description: Missing("description", projectConfig.Description));
             if (update.IsEmpty) return;
             await client.UpdateListingAsync(appId, update, cancellationToken);
-            ReportProgress("Set the marketplace summary from automaton.json.");
+            ReportProgress("Set the marketplace text from automaton.json.");
         }
         catch (Exception ex)
         {

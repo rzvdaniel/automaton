@@ -363,8 +363,16 @@ public class PublicMarketplaceController : ControllerBase
 
     private static bool HasWebPage(string contractJson)
     {
-        var contract = Core.Models.ApplicationContractSerialization.Deserialize(contractJson);
-        return contract.Runtime.Command is not null || contract.Compose is not null || contract.IsStaticSite;
+        try
+        {
+            var contract = Core.Models.ApplicationContractSerialization.Deserialize(contractJson);
+            return contract.Runtime.Command is not null || contract.Compose is not null || contract.IsStaticSite;
+        }
+        catch (Exception)
+        {
+            // An unreadable contract must not break the whole store list; keep the old behaviour for that app.
+            return true;
+        }
     }
 
     private async Task PopulateApplicationSourceFlagsAsync(IEnumerable<MarketplaceAppCardDto> apps)

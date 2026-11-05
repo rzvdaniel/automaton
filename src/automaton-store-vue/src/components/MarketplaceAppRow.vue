@@ -27,7 +27,7 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
       <div class="app-title">
         <RouterLink class="app-name" :to="`/apps/${app.id}`">{{ app.name }}</RouterLink>
         <span v-if="app.isFeatured" class="badge">Featured</span>
-        <span v-if="app.isForkable" class="badge badge-quiet">Installable</span>
+        <span v-if="installUrl" class="badge badge-quiet">Installable</span>
         <span v-if="openToUse" class="badge badge-quiet">Open to use</span>
       </div>
       <p class="app-summary">{{ summary }}</p>

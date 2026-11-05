@@ -157,7 +157,13 @@ async function install() {
     if (steps.value.some((item) => item.key === 'schedules')) await step('schedules', () => createSchedules(app.id))
     succeeded.value = true
   } catch {
-    error.value = 'The install stopped. The app was created; open it to fix the failed step and deploy again.'
+    if (installedAppId.value) {
+      error.value = 'The install stopped. The app was created; open it to fix the failed step and deploy again.'
+    } else {
+      // Nothing was created, so show the form again with what the user typed.
+      error.value = steps.value.find((item) => item.state === 'failed')?.detail ?? 'The install failed. Nothing was created.'
+      steps.value = []
+    }
   } finally {
     installing.value = false
   }
@@ -305,6 +311,7 @@ function openInstalledApp() {
       </div>
 
       <template v-if="!started">
+        <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
         <Message v-if="missingRequired.length" severity="warn" :closable="false">Still needed: {{ missingRequired.join(', ') }}</Message>
         <div>
           <Button
