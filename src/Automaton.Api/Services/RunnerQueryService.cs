@@ -157,6 +157,8 @@ public sealed class RunnerQueryService(
         foreach (var runner in runners)
         {
             runner.Status = RunnerPresenceEvaluator.DeriveStatus(runner.ConnectionId, runner.LastHeartbeatAtUtc, now);
+            // A connection id left in the database (for example by a restored backup) is not a live connection to this server.
+            if (runner.Status != RunnerStatus.Online) runner.ConnectionId = null;
             if (!sessionStats.TryGetValue(runner.Id, out var stats))
                 continue;
 

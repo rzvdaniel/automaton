@@ -343,6 +343,9 @@ public class ProjectResourceService
             return null;
         }
 
+        if (!await dbContext.Projects.AnyAsync(project => project.Id == projectId && project.IsActive, cancellationToken))
+            throw new InvalidOperationException("This project was deleted.");
+
         var runner = await dbContext.Runners
             .FirstOrDefaultAsync(r => r.Id == runnerId && r.RunnerUsers.Any(u => u.UserId == UserId), cancellationToken);
 

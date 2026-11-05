@@ -13,6 +13,7 @@ internal static class ServerCommand
         var command = new Command("server", "Update the Automaton server you are logged in to");
         command.AddCommand(BuildUpdate(config));
         command.AddCommand(BuildUpdateStatus(config));
+        command.AddCommand(BuildStatus(config));
         return command;
     }
 
@@ -72,6 +73,20 @@ internal static class ServerCommand
         }
         if (asJson && results.Count > 0) CliJson.Write(new { runners = results });
         return success;
+    }
+
+    private static Command BuildStatus(ConfigService config)
+    {
+        var json = new Option<bool>("--json", "Print the result as JSON");
+        var command = new Command("status", "Show whether the server is healthy and which release it runs") { json };
+        command.SetHandler(context => RunAsync(context, config, async (client, asJson, ct) =>
+        {
+            var (status, version) = await client.GetHealthReportAsync(ct);
+            if (asJson) CliJson.Write(new { success = status == "ok", status, version });
+            else Console.WriteLine($"Status: {status}{Environment.NewLine}Version: {version ?? "not reported by this server"}");
+            return status == "ok";
+        }, json));
+        return command;
     }
 
     private static Command BuildUpdateStatus(ConfigService config)

@@ -194,7 +194,7 @@ public class ServerUpdateRunnerTests
         var result = command.Parse("update --version 0.2.0 --wait --timeout 60 --json");
 
         Assert.That(result.Errors, Is.Empty);
-        Assert.That(command.Subcommands.Select(child => child.Name), Is.EquivalentTo(new[] { "update", "update-status" }));
+        Assert.That(command.Subcommands.Select(child => child.Name), Is.EquivalentTo(new[] { "update", "update-status", "status" }));
         Assert.That(command.Parse("update-status --json").Errors, Is.Empty);
     }
 

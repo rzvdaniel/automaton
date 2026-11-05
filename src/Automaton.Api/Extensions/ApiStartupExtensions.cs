@@ -35,11 +35,19 @@ internal static class ApiApplicationPipelineExtensions
         app.UseMiddleware<PasswordChangeRequirement>();
         app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
-        app.MapGet("/health", () => Results.Text("ok")).AllowAnonymous();
+        app.MapGet("/health", (IConfiguration configuration) => Results.Json(HealthResponse(configuration["Installation:Version"]))).AllowAnonymous();
         app.MapControllers();
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
         app.MapFallbackToPage("/_Host");
+    }
+
+    /// <summary>The /health body: the release tag (server-vX.Y.Z) when the server knows it, nothing else.</summary>
+    internal static object HealthResponse(string? installedVersion)
+    {
+        var version = installedVersion?.Trim();
+        if (string.IsNullOrEmpty(version) || version.Length > 40) return new { status = "ok" };
+        return new { status = "ok", version = version.StartsWith("server-v", StringComparison.Ordinal) ? version : "server-v" + version };
     }
 }
 

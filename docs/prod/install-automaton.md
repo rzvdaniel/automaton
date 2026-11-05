@@ -65,7 +65,7 @@ You can supply `--domain example.com --email owner@example.com` to avoid those t
 
 The standalone installer downloads the versioned bundle and verifies its SHA-256 checksum; verify an extracted bundle before running its installer as shown above. The installer creates configuration, pulls digest-pinned application images, runs API startup migrations, and starts the stack. It checks the public Studio/API HTTPS route before printing the setup address. It refuses to take over occupied ports or a different existing installation.
 
-To check API liveness after installation or an update, run `curl -fsS https://api.example.com/health` with your domain. A reachable API returns HTTP 200 with the body `ok`. This probe checks the API process and HTTPS route.
+To check API liveness after installation or an update, run `curl -fsS https://api.example.com/health` with your domain. A reachable API returns HTTP 200 with `{"status":"ok","version":"server-vX.Y.Z"}` (earlier releases returned the plain text `ok`; `version` is left out when the server does not know its release). `automaton server status` prints the same. This probe checks the API process and HTTPS route.
 
 For offline preparation with an already downloaded bundle, extract `automaton-server.tar.gz`, verify its checksum, and run `sudo bash automaton-server/install.sh --domain example.com --email owner@example.com`. `--configure-only` prepares configuration and validates Compose without pulling or starting containers; it can still install missing Docker, Compose, and Python packages, so package repository access is needed if they are absent.
 
@@ -123,6 +123,7 @@ Preserve generated encryption/signing keys and Data Protection volumes. Back up 
 
 ```bash
 automaton server update --wait            # latest release; add --version server-vX.Y.Z for a specific one
+automaton server status                   # health and the release the server runs
 automaton server update-status            # last run, log tail and recovery backup
 ```
 

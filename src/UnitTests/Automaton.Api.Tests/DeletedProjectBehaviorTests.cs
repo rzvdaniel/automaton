@@ -50,6 +50,33 @@ public sealed class DeletedProjectBehaviorTests
     }
 
     [Test]
+    public async Task AddingRunnerToDeletedProjectReturnsBadRequest()
+    {
+        var (db, owner, project) = CreateDeletedProject();
+        var runner = Guid.NewGuid();
+        db.Runners.Add(new Runner { Id = runner, Name = "runner", Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement, Status = "Online" });
+        db.RunnerUsers.Add(new RunnerUser { RunnerId = runner, UserId = owner });
+        await db.SaveChangesAsync();
+        var user = AppAuthorizationTestData.CreateUserContextService(owner);
+        var audit = new NoAudit();
+        var authorization = new ProjectResourceAuthorizationService(db, audit);
+        var resources = new ProjectResourceService(db, user, authorization,
+            new ProjectCredentialResourceService(db, authorization, audit), audit);
+        var controller = new ProjectResourcesController(resources, NullLogger<ProjectResourcesController>.Instance)
+        {
+            ControllerContext = new() { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
+                new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, owner.ToString())], "Test")) } }
+        };
+
+        var response = await controller.AddRunnerToProject(project, runner);
+
+        Assert.That(response.Result, Is.TypeOf<BadRequestObjectResult>());
+        Assert.That((response.Result as BadRequestObjectResult)?.Value?.ToString(), Does.Contain("This project was deleted"));
+        Assert.That(await db.ProjectRunners.AnyAsync(link => link.RunnerId == runner), Is.False);
+    }
+
+    [Test]
     public async Task RunnerAssignmentExplainsDeletedProject()
     {
         var (db, owner, project) = CreateDeletedProject();

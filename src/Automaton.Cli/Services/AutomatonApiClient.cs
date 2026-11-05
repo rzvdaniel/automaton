@@ -209,11 +209,33 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(response);
     }
 
-    internal async Task<string> GetHealthAsync(CancellationToken ct = default)
+    /// <summary>The API's /health status ("ok") and, on servers that report it, the release (server-vX.Y.Z).</summary>
+    internal async Task<(string Status, string? Version)> GetHealthReportAsync(CancellationToken ct = default)
     {
         using var response = await _http.GetAsync("health", ct);
         await EnsureSuccessAsync(response);
-        return (await response.Content.ReadAsStringAsync(ct)).Trim();
+        return ParseHealth(await response.Content.ReadAsStringAsync(ct));
+    }
+
+    internal async Task<string> GetHealthAsync(CancellationToken ct = default) => (await GetHealthReportAsync(ct)).Status;
+
+    /// <summary>Older servers answer a plain "ok"; newer ones answer {"status":"ok","version":"server-vX.Y.Z"}.</summary>
+    internal static (string Status, string? Version) ParseHealth(string body)
+    {
+        body = body.Trim();
+        if (!body.StartsWith('{')) return (body, null);
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            var status = root.TryGetProperty("status", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null;
+            var version = root.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            return (status ?? body, version);
+        }
+        catch (JsonException)
+        {
+            return (body, null);
+        }
     }
 
     public async Task<JsonElement> RunAppActionAsync(string appId, string actionKey, JsonElement input, CancellationToken ct = default)

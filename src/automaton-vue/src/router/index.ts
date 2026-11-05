@@ -29,6 +29,12 @@ const router = createRouter({
       component: () => import('@/views/PricingView.vue'),
     },
     { path: '/creators/:rest(.*)*', name: 'creators', component: HomeView, beforeEnter: redirectToStore },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { seo: { title: 'Page not found', noindex: true } },
+    },
   ],
   scrollBehavior(to) {
     if (to.hash) {

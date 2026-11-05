@@ -211,7 +211,7 @@ echo 'Waiting for HTTPS certificates…'
 if grep -Fq 'http://127.0.0.1:8080/health]' "$install_dir/compose.yaml"; then
     api_health=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health" 2>/dev/null) \
         || { echo "The API HTTPS health check failed at https://api.$domain/health." >&2; exit 1; }
-    [[ "$api_health" == ok ]] || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
+    printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' 2>/dev/null || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
 fi
 studio_status=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" 2>/dev/null) \
     || { echo "The Studio installation status check failed at https://studio.$domain/api/install/status." >&2; exit 1; }
