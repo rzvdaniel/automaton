@@ -154,6 +154,11 @@ def clean_users(api, values, cutoff, apply):
             print(f"  would remove {label}")
             continue
         status, _ = api.call("DELETE", f"/api/admin/users/{user['id']}/hard", {"confirmationText": "DELETE"})
+        if status == 400:  # the API refuses to delete a user who ever had a project membership: disable instead
+            status, _ = api.call("POST", f"/api/admin/users/{user['id']}/disable")
+            print(f"  {'disabled (has project memberships)' if status in (200, 204) else f'FAILED ({status})'} {label}")
+            failures += status not in (200, 204)
+            continue
         ok = status in (200, 202, 204, 404)
         failures += not ok
         print(f"  {'removed' if ok else f'FAILED ({status})'} {label}")
