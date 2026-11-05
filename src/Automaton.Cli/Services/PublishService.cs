@@ -36,6 +36,22 @@ public sealed class PublishService
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {context.AppId}"));
 
+            if (FindEmptyAppProblem(app, directory) is { } emptyApp)
+            {
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, emptyApp));
+                nextSteps.Add(EmptyAppHint);
+                return new PublishResult
+                {
+                    Success = false,
+                    Summary = "Publish failed",
+                    Checks = checks,
+                    NextSteps = nextSteps.ToList(),
+                    AppId = context.AppId,
+                    AppName = context.AppConfig.Name,
+                    StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(context.Server, context.AppId)
+                };
+            }
+
             var resolved = ResolvePublishSettings(
                 context, app, slug, requiresAuthentication, isForkable, yes, nonInteractive, checks, nextSteps);
             if (resolved.Failure != null) return resolved.Failure;
@@ -271,6 +287,28 @@ public sealed class PublishService
         return !string.IsNullOrWhiteSpace(value)
             && System.Text.RegularExpressions.Regex.IsMatch(value.Trim(), "^[a-z0-9\\-]+$");
     }
+
+    internal const string EmptyAppHint =
+        "Declare a runtime command, a static-site build command and output directory, or at least one Action for an Actions-only app";
+
+    /// <summary>An app with no runtime, static site, compose file or Action would publish an empty page.</summary>
+    internal static string? FindEmptyAppProblem(JsonElement app, string directory)
+    {
+        if (app.TryGetProperty("application", out var application) && application.ValueKind == JsonValueKind.Object)
+        {
+            if (TryReadBool(application, "isStaticSite") == true) return null;
+            if (HasValue(application, "compose")) return null;
+            if (application.TryGetProperty("runtime", out var runtime) && runtime.ValueKind == JsonValueKind.Object
+                && HasValue(runtime, "command")) return null;
+        }
+        return Core.Models.AppActionManifestParser.Discover(directory).Count > 0
+            ? null
+            : "this app declares no runtime command, static site or Action, so there is nothing to publish";
+    }
+
+    private static bool HasValue(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
 
     // Publishing replaces the category and tags, so re-send the ones set with automaton listing or Studio.
     internal static (string? Category, string? Tags) ReadCurrentListing(JsonElement app)

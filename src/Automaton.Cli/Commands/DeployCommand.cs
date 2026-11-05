@@ -177,6 +177,9 @@ public static class DeployCommand
         };
     }
 
+    private static IEnumerable<DeployCheckResult> FailedChecks(DeployResult result)
+        => result.Success ? [] : result.Checks.Where(check => !check.Success && !check.IsWarning);
+
     private static void AddNextStep(ICollection<string> nextSteps, string value)
     {
         if (nextSteps.Contains(value, StringComparer.OrdinalIgnoreCase))
@@ -223,6 +226,11 @@ public static class DeployCommand
         }
 
         WriteVerboseSkippedEntries(result, verbose);
+
+        foreach (var failed in FailedChecks(result))
+        {
+            AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(failed.Message)}");
+        }
 
         if (result.NextSteps.Count > 0)
         {
@@ -418,6 +426,11 @@ public static class DeployCommand
     {
         WritePlainSkippedSection("Source ignored files", result.SourceUploaded, verbose);
         WritePlainSkippedSection("Runtime package ignored files", result.RuntimeUploaded, verbose);
+
+        foreach (var failed in FailedChecks(result))
+        {
+            Console.WriteLine($"Error: {failed.Message}");
+        }
 
         if (result.NextSteps.Count > 0)
         {

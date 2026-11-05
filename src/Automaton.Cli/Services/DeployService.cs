@@ -476,7 +476,7 @@ public sealed class DeployService
             return new DeployCheckResult(
                 DeployCheckNames.ApplicationPackage,
                 hasActions,
-                hasActions ? "no runtime artifact configured; deploying an Actions-only App" : "runtime command is required");
+                hasActions ? "no runtime artifact configured; deploying an Actions-only App" : "runtime command is required: this app declares no runtime command, static site or Action");
         }
         try
         {
