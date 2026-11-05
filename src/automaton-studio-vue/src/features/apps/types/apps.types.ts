@@ -60,6 +60,7 @@ export interface App {
   created: string // ISO date string
   updated: string // ISO date string
   executionRunnerId?: string
+  canUpdate?: boolean // set on a single-app read
   // Project context
   scope: AccessScope
   projectId?: string

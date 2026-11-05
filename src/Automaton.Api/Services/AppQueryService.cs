@@ -112,6 +112,7 @@ public sealed class AppQueryService(
 
         var app = AppsService.MapToModel(appEntity, definition, ownerId);
         AppsService.ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, id).Result);
+        app.CanUpdate = authorizationService.CanUpdateAppAsync(id).Result;
 
         return app;
     }

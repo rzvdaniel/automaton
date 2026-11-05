@@ -29,10 +29,10 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
   }
 }
 
-function mountRuntime(targets: AppDeploymentTarget[], selectedTarget = targets[0] ?? null) {
+function mountRuntime(targets: AppDeploymentTarget[], selectedTarget = targets[0] ?? null, canUpdate?: boolean) {
   return mount(AppRuntimeOperations, {
     props: {
-      app: { id: 'app-id', name: 'Example app' },
+      app: { id: 'app-id', name: 'Example app', canUpdate },
       targets,
       selectedTarget,
     },
@@ -132,6 +132,12 @@ describe('AppRuntimeOperations', () => {
     expect(button(wrapper, 'Open app').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).not.toContain('Healthy')
     expect(wrapper.text()).not.toContain('automaton deploy')
+  })
+
+  it('hides the Deploy button from a user who cannot update the app', () => {
+    const wrapper = mountRuntime([target()], undefined, false)
+
+    expect(wrapper.findAll('button').some((item) => item.text().trim() === 'Deploy')).toBe(false)
   })
 
   it('provides Logs and Deployments destinations from the runtime action surface', async () => {

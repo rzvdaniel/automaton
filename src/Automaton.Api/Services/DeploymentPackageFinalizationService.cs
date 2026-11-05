@@ -37,8 +37,11 @@ public sealed class DeploymentPackageFinalizationService(
             cancellationToken,
             deploymentOperationId);
         await DeployPackageContractService.PersistAsync(dataContext, appId, packageApplication, cancellationToken);
-        await PersistSourceAsync(appId, ownerId, file, cancellationToken);
-        await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        // Source is stored under the app owner (the project owner for project apps), where Studio and
+        // forks read it, even when a project editor ran the deploy.
+        var sourceOwnerId = await ResolveSourceOwnerIdAsync(appId, ownerId, cancellationToken);
+        await PersistSourceAsync(appId, sourceOwnerId, file, cancellationToken);
+        await fileStorageService.UpdateAppStorageMetadataAsync(sourceOwnerId, appId, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Local;
             metadata.SourceModifiedAtUtc = DateTime.UtcNow;
@@ -103,6 +106,15 @@ public sealed class DeploymentPackageFinalizationService(
     }
 
     public Task RestoreRoutesAsync() => backendRouteConfigService.RefreshAsync(CancellationToken.None);
+
+    internal async Task<Guid> ResolveSourceOwnerIdAsync(Guid appId, Guid actingUserId, CancellationToken cancellationToken)
+    {
+        var projectOwnerId = await dataContext.WebApps
+            .Where(app => app.Id == appId && app.ProjectId != null)
+            .Join(dataContext.Projects, app => app.ProjectId, project => project.Id, (app, project) => (Guid?)project.OwnerId)
+            .FirstOrDefaultAsync(cancellationToken);
+        return projectOwnerId ?? actingUserId;
+    }
 
     private async Task PersistSourceAsync(
         Guid appId,

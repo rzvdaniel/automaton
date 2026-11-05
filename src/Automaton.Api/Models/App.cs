@@ -26,6 +26,8 @@ public class AppModel
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }
+    /// <summary>Whether the current user can update (deploy) the app; set when a single app is read.</summary>
+    public bool CanUpdate { get; set; }
 
     // Project context
     public AccessScope Scope { get; set; }

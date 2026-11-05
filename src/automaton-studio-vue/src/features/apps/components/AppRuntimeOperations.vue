@@ -19,7 +19,7 @@ import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getViewingTargetPreviewState } from '../utils/viewing-target'
 
 const props = defineProps<{
-  app: Pick<App, 'id' | 'name'>
+  app: Pick<App, 'id' | 'name' | 'canUpdate'>
   targets: ReadonlyArray<AppDeploymentTarget>
   selectedTarget: AppDeploymentTarget | null
 }>()
@@ -360,7 +360,7 @@ function navigate(view: AppViewKey): void {
               @click="openApp"
             />
             <Button
-              v-if="hasAssignment"
+              v-if="hasAssignment && app.canUpdate !== false"
               label="Deploy"
               icon="pi pi-cloud-upload"
               :loading="deployState === 'running'"
