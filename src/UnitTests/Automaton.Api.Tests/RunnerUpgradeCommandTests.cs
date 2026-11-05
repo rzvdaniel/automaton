@@ -34,6 +34,14 @@ public sealed class RunnerUpgradeCommandTests
         Assert.That(command, Does.Contain("Connected to server successfully"));
     }
 
+    [Test]
+    public void TheHeredocTerminatorSitsOnItsOwnLine()
+    {
+        var lines = RunnerUpgradeCommand.Build(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", Image, "Runner").Split('\n');
+        Assert.That(lines[0], Is.EqualTo("/bin/sh <<'AUTOMATON_RUNNER_UPGRADE'"));
+        Assert.That(lines.Count(line => line == "AUTOMATON_RUNNER_UPGRADE"), Is.EqualTo(1));
+    }
+
     [TestCase("")]
     [TestCase("line\nbreak")]
     public void RejectsUnusableRunnerName(string name)
@@ -51,5 +59,6 @@ public sealed class RunnerUpgradeCommandTests
         var error = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
         Assert.That(process.ExitCode, Is.EqualTo(0), error);
+        Assert.That(error, Is.Empty, "an unterminated here-document only warns");
     }
 }

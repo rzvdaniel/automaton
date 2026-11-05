@@ -11,7 +11,7 @@ internal static partial class RunnerUpgradeCommand
     /// <summary>The command a person runs on the Runner's host.</summary>
     public static string Build(Guid runnerId, string? installationId, string image, string runnerName)
         => "/bin/sh <<'AUTOMATON_RUNNER_UPGRADE'\n" + BuildScript(runnerId, installationId, image, runnerName)
-            + "AUTOMATON_RUNNER_UPGRADE\n";
+            + "\nAUTOMATON_RUNNER_UPGRADE\n";
 
     /// <summary>The upgrade procedure itself; the Runner also runs it inside a helper container.</summary>
     public static string BuildScript(Guid runnerId, string? installationId, string image, string runnerName)
