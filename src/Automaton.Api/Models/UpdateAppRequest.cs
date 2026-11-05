@@ -34,8 +34,8 @@ public sealed class UpdateAppRequest
     public AppModel ToAppModel() => new()
     {
         Name = Name,
-        Summary = Summary,
-        Description = Description,
+        Summary = Summary ?? string.Empty,
+        Description = Description ?? string.Empty,
         IsPublished = IsPublished,
         IsForkable = IsForkable,
         PublicUrl = PublicUrl,

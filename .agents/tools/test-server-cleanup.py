@@ -145,7 +145,7 @@ def clean_users(api, values, cutoff, apply):
     plan = [u for u in users
             if (tagged(u.get("name")) or tagged(u.get("email")))
             and (u.get("email") or "").lower() not in keep
-            and "SysAdmin" not in (u.get("roles") or [])
+            and not {"SysAdmin", "Admin"} & set(u.get("roles") or [])  # the server refuses to delete administrators
             and old_enough(u.get("registeredAtUtc"), cutoff)]
     failures = 0
     for user in plan:

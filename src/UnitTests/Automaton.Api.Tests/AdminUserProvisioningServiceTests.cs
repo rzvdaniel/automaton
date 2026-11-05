@@ -302,6 +302,10 @@ public sealed class AdminUserProvisioningServiceTests
         var results = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
         Assert.That(System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
             request, new System.ComponentModel.DataAnnotations.ValidationContext(request), results, true), Is.True);
+        request.Summary = null!;
+        request.Description = null!;
+        var model = request.ToAppModel();
+        Assert.That((model.Summary, model.Description), Is.EqualTo((string.Empty, string.Empty)), "an explicit null saves as empty");
     }
 
     [Test]
