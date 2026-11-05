@@ -37,8 +37,8 @@ public sealed class DeploymentPackageFinalizationService(
             cancellationToken,
             deploymentOperationId);
         await DeployPackageContractService.PersistAsync(dataContext, appId, packageApplication, cancellationToken);
-        // Source is stored under the app owner (the project owner for project apps), where Studio and
-        // forks read it, even when a project editor ran the deploy.
+        // Source is stored under the project owner for project apps, where Studio deploy reads it
+        // even when a project editor ran the deploy (forking still reads the first linked user).
         var sourceOwnerId = await ResolveSourceOwnerIdAsync(appId, ownerId, cancellationToken);
         await PersistSourceAsync(appId, sourceOwnerId, file, cancellationToken);
         await fileStorageService.UpdateAppStorageMetadataAsync(sourceOwnerId, appId, metadata =>
