@@ -141,6 +141,7 @@ export interface ApplicationContract {
   secrets?: ApplicationSecretDeclaration[]
   permissions?: string[]
   isStaticSite?: boolean
+  compose?: unknown
 }
 
 export interface ApplicationSecretDeclaration {

@@ -280,6 +280,8 @@ function handleUnpublish() {
             <div class="header-status">
               <Tag :value="editorStore.applicationState.label" :severity="editorStore.applicationState.severity" />
               <Tag :value="publishingStateLabel" :severity="publishingStateLabel === 'Needs review' ? 'warn' : editorStore.isPublished ? 'success' : 'secondary'" />
+              <Tag v-if="editorStore.currentApp.forkedFromAppId" value="Installed from store" severity="info" icon="pi pi-download" />
+              <Tag v-if="editorStore.isPublished && editorStore.currentApp.catalogVisibility !== 'unlisted'" value="Store listing" severity="contrast" icon="pi pi-shop" />
             </div>
           </div>
         </div>

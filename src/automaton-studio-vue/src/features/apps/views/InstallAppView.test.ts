@@ -52,5 +52,9 @@ describe('InstallAppView', () => {
       applicationId: 'new-1', actionKey: 'upload', scheduleType: 'Cron', cronExpression: '30 3 * * *',
     }))
     expect(wrapper.text()).not.toContain('shh')
+    expect(wrapper.get('.install-progress').text()).toContain('Installed')
+    expect(wrapper.get('.install-progress').text()).toContain('Deploy and start the app')
+    expect(wrapper.get('.install-progress').text()).toContain('Nightly runs on cron 30 3 * * *')
+    expect(wrapper.text()).toContain('Open the installed app')
   })
 })

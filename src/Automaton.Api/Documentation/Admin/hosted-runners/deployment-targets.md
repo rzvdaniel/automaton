@@ -122,6 +122,8 @@ Static sites declare a build command and output directory with no runtime comman
 a Machine Management Runner publishes their output through one shared static
 serving container per machine. Successful static and supported Compose deployments
 retain HTTP routing state even though they do not declare a runtime command.
+An app with only Actions shows in Studio as **Actions only, no web app** (healthy, with its last Action run) instead of Degraded or not deployed.
+
 Actions-only deployments have no HTTP route. After upgrading from a release that
 omitted static or Compose routing state, redeploy affected environments to restore
 their routes; publishing alone does not repair that deployment state.

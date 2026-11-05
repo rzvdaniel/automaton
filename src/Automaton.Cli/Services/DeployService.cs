@@ -93,6 +93,33 @@ public sealed class DeployService
         ReportProgress($"Permissions: {outcome.Message}");
     }
 
+    // automaton.json supplies the marketplace text only while Studio (or `automaton listing`) has set none.
+    private async Task ApplyListingTextAsync(List<DeployCheckResult> checks, string server, string apiKey,
+        string appId, Models.AutomatonConfig projectConfig, CancellationToken cancellationToken)
+    {
+        if (!checksServerStatus) return;
+        if (string.IsNullOrWhiteSpace(projectConfig.Summary) && string.IsNullOrWhiteSpace(projectConfig.Description)) return;
+        try
+        {
+            using var client = new AutomatonApiClient(server, apiKey);
+            var app = await client.GetAppAsync(appId, cancellationToken);
+            string? Missing(string property, string? value) =>
+                !string.IsNullOrWhiteSpace(value) && string.IsNullOrWhiteSpace(
+                    app.TryGetProperty(property, out var current) && current.ValueKind == JsonValueKind.String ? current.GetString() : null)
+                    ? value!.Trim() : null;
+            var update = new MarketplaceListingUpdate(
+                Summary: Missing("summary", projectConfig.Summary),
+                Description: Missing("description", projectConfig.Description));
+            if (update.IsEmpty) return;
+            await client.UpdateListingAsync(appId, update, cancellationToken);
+            ReportProgress("Set the marketplace summary from automaton.json.");
+        }
+        catch (Exception ex)
+        {
+            AddCheck(checks, new DeployCheckResult("listing_text", false, ex.Message, IsWarning: true));
+        }
+    }
+
     public async Task<DeployResult> DeployAsync(
         string directory,
         bool clean,
@@ -185,6 +212,7 @@ public sealed class DeployService
         ReportProgress(runtimeResult.Message ?? $"Deploy package applied to {runtimeResult.RunnerCount} runner(s).");
         // After the deploy, which is what sends new permission requests to the server.
         await WarnAboutWaitingPermissionsAsync(checks, server!, apiKey!, appId!, projectConfig, cancellationToken);
+        await ApplyListingTextAsync(checks, server!, apiKey!, appId!, projectConfig, cancellationToken);
 
         return CreateResult(
             true, checks, nextSteps, projectConfig, appId, server, clean,

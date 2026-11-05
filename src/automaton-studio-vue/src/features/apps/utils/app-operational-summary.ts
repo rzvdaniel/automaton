@@ -54,7 +54,7 @@ const statusDetails: Record<
 export function isActionOnlyApp(app?: Pick<App, 'application'> | null): boolean {
   const application = app?.application
   if (!application) return false
-  return !application.runtime?.command && !application.isStaticSite && !application.build?.outputDirectory
+  return !application.runtime?.command && !application.isStaticSite && !application.compose && !application.build?.outputDirectory
 }
 
 export function getAppOperationalSummary(

@@ -17,7 +17,7 @@ public static class PublishCommand
         var slugOption = new Option<string?>(["--slug", "-s"], "Public URL slug to use for publishing");
         var privateOption = new Option<bool>("--private", "Require Automaton login to access the published app");
         var publicOption = new Option<bool>("--public", "Allow public access without login");
-        var forkableOption = new Option<bool>("--forkable", "Allow other users to fork this published app");
+        var forkableOption = new Option<bool>(["--install", "--forkable"], "Let other people install a copy of this published app (--forkable is the old name)");
         var yesOption = new Option<bool>("--yes", "Publish without prompting for confirmation");
         var openOption = new Option<bool>("--open", "Open the published app in the browser after success");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");

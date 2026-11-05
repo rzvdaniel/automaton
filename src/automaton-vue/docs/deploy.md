@@ -54,6 +54,12 @@ automaton listing add-screenshot lobby.png
 automaton listing show
 ```
 
+Or put `"summary"` and `"description"` at the top level of `automaton.json`: `automaton deploy` copies them to the listing while the app has none set in Studio or with `automaton listing`.
+
+To let other people install a copy of your published app on their server, publish with `automaton publish --install` (`--forkable` still works). The store then shows an **Install** button; an app with no web page (Actions only) shows only **Install**, an installable web app shows **Open** and **Install**.
+
+`automaton deploy` and `automaton publish` refuse an app that declares no runtime command, static site or Action.
+
 Summary up to 200 characters, description up to 500. Images are PNG, JPG, WEBP or GIF up to 2 MB: one cover and up to 8 screenshots. Remove one with `automaton listing remove-screenshot <id>`. The same settings are in Studio under the app's Settings.
 
 ## Delete an app
