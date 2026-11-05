@@ -51,11 +51,12 @@ as you go; the task is not done until step 8 is.
    Real-server testing happens here, after merge. If a check fails, fix forward: a small follow-up PR (same review and
    CI), a new release and a re-check. Revert instead only when the fix is not quick or the failure blocks other work on
    the test server. Production is updated only after the proof passes, and only when the owner asks.
-8. **Close out.** The PR's `Closes #N` closes the issue on merge. Attach the `proof` artifact (`verify.md`), comment
-   the end-to-end results (pass or fail per check) and every administrator action on the PR, and link that comment from
-   the issue. Remove the `e2e-` items you created (`verify.md`), set the board Status to Done, open issues for gaps you
-   found (`issue.md`), and tell the owner what is left for them, with links. If testing showed the docs are wrong, or
-   the issue completes a roadmap step, fix the docs or the status in `docs/roadmap/README.md` in a small follow-up PR.
+8. **Close out.** The PR's `Closes #N` closes the issue on merge. Attach the `proof` artifact to the issue and set its
+   `verified` or `verification-failed` label (`verify.md`), comment the end-to-end results (pass or fail per check)
+   and every administrator action on the PR, and link that comment from the issue. Remove the `e2e-` items you created
+   (`verify.md`), set the board Status to Done, open issues for gaps you found (`issue.md`), and tell the owner what
+   is left for them, with links. If testing showed the docs are wrong, or the issue completes a roadmap step, fix the
+   docs or the status in `docs/roadmap/README.md` in a small follow-up PR.
 
 ## Handoff
 

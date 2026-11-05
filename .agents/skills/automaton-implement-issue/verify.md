@@ -58,17 +58,21 @@ and `ab-shot.sh` log in and take screenshots), following the studio-design visua
 action (a button, a form), do it by clicking in Studio with `agent-browser`, not through the API. Record what passed
 and what you could not check.
 
-Proof on the PR: attach one HTML artifact named `proof` to the PR (GitHub issue artifacts; a PR is an issue):
+Proof on the issue: GitHub shows artifacts on issues, not on pull requests. Attach one HTML artifact named `proof` to
+the **issue** the PR closes, and comment its link on the PR:
 
 ```bash
-gh api -X POST repos/rzvdaniel/automaton/issues/<N>/artifacts -f name=proof -f type=embedded_html -F body=@proof.html
+gh api -X POST repos/rzvdaniel/automaton/issues/<issue>/artifacts -f name=proof -f type=embedded_html -F body=@proof.html
 ```
 
-It lists each done criterion from the issue, the evidence for it (the command and what came back, or a screenshot) and
-pass, fail or not checked with the reason. To update it, delete it and create it again; the artifact `number` is in
-the create response and in `gh api repos/rzvdaniel/automaton/issues/<N>/artifacts`, and `gh api -X DELETE
-repos/rzvdaniel/automaton/issues/<N>/artifacts/<number>` removes it. Add a `link` artifact to the issue that points to
-the PR. Artifact types are `generic` (Markdown), `link`, `plan` and `embedded_html`.
+It lists each done criterion from the issue, the evidence for it (the command and what came back, or a screenshot)
+and pass, fail or not checked with the reason. To update it, delete it and create it again: the artifact `number` is
+in the create response and in `gh api repos/rzvdaniel/automaton/issues/<issue>/artifacts`, and
+`gh api -X DELETE repos/rzvdaniel/automaton/issues/<issue>/artifacts/<number>` removes it. Reading one artifact returns
+its content under `.artifact.body`. Artifact types are `generic` (Markdown), `link`, `plan` and `embedded_html`.
+
+Then label the issue: `verified` when every criterion passes (or is "not checked" with a reason the owner accepted),
+`verification-failed` when a check fails. Swap the label when the fix-forward release passes its re-check.
 
 Screenshots: GitHub has no image upload API, so push them to the orphan branch `pr-screenshots` under `pr-<N>/`
 (create the branch with `git switch --orphan pr-screenshots` if it does not exist; never merge it) and embed them in
