@@ -42,8 +42,9 @@ public static class LogsCommand
                 else
                 {
                     Console.WriteLine($"Runtime logs · {target.Name}");
-                    CliBrowserService.OpenUrl(url);
-                    Console.WriteLine($"Opened: {url}");
+                    Console.WriteLine(CliBrowserService.TryOpenUrl(url)
+                        ? $"Opened: {url}"
+                        : $"No browser available. Open this URL: {url}");
                 }
                 context.ExitCode = 0;
             }

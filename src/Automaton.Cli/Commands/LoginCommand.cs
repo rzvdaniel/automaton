@@ -192,7 +192,8 @@ public static class LoginCommand
         if (asJson) return;
         AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
         AnsiConsole.MarkupLine("Authorize Automaton CLI in your browser:");
-        AnsiConsole.MarkupLine($"[link={authorization.VerificationUrl}]{authorization.VerificationUrl}[/]");
+        // Plain Console so long URLs and codes are never wrapped at the terminal width.
+        Console.WriteLine(authorization.VerificationUrl);
         var browserOpened = !forceDevice && CliBrowserService.TryOpenUrl(authorization.VerificationUrl);
         WriteVerificationCode(authorization.UserCode, forceDevice, browserOpened);
         AnsiConsole.MarkupLine("[grey]Waiting for authorization...[/]");
@@ -202,16 +203,16 @@ public static class LoginCommand
     {
         if (browserOpened)
         {
-            AnsiConsole.MarkupLine($"Confirm this code in Studio: [bold]{userCode}[/]");
+            Console.WriteLine($"Confirm this code in Studio: {userCode}");
             return;
         }
         if (forceDevice)
         {
-            AnsiConsole.MarkupLine($"Open the URL above and enter this code: [bold]{userCode}[/]");
+            Console.WriteLine($"Open the URL above and enter this code: {userCode}");
             return;
         }
         AnsiConsole.MarkupLine("[yellow]A browser could not be opened. Open the URL above on another device.[/]");
-        AnsiConsole.MarkupLine($"Enter this code: [bold]{userCode}[/]");
+        Console.WriteLine($"Enter this code: {userCode}");
     }
 
     internal static async Task<string> PollForApiKeyAsync(

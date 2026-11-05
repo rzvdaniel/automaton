@@ -14,6 +14,9 @@ namespace Automaton.Api.Services;
 
 public sealed class CliAuthorizationService
 {
+    // 5 s keeps polling (plus create and complete) under the 20 requests a minute per IP limit.
+    private const int PollIntervalSeconds = 5;
+
     private const int LifetimeMinutes = 10;
     private const string UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -64,7 +67,7 @@ public sealed class CliAuthorizationService
             request.UserCode,
             verifier,
             request.ExpiresAt,
-            3);
+            PollIntervalSeconds);
     }
 
     public async Task<bool> ApproveAsync(
