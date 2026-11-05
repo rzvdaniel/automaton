@@ -1,10 +1,11 @@
-import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.types'
+import { DeploymentTargetStatus, type App, type AppDeploymentTarget } from '../types/apps.types'
 import type { AppViewKey } from '../app-navigation'
 
 export type AppOperationalStatus =
   | 'not-deployed'
   | 'operation-in-progress'
   | 'running'
+  | 'actions-only'
   | 'degraded'
   | 'deployment-failed'
   | 'runtime-unavailable'
@@ -42,14 +43,23 @@ const statusDetails: Record<
   'not-deployed': { label: 'Not deployed', severity: 'secondary' },
   'operation-in-progress': { label: 'Operation in progress', severity: 'info' },
   running: { label: 'Running', severity: 'success' },
+  'actions-only': { label: 'Actions only', severity: 'success' },
   degraded: { label: 'Degraded', severity: 'warn' },
   'deployment-failed': { label: 'Deployment failed', severity: 'danger' },
   'runtime-unavailable': { label: 'Runtime unavailable', severity: 'warn' },
   'no-runtime-assigned': { label: 'No runtime assigned', severity: 'secondary' },
 }
 
+/** An app with no runtime command and no static site: it only has Actions. */
+export function isActionOnlyApp(app?: Pick<App, 'application'> | null): boolean {
+  const application = app?.application
+  if (!application) return false
+  return !application.runtime?.command && !application.isStaticSite && !application.build?.outputDirectory
+}
+
 export function getAppOperationalSummary(
   target?: AppDeploymentTarget | null,
+  actionOnly = false,
 ): AppOperationalSummary {
   if (!target) {
     return {
@@ -72,6 +82,25 @@ export function getAppOperationalSummary(
   const runnerUnavailable =
     target.status === DeploymentTargetStatus.RunnerOffline ||
     (!!target.runner && !target.runner.isOnline)
+
+  const healthyActionOnly =
+    actionOnly &&
+    !target.cleanupPending &&
+    target.status !== DeploymentTargetStatus.Deploying &&
+    target.status !== DeploymentTargetStatus.Failed &&
+    !runnerUnavailable
+
+  if (healthyActionOnly) {
+    return {
+      ...statusDetails['actions-only'],
+      status: 'actions-only',
+      deploymentLabel: 'Actions only, no web app',
+      runtimeLabel: 'Actions only, no web app',
+      hasDeployedRuntime: false,
+      cliGuidance: 'secondary',
+      diagnostic: null,
+    }
+  }
 
   let status: AppOperationalStatus
   if (target.cleanupPending) {

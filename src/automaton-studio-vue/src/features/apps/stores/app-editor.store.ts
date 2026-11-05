@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { appsService } from '../services/apps.service'
-import { getAppOperationalSummary } from '../utils/app-operational-summary'
+import { getAppOperationalSummary, isActionOnlyApp } from '../utils/app-operational-summary'
 import type {
   App,
   AppDeploymentTarget,
@@ -19,7 +19,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const consoleEntries = ref<ConsoleEntry[]>([])
 
   const isPublished = computed(() => currentApp.value?.isPublished ?? false)
-  const applicationState = computed(() => getAppOperationalSummary(defaultTarget.value))
+  const applicationState = computed(() => getAppOperationalSummary(defaultTarget.value, isActionOnlyApp(currentApp.value)))
 
   async function loadApp(appId: string): Promise<void> {
     isLoading.value = true

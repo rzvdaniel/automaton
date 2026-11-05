@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
@@ -11,6 +11,7 @@ import CopyCommand from './CopyCommand.vue'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getPublicRuntimeUrl, getPublishingConsistencyIssue } from '../utils/publishing-state'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
+import { appsService, type AppActionExecution } from '../services/apps.service'
 import { getViewingTargetPreviewState } from '../utils/viewing-target'
 
 const props = defineProps<{
@@ -22,6 +23,23 @@ const props = defineProps<{
 const emit = defineEmits<{
   navigate: [view: AppViewKey]
 }>()
+
+const isActionsOnly = computed(() => props.applicationState.status === 'actions-only')
+const lastActionRun = ref<AppActionExecution | null>(null)
+watch(
+  () => [props.app.id, isActionsOnly.value] as const,
+  async ([appId, actionsOnly]) => {
+    lastActionRun.value = null
+    if (!actionsOnly) return
+    try {
+      const runs = await appsService.listActionExecutions(appId)
+      lastActionRun.value = [...runs].sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0] ?? null
+    } catch {
+      lastActionRun.value = null
+    }
+  },
+  { immediate: true },
+)
 
 const liveTarget = computed(() => props.targets.find((target) => target.isDefault) ?? null)
 const liveTargetName = computed(() =>
@@ -110,14 +128,26 @@ function navigate(action: AppOperationalAction): void {
             <p v-if="showLastAttempt && lastDeploymentAt" class="deployment-time">
               Last attempt <time :datetime="lastDeploymentAt">{{ formatDate(lastDeploymentAt) }}</time>
             </p>
-            <p v-if="lastSuccessfulDeploymentAt" class="deployment-time">
+            <p v-if="isActionsOnly" class="deployment-time">This app only has Actions, so there is no web runtime to deploy.</p>
+            <p v-else-if="lastSuccessfulDeploymentAt" class="deployment-time">
               Last successful deployment
               <time :datetime="lastSuccessfulDeploymentAt">{{ formatDate(lastSuccessfulDeploymentAt) }}</time>
             </p>
             <p v-else class="deployment-time">No successful deployment yet.</p>
           </div>
 
-          <div class="live-app-link">
+          <div v-if="isActionsOnly" class="live-app-link">
+            <div class="live-app-link__url">
+              <span class="status-label">Last Action run</span>
+              <span v-if="lastActionRun">
+                {{ lastActionRun.moduleKey }}: {{ lastActionRun.status }}
+                <time :datetime="lastActionRun.createdAtUtc">{{ formatDate(lastActionRun.createdAtUtc) }}</time>
+              </span>
+              <span v-else class="muted">No Action has run yet. This app has no web page.</span>
+            </div>
+          </div>
+
+          <div v-else class="live-app-link">
             <div class="live-app-link__url">
               <span class="status-label">Live app URL</span>
               <a v-if="liveAppUrl" :href="liveAppUrl" target="_blank" rel="noopener noreferrer">

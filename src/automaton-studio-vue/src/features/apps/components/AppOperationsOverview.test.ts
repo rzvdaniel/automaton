@@ -5,6 +5,14 @@ import { AccessScope, DeploymentTargetStatus, type App, type AppDeploymentTarget
 import { getAppOperationalSummary } from '../utils/app-operational-summary'
 import AppOperationsOverview from './AppOperationsOverview.vue'
 
+vi.mock('../services/apps.service', () => ({
+  appsService: {
+    listActionExecutions: vi.fn().mockResolvedValue([
+      { id: 'e1', appId: 'app-id', moduleKey: 'upload', status: 'Succeeded', createdAtUtc: '2026-09-15T04:30:00Z' },
+    ]),
+  },
+}))
+
 const writeText = vi.fn().mockResolvedValue(undefined)
 Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
 
@@ -85,6 +93,21 @@ function mountOverview(
 afterEach(() => vi.clearAllMocks())
 
 describe('AppOperationsOverview', () => {
+  it('shows an Action-only app as healthy with its last Action run', async () => {
+    const target = liveTarget({ status: DeploymentTargetStatus.Running, genericRuntimeDeployed: false })
+    const wrapper = mount(AppOperationsOverview, {
+      props: { app: app(), targets: [target], applicationState: getAppOperationalSummary(target, true) },
+    })
+    await new Promise((resolve) => setTimeout(resolve))
+
+    expect(wrapper.text()).toContain('Actions only')
+    expect(wrapper.text()).toContain('Last Action run')
+    expect(wrapper.text()).toContain('upload: Succeeded')
+    expect(wrapper.text()).not.toContain('Degraded')
+    expect(wrapper.text()).not.toContain('not deployed yet')
+    expect(wrapper.find('.diagnostic').exists()).toBe(false)
+  })
+
   it('leads with the Live URL and operational facts for a deployed app', () => {
     const wrapper = mountOverview()
     const openApp = wrapper.get('a.open-app-link')
