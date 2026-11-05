@@ -67,6 +67,10 @@ async function step<T>(label: string, work: () => Promise<T>): Promise<T> {
   }
 }
 
+function defaultOf(key: string) {
+  return manifest.value.settings?.find((item) => item.name === key)?.default ?? ''
+}
+
 async function deployAndWait(appId: string) {
   const operation = await appsService.deployStoredSource(appId)
   for (let attempt = 0; attempt < 300; attempt++) {
@@ -107,7 +111,8 @@ async function install() {
     const app = await step('Create your copy of the app', () => appsService.install(sourceId, name.value.trim()))
     installedAppId.value = app.id
     const values = [
-      ...Object.entries(settings).filter(([, value]) => value.trim()),
+      // A setting left at its default is not saved, so the app keeps following the default.
+      ...Object.entries(settings).filter(([key, value]) => value.trim() && value !== defaultOf(key)),
       ...Object.entries(secrets).filter(([, value]) => value),
     ]
     if (values.length > 0)

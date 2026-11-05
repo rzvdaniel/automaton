@@ -41,7 +41,7 @@ describe('InstallAppView', () => {
     await flushPromises()
 
     expect(appsService.install).toHaveBeenCalledWith('src-1', 'Off-site Backup')
-    expect(appsService.setSecret).toHaveBeenCalledWith('new-1', 'S3_REGION', 'us-east-1')
+    expect(appsService.setSecret).not.toHaveBeenCalledWith('new-1', 'S3_REGION', expect.anything()) // default is not pinned
     expect(appsService.setSecret).toHaveBeenCalledWith('new-1', 'S3_SECRET_ACCESS_KEY', 'shh')
     expect(adminAppsService.setPermission).toHaveBeenCalledWith('new-1', 'backups:read', true)
     expect(actionSchedulesService.create).toHaveBeenCalledWith(expect.objectContaining({
