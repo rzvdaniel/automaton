@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Remove what agents created on the TEST server: apps, projects and API keys whose name starts with "e2e-".
+"""Remove what agents created on the TEST server: apps, projects, API keys and users whose name (users: name or
+email) starts with "e2e-".
 
-Never touches the test accounts themselves, or anything without the prefix. Never point it at production.
+Never touches the test accounts themselves (users are removed only by the ADMIN sign-in, never a SysAdmin or a
+configured test account), or anything without the prefix. Never point it at production.
 
 Usage:
   python .agents/tools/test-server-cleanup.py                 # dry run: list what would be removed
@@ -134,6 +136,32 @@ def clean(api, who, cutoff, apply):
     return failures
 
 
+def clean_users(api, values, cutoff, apply):
+    """Hard-delete e2e- users (administrator only). Skips the configured test accounts and system administrators."""
+    keep = {values.get(f"AUTOMATON_TEST_{w}_EMAIL", "").lower()
+            for w in ("ADMIN", "USER", "USER2", "PLAINADMIN")} - {""}
+    status, body = api.call("GET", "/api/admin/users?page=1&pageSize=100&search=" + PREFIX)
+    users = (body or {}).get("items", []) if status == 200 else []
+    plan = [u for u in users
+            if (tagged(u.get("name")) or tagged(u.get("email")))
+            and (u.get("email") or "").lower() not in keep
+            and "SysAdmin" not in (u.get("roles") or [])
+            and old_enough(u.get("registeredAtUtc"), cutoff)]
+    failures = 0
+    for user in plan:
+        label = f"user {user.get('name') or user.get('email')} ({user['id']})"
+        if not apply:
+            print(f"  would remove {label}")
+            continue
+        status, _ = api.call("DELETE", f"/api/admin/users/{user['id']}/hard", {"confirmationText": "DELETE"})
+        ok = status in (200, 202, 204, 404)
+        failures += not ok
+        print(f"  {'removed' if ok else f'FAILED ({status})'} {label}")
+    if not plan:
+        print("  no e2e- users")
+    return failures
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--apply", action="store_true", help="remove; without it, only list")
@@ -149,7 +177,7 @@ def main():
         sys.exit("AUTOMATON_TEST_API_URL does not look like the test server; refusing to run.")
     cutoff = None
     if args.older_than_hours is not None:
-        cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=args.older_than_hours)
+        cutoff = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(hours=args.older_than_hours)
     api, failures = Api(base), 0
     for who in ACCOUNTS:
         if not api.login(values, who):
@@ -157,6 +185,9 @@ def main():
             continue
         print(f"{who}:")
         failures += clean(api, who, cutoff, args.apply)
+    if api.login(values, "ADMIN"):
+        print("ADMIN (users):")
+        failures += clean_users(api, values, cutoff, args.apply)
     sys.exit(1 if failures else 0)
 
 

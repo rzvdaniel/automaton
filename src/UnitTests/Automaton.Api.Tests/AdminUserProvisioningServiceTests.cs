@@ -272,7 +272,7 @@ public sealed class AdminUserProvisioningServiceTests
     {
         var fixture = await Fixture.CreateAsync();
         var projectId = Guid.NewGuid();
-        fixture.Db.Users.Add(new ApplicationUser { Id = fixture.CallerId, UserName = "owner@example.com", Email = "owner@example.com", PublicUsername = "owner" });
+        fixture.Db.Users.Add(new ApplicationUser { Id = fixture.CallerId, UserName = "owner@example.com", Email = "owner@example.com", PublicUsername = "owner", DisplayName = "Olivia Owner" });
         fixture.Db.Projects.Add(new Project { Id = projectId, OwnerId = fixture.CallerId, Name = "workspace", DisplayName = "Workspace" });
         fixture.Db.ProjectMembers.Add(new ProjectMember
         {
@@ -292,6 +292,16 @@ public sealed class AdminUserProvisioningServiceTests
         var existing = await fixture.Service.CreateAsync(new AdminCreateUserRequest("known@example.com"), false, default);
         var added = await members.AddMemberAsync(projectId, new AddProjectMemberRequest { Email = "known@example.com", Role = ProjectRole.Viewer });
         Assert.That(added!.UserId, Is.EqualTo(existing.UserId));
+        Assert.That(added.InvitedByName, Is.EqualTo("Olivia Owner"), "the inviter is named by display name, not login");
+    }
+
+    [Test]
+    public void AppSettingsDoNotRequireSummaryOrDescription()
+    {
+        var request = new Automaton.Api.Models.UpdateAppRequest { Name = "x" };
+        var results = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        Assert.That(System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+            request, new System.ComponentModel.DataAnnotations.ValidationContext(request), results, true), Is.True);
     }
 
     [Test]

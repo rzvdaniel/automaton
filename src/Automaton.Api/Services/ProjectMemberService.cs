@@ -169,7 +169,7 @@ public class ProjectMemberService
             Role = request.Role,
             JoinedAt = DateTime.UtcNow,
             InvitedBy = UserId,
-            InvitedByName = userContextService.GetUserName(),
+            InvitedByName = await InviterNameAsync(),
             IsActive = true,
             IsOwner = false
         };
@@ -195,8 +195,9 @@ public class ProjectMemberService
             var setupPasswordUrl = requirePasswordSetup
                 ? await CreatePasswordSetupUrlAsync(user)
                 : null;
+            var inviterName = await InviterNameAsync();
             var emailDetails = CreateInvitationEmail(project, user, request, invitationUrl,
-                requirePasswordSetup, setupPasswordUrl);
+                requirePasswordSetup, setupPasswordUrl, inviterName);
             await emailService.Send(emailDetails, cancellationToken);
         }
         catch (Exception ex)
@@ -215,14 +216,15 @@ public class ProjectMemberService
         AddProjectMemberRequest request,
         string invitationUrl,
         bool requirePasswordSetup,
-        string? setupPasswordUrl)
+        string? setupPasswordUrl,
+        string inviterName)
     {
         var variables = new Dictionary<string, string>
         {
             { "Name", user.Name ?? request.Email },
             { "ProjectName", project.DisplayName },
             { "ProjectDescription", project.Description ?? string.Empty },
-            { "InviterName", userContextService.GetUserName() ?? string.Empty },
+            { "InviterName", inviterName },
             { "Role", request.Role.ToString() },
             { "InviteUrl", invitationUrl },
             { "ExpirationHours", "24" },
@@ -398,6 +400,13 @@ public class ProjectMemberService
     }
 
     // Members are shown by name; accounts without one fall back to the sign-in name (usually the email).
+    // The signed-in name is the login (an email for some users); people recognise the display name.
+    private async Task<string> InviterNameAsync()
+    {
+        var inviter = await userManager.FindByIdAsync(UserId.ToString());
+        return inviter is null ? userContextService.GetUserName() : DisplayNameOf(inviter);
+    }
+
     private static string DisplayNameOf(ApplicationUser user) =>
         string.IsNullOrWhiteSpace(user.DisplayName) ? user.UserName ?? string.Empty : user.DisplayName;
 
