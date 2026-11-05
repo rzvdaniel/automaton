@@ -15,7 +15,8 @@ public sealed class AppDeploymentController(
     ConfirmedEmailGuardService confirmedEmailGuardService,
     IAppDeployCapabilityService appDeployCapabilityService,
     ManagedRunnerBootstrapService managedRunnerBootstrapService,
-    DeploymentOperationService deploymentOperationService) : ControllerBase
+    DeploymentOperationService deploymentOperationService,
+    StoredSourceDeploymentService storedSourceDeploymentService) : ControllerBase
 {
     [HttpPost("api/apps/{appId:guid}/managed-runtime/readiness")]
     [Authorize(Policy = "AllowApiKey")]
@@ -64,6 +65,42 @@ public sealed class AppDeploymentController(
         {
             Serilog.Log.Error(ex, "Deploy package failed: AppId={AppId}", appId);
             return StatusCode(500, new { error = "Deploy package failed: " + ex.Message });
+        }
+    }
+
+    [HttpPost("api/apps/{appId:guid}/deploy")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<DeploymentOperationResponse>> DeployStoredSource(
+        Guid appId, [FromQuery] bool clean = false, [FromQuery] string? targetSlug = null,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = userContextService.GetUserId();
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userId))
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+
+        try
+        {
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken);
+            if (appInfo == null)
+                return NotFound(new { message = "App not found" });
+
+            var result = await storedSourceDeploymentService.AcceptAsync(
+                appId, userId, appInfo.OwnerId ?? userId, targetSlug, clean, cancellationToken);
+            return AcceptedAtAction(nameof(GetDeploymentOperation),
+                new { appId, operationId = result.OperationId }, result);
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = exception.Message });
+        }
+        catch (Exception exception) when (exception is InvalidDataException or InvalidOperationException)
+        {
+            return BadRequest(new { error = exception.Message });
         }
     }
 

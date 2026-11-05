@@ -476,3 +476,11 @@ export interface SecretAuditEntry {
   runnerId?: string | null
   delivered: SecretDelivery[]
 }
+
+export interface DeploymentOperation {
+  operationId: string
+  status: 'Pending' | 'Running' | 'Succeeded' | 'Failed'
+  success?: boolean | null
+  error?: string | null
+  result?: { message?: string | null } | null
+}

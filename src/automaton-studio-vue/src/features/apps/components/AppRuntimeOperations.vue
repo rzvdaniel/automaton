@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import type { App, AppDeploymentTarget } from '../types/apps.types'
+import { appsService } from '../services/apps.service'
 import type { AppViewKey } from '../app-navigation'
 import CopyCommand from './CopyCommand.vue'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
@@ -26,6 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectTarget: [target: AppDeploymentTarget]
   navigate: [view: AppViewKey]
+  deployed: []
 }>()
 
 type Severity = 'secondary' | 'info' | 'success' | 'warn' | 'danger'
@@ -204,6 +206,53 @@ function selectTarget(slug: string | null | undefined): void {
   if (selected) emit('selectTarget', selected)
 }
 
+const DEPLOY_POLL_MS = 2000
+const deployState = ref<'idle' | 'running' | 'succeeded' | 'failed'>('idle')
+const deployMessage = ref('')
+let deployTimer: ReturnType<typeof setTimeout> | null = null
+
+onBeforeUnmount(() => {
+  if (deployTimer) clearTimeout(deployTimer)
+})
+
+function errorText(error: unknown): string {
+  const data = (error as { response?: { data?: { error?: string; message?: string } } }).response?.data
+  return data?.error ?? data?.message ?? (error as Error).message ?? 'Deploy failed.'
+}
+
+async function deployStoredSource(): Promise<void> {
+  const slug = target.value?.slug
+  deployState.value = 'running'
+  deployMessage.value = 'Deploy requested…'
+  try {
+    const operation = await appsService.deployStoredSource(props.app.id, slug)
+    await pollDeployment(operation.operationId)
+  } catch (error) {
+    deployState.value = 'failed'
+    deployMessage.value = errorText(error)
+  }
+}
+
+async function pollDeployment(operationId: string): Promise<void> {
+  try {
+    const operation = await appsService.getDeploymentOperation(props.app.id, operationId)
+    if (operation.status === 'Succeeded' || operation.status === 'Failed') {
+      const succeeded = operation.status === 'Succeeded' && operation.success !== false
+      deployState.value = succeeded ? 'succeeded' : 'failed'
+      deployMessage.value = succeeded
+        ? 'Deployed from the stored source.'
+        : operation.error ?? operation.result?.message ?? 'Deploy failed.'
+      emit('deployed')
+      return
+    }
+    deployMessage.value = `Deploy ${operation.status.toLowerCase()}…`
+    deployTimer = setTimeout(() => void pollDeployment(operationId), DEPLOY_POLL_MS)
+  } catch (error) {
+    deployState.value = 'failed'
+    deployMessage.value = errorText(error)
+  }
+}
+
 function navigate(view: AppViewKey): void {
   emit('navigate', view)
 }
@@ -310,9 +359,24 @@ function navigate(view: AppViewKey): void {
               :title="canOpenApp ? undefined : openAppUnavailableReason"
               @click="openApp"
             />
+            <Button
+              v-if="hasAssignment"
+              label="Deploy"
+              icon="pi pi-cloud-upload"
+              :loading="deployState === 'running'"
+              :disabled="deployState === 'running' || !isRuntimeOnline || target?.status === 'Deploying'"
+              @click="deployStoredSource"
+            />
             <Button v-if="hasAssignment" label="View logs" icon="pi pi-list" text @click="navigate('logs')" />
             <Button label="View deployments" icon="pi pi-cloud-upload" text @click="navigate('deployments')" />
           </div>
+          <Message
+            v-if="deployState !== 'idle'"
+            :severity="deployState === 'failed' ? 'error' : deployState === 'succeeded' ? 'success' : 'info'"
+            :closable="false"
+            class="runtime-deploy-status"
+            role="status"
+          >{{ deployMessage }}</Message>
         </template>
       </Card>
 

@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

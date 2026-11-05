@@ -567,6 +567,7 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<ConnectedFlowArtifactService>();
         services.AddScoped<IManagedApplicationArtifactCommands, ManagedApplicationArtifactGateway>();
         services.AddScoped<DeploymentOperationService>();
+        services.AddScoped<StoredSourceDeploymentService>();
         services.AddSingleton<DeploymentOperationDispatcher>();
         services.AddHostedService(sp => sp.GetRequiredService<DeploymentOperationDispatcher>());
         services.AddScoped<AppActionExecutionService>();

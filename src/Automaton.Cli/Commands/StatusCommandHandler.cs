@@ -1,3 +1,4 @@
+using Automaton.Core.Services;
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;

@@ -1,9 +1,8 @@
 using System.IO.Compression;
 using Microsoft.Extensions.FileSystemGlobbing;
-using Automaton.Cli.Models;
 using Automaton.Core.Models;
 
-namespace Automaton.Cli.Services;
+namespace Automaton.Core.Services;
 
 /// <summary>
 /// Creates a zip stream from a local directory, respecting an explicit deploy directory.

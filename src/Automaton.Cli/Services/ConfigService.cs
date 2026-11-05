@@ -1,3 +1,4 @@
+using Automaton.Core.Services;
 using Automaton.Cli.Models;
 using Automaton.Core.Models;
 using System.Reflection;

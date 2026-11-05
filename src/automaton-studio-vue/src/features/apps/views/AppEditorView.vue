@@ -157,6 +157,10 @@ function handleNavigation(view: AppViewKey) {
   void router.replace({ query })
 }
 
+async function refreshTargets() {
+  handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
+}
+
 function handleTargetsChanged(targets: AppDeploymentTarget[]) {
   deploymentTargets.value = targets
   const liveTarget = getLiveTarget(targets)
@@ -324,6 +328,7 @@ function handleUnpublish() {
             :selected-target="selectedViewingTarget"
             @select-target="handleSelectViewingTarget"
             @navigate="handleNavigation"
+            @deployed="refreshTargets"
           />
 
           <AppRuntimeLogs

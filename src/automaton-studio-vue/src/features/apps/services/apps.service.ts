@@ -4,6 +4,7 @@
  */
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
+  DeploymentOperation,
   AppPermissionsResponse,
   AppSecretSummary,
   SecretAuditEntry,
@@ -215,6 +216,19 @@ class AppsService {
    */
   async unpublish(id: string): Promise<void> {
     await apiClient.post(`/api/apps/${id}/unpublish`)
+  }
+
+  /** Deploys the app from the source the server stores for it; returns the pending operation. */
+  async deployStoredSource(id: string, targetSlug?: string): Promise<DeploymentOperation> {
+    const { data } = await apiClient.post<DeploymentOperation>(`/api/apps/${id}/deploy`, null, {
+      params: targetSlug ? { targetSlug } : undefined,
+    })
+    return data
+  }
+
+  async getDeploymentOperation(id: string, operationId: string): Promise<DeploymentOperation> {
+    const { data } = await apiClient.get<DeploymentOperation>(`/api/apps/${id}/deploy-operations/${operationId}`)
+    return data
   }
 
   async listDeploymentTargets(id: string): Promise<AppDeploymentTarget[]> {

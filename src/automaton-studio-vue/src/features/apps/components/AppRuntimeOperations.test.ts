@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import Select from 'primevue/select'
 import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.types'
+import { appsService } from '../services/apps.service'
 import AppRuntimeOperations from './AppRuntimeOperations.vue'
 
 function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarget {
@@ -103,7 +104,7 @@ describe('AppRuntimeOperations', () => {
     expect(wrapper.findAll('button').some((item) => item.text().trim() === 'View logs')).toBe(false)
   })
 
-  it('gives CLI guidance for an assigned target without an app runtime, but adds no Studio deploy action', () => {
+  it('gives CLI guidance for an assigned target without an app runtime and offers a Studio Deploy button', () => {
     const notDeployed = target({
       status: DeploymentTargetStatus.NotDeployed,
       genericRuntimeDeployed: false,
@@ -113,7 +114,7 @@ describe('AppRuntimeOperations', () => {
     expect(wrapper.text()).toContain('This environment has no app runtime deployed')
     expect(wrapper.text()).toContain('automaton deploy live')
     expect(wrapper.text()).toContain('Copy deploy command')
-    expect(wrapper.findAll('button').some((item) => item.text().trim() === 'Deploy')).toBe(false)
+    expect(wrapper.findAll('button').some((item) => item.text().trim() === 'Deploy')).toBe(true)
     expect(wrapper.findAll('input, textarea')).toHaveLength(0)
   })
 
@@ -188,5 +189,25 @@ describe('AppRuntimeOperations', () => {
     expect(wrapper.text()).toContain('The latest deployment failed')
     expect(wrapper.text()).toContain('View logs')
     expect(wrapper.text()).toContain('View deployments')
+  })
+
+  it('deploys from stored source and shows the result', async () => {
+    vi.spyOn(appsService, 'deployStoredSource').mockResolvedValue({ operationId: 'op-1', status: 'Pending' })
+    vi.spyOn(appsService, 'getDeploymentOperation').mockResolvedValue({ operationId: 'op-1', status: 'Succeeded', success: true })
+    const wrapper = mountRuntime([target()])
+
+    await button(wrapper, 'Deploy').trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Deployed from the stored source.'))
+
+    expect(appsService.deployStoredSource).toHaveBeenCalledWith('app-id', 'live')
+    expect(wrapper.emitted('deployed')).toHaveLength(1)
+  })
+
+  it('shows why a stored-source deploy failed', async () => {
+    vi.spyOn(appsService, 'deployStoredSource').mockRejectedValue({ response: { data: { error: 'This app has no stored source to deploy.' } } })
+    const wrapper = mountRuntime([target()])
+
+    await button(wrapper, 'Deploy').trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('no stored source'))
   })
 })
