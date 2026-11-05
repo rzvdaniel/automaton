@@ -9,10 +9,12 @@ turned into a link to that image. An existing `proof` artifact on the issue is r
 Requires the gh CLI.
 """
 import json
+import os
 import re
 import subprocess
 import sys
 import tempfile
+from html import escape
 from pathlib import Path
 
 HINT = ('<p id="proof-hint" style="color:#666">Screenshots are links: the preview blocks a plain click, '
@@ -24,10 +26,10 @@ def link_images(html: str) -> str:
     def replace(match: re.Match) -> str:
         tag, src = match.group(0), match.group(1)
         alt = re.search(r'\balt="([^"]*)"', tag)
-        label = alt.group(1) if alt and alt.group(1) else src.rsplit("/", 1)[-1]
+        label = escape(alt.group(1) if alt and alt.group(1) else src.rsplit("/", 1)[-1])
         return f'<a href="{src}" target="_blank" rel="noopener">{label}</a>'
 
-    html = re.sub(r'<img\b[^>]*?\bsrc="(https?://[^"]+)"[^>]*>', replace, html)
+    html = re.sub(r'<img\b[^>]*?\bsrc=["\'](https?://[^"\']+)["\'][^>]*>', replace, html)
     if "<a " in html and 'id="proof-hint"' not in html:
         body = re.search(r"<body[^>]*>", html)
         html = html[:body.end()] + HINT + html[body.end():] if body else HINT + html
@@ -52,11 +54,18 @@ def main() -> int:
     base = f"repos/{repo}/issues/{issue}/artifacts"
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as handle:
         handle.write(html)
-    created = json.loads(gh("api", "-X", "POST", base, "-f", "name=proof", "-f", "type=embedded_html",
-                            "-F", f"body=@{handle.name}"))
-    for item in json.loads(gh("api", base)):
-        if item.get("name") == "proof" and item["number"] != created["number"]:
-            gh("api", "-X", "DELETE", f"{base}/{item['number']}")
+    try:
+        created = json.loads(gh("api", "-X", "POST", base, "-f", "name=proof", "-f", "type=embedded_html",
+                                "-F", f"body=@{handle.name}"))
+        listed = gh("api", "--paginate", "--slurp", base)
+        for item in (entry for page_items in json.loads(listed) for entry in page_items):
+            if item.get("name") == "proof" and item["number"] != created["number"]:
+                gh("api", "-X", "DELETE", f"{base}/{item['number']}")
+    except subprocess.CalledProcessError as error:
+        print(f"gh failed: {error.stderr.strip() or error}", file=sys.stderr)
+        return 1
+    finally:
+        os.unlink(handle.name)
     print(f"https://github.com/{repo}/issues/{issue}  (artifact {created['number']}, {len(html.encode())} bytes)")
     return 0
 
