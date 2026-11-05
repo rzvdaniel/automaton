@@ -25,6 +25,12 @@ public sealed class ApplicationContract
     /// <summary>Platform capabilities the app requests for administrator approval.</summary>
     public List<string> Permissions { get; set; } = [];
 
+    /// <summary>Plain (non-secret) values an installer chooses, delivered as environment variables like secrets.</summary>
+    public List<ApplicationSettingDeclaration> Settings { get; set; } = [];
+
+    /// <summary>Action schedules the installer is offered; each is created only when the installer accepts it.</summary>
+    public List<ApplicationScheduleDeclaration> Schedules { get; set; } = [];
+
     /// <summary>Fields this version does not know; kept so older tools never drop a newer contract field.</summary>
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
@@ -46,6 +52,38 @@ public sealed class ApplicationSecretDeclaration
 
     /// <summary>Optional source in a vault under another name: <c>project:NAME</c> or <c>user:NAME</c>.</summary>
     public string? From { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+/// <summary>A non-secret value the installer sets, read by the app as an environment variable.</summary>
+public sealed class ApplicationSettingDeclaration
+{
+    /// <summary>The environment variable name the app reads.</summary>
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    /// <summary>Value used when the installer leaves the setting empty.</summary>
+    public string? Default { get; set; }
+    /// <summary>The installer must provide a value (or the default must exist).</summary>
+    public bool Required { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+/// <summary>A default schedule for one of the app's Actions: a cron expression or an interval.</summary>
+public sealed class ApplicationScheduleDeclaration
+{
+    public string Name { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    /// <summary>Five-field cron expression; use this or <see cref="IntervalSeconds"/>.</summary>
+    public string? Cron { get; set; }
+    public int? IntervalSeconds { get; set; }
+    public string TimeZone { get; set; } = "Etc/UTC";
+    /// <summary>Input passed to the Action on each run.</summary>
+    public JsonElement? Input { get; set; }
 
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
@@ -265,6 +303,8 @@ public static class ApplicationContractValidator
         ValidateCompose(contract, errors);
         ValidateSecrets(contract.Secrets, errors);
         ValidatePermissions(contract.Permissions, errors);
+        ValidateSettings(contract.Settings, contract.Secrets, errors);
+        ValidateSchedules(contract.Schedules, errors);
 
         return errors;
     }
@@ -281,6 +321,56 @@ public static class ApplicationContractValidator
         {
             if (permission != SupportedPermission) errors.Add($"permissions contains unsupported permission '{permission}'");
             if (!seen.Add(permission)) errors.Add($"permissions declares '{permission}' more than once");
+        }
+    }
+
+    private static void ValidateSettings(
+        List<ApplicationSettingDeclaration>? settings, List<ApplicationSecretDeclaration>? secrets, ICollection<string> errors)
+    {
+        if (settings is null) return;
+        if (settings.Count > 50) errors.Add("settings can declare at most 50 names");
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var setting in settings)
+        {
+            if (setting is null || !ApplicationSecretNames.IsValidName(setting.Name))
+            {
+                errors.Add("settings[].name must be capital letters, digits and underscores, not starting with a digit or AUTOMATON_, and not the reserved APP_AUTOMATON_API_KEY");
+                continue;
+            }
+            if (!names.Add(setting.Name)) errors.Add($"settings declares {setting.Name} more than once");
+            if (secrets?.Any(secret => secret?.Name == setting.Name) == true)
+                errors.Add($"settings.{setting.Name} is also declared as a secret");
+            if (setting.Description is { } description
+                && (description.Length > ApplicationSecretNames.MaxDescriptionLength || description.Any(char.IsControl)))
+                errors.Add($"settings.{setting.Name}.description must be one line of at most {ApplicationSecretNames.MaxDescriptionLength} characters");
+            if (setting.Default is { Length: > 1000 }) errors.Add($"settings.{setting.Name}.default can be at most 1000 characters");
+        }
+    }
+
+    private static void ValidateSchedules(List<ApplicationScheduleDeclaration>? schedules, ICollection<string> errors)
+    {
+        if (schedules is null) return;
+        if (schedules.Count > 10) errors.Add("schedules can declare at most 10 entries");
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var schedule in schedules)
+        {
+            if (schedule is null || string.IsNullOrWhiteSpace(schedule.Name) || schedule.Name.Length > 160)
+            {
+                errors.Add("schedules[].name is required and can be at most 160 characters");
+                continue;
+            }
+            if (!names.Add(schedule.Name)) errors.Add($"schedules declares '{schedule.Name}' more than once");
+            try { AppActionManifestParser.ValidateKey(schedule.Action); }
+            catch (Exception) { errors.Add($"schedules.{schedule.Name}.action must be a valid Action key"); }
+            var hasCron = !string.IsNullOrWhiteSpace(schedule.Cron);
+            if (hasCron == schedule.IntervalSeconds.HasValue)
+                errors.Add($"schedules.{schedule.Name} needs exactly one of cron or intervalSeconds");
+            if (hasCron && schedule.Cron!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length != 5)
+                errors.Add($"schedules.{schedule.Name}.cron must have five fields: minute hour day-of-month month day-of-week");
+            if (schedule.IntervalSeconds is < 1)
+                errors.Add($"schedules.{schedule.Name}.intervalSeconds must be positive");
+            if (schedule.Input is { ValueKind: not (JsonValueKind.Object or JsonValueKind.Null) })
+                errors.Add($"schedules.{schedule.Name}.input must be an object");
         }
     }
 

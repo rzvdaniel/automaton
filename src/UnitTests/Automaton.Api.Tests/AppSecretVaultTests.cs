@@ -33,6 +33,32 @@ public sealed class AppSecretVaultTests
     }
 
     [Test]
+    public async Task SettingsUseTheirDefaultUntilSetAndEachInstallGetsItsOwnAppId()
+    {
+        var fixture = Fixture.Create();
+        var first = fixture.AddPersonalApp(fixture.Developer);
+        var second = fixture.AddPersonalApp(fixture.Developer);
+        foreach (var id in new[] { first, second })
+        {
+            var app = fixture.Db.WebApps.Single(item => item.Id == id);
+            app.ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract
+            {
+                Settings = [new() { Name = "S3_REGION", Default = "us-east-1" }, new() { Name = "S3_PREFIX" }]
+            });
+        }
+        fixture.Db.SaveChanges();
+        await fixture.Service.SetAsync(second, fixture.Developer, "S3_REGION", "eu-central", None);
+
+        var one = await fixture.Service.ResolveForExecutionAsync(first, None);
+        var two = await fixture.Service.ResolveForExecutionAsync(second, None);
+        Assert.That(one["S3_REGION"], Is.EqualTo("us-east-1"));
+        Assert.That(two["S3_REGION"], Is.EqualTo("eu-central"));
+        Assert.That(one.ContainsKey("S3_PREFIX"), Is.False);
+        Assert.That(one["AUTOMATON_APP_ID"], Is.EqualTo(first.ToString()));
+        Assert.That(two["AUTOMATON_APP_ID"], Is.EqualTo(second.ToString()));
+    }
+
+    [Test]
     public async Task UndeclaredVaultSecretsNeverReachAnApp()
     {
         var fixture = Fixture.Create();
@@ -41,8 +67,8 @@ public sealed class AppSecretVaultTests
         await fixture.Service.SetAsync(declares, fixture.Developer, AppSecretScopes.Project, "STRIPE_KEY", "value", null, None);
         await fixture.Service.SetAsync(declares, fixture.Developer, AppSecretScopes.Project, "OTHER", "value", null, None);
 
-        Assert.That((await fixture.Service.ResolveForExecutionAsync(declares, None)).Keys, Is.EquivalentTo(new[] { "STRIPE_KEY" }));
-        Assert.That(await fixture.Service.ResolveForExecutionAsync(silent, None), Is.Empty);
+        Assert.That((await fixture.Service.ResolveForExecutionAsync(declares, None)).Keys, Is.EquivalentTo(new[] { "STRIPE_KEY", "AUTOMATON_APP_ID" }));
+        Assert.That((await fixture.Service.ResolveForExecutionAsync(silent, None)).Keys, Is.EquivalentTo(new[] { "AUTOMATON_APP_ID" }));
     }
 
     [Test]
@@ -70,7 +96,7 @@ public sealed class AppSecretVaultTests
         await fixture.Service.SetAsync(personal, fixture.Developer, AppSecretScopes.User, "OPENAI_KEY", "mine", null, None);
 
         Assert.That((await fixture.Service.ResolveForExecutionAsync(personal, None))["OPENAI_KEY"], Is.EqualTo("mine"));
-        Assert.That(await fixture.Service.ResolveForExecutionAsync(project, None), Is.Empty);
+        Assert.That((await fixture.Service.ResolveForExecutionAsync(project, None)).Keys, Is.EquivalentTo(new[] { "AUTOMATON_APP_ID" }));
         var status = await fixture.Service.StatusAsync(project, fixture.Developer, [Declare("OPENAI_KEY", "user:OPENAI_KEY")], None);
         Assert.That(status.Single().Problem, Does.Contain("personal apps"));
     }

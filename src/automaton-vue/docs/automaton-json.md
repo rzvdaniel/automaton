@@ -118,6 +118,28 @@ From the app's folder:
 
 `application.permissions` requests platform access for the app, for example `"permissions": ["backups:read"]` (the only supported permission today). A system administrator of the server approves each request in Studio; the app then receives a scoped key as `APP_AUTOMATON_API_KEY` at its next Action run or start. `automaton permissions status` shows each request (waiting, approved, rejected or revoked) and the approval link to send to an administrator, and `automaton validate` and `automaton deploy` warn while a request waits. An app cannot approve its own requests, and neither can an API key.
 
+## Install manifest: settings and default schedules
+
+Anyone can install a published app from Studio. The installer is asked for what `automaton.json` declares, so an app needs no README steps:
+
+```json
+"settings": [
+  { "name": "S3_REGION", "description": "Object storage region", "default": "us-east-1" },
+  { "name": "S3_PREFIX", "description": "Folder for this install's copies", "required": true }
+],
+"schedules": [
+  { "name": "Nightly upload", "action": "upload", "cron": "30 3 * * *", "timeZone": "Etc/UTC", "input": {} }
+]
+```
+
+- **`settings`** are plain, non-secret values (`name` as for secrets, optional `description`, `default`, `required`). The installer fills them in; they reach Actions and the running app as environment variables, like secrets, and a `default` applies until a value is saved. Anything sensitive belongs in `secrets`, not here.
+- **`schedules`** are offered to the installer, who accepts or skips each; accepted ones become ordinary Action schedules of the installed app. `action` is an Action key; give exactly one of `cron` (five fields) or `intervalSeconds`; `input` is an object.
+- **`secrets`** and **`permissions`** work as above. Infrastructure permissions still need a system administrator's approval.
+
+Every installed app also receives `AUTOMATON_APP_ID`, its own app ID. Use it (or the install's name) in a storage prefix so two installs of one app never share data.
+
+`automaton validate` checks all of these.
+
 ## Create or link
 
 Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`

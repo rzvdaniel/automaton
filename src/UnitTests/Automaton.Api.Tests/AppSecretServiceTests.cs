@@ -20,7 +20,8 @@ public sealed class AppSecretServiceTests
         Assert.That(listed.Select(secret => secret.Name), Is.EqualTo(new[] { "S3_BUCKET", "S3_SECRET_KEY" }));
         Assert.That(listed.Single(secret => secret.Name == "S3_SECRET_KEY").Version, Is.EqualTo(2));
         var resolved = await service.ResolveForExecutionAsync(appId, CancellationToken.None);
-        Assert.That(resolved, Is.EqualTo(new Dictionary<string, string> { ["S3_SECRET_KEY"] = "second", ["S3_BUCKET"] = "backups" }));
+        Assert.That(resolved, Is.EqualTo(new Dictionary<string, string>
+            { ["S3_SECRET_KEY"] = "second", ["S3_BUCKET"] = "backups", ["AUTOMATON_APP_ID"] = appId.ToString() }));
         Assert.That(await db.SecretVersions.CountAsync(version => version.RevokedAtUtc != null), Is.EqualTo(1));
         Assert.That(await db.SecretVersions.AnyAsync(version => version.ProtectedValue.Contains("second")), Is.False);
     }
@@ -42,7 +43,7 @@ public sealed class AppSecretServiceTests
         await service.SetAsync(appId, ownerId, "TOKEN", "value", CancellationToken.None);
 
         Assert.That(await service.DeleteAsync(appId, ownerId, "TOKEN", CancellationToken.None), Is.True);
-        Assert.That(await service.ResolveForExecutionAsync(appId, CancellationToken.None), Is.Empty);
+        Assert.That((await service.ResolveForExecutionAsync(appId, CancellationToken.None)).Keys, Is.EqualTo(new[] { "AUTOMATON_APP_ID" }));
         Assert.That(await service.DeleteAsync(appId, ownerId, "TOKEN", CancellationToken.None), Is.False);
     }
 
@@ -64,7 +65,7 @@ public sealed class AppSecretServiceTests
         await db.SaveChangesAsync();
         await service.SetAsync(appId, ownerId, "TOKEN", "value", CancellationToken.None);
 
-        Assert.That(await service.ResolveForExecutionAsync(otherApp, CancellationToken.None), Is.Empty);
+        Assert.That((await service.ResolveForExecutionAsync(otherApp, CancellationToken.None)).Keys, Is.EqualTo(new[] { "AUTOMATON_APP_ID" }));
     }
 
     [Test]

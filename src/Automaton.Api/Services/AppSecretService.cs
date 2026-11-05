@@ -193,10 +193,21 @@ public sealed class AppSecretService(
             values[AppPermissionApproval.CredentialVariable] = protector.Unprotect(permissionKey);
             delivered.Add(new(AppPermissionApproval.CredentialVariable, "permission", null, AppPermissionApproval.BackupsRead));
         }
-        var declarations = await DeclarationsAsync(appId, token);
-        var wanted = declarations.Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
-        if (wanted.Count == 0) return (values, delivered);
+        var contract = await ContractAsync(appId, token);
+        // Settings are saved like app secrets; a declared default applies until the installer sets a value.
+        foreach (var setting in contract.Settings ?? [])
+            if (setting.Default is { Length: > 0 } fallback && !values.ContainsKey(setting.Name))
+                values[setting.Name] = fallback;
+        // Lets an app keep per-install data apart (for example a storage prefix); AUTOMATON_ names cannot be declared.
+        values["AUTOMATON_APP_ID"] = appId.ToString();
+        var wanted = (contract.Secrets ?? []).Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
+        if (wanted.Count > 0) await AddVaultSecretsAsync(vaults, wanted, values, delivered, token);
+        return (values, delivered);
+    }
 
+    private async Task AddVaultSecretsAsync(AppVaults vaults, List<ApplicationSecretDeclaration> wanted,
+        Dictionary<string, string> values, List<SecretDelivery> delivered, CancellationToken token)
+    {
         var available = await CurrentNamesAsync(vaults, token);
         var sources = new List<(string Name, SecretOwner Owner, string SourceName)>();
         foreach (var declaration in wanted)
@@ -214,7 +225,6 @@ public sealed class AppSecretService(
                     delivered.Add(new(source.Name, scope, secret.Version, source.SourceName == source.Name ? null : source.SourceName));
                 }
         }
-        return (values, delivered);
     }
 
     /// <summary>Stages removal of every secret of an app; the caller saves with the app deletion.</summary>
@@ -327,15 +337,15 @@ public sealed class AppSecretService(
         return current.Select(secret => new CurrentSecret(secret.Name, secret.ProtectedValue, secret.Version)).ToList();
     }
 
-    private async Task<IReadOnlyList<ApplicationSecretDeclaration>> DeclarationsAsync(Guid appId, CancellationToken token)
+    private async Task<ApplicationContract> ContractAsync(Guid appId, CancellationToken token)
     {
         var json = await db.WebApps.Where(app => app.Id == appId).Select(app => app.ApplicationContractJson).SingleOrDefaultAsync(token);
-        if (string.IsNullOrWhiteSpace(json)) return [];
-        try { return ApplicationContractSerialization.Deserialize(json).Secrets ?? []; }
+        if (string.IsNullOrWhiteSpace(json)) return new();
+        try { return ApplicationContractSerialization.Deserialize(json); }
         catch (Exception exception) when (exception is InvalidOperationException or System.Text.Json.JsonException)
         {
             // A stored contract that no longer validates declares nothing; app secrets still apply.
-            return [];
+            return new();
         }
     }
 
