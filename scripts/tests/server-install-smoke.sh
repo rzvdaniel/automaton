@@ -39,7 +39,7 @@ trap cleanup EXIT
 "${compose[@]}" up -d --wait --wait-timeout 600 postgres rabbitmq api worker studio store traefik
 address="http://$("${compose[@]}" port api 8080)"
 https_address="$("${compose[@]}" port traefik 443)"
-[[ $(curl -kfSs -H "Host: api.example.invalid" "https://$https_address/health") == "ok" ]]
+curl -kfSs -H "Host: api.example.invalid" "https://$https_address/health" | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"]=="ok"'
 curl -kfSs -H 'Host: studio.example.invalid' "https://$https_address/" | grep -q '<!doctype html>'
 curl -kfSs -H 'Host: studio.example.invalid' "https://$https_address/runtime-config.js" | python3 -c 'import sys; data=sys.stdin.read(); assert "https://api.example.invalid" in data and "https://apps.example.invalid" in data'
 curl -kfSsI -H 'Host: studio.example.invalid' "https://$https_address/runtime-config.js" | grep -qi 'cache-control: no-store'
