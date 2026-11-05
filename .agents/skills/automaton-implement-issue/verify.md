@@ -45,6 +45,26 @@ settings) and report what they did.
 New regular users have no Runner. To test as a regular user, put the app in a project that has a Runner, or deploy as
 the administrator and use the regular user for the access checks.
 
+## Test inbox (emails)
+
+Studio on the test server sends all mail to a catch-all [Mailpit](https://mailpit.axllent.com) container
+(`automaton-test-mailpit`, SMTP `automaton-test-mailpit:1025` on the `automaton-server_default` network, Studio's SMTP
+settings point at it). No mail leaves the server, so invite, reset and alert emails for `e2e-` users never reach a real
+inbox. Use `@example.test` addresses. The API is bound to the server's localhost only; on the test server:
+
+```bash
+curl -s localhost:8025/api/v1/messages                     # list: .messages[] {ID, Subject, To, Created}
+curl -s localhost:8025/api/v1/message/<ID>                 # one mail: .Text, .HTML
+curl -s "localhost:8025/api/v1/search?query=to:e2e-x@example.test"
+curl -s -X DELETE localhost:8025/api/v1/messages           # empty the inbox
+```
+
+From another machine use `ssh -L 8025:localhost:8025 automaton-runner-01`; the UI is then at `http://localhost:8025`.
+Quote the mail (subject, recipient, link) in the proof, but not one-time links or passwords. If the container is gone, recreate it:
+`docker run -d --name automaton-test-mailpit --restart unless-stopped --network automaton-server_default -p 127.0.0.1:8025:8025 -e MP_SMTP_AUTH_ACCEPT_ANY=1 -e MP_SMTP_AUTH_ALLOW_INSECURE=1 axllent/mailpit`,
+then in Admin → Settings → SMTP (or `PUT api/admin/installation/smtp`) set host `automaton-test-mailpit`, port 1025, SSL off,
+any account and password. Test server only; never point production at it.
+
 ## Verify as real users
 
 Against the test server API, the CLI and Studio, check:
