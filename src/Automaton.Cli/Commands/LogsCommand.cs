@@ -42,9 +42,9 @@ public static class LogsCommand
                 else
                 {
                     Console.WriteLine($"Runtime logs · {target.Name}");
-                    Console.WriteLine(CliBrowserService.TryOpenUrl(url)
-                        ? $"Opened: {url}"
-                        : $"No browser available. Open this URL: {url}");
+                    // A launcher can start and still show nothing (no display), so always print the URL.
+                    var opened = CliBrowserService.TryOpenUrl(url);
+                    Console.WriteLine(opened ? $"Opened (open it yourself if no browser appears): {url}" : $"No browser available. Open this URL: {url}");
                 }
                 context.ExitCode = 0;
             }
