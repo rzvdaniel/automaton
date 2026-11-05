@@ -46,7 +46,7 @@ Proven on a fresh server: install the same release (or newer) there, then:
 
    ```bash
    AGE_IMAGE=$(grep -m1 '^AGE_IMAGE=' /opt/automaton-server/release.env | cut -d= -f2-)
-   docker run --rm -v "$PWD":/data "$AGE_IMAGE" -d -i /data/backup-key -o /data/backup.tar /data/automaton-YYYYMMDDTHHMMSSZ.tar.age
+   docker run --rm -v "$PWD":/data "$AGE_IMAGE" age -d -i /data/backup-key -o /data/backup.tar /data/automaton-YYYYMMDDTHHMMSSZ.tar.age
    ```
 3. Extract it into the backups folder: `sudo tar -xf backup.tar -C /opt/automaton-server/backups/nightly/`. It then shows in `backup.sh --list`.
 4. Restore it: `sudo bash /opt/automaton-server/restore.sh automaton-YYYYMMDDTHHMMSSZ --confirm your-domain`.
