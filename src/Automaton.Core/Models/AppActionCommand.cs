@@ -9,3 +9,12 @@ public sealed record AppActionCommand(string Kind, JsonElement Payload)
         => new(kind, JsonSerializer.SerializeToElement(payload));
     public T Read<T>() => Payload.Deserialize<T>() ?? throw new InvalidDataException("App Action payload is required.");
 }
+
+/// <summary>Asks a Machine Management Runner to replace itself with the script the server prepared for it.</summary>
+public sealed record UpgradeRunnerRequest(Guid RunnerId, string Script);
+
+/// <summary>Whether the Runner's helper container has started an upgrade.</summary>
+public sealed record UpgradeRunnerStarted(bool Started);
+
+/// <summary>State of the helper container that upgrades a Runner: none, running, succeeded or failed.</summary>
+public sealed record RunnerUpgradeHelperStatus(string State, string? Log);

@@ -38,6 +38,10 @@ Good to know:
 - Removing someone from the project stops their deploys to its Runner straight away. Apps they created stay theirs, but cannot deploy until they are assigned a Runner they can use.
 - A project for one person to experiment in, or one everyone can deploy to, is just another project you can create. Automaton doesn't create these for you.
 
+## Upgrade a Machine Management Runner
+
+A Runner on an old image shows **Update available** on its card, with an **Upgrade** button, a banner on **Runners**, and a count in **Admin → Installation**. The owner clicks **Upgrade → Upgrade now**: the Runner replaces itself on the server's current image, reconnects with its identity and apps, and Studio reports that it reconnected or that it was rolled back to the previous container. The upgrade is refused while a deploy or an Action runs on the Runner, and for an offline Runner; use **Run it manually** (a host command) for those and for a Runner too old to upgrade itself. With a Developer API key, `automaton runners upgrade <runner> --wait` does the same and exits non-zero on failure; `automaton server update --wait --runners` also upgrades the Runners left on an old image.
+
 ## Remove a Machine Management Runner
 
 The personal owner uses **Runners → Delete runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove it from active projects (deleted projects do not count; a deleted project also stops giving its members access to the Runner, and gets it back if the project is reactivated), and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.

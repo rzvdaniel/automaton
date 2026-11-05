@@ -6,6 +6,9 @@ import UpdatePanel from './UpdatePanel.vue'
 import { installService } from '../services/install.service'
 import type { InstallationUpdateStatus } from '../types/install.types'
 
+vi.mock('@/features/runners/services/runners.service', () => ({
+  runnersService: { list: vi.fn().mockResolvedValue([{ id: 'r1', upgradeAvailable: true }, { id: 'r2', upgradeAvailable: false }]) },
+}))
 vi.mock('../services/install.service', () => ({
   installService: { getUpdate: vi.fn(), startUpdate: vi.fn() },
 }))
@@ -34,6 +37,14 @@ describe('UpdatePanel', () => {
     vi.mocked(installService.startUpdate).mockReset()
   })
   afterEach(() => vi.useRealTimers())
+
+  it('tells the administrator how many Runners need an upgrade', async () => {
+    vi.mocked(installService.getUpdate).mockResolvedValue(idle)
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="runners-need-upgrade"]').text()).toContain('1 Runner needs an upgrade')
+    wrapper.unmount()
+  })
 
   it('shows the version and asks for confirmation before starting an update', async () => {
     vi.mocked(installService.getUpdate).mockResolvedValue(idle)

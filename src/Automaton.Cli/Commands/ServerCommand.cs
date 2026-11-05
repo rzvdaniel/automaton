@@ -22,8 +22,9 @@ internal static class ServerCommand
         var wait = new Option<bool>("--wait", "Wait for the update to finish, then verify /health and the installed version");
         var timeout = new Option<int>("--timeout", () => 1800, "Seconds to wait with --wait");
         var downgrade = new Option<bool>("--allow-downgrade", "Allow installing a release older than the installed one");
+        var runners = new Option<bool>("--runners", "After a waited update, also upgrade the Runners that are on an old image");
         var json = new Option<bool>("--json", "Print the result as JSON");
-        var command = new Command("update", "Update the server to the latest release or a given version") { version, wait, timeout, downgrade, json };
+        var command = new Command("update", "Update the server to the latest release or a given version") { version, wait, timeout, downgrade, runners, json };
         command.SetHandler(context => RunAsync(context, config, async (client, asJson, ct) =>
         {
             var requested = ServerUpdateRunner.NormalizeVersion(context.ParseResult.GetValueForOption(version))
@@ -34,9 +35,43 @@ internal static class ServerCommand
             var outcome = await runner.RunAsync(requested, context.ParseResult.GetValueForOption(wait), TimeSpan.FromSeconds(seconds), ct,
                 context.ParseResult.GetValueForOption(downgrade));
             WriteOutcome(outcome, asJson);
-            return outcome.Success;
+            if (!outcome.Success || !outcome.Waited) return outcome.Success;
+            return await ReportRunnersAsync(client, context.ParseResult.GetValueForOption(runners), asJson, ct);
         }, json));
         return command;
+    }
+
+    /// <summary>Lists Runners left on an old image with the command to upgrade them; with upgrade, upgrades them too.</summary>
+    private static async Task<bool> ReportRunnersAsync(AutomatonApiClient client, bool upgrade, bool asJson, CancellationToken ct)
+    {
+        var old = (await client.ListRunnersAsync(ct)).EnumerateArray()
+            .Where(runner => runner.TryGetProperty("upgradeAvailable", out var flag) && flag.ValueKind == System.Text.Json.JsonValueKind.True)
+            .Select(runner => (Id: runner.GetProperty("id").GetString() ?? "", Name: runner.GetProperty("name").GetString() ?? "?"))
+            .ToList();
+        var results = new List<object>();
+        var success = true;
+        foreach (var (id, name) in old)
+        {
+            var command = $"automaton runners upgrade {id} --wait";
+            if (!upgrade)
+            {
+                (asJson ? Console.Error : Console.Out).WriteLine($"Runner {name} is on an old image. Upgrade it with: {command}");
+                results.Add(new { id, name, upgraded = false, command });
+                continue;
+            }
+            var upgrader = new RunnerUpgradeRunner(client, Task.Delay, text => (asJson ? Console.Error : Console.Out).WriteLine($"{name}: {text}"));
+            RunnerUpgradeOutcome outcome;
+            try { outcome = await upgrader.RunAsync(id, true, TimeSpan.FromMinutes(10), ct); }
+            catch (Exception exception) when (!ct.IsCancellationRequested)
+            {
+                outcome = new(false, "Failed", exception.Message + $" Run on its server instead, or retry: {command}");
+            }
+            success &= outcome.Success;
+            (asJson ? Console.Error : Console.Out).WriteLine($"Runner {name}: {outcome.Message}");
+            results.Add(new { id, name, upgraded = outcome.Success, state = outcome.State, outcome.Message });
+        }
+        if (asJson && results.Count > 0) CliJson.Write(new { runners = results });
+        return success;
     }
 
     private static Command BuildUpdateStatus(ConfigService config)

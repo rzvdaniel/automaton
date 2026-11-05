@@ -7,7 +7,8 @@ namespace Automaton.Runner.Console.Services;
 internal sealed class AppActionCommandExecutor(AppActionExecutionService execution, AppActionDeploymentService deployment,
     RunnerDeploymentService runtime,
     MachineStaticSitePublisher? staticSites = null,
-    MachineApplicationStorageCleanup? storageCleanup = null)
+    MachineApplicationStorageCleanup? storageCleanup = null,
+    RunnerSelfUpgradeService? selfUpgrade = null)
 {
     public async Task<RunnerExecutionResult> ExecuteAsync(AppActionCommand command, CancellationToken token)
     {
@@ -26,6 +27,9 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "restart-runtime" => await RestartAsync(command.Read<RestartAppRuntimeRequest>(), token),
             "cleanup-target" or "cleanup-target-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = false }),
             "cleanup-app" or "cleanup-app-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = true }),
+            "upgrade-runner" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable."))
+                .StartAsync(command.Read<UpgradeRunnerRequest>(), token),
+            "upgrade-status" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable.")).StatusAsync(token),
             _ => throw new InvalidDataException("Unknown App Action command.")
         };
         return new() { Outcome = "Succeeded", Started = started, Finished = DateTime.UtcNow,

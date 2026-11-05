@@ -163,7 +163,7 @@ Demonstrated on 23 October 2026 using a separate development API, Studio, Worker
 
 The previous workstation-to-workload networking blocker was avoided by placing the isolated development control plane and Runner on the same test host. Existing databases and app volumes were preserved; only the separate development database was initialized/migrated. This does not close the deferred M1/M2 multi-user, Action, cancellation or restart/replay evidence (checked later: see [Two-user isolation acceptance](#two-user-isolation-acceptance)). Second-machine acceptance remains deferred.
 
-Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment creates a separate installation and is not an upgrade path. Backup automation and Runner self-update are deferred.
+Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment creates a separate installation and is not an upgrade path. Backup automation is deferred.
 
 A normal-user CLI exercise on 27 October created two static sites, an HTTP API
 and a reporting Action app through one authorized account and an explicitly
@@ -224,7 +224,7 @@ These are later improvements, not prerequisites for M3's single-server target or
 
 - Second-machine acceptance and additional multi-machine operating features. Preserve existing enrollment/assignment behavior.
 - Additional monitoring, per-category storage breakdowns and system-app catalog work. Basic host retention/admission is covered by the [operations policies](../prod/production-docker-cheat-sheet.md#storage-maintenance); applying those policies to existing hosts remains an operator step, not milestone acceptance.
-- Automatic Runner self-update. Studio provides an operator-run Runner upgrade command with rollback (**Runners → Upgrade runner**).
+- Runner self-update is done: **Runners → Upgrade** replaces an online Runner with rollback; the manual command remains for offline Runners.
 - Off-site backup destinations and app-data backups, delivered as maintenance apps; see [self-maintenance](self-maintenance.md). Nightly local database/key backups and `restore.sh` ship with the server.
 - Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.
 - Smaller developer-experience improvements found while building apps, such as persisted runtime logs and real-time connections, are tracked in [enhancements](enhancements.md).

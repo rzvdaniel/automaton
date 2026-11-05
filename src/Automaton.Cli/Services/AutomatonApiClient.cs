@@ -657,6 +657,21 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    /// <summary>Starts a one-click upgrade of an online Runner to the server's configured image.</summary>
+    public async Task<JsonElement> StartRunnerUpgradeAsync(string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/runners/{Uri.EscapeDataString(runnerId)}/upgrade", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> GetRunnerUpgradeAsync(string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/runners/{Uri.EscapeDataString(runnerId)}/upgrade", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task DeleteRunnerAsync(string runnerId, CancellationToken ct = default)
     {
         using var resp = await _http.DeleteAsync($"api/runners/{Uri.EscapeDataString(runnerId)}?hostCleanupConfirmed=true", ct);

@@ -20,7 +20,7 @@ public sealed class RunnersControllerAccessTests
             runnerDeletionService: null!, connectionSessionService: null!, runnerQueryService: null!,
             flowExecutionService: null!, connectionLifecycleService: null!);
 
-        var result = await new RunnersController(service)
+        var result = await new RunnersController(service, Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Config.HostedRunnerOptions()))
             .Put(Guid.NewGuid(), new Automaton.Api.Models.UpdateRunnerRequest { Name = "renamed" }, default);
 
         Assert.That(result, Is.TypeOf<ForbidResult>());
@@ -65,7 +65,7 @@ public sealed class RunnersControllerAccessTests
             await db.SaveChangesAsync();
         }
         var users = AppAuthorizationTestData.CreateUserContextService(user);
-        var upgrade = new RunnerUpgradeService(db, new ResourceAuthorizationService(db, users),
+        var upgrade = new RunnerUpgradeService(db, new ResourceAuthorizationService(db, users), new FakeRunner(),
             Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Config.HostedRunnerOptions { DockerImage = Image }));
 
         if (allowed)

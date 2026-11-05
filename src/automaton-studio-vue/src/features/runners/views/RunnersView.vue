@@ -23,7 +23,6 @@ import {
   getStatusSeverity,
   type Runner,
   type RunnerRemovalInstructions,
-  type RunnerUpgradeInstructions,
   isRunnerLinkedToProject,
 } from '../types/runners.types'
 import { classifyRunner, isVisibleApplicationRunner } from '../utils/runner-classification'
@@ -40,8 +39,7 @@ const showSelfHostedInstallDialog = ref(false)
 const removalInstructions = ref<RunnerRemovalInstructions | null>(null)
 const removalRunnerName = ref('')
 const showRemovalDialog = ref(false)
-const upgradeInstructions = ref<RunnerUpgradeInstructions | null>(null)
-const upgradeRunnerName = ref('')
+const upgradeRunner = ref<Runner | null>(null)
 const showUpgradeDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const showDebugDetails = ref(false)
@@ -55,6 +53,9 @@ const viewOptions = [
 ]
 
 // Computed stats
+const needUpgradeCount = computed(
+  () => visibleRunners.value.filter((r) => canUpgrade(r) && r.upgradeAvailable).length
+)
 const visibleRunners = computed(() => runners.value.filter(isVisibleApplicationRunner))
 const onlineCount = computed(
   () => visibleRunners.value.filter((r) => r.status === RunnerStatus.Online).length
@@ -222,19 +223,9 @@ function canUpgrade(runner: Runner) {
   return !runner.isHostedRunner && runner.applicationProfile === 'MachineManagement'
 }
 
-async function openUpgrade(runner: Runner) {
-  try {
-    upgradeInstructions.value = await runnersService.prepareUpgrade(runner.id)
-    upgradeRunnerName.value = runner.name
-    showUpgradeDialog.value = true
-  } catch (err: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: isAxiosError(err) ? err.response?.data?.message ?? 'Failed to prepare the Runner upgrade' : 'Failed to prepare the Runner upgrade',
-      life: 10000,
-    })
-  }
+function openUpgrade(runner: Runner) {
+  upgradeRunner.value = runner
+  showUpgradeDialog.value = true
 }
 
 function confirmDelete(runner: Runner) {
@@ -333,6 +324,10 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <Message v-if="needUpgradeCount > 0" severity="warn" :closable="false" class="mb-4" data-testid="runner-upgrade-banner">
+      {{ needUpgradeCount }} {{ needUpgradeCount === 1 ? 'Runner needs' : 'Runners need' }} an upgrade to the server's current Runner image.
+    </Message>
+
     <!-- Runners Section Header with View Toggle -->
     <div class="flex align-items-center justify-content-between mb-4">
       <h2 class="text-xl font-semibold m-0">Registered Runners</h2>
@@ -409,6 +404,12 @@ onUnmounted(() => {
                     :severity="getRunnerSourceSeverity(runner)"
                   />
                   <Tag
+                    v-if="canUpgrade(runner) && runner.upgradeAvailable"
+                    value="Update available"
+                    severity="warn"
+                    data-testid="runner-update-badge"
+                  />
+                  <Tag
                     v-if="isRunnerLinkedToProject(runner)"
                     v-tooltip.top="'Linked to a project. Manage under Project settings.'"
                     :value="`Project: ${runner.projectName}`"
@@ -430,11 +431,13 @@ onUnmounted(() => {
             <div class="flex gap-1">
               <Button
                 v-if="canUpgrade(runner)"
+                :label="runner.upgradeAvailable ? 'Upgrade' : undefined"
                 v-tooltip.top="'Upgrade runner'"
                 icon="pi pi-refresh"
-                text
-                rounded
+                :text="!runner.upgradeAvailable"
+                :rounded="!runner.upgradeAvailable"
                 size="small"
+                data-testid="runner-upgrade-button"
                 @click.stop="openUpgrade(runner)"
               />
               <Button
@@ -658,15 +661,16 @@ onUnmounted(() => {
             </template>
           </Column>
 
-          <Column header="Actions" style="width: 120px">
+          <Column header="Actions" style="width: 180px">
             <template #body="{ data }">
               <div class="flex gap-1">
                 <Button
                   v-if="canUpgrade(data)"
+                  :label="data.upgradeAvailable ? 'Upgrade' : undefined"
                   v-tooltip.top="'Upgrade runner'"
                   icon="pi pi-refresh"
-                  text
-                  rounded
+                  :text="!data.upgradeAvailable"
+                  :rounded="!data.upgradeAvailable"
                   size="small"
                   @click.stop="openUpgrade(data)"
                 />
@@ -696,9 +700,10 @@ onUnmounted(() => {
       v-model:visible="showRemovalDialog" :instructions="removalInstructions"
       :runner-name="removalRunnerName" @removed="loadRunners" />
 
-    <RunnerUpgradeDialog v-if="upgradeInstructions" :key="upgradeInstructions.runnerId"
-      v-model:visible="showUpgradeDialog" :instructions="upgradeInstructions"
-      :runner-name="upgradeRunnerName" />
+    <RunnerUpgradeDialog v-if="upgradeRunner" :key="upgradeRunner.id"
+      v-model:visible="showUpgradeDialog" :runner-id="upgradeRunner.id" :runner-name="upgradeRunner.name"
+      :online="upgradeRunner.status === RunnerStatus.Online" :upgrade-available="!!upgradeRunner.upgradeAvailable"
+      @finished="loadRunners" />
 
 
   </div>

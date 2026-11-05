@@ -55,6 +55,7 @@ export interface Runner {
   projectName?: string | null
   hostedRunnerId?: string | null
   isHostedRunner: boolean
+  upgradeAvailable?: boolean
   storageAllowanceBytes?: number | null
   storageTotalBytes?: number | null
   storageUsagePercent?: number | null
@@ -80,6 +81,15 @@ export interface RunnerUpgradeInstructions {
   image: string
   upToDate: boolean
   upgradeCommand: string
+}
+
+export type RunnerUpgradeState = 'InProgress' | 'Reconnected' | 'RolledBack' | 'Unknown'
+
+export interface RunnerUpgradeStatus {
+  runnerId: string
+  state: RunnerUpgradeState
+  message: string
+  imageDigest?: string | null
 }
 
 export const RunnerApplicationProfiles = {

@@ -8,6 +8,7 @@ import type {
   Runner,
   RunnerRemovalInstructions,
   RunnerUpgradeInstructions,
+  RunnerUpgradeStatus,
   RunnerStatusResponse,
   SelfHostedRunnerInstallation,
   SelfHostedRunnerInstallationStatusResponse,
@@ -41,8 +42,20 @@ class RunnersService {
     await apiClient.delete(`/api/runners/${id}`, { params: { hostCleanupConfirmed: true } })
   }
 
+  /** The manual host command, for an offline or broken Runner. */
   async prepareUpgrade(id: string): Promise<RunnerUpgradeInstructions> {
-    const { data } = await apiClient.post<RunnerUpgradeInstructions>(`/api/runners/${id}/upgrade`)
+    const { data } = await apiClient.post<RunnerUpgradeInstructions>(`/api/runners/${id}/upgrade-command`)
+    return data
+  }
+
+  /** Starts a one-click upgrade of an online Runner to the server's current image. */
+  async startUpgrade(id: string): Promise<RunnerUpgradeStatus> {
+    const { data } = await apiClient.post<RunnerUpgradeStatus>(`/api/runners/${id}/upgrade`)
+    return data
+  }
+
+  async getUpgradeStatus(id: string): Promise<RunnerUpgradeStatus> {
+    const { data } = await apiClient.get<RunnerUpgradeStatus>(`/api/runners/${id}/upgrade`)
     return data
   }
 

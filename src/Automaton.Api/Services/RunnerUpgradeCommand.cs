@@ -8,7 +8,13 @@ namespace Automaton.Api.Services;
 /// </summary>
 internal static partial class RunnerUpgradeCommand
 {
+    /// <summary>The command a person runs on the Runner's host.</summary>
     public static string Build(Guid runnerId, string? installationId, string image, string runnerName)
+        => "/bin/sh <<'AUTOMATON_RUNNER_UPGRADE'\n" + BuildScript(runnerId, installationId, image, runnerName)
+            + "AUTOMATON_RUNNER_UPGRADE\n";
+
+    /// <summary>The upgrade procedure itself; the Runner also runs it inside a helper container.</summary>
+    public static string BuildScript(Guid runnerId, string? installationId, string image, string runnerName)
     {
         if (string.IsNullOrWhiteSpace(runnerName) || runnerName.Any(char.IsControl))
             throw new InvalidOperationException("The Runner name cannot be used in an upgrade command. Rename the Runner in Studio, then retry.");
@@ -21,7 +27,6 @@ internal static partial class RunnerUpgradeCommand
         // The server's current name: a Runner renamed in Studio must not restart under its old name.
         var nameLine = ShellQuote($"AUTOMATON_RUNNER_NAME={runnerName}");
         return $$$"""
-            /bin/sh <<'AUTOMATON_RUNNER_UPGRADE'
             set -eu
             container='{{{container}}}'
             image='{{{image}}}'
@@ -94,7 +99,6 @@ internal static partial class RunnerUpgradeCommand
               docker start "$container" >/dev/null
               exit 1
             fi
-            AUTOMATON_RUNNER_UPGRADE
             """;
     }
 

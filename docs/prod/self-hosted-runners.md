@@ -137,18 +137,28 @@ a separate operator decision.
 
 ## Machine Management Runner updates
 
-The Runner's owner upgrades a Machine Management Runner from **Studio -> Runners -> Upgrade runner**,
-also while projects use it. Studio shows a command to run on the Runner's server. It verifies the container's installation
-and Runner identity, pulls the server's configured Runner image
-(`HostedRunners.DockerImage`, updated by each server release), and recreates the Runner
-container with the same identity, configuration, workspace volume and network. Deployed
-app containers keep running. If the new container does not start, the command restores
-the previous one. Rerunning it when the Runner is current makes no changes.
+A Machine Management Runner on an old image shows **Update available** in **Studio -> Runners** and in a banner
+there; **Admin -> Installation** also counts the Runners that need an upgrade after a server update. The Runner's
+owner clicks **Upgrade** (also while projects use it). An online Runner replaces itself: it starts a short-lived
+helper container from its current image, which runs the same procedure as the manual command. That procedure
+verifies the container's installation and Runner identity, pulls the server's configured Runner image
+(`HostedRunners.DockerImage`, updated by each server release; a request can never name an image), and recreates the
+Runner container with the same identity, configuration, workspace volume and network. Deployed app containers keep
+running. If the new container does not connect, the previous one is restored and Studio reports the rollback. The
+upgrade is refused while a deploy or an Action is running on the Runner, and for an offline Runner.
+
+Agents use the API (`POST /api/runners/{id}/upgrade`, then `GET /api/runners/{id}/upgrade`; Developer API key of the
+Runner's owner) or the CLI: `automaton runners upgrade <runner> --wait` exits non-zero when the Runner rolled back.
+`automaton server update --wait` lists Runners left on an old image with the command to upgrade each, and
+`--runners` upgrades them too.
+
+For an offline or broken Runner, and for a Runner too old to know the upgrade command (the first upgrade after
+installing a release before this feature), use **Run it manually** in the dialog: it shows the command to run on the
+Runner's server (`POST /api/runners/{id}/upgrade-command`). Rerunning it when the Runner is current makes no changes.
 
 Upgrade Runners installed from server releases before 0.1.15: they run an older Runner
 that cannot clean up, move or delete deployed apps. The install command is for enrolling
-a new installation; do not rerun it as an upgrade. Automatic Runner self-update is not
-provided.
+a new installation; do not rerun it as an upgrade.
 
 ## When a Runner does not answer
 

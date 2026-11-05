@@ -24,6 +24,8 @@ public class RunnerDetails
     public string? ApiInstanceId { get; set; }
     public string? ApiColor { get; set; }
     public string? ImageDigest { get; set; }
+    /// <summary>True when this Machine Management Runner is not on the server's configured Runner image.</summary>
+    public bool UpgradeAvailable { get; set; }
     public int? ContainerSpecificationVersion { get; set; }
     public string? ApiCompatibilityVersion { get; set; }
     public string? OperatingSystem { get; set; }

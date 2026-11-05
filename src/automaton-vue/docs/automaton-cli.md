@@ -24,7 +24,7 @@ an AI conversation.
 
 ## Install a Runner
 
-`automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. Steps, options and errors: [Add a Runner](./deploy-runner).
+`automaton runners upgrade RUNNER [--wait]` upgrades an online Runner to the server's current image (non-zero exit if it rolled back); `automaton server update --wait [--runners]` lists, or with `--runners` upgrades, Runners left on an old image. `automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. Steps, options and errors: [Add a Runner](./deploy-runner).
 
 ## Several servers
 

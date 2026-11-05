@@ -28,7 +28,7 @@ public sealed class RunnerApiKeyDeletionAccessTests
     {
         var user = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim("api_key_scope", scope)], "ApiKey"));
-        var controller = new RunnersController(null!)
+        var controller = new RunnersController(null!, Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Config.HostedRunnerOptions()))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } }
         };
