@@ -41,7 +41,7 @@ docker compose -f docker-compose.dev.yml up -d postgres
 docker compose -f docker-compose.rabbitmq.yml up -d
 ```
 
-Configure the backend connection string. Replace `<your-POSTGRES_PASSWORD>` with the `POSTGRES_PASSWORD` the PostgreSQL container starts with: set it in a local, untracked `.env` in the repo root (start from `.env.example`) before the first `docker compose up`. The compose files refuse to start without it (also set `RABBITMQ_PASSWORD` for RabbitMQ), so no password is committed to the repository; the Worker reads `RabbitMq__Password` and `ConnectionStrings__PostgreSqlConnection` from user secrets or environment variables.
+Configure the backend connection string. Replace `<your-POSTGRES_PASSWORD>` with the `POSTGRES_PASSWORD` the PostgreSQL container starts with: set it in a local, untracked `.env` in the repo root (start from `.env.example`) before the first `docker compose up`. The compose files refuse to start without it (also set `RABBITMQ_PASSWORD` for RabbitMQ), so no password is committed to the repository; the Worker's `appsettings.json` only holds placeholders, so override them for `src/Automaton.Worker` with user secrets (`ConnectionStrings:PostgreSqlConnection`, `RabbitMq:Password`) or environment variables (`ConnectionStrings__PostgreSqlConnection`, `RabbitMq__Password`). `docker/test-setup.sh` and `scripts/setup-local-development.ps1` generate missing passwords into `.env` for you; the local runtime stack (`docker-compose.runtime-local.yml`) uses `LOCAL_RUNTIME_POSTGRES_PASSWORD` and `LOCAL_RUNTIME_RABBITMQ_PASSWORD`.
 
 ```bash
 cd src/Automaton.Api

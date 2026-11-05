@@ -12,6 +12,17 @@ $composeFile = Join-Path $repoRoot 'docker-compose.runtime-local.yml'
 $localRoot = Join-Path $repoRoot '.local-runtime'
 $helpers = Join-Path $PSScriptRoot 'local'
 
+# Generate random local passwords into the untracked .env when missing.
+$envFile = Join-Path $repoRoot '.env'
+if (-not (Test-Path -LiteralPath $envFile)) { New-Item -ItemType File -Path $envFile | Out-Null }
+foreach ($name in 'LOCAL_RUNTIME_POSTGRES_PASSWORD', 'LOCAL_RUNTIME_RABBITMQ_PASSWORD') {
+    if (-not (Select-String -LiteralPath $envFile -Pattern "^$name=" -Quiet)) {
+        $bytes = [byte[]]::new(16)
+        [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+        Add-Content -LiteralPath $envFile -Value "$name=$([Convert]::ToHexString($bytes).ToLower())"
+    }
+}
+
 & (Join-Path $helpers 'Test-LocalPrerequisites.ps1')
 & (Join-Path $helpers 'Initialize-LocalDns.ps1') -NoHostsFileChanges:$NoHostsFileChanges
 & (Join-Path $helpers 'Initialize-LocalCertificates.ps1') -RepositoryRoot $repoRoot | Out-Null

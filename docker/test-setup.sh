@@ -62,6 +62,15 @@ if [ ! -f docker-compose.dev.yml ]; then
 fi
 print_success "docker-compose.dev.yml exists"
 
+# Generate random local passwords into the untracked .env when missing
+[ -f .env ] || touch .env
+for name in POSTGRES_PASSWORD RABBITMQ_PASSWORD; do
+    if ! grep -q "^$name=" .env; then
+        echo "$name=$(openssl rand -hex 16)" >> .env
+        print_info "Generated $name in .env"
+    fi
+done
+
 # Step 3: Validate docker-compose configuration
 echo ""
 echo "Step 3: Validating Docker Compose configuration..."
