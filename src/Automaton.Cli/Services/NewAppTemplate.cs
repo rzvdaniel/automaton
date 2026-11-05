@@ -50,10 +50,13 @@ internal sealed record NewAppTemplate(ApplicationContract Contract, IReadOnlyDic
     {
         var contract = Runtime("mcr.microsoft.com/dotnet/aspnet:10.0", "dotnet", "App.dll");
         contract.Runtime.Command!.WorkingDirectory = "dist";
+        var build = Command("dotnet", "publish", "App.csproj", "-c", "Release", "-o", "dist");
+        // The .NET SDK needs a writable home; /tmp is too small for NuGet, so use the build workspace.
+        build.Environment["DOTNET_CLI_HOME"] = "/automaton/source/.automaton-home";
         contract.Build = new ApplicationBuildSpec
         {
             Image = "mcr.microsoft.com/dotnet/sdk:10.0",
-            Command = Command("dotnet", "publish", "App.csproj", "-c", "Release", "-o", "dist"),
+            Command = build,
             OutputDirectory = "dist"
         };
         return new(contract, new Dictionary<string, string>

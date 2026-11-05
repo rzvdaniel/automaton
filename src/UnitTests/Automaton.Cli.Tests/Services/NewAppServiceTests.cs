@@ -59,6 +59,11 @@ public class NewAppServiceTests
         });
     }
 
+    [Test]
+    public void DotNetTemplate_BuildSetsADotNetHomeDirectory()
+        => Assert.That(NewAppTemplate.Create("dotnet").Contract.Build!.Command!.Environment,
+            Contains.Key("DOTNET_CLI_HOME"));
+
     [TestCase("server.py")]
     [TestCase("automaton.json")]
     public async Task CreateAsync_WithTemplate_DoesNotOverwriteExistingFiles(string name)
