@@ -15,6 +15,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+HINT = ('<p id="proof-hint" style="color:#666">Screenshots are links: the preview blocks a plain click, '
+        'so right-click a link and choose Open in new tab.</p>')
 LIMIT = 1024 * 1024  # a proof is text and links; embedded images do not belong here
 
 

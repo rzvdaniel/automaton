@@ -76,7 +76,9 @@ Screenshots: push them to the orphan branch `pr-screenshots` under `pr-<N>/` (cr
 `git switch --orphan pr-screenshots` if it does not exist; never merge or delete it). Link them, do not embed them:
 `https://raw.githubusercontent.com/rzvdaniel/automaton/pr-screenshots/pr-<N>/name.png`. The same links work in the
 proof, PR comments and issue comments (in Markdown, `![name](link)` also shows the image there). The artifact preview
-does not load images from other sites, so in the proof they are plain links.
+does not load images from other sites, so in the proof they are plain links (it also blocks a plain click: right-click,
+Open in new tab; `proof.py` adds that hint). Also list the screenshot links in the close-out comment on the issue,
+where a normal click opens them.
 The repository is public: use only `e2e-` test data and no passwords, tokens or keys in the shot.
 
 After every test-server upgrade, also run the Studio smoke checks (`src/automaton-studio-vue/smoke/README.md`:
