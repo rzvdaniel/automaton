@@ -55,12 +55,23 @@ internal static class CliApplication
         }
         if (RequiresAuthorizationCompletion(context) && !await CompleteAuthorizationAsync(context, authorizationCompletion))
             WritePendingAuthorizationWarning();
+        Environment.ExitCode = 0;
         try { await next(context); }
         catch (InvalidOperationException error)
         {
             Console.Error.WriteLine(error.Message);
             context.ExitCode = 1;
         }
+        PropagateHandlerExitCode(context);
+    }
+
+    /// <summary>
+    /// Handlers that set <see cref="Environment.ExitCode"/> instead of the invocation context would otherwise
+    /// exit 0, because the value the invocation returns wins over the environment value.
+    /// </summary>
+    internal static void PropagateHandlerExitCode(InvocationContext context)
+    {
+        if (context.ExitCode == 0 && Environment.ExitCode != 0) context.ExitCode = Environment.ExitCode;
     }
 
     private static bool HasUnsupportedInput(InvocationContext context, string[] args)
