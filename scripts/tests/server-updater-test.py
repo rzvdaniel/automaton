@@ -312,14 +312,13 @@ esac
 
     def test_removes_unused_untagged_runner_images_before_the_disk_check(self):
         log = self.root / 'docker.log'
-        repository = 'ghcr.io/rzvdaniel/automaton-runner'
+        repository = 'example.invalid/runner'  # the fixture manifest pins RUNNER_IMAGE in this repository
         # Listed oldest first on purpose: the updater must sort by creation time, keep the newest
         # untagged image for rollback and never remove the pinned one (the fake resolves pins to sha256:pinned).
         listing = ';'.join([f'sha256:old2 {repository} <none>', f'sha256:pinned {repository} <none>',
                             f'sha256:old1 {repository} <none>', f'sha256:new {repository} <none>',
                             f'sha256:tagged {repository} latest', 'sha256:other example.invalid/other <none>'])
         created = 'sha256:old2=2026-10-01T00:00:00Z;sha256:pinned=2026-10-15T00:00:00Z;sha256:old1=2026-10-20T00:00:00Z;sha256:new=2026-11-01T00:00:00Z'
-        (self.install / 'release.env').write_text((self.install / 'release.env').read_text() + f'RUNNER_IMAGE={repository}:1'+chr(10))
         result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log), 'FAKE_IMAGE_LS': listing, 'FAKE_IMAGE_CREATED': created})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         calls = [json.loads(line) for line in log.read_text().splitlines()]
