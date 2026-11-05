@@ -24,7 +24,7 @@ internal sealed class RunnerSelfUpgradeService(Func<string> runnerId, string? in
             throw new InvalidOperationException("This Runner is not running in a Docker container it can inspect.");
         await run(["rm", "--force", helper], token);
         // A short pause lets this command's result reach the server before the old container stops.
-        var script = "sleep 5\n" + request.Script;
+        var script = "sleep 10\n" + request.Script;
         var started = await run(["run", "-d", "--name", helper, "--user", "root",
             "-v", "/var/run/docker.sock:/var/run/docker.sock", "--entrypoint", "/bin/sh", image.Output.Trim(), "-c", script], token);
         if (started.ExitCode != 0)

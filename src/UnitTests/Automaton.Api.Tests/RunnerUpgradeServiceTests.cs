@@ -86,6 +86,29 @@ public sealed class RunnerUpgradeServiceTests
     }
 
     [Test]
+    public async Task ARunnerWithARunningDeployIsRefused()
+    {
+        var (service, fake, runner, db) = SetUp();
+        var app = Guid.NewGuid();
+        db.AppDeploymentTargets.Add(new AppDeploymentTarget { Id = Guid.NewGuid(), WebAppId = app, Name = "Live", Slug = "live", IsDefault = true, ExecutionRunnerId = runner });
+        db.DeploymentOperations.Add(new DeploymentOperation
+            { Id = Guid.NewGuid(), WebAppId = app, OwnerUserId = Guid.NewGuid(), PackagePath = "p", Status = DeploymentOperationStatuses.Running });
+        await db.SaveChangesAsync();
+        var error = Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(runner, default));
+        Assert.That(error!.Message, Does.Contain("deploy or an Action"));
+        Assert.That(fake.Kind, Is.Null);
+    }
+
+    [TestCase("repo/runner@sha256:aaa", "repo/runner@sha256:aaa", true)]
+    [TestCase("other/runner@sha256:aaa", "repo/runner@sha256:aaa", true)]
+    [TestCase("repo/runner@sha256:bbb", "repo/runner@sha256:aaa", false)]
+    [TestCase(null, "repo/runner@sha256:aaa", false)]
+    [TestCase("runner:latest", "runner:latest", true)]
+    [TestCase("repo/runner@sha256:aaa", "runner:latest", false)]
+    public void ComparesTheReportedImageWithTheConfiguredOne(string? reported, string configured, bool current)
+        => Assert.That(RunnerUpgradeService.IsCurrent(reported, configured), Is.EqualTo(current));
+
+    [Test]
     public async Task AnOldRunnerThatDoesNotKnowTheCommandGetsTheManualHint()
     {
         var (service, fake, runner, _) = SetUp();
@@ -96,7 +119,7 @@ public sealed class RunnerUpgradeServiceTests
 
     [TestCase("running", RunnerUpgradeStates.InProgress)]
     [TestCase("failed", RunnerUpgradeStates.RolledBack)]
-    [TestCase("succeeded", RunnerUpgradeStates.Reconnected)]
+    [TestCase("succeeded", RunnerUpgradeStates.InProgress)]
     [TestCase("none", RunnerUpgradeStates.Unknown)]
     public async Task StatusFollowsTheHelperWhileTheRunnerStillHasTheOldImage(string helper, string expected)
     {

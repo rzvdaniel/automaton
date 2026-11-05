@@ -21,7 +21,7 @@ internal sealed class RunnerUpgradeRunner(AutomatonApiClient client, Func<TimeSp
             await delay(PollInterval, ct);
             JsonElement status;
             try { status = await client.GetRunnerUpgradeAsync(runnerId, ct); }
-            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+            catch (Exception exception) when ((exception is HttpRequestException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 continue; // the API may be restarting
             }

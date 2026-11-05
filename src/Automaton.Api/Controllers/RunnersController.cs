@@ -4,7 +4,9 @@ using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Scripting.Engines;
 using Microsoft.AspNetCore.Authorization;
+using Automaton.Api.Config;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Controllers;
 
@@ -12,7 +14,7 @@ public class RunnersController : BaseController
 {
     private readonly RunnerService runnersService;
     private readonly string currentImage;
-    public RunnersController(RunnerService runnersService, Microsoft.Extensions.Options.IOptions<Automaton.Api.Config.HostedRunnerOptions> hostedRunnerOptions)
+    public RunnersController(RunnerService runnersService, IOptions<HostedRunnerOptions> hostedRunnerOptions)
     {
         this.runnersService = runnersService;
         currentImage = hostedRunnerOptions.Value.DockerImage;
@@ -25,7 +27,7 @@ public class RunnersController : BaseController
         var runners = (await runnersService.List(projectId, cancellationToken)).ToList();
         foreach (var runner in runners)
             runner.UpgradeAvailable = !string.IsNullOrEmpty(runner.InstallationId)
-                && !string.Equals(runner.ImageDigest, currentImage, StringComparison.Ordinal);
+                && !RunnerUpgradeService.IsCurrent(runner.ImageDigest, currentImage);
         return Ok(runners);
     }
 

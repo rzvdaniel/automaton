@@ -1,5 +1,6 @@
 using Automaton.Api.Config;
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -22,8 +23,7 @@ public sealed class RunnerUpgradeService(
     {
         var entity = await LoadAsync(id, token);
         var image = hostedRunnerOptions.Value.DockerImage;
-        var upToDate = string.Equals(entity.ImageDigest, image, StringComparison.Ordinal);
-        return new(id, image, upToDate, RunnerUpgradeCommand.Build(id, entity.InstallationId, image, entity.Name));
+        return new(id, image, IsCurrent(entity.ImageDigest, image), RunnerUpgradeCommand.Build(id, entity.InstallationId, image, entity.Name));
     }
 
     /// <summary>Starts the upgrade on an online, idle Runner. The image is always the server's configured one.</summary>
@@ -33,11 +33,10 @@ public sealed class RunnerUpgradeService(
         var image = hostedRunnerOptions.Value.DockerImage;
         if (!RunnerPresenceEvaluator.IsOnline(entity.ConnectionId, entity.LastHeartbeatAtUtc, DateTime.UtcNow))
             throw new InvalidOperationException("The Runner is offline. Run the manual upgrade command on its server instead.");
-        if (string.Equals(entity.ImageDigest, image, StringComparison.Ordinal))
+        if (IsCurrent(entity.ImageDigest, image))
             throw new InvalidOperationException("The Runner already uses the current image.");
         var since = DateTime.UtcNow - BusyWindow;
-        if (await db.RunnerExecutionOperations.AnyAsync(
-                o => o.RunnerId == id && o.ResultJson == null && o.CreatedAtUtc > since, token))
+        if (await IsBusyAsync(id, since, token))
             throw new InvalidOperationException("The Runner is running a deploy or an Action. Try again when it has finished.");
         var script = RunnerUpgradeCommand.BuildScript(id, entity.InstallationId, image, entity.Name);
         try
@@ -57,7 +56,7 @@ public sealed class RunnerUpgradeService(
     {
         var entity = await LoadAsync(id, token);
         var image = hostedRunnerOptions.Value.DockerImage;
-        if (string.Equals(entity.ImageDigest, image, StringComparison.Ordinal)
+        if (IsCurrent(entity.ImageDigest, image)
             && RunnerPresenceEvaluator.IsOnline(entity.ConnectionId, entity.LastHeartbeatAtUtc, DateTime.UtcNow))
             return new(id, RunnerUpgradeStates.Reconnected, "The Runner reconnected on the current image.", entity.ImageDigest);
         if (!RunnerPresenceEvaluator.IsOnline(entity.ConnectionId, entity.LastHeartbeatAtUtc, DateTime.UtcNow))
@@ -75,12 +74,34 @@ public sealed class RunnerUpgradeService(
             "running" => new(id, RunnerUpgradeStates.InProgress, "The upgrade is running.", entity.ImageDigest),
             "failed" => new(id, RunnerUpgradeStates.RolledBack,
                 "The upgraded Runner did not connect, so the previous container was restored. " + helper.Log, entity.ImageDigest),
-            "succeeded" => new(id, RunnerUpgradeStates.Reconnected, "The upgrade finished.", entity.ImageDigest),
+            // The helper finished and the Runner is back, but it has not reported the new image yet.
+            "succeeded" => new(id, RunnerUpgradeStates.InProgress, "Waiting for the Runner to report its new image.", entity.ImageDigest),
             _ => new(id, RunnerUpgradeStates.Unknown, "No upgrade was started on this Runner.", entity.ImageDigest)
         };
     }
 
-    private async Task<Entities.Runner> LoadAsync(Guid id, CancellationToken token)
+    /// <summary>True when the Runner reports the configured image (compared by digest when one is configured).</summary>
+    internal static bool IsCurrent(string? reported, string configured)
+    {
+        var digest = configured.IndexOf('@', StringComparison.Ordinal);
+        return digest < 0
+            ? string.Equals(reported, configured, StringComparison.Ordinal)
+            : reported is not null && reported.EndsWith(configured[digest..], StringComparison.Ordinal);
+    }
+
+    /// <summary>Queued Runner commands, deploys and Actions that have not finished on this Runner.</summary>
+    private async Task<bool> IsBusyAsync(Guid runnerId, DateTime since, CancellationToken token)
+    {
+        if (await db.RunnerExecutionOperations.AnyAsync(o => o.RunnerId == runnerId && o.ResultJson == null && o.CreatedAtUtc > since, token))
+            return true;
+        return await db.DeploymentOperations.AnyAsync(operation => operation.CreatedAtUtc > since
+            && (operation.Status == DeploymentOperationStatuses.Pending || operation.Status == DeploymentOperationStatuses.Running)
+            && db.AppDeploymentTargets.Any(target => target.WebAppId == operation.WebAppId
+                && (operation.TargetSlug == null ? target.IsDefault : target.Slug == operation.TargetSlug)
+                && target.ExecutionRunnerId == runnerId), token);
+    }
+
+    private async Task<Runner> LoadAsync(Guid id, CancellationToken token)
     {
         // Upgrading replaces the Runner's software without changing who may use it, so the owner may
         // upgrade a Runner that projects share; deleting it still requires removing it from them first.
