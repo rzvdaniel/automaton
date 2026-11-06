@@ -50,6 +50,41 @@ public sealed class PublicMarketplaceVisibilityTests
         Assert.That(result, Is.TypeOf<NotFoundObjectResult>());
     }
 
+    [Test]
+    public async Task GetApps_ListsOnlyAppsWithAWebPage_AndInstallableOnlyListsTheRest()
+    {
+        await using var db = CreateDbContext();
+        var website = CreatePrivateMediaPreview();
+        website.Name = "Website";
+        website.ApplicationContractJson = ContractJson(command: "node server.js");
+        var tool = CreatePrivateMediaPreview();
+        tool.Name = "Tool";
+        tool.IsForkable = true;
+        tool.ApplicationContractJson = ContractJson(command: null);
+        var closedTool = CreatePrivateMediaPreview();
+        closedTool.Name = "Closed tool";
+        closedTool.ApplicationContractJson = ContractJson(command: null);
+        db.WebApps.AddRange(website, tool, closedTool);
+        await db.SaveChangesAsync();
+        var controller = CreateController(db);
+
+        var store = (await controller.GetApps()).Result as OkObjectResult;
+        var installable = (await controller.GetApps(installableOnly: true)).Result as OkObjectResult;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(((List<MarketplaceAppCardDto>)store!.Value!).Select(app => app.Name), Is.EqualTo(new[] { "Website" }));
+            Assert.That(((List<MarketplaceAppCardDto>)installable!.Value!).Select(app => app.Name), Is.EqualTo(new[] { "Tool" }));
+        });
+    }
+
+    private static string ContractJson(string? command)
+    {
+        var contract = new Automaton.Core.Models.ApplicationContract();
+        contract.Runtime.Command = command is null ? null : new Automaton.Core.Models.ApplicationCommandSpec { Executable = command };
+        return Automaton.Core.Models.ApplicationContractSerialization.Serialize(contract);
+    }
+
     private static ApplicationDbContext CreateDbContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -68,6 +103,7 @@ public sealed class PublicMarketplaceVisibilityTests
         Summary = string.Empty,
         Description = string.Empty,
         Definition = "{}",
+        ApplicationContractJson = ContractJson(command: "node server.js"),
         Created = DateTime.UtcNow,
         Updated = DateTime.UtcNow,
         IsPublished = true,

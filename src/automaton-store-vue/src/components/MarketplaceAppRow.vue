@@ -13,9 +13,7 @@ const creator = computed(() => props.app.creatorDisplayName || props.app.creator
 const installUrl = computed(() =>
   props.app.isForkable && publicAppConfig.studioUrl ? `${publicAppConfig.studioUrl}apps/install/${props.app.id}` : '',
 )
-// An Actions-only app has no web page, so the only useful action is Install.
-const showOpen = computed(() => props.app.hasWebPage !== false || !installUrl.value)
-const openToUse = computed(() => props.app.hasWebPage !== false && props.app.canLaunch)
+const openToUse = computed(() => props.app.canLaunch)
 const summary = computed(() => props.app.summary || props.app.description || 'A public Automaton app')
 </script>
 
@@ -42,8 +40,8 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
       </p>
     </div>
     <div class="app-actions">
-      <RouterLink v-if="showOpen" class="btn small" :to="`/apps/${app.id}`" :aria-label="`View ${app.name} details`">Open</RouterLink>
-      <a v-if="installUrl" class="btn small" :class="{ primary: !showOpen }" :href="installUrl" :aria-label="`Install ${app.name}`">Install</a>
+      <RouterLink class="btn small" :to="`/apps/${app.id}`" :aria-label="`View ${app.name} details`">Open</RouterLink>
+      <a v-if="installUrl" class="btn small" :href="installUrl" :aria-label="`Install ${app.name}`">Install</a>
     </div>
   </article>
 </template>

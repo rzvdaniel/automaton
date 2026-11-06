@@ -488,6 +488,14 @@ export interface DeploymentOperation {
   result?: { message?: string | null } | null
 }
 
+export interface InstallableApp {
+  id: string
+  name: string
+  summary?: string | null
+  description?: string | null
+  creatorDisplayName?: string | null
+}
+
 export interface InstallSource {
   id: string
   name: string

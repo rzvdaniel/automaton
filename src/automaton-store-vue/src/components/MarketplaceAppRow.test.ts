@@ -49,14 +49,6 @@ describe('MarketplaceAppRow', () => {
     return { text: container.textContent ?? '', buttons: [...container.querySelectorAll('a.btn')].map((a) => a.textContent), vue }
   }
 
-  it('shows only Install for a forkable app without a web page', async () => {
-    const { text, buttons, vue } = await render({ isForkable: true, hasWebPage: false })
-    expect(buttons).toEqual(['Install'])
-    expect(text).toContain('Installable')
-    expect(text).not.toContain('Open to use')
-    vue.unmount()
-  })
-
   it('shows Open and Install for a forkable web app, and only Open for a plain one', async () => {
     const web = await render({ isForkable: true, hasWebPage: true })
     expect(web.buttons).toEqual(['Open', 'Install'])

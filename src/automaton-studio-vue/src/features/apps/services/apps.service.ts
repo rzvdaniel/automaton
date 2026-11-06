@@ -5,6 +5,7 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
   InstallSource,
+  InstallableApp,
   DeploymentOperation,
   AppPermissionsResponse,
   AppSecretSummary,
@@ -353,6 +354,14 @@ class AppsService {
    */
   async updateRunner(id: string, runnerId: string | null): Promise<void> {
     await apiClient.put(`/api/apps/${id}/runner`, { executionRunnerId: runnerId })
+  }
+
+  /** Published, forkable tools without a web page: the public store hides them, Studio's Install apps page lists them. */
+  async getInstallableApps(): Promise<InstallableApp[]> {
+    const { data } = await apiClient.get<InstallableApp[]>('/api/public/marketplace/apps', {
+      params: { installableOnly: true, take: 100 },
+    })
+    return data ?? []
   }
 
   async getMarketplaceCategories(): Promise<string[]> {

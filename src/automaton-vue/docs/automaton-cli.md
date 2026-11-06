@@ -29,6 +29,32 @@ automaton login --server https://api.your-domain.com
 
 `automaton login` prints the approval URL and a code, then notices your approval within about five seconds. On a server without a browser it prints the URL; open it on another device. Use `--device` to skip the browser attempt.
 
+## Log in without a browser
+
+On a server over SSH, or for an AI agent, use one of these. Neither needs a browser on the machine that runs the CLI.
+
+**Device approval.** Run `automaton login --device --server https://api.your-domain.com`. It prints an approval URL and a code, and waits. Approve it from any signed-in session: open the URL in a browser on another device, or approve it from a terminal with an administrator or user token:
+
+```bash
+API=https://api.your-domain.com
+# URL printed by the CLI: .../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
+read -rp "Email: " EMAIL; read -rsp "Password: " PASSWORD; echo
+TOKEN=$(jq -n --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}' |
+  curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -r .accessToken)
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/REQUEST_ID/approve" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"userCode":"USER_CODE"}'
+```
+
+`200` means approved; the waiting CLI notices within about five seconds. Codes expire after a few minutes, so approve soon after `login` prints it.
+
+**API key.** Create a key in Studio (**API Keys**) or with `POST /api/ApiKeys` (`{"name": "my-cli"}`, bearer token as above; the response `apiKey` is shown once). Then:
+
+```bash
+automaton login --server https://api.your-domain.com --key
+```
+
+`--key` with no value asks for the key at a hidden prompt. Do not put the key in a command argument, a log or an AI conversation; for unattended jobs set `AUTOMATON_SERVER` and `AUTOMATON_API_KEY` in the process environment instead.
+
 For unattended use, configure `AUTOMATON_API_KEY` in the process environment and
 use the command's non-interactive option where available. Do not paste keys into
 an AI conversation.

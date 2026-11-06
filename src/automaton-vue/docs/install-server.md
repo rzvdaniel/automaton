@@ -5,7 +5,7 @@ description: Install Automaton (Studio, API, app store, PostgreSQL, RabbitMQ, Tr
 
 # Install the server
 
-This page installs your own Automaton server on one x86_64 Linux machine. Next steps: [create the first administrator](./first-admin), then [add a Runner](./deploy-runner).
+This page installs your own Automaton server on one x86_64 Linux machine. Next steps: [create the first administrator](./first-admin), then [add a Runner](./deploy-runner). Installing over SSH with no browser works too: [first administrator without a browser](./first-admin#without-a-browser-ssh-or-an-ai-agent).
 
 Already have a team server? Ask its administrator for the API URL and go to [Create your first app](./getting-started).
 
