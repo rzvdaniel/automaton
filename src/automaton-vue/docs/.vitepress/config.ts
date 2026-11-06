@@ -35,6 +35,7 @@ export default defineConfig({
         text: 'Tasks',
         items: [
           { text: 'Is Automaton for you?', link: '/is-automaton-for-you' },
+          { text: 'Automaton by the numbers', link: '/numbers' },
           { text: 'Install the server', link: '/install-server' },
           { text: 'Create the first administrator', link: '/first-admin' },
           { text: 'Add a Runner', link: '/deploy-runner' },

@@ -220,6 +220,7 @@ const websiteDocsRoot = path.resolve(__dirname, 'docs')
 // Key documentation pages, in reading order. llms.txt lists them and llms-full.txt contains them,
 // both built from the Markdown source at build time so they cannot go stale.
 const keyDocs: Array<{ file: string; url: string }> = [
+  'numbers',
   'install-server',
   'first-admin',
   'deploy-runner',
