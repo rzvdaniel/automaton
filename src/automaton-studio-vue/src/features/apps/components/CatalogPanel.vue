@@ -70,21 +70,27 @@ function clearFilters() {
 
 const showTime = computed(() => (catalog.value?.fetchedAt ? new Date(catalog.value.fetchedAt).toLocaleString() : ''))
 
+let latest = 0
 async function load(refresh = false) {
-  loading.value = true
+  const mine = ++latest
+  loading.value = !catalog.value
   failed.value = false
   try {
-    catalog.value = await appsService.getCatalog(refresh, query.value)
+    const response = await appsService.getCatalog(refresh, query.value)
+    if (mine === latest) catalog.value = response
   } catch {
-    catalog.value = null
-    failed.value = true
+    if (mine === latest) {
+      catalog.value = null
+      failed.value = true
+    }
   } finally {
-    loading.value = false
+    if (mine === latest) loading.value = false
   }
 }
 
 onMounted(() => load())
 watch(query, () => load())
+watch(() => route.query.q, (q) => { search.value = one(q) })
 onBeforeUnmount(() => clearTimeout(searchTimer))
 
 async function installFromUrl() {

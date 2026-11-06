@@ -82,6 +82,22 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task Get_WithNullFieldsInAnEntry_StillListsAndSearchesTheCatalog()
+    {
+        await using var db = CreateDb();
+        var json = $"{{\"schemaVersion\":1,\"repo\":\"owner/apps\",\"apps\":[{{\"id\":\"x\",\"name\":\"Odd\",\"summary\":null,\"category\":null,\"folder\":\"m/x\",\"commit\":\"{Commit}\",\"tags\":[null,\"ok\"]}}]}}";
+        var service = CreateService(db, new FakeHandler(_ => Respond(json, null)));
+
+        var all = await service.GetAsync(Guid.NewGuid(), true, default, new CatalogQuery { Q = "ok" });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(all.Apps.Single().Name, Is.EqualTo("Odd"));
+            Assert.That(all.Categories, Is.Empty);
+        });
+    }
+
+    [Test]
     public async Task Get_ReadsTheMainBranchOfTheOfficialRepoByDefault_AndTheConfiguredSourceWhenSet()
     {
         await using var db = CreateDb();
@@ -166,9 +182,13 @@ public sealed class AppCatalogTests
 
         var mine = await service.GetAsync(owner, refresh: true, default);
         var other = await service.GetAsync(Guid.NewGuid(), refresh: false, default);
+        var mineOnly = await service.GetAsync(owner, false, default, new CatalogQuery { Installed = true });
+        var otherOnly = await service.GetAsync(Guid.NewGuid(), false, default, new CatalogQuery { Installed = true });
 
         Assert.Multiple(() =>
         {
+            Assert.That(mineOnly.Apps.Single().InstalledAppId, Is.EqualTo(app.Id));
+            Assert.That(otherOnly.Total, Is.EqualTo(0));
             Assert.That(mine.Apps.Single().InstalledAppId, Is.EqualTo(app.Id));
             Assert.That(other.Apps.Single().InstalledAppId, Is.Null);
             Assert.That(mine.Apps.Single().RequiresNewerServer, Is.True);

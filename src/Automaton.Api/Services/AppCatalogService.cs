@@ -270,8 +270,8 @@ public sealed class AppCatalogService(
         var minimum = ParseVersion(app.MinServerVersion);
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
         Guid? installedId = installed.TryGetValue((repo, app.Folder), out var id) ? id : null;
-        return new CatalogEntryDto(app.Id, app.Name, app.Summary, app.Category, repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags, app.Icon);
+        return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon);
     }
 
     internal static Version? ParseVersion(string? text)
