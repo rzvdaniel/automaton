@@ -41,6 +41,7 @@ export default defineConfig({
           { text: 'Create your first app', link: '/getting-started' },
           { text: 'Build an Automaton app', link: '/build-an-automaton-app' },
           { text: 'Deploy and publish an app', link: '/deploy' },
+          { text: 'Publish your own app catalog', link: '/apps-repository' },
           { text: 'Update the server', link: '/update-server' },
           { text: 'Back up and restore', link: '/backup-restore' },
           { text: 'Secrets and permissions', link: '/secrets-and-permissions' },

@@ -139,6 +139,8 @@ automaton project list
 automaton publish --yes --slug NAME
 automaton delete --yes          # permanently delete the linked remote app
 automaton listing show
+automaton catalog init my-apps  # files for your own apps repository (writes only; no git, no GitHub)
+automaton catalog build         # generate catalog.json from catalog-apps.json
 ```
 
 `sync-ai` restores the canonical local guidance files. `pull` downloads app
@@ -146,6 +148,8 @@ source. `runners` lists available Runners. `project create|list|add-app` manages
 public and requires explicit user approval. `listing` sets the app's marketplace
 summary, description, category, tags, cover and screenshots; see
 [Deploy and publish an app](./deploy#marketplace-listing).
+
+`catalog init` and `catalog build` create and maintain an apps repository that servers can use as a catalog source: see [Publish your own app catalog](./apps-repository).
 
 System administrators of a self-hosted server can update it from the CLI:
 `automaton server update --wait` installs the latest release (or `--version

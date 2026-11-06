@@ -16,9 +16,10 @@ Automaton is open source and self-hosted: you run your own Studio, API and Runne
 5. [Create your first app](/getting-started)
 6. [Build an Automaton app](/build-an-automaton-app)
 7. [Deploy and publish an app](/deploy)
-8. [Update the server](/update-server)
-9. [Back up and restore](/backup-restore)
-10. [Secrets and permissions](/secrets-and-permissions)
+8. [Publish your own app catalog](/apps-repository)
+9. [Update the server](/update-server)
+10. [Back up and restore](/backup-restore)
+11. [Secrets and permissions](/secrets-and-permissions)
 
 ## Reference
 
