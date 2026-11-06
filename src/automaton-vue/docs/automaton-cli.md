@@ -40,12 +40,13 @@ API=https://api.your-domain.com
 # URL printed by the CLI: .../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
 read -rp "Email: " EMAIL; read -rsp "Password: " PASSWORD; echo
 TOKEN=$(jq -n --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}' |
-  curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -r .accessToken)
+  curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
 curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/REQUEST_ID/approve" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"userCode":"USER_CODE"}'
+unset PASSWORD TOKEN
 ```
 
-`200` means approved; the waiting CLI notices within about five seconds. Codes expire after a few minutes, so approve soon after `login` prints it.
+`200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. the waiting CLI notices within about five seconds. Codes expire after a few minutes, so approve soon after `login` prints it.
 
 **API key.** Create a key in Studio (**API Keys**) or with `POST /api/ApiKeys` (`{"name": "my-cli"}`, bearer token as above; the response `apiKey` is shown once). Then:
 

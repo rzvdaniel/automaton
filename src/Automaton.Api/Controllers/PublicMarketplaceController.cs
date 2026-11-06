@@ -45,17 +45,23 @@ public class PublicMarketplaceController : ControllerBase
         [FromQuery] int take = 20,
         [FromQuery] bool installableOnly = false)
     {
-        // The web-page rule is read from each app's contract, so fetch the largest page and trim afterwards.
-        var apps = await _catalogQuery.GetAppsAsync(
-            category, search, 100, TryGetCurrentUserId(), HttpContext.RequestAborted);
+        var wanted = Math.Clamp(take, 1, 100);
+        var currentUserId = TryGetCurrentUserId();
+        var result = new List<MarketplaceAppCardDto>();
 
-        await PopulateApplicationSourceFlagsAsync(apps);
+        // The web-page rule is read from each app's contract, so page through the catalog until enough apps pass it.
+        // The public store lists apps a visitor can open; tools without a web page are for Studio's Install apps page.
+        const int batchSize = 100;
+        for (var skip = 0; result.Count < wanted; skip += batchSize)
+        {
+            var batch = await _catalogQuery.GetAppsAsync(
+                category, search, batchSize, currentUserId, HttpContext.RequestAborted, skip);
+            await PopulateApplicationSourceFlagsAsync(batch);
+            result.AddRange(batch.Where(app => installableOnly ? !app.HasWebPage && app.IsForkable : app.HasWebPage));
+            if (batch.Count < batchSize) break;
+        }
 
-        // The public store lists apps a visitor can open. Tools without a web page are for Studio's Install apps page.
-        return Ok(apps
-            .Where(app => installableOnly ? !app.HasWebPage && app.IsForkable : app.HasWebPage)
-            .Take(Math.Clamp(take, 1, 100))
-            .ToList());
+        return Ok(result.Take(wanted).ToList());
     }
 
     [HttpGet("apps/{appId:guid}")]
@@ -308,12 +314,12 @@ public class PublicMarketplaceController : ControllerBase
         }
 
         var apps = await _creatorAppsQuery
-            .FindCreatorApps(appId, creatorUserId, currentUserId, take)
+            .FindCreatorApps(appId, creatorUserId, currentUserId, 100)
             .ToListAsync();
 
         await PopulateApplicationSourceFlagsAsync(apps);
 
-        return Ok(apps.Where(app => app.HasWebPage).ToList());
+        return Ok(apps.Where(app => app.HasWebPage).Take(Math.Clamp(take, 1, 100)).ToList());
     }
 
     [HttpGet("categories")]

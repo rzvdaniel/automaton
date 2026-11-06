@@ -27,7 +27,7 @@ SMTP is not needed to start: the first administrator's email is confirmed by thi
 
 ## Without a browser (SSH or an AI agent)
 
-Studio's setup page calls two endpoints, and you can call them yourself. Run this on the server (or anywhere that can reach the API) in a shell where the password is typed at a hidden prompt, never given as an argument and never echoed:
+Studio's setup page calls two endpoints, and you can call them yourself. Run this on the server, in a shell where the password is typed at a hidden prompt, never given as an argument and never echoed:
 
 ```bash
 API=https://api.example.com
@@ -45,9 +45,10 @@ jq -n --arg name "$NAME" --arg email "$EMAIL" --arg password "$PASSWORD" \
   curl -s -w '\nHTTP %{http_code}\n' -X POST "$API/api/install" \
     -H @<(printf 'X-Automaton-Setup-Token: %s\n' "$(sudo cat /etc/automaton/secrets/setup-token)") \
     -H 'Content-Type: application/json' --data-binary @-
+unset PASSWORD
 ```
 
-`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token stops working once setup is complete.
+`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token stops working once setup is complete.
 
 Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
 

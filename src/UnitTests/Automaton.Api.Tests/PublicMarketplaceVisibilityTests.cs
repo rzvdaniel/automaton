@@ -78,6 +78,35 @@ public sealed class PublicMarketplaceVisibilityTests
         });
     }
 
+    [Test]
+    public async Task GetApps_FillsTheRequestedCountPastTools()
+    {
+        await using var db = CreateDbContext();
+        for (var i = 0; i < 105; i++)
+        {
+            var tool = CreatePrivateMediaPreview();
+            tool.Name = $"Tool {i}";
+            tool.IsFeatured = true;
+            tool.IsForkable = true;
+            tool.ApplicationContractJson = ContractJson(command: null);
+            db.WebApps.Add(tool);
+        }
+        var website = CreatePrivateMediaPreview();
+        website.Name = "Website";
+        db.WebApps.Add(website);
+        await db.SaveChangesAsync();
+        var controller = CreateController(db);
+
+        var store = (await controller.GetApps(take: 5)).Result as OkObjectResult;
+        var installable = (await controller.GetApps(take: 100, installableOnly: true)).Result as OkObjectResult;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(((List<MarketplaceAppCardDto>)store!.Value!).Select(app => app.Name), Is.EqualTo(new[] { "Website" }));
+            Assert.That(((List<MarketplaceAppCardDto>)installable!.Value!), Has.Count.EqualTo(100));
+        });
+    }
+
     private static string ContractJson(string? command)
     {
         var contract = new Automaton.Core.Models.ApplicationContract();

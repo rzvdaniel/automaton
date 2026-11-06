@@ -13,7 +13,8 @@ public sealed class PublicMarketplaceCatalogQuery(ApplicationDbContext dbContext
         string? search,
         int take,
         Guid? currentUserId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int skip = 0)
     {
         var query = dbContext.WebApps
             .AsNoTracking()
@@ -29,6 +30,7 @@ public sealed class PublicMarketplaceCatalogQuery(ApplicationDbContext dbContext
             .ThenByDescending(app => app.StarCount)
             .ThenByDescending(app => app.ViewCount)
             .ThenByDescending(app => app.PublishedAt)
+            .Skip(skip)
             .Take(Math.Clamp(take, 1, 100))
             .Select(app => new MarketplaceAppCardDto
             {
