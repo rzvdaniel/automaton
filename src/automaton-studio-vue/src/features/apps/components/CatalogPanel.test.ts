@@ -5,6 +5,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 const getCatalog = vi.fn()
 const resolveGitUrl = vi.fn()
 const push = vi.fn()
+const roles = vi.hoisted(() => ({ value: [] as string[] }))
+vi.mock('@/features/auth/stores/auth.store', () => ({ useAuthStore: () => ({ user: { roles: roles.value } }) }))
 vi.mock('../services/apps.service', () => ({ appsService: { getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a) } }))
 vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push }) }))
 
@@ -13,11 +15,11 @@ import PrimeVue from 'primevue/config'
 import CatalogPanel from './CatalogPanel.vue'
 
 const RouterLink = { props: ['to'], template: '<a class="link" :data-to="JSON.stringify(to)"><slot /></a>' }
-const entry = { id: 'backup', name: 'Off-site Backup', summary: 'Copies backups away', category: 'Maintenance', repo: 'o/apps', folder: 'm/backup', commit: '0123456789abcdef0123456789abcdef01234567', minServerVersion: '0.2.31', permissions: ['backups:read'], requiresNewerServer: false, installedAppId: null }
-const mountPanel = () => mount(CatalogPanel, { global: { plugins: [PrimeVue], stubs: { RouterLink } } })
+const entry = { id: 'backup', name: 'Off-site Backup', summary: 'Copies backups away', category: 'Maintenance', repo: 'o/apps', folder: 'm/backup', commit: '0123456789abcdef0123456789abcdef01234567', minServerVersion: '0.2.31', permissions: ['backups:read'], requiresNewerServer: false, installedAppId: null, sourceId: 'official', sourceName: 'Official', customSource: false }
+const mountPanel = () => mount(CatalogPanel, { global: { plugins: [PrimeVue], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
 
 describe('CatalogPanel', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks(); roles.value = [] })
 
   it('lists catalog entries with source, commit, permissions and an Install link pinned to the commit', async () => {
     getCatalog.mockResolvedValue({ apps: [entry], fetchedAt: null, stale: false, unavailable: false, message: null })
@@ -79,5 +81,23 @@ describe('CatalogPanel', () => {
     expect(source).toContain('var(--p-content-background)')
     expect(source).toContain('var(--p-primary-color)')
     expect(source).not.toMatch(/var\(--surface-/)
+  })
+
+  it('labels entries from a custom source with its name', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, customSource: true, sourceName: 'Acme store' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Source: Acme store')
+  })
+
+  it('shows the source management only to a system administrator', async () => {
+    getCatalog.mockResolvedValue({ apps: [entry], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const plain = mountPanel()
+    await flushPromises()
+    expect(plain.find('.sources-stub').exists()).toBe(false)
+    roles.value = ['SysAdmin']
+    const admin = mountPanel()
+    await flushPromises()
+    expect(admin.find('.sources-stub').exists()).toBe(true)
   })
 })

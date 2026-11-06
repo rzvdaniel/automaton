@@ -6,6 +6,8 @@ import apiClient from '@/shared/services/api/axios-instance'
 import type {
   InstallSource,
   CatalogResponse,
+  CatalogSource,
+  CatalogSourceInput,
   GitAppSource,
   DeploymentOperation,
   AppPermissionsResponse,
@@ -237,6 +239,26 @@ class AppsService {
   async getCatalog(refresh = false): Promise<CatalogResponse> {
     const { data } = await apiClient.get<CatalogResponse>('/api/catalog', { params: refresh ? { refresh: true } : undefined })
     return data
+  }
+
+  /** Catalog sources of this instance (system administrators only). The token of a private source is never returned. */
+  async getCatalogSources(): Promise<CatalogSource[]> {
+    const { data } = await apiClient.get<CatalogSource[]>('/api/admin/catalog/sources')
+    return data
+  }
+
+  async addCatalogSource(input: CatalogSourceInput): Promise<CatalogSource> {
+    const { data } = await apiClient.post<CatalogSource>('/api/admin/catalog/sources', input)
+    return data
+  }
+
+  async setCatalogSourceEnabled(id: string, enabled: boolean): Promise<CatalogSource> {
+    const { data } = await apiClient.put<CatalogSource>(`/api/admin/catalog/sources/${id}/enabled`, { enabled })
+    return data
+  }
+
+  async removeCatalogSource(id: string): Promise<void> {
+    await apiClient.delete(`/api/admin/catalog/sources/${id}`)
   }
 
   /** Pins a pasted GitHub address to a commit. */

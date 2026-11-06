@@ -14,7 +14,8 @@ public sealed class AppCatalogService(
     ApplicationDbContext dbContext,
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
-    ILogger<AppCatalogService> logger)
+    ILogger<AppCatalogService> logger,
+    CatalogSourceStore sources)
 {
     public const string DefaultSourceUrl = "https://raw.githubusercontent.com/rzvdaniel/automaton-apps/catalog/catalog.json";
     internal const string CacheKey = "Apps.Catalog.Cache";
@@ -23,56 +24,127 @@ public sealed class AppCatalogService(
     private static readonly TimeSpan FreshFor = TimeSpan.FromMinutes(10);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    internal static string CacheKeyFor(string sourceId) => sourceId == CatalogSourceStore.OfficialId ? CacheKey : $"{CacheKey}.{sourceId}";
+
     public async Task<CatalogResponse> GetAsync(Guid userId, bool refresh, CancellationToken cancellationToken)
     {
-        var cached = await LoadCacheAsync(cancellationToken);
+        var enabled = await sources.EnabledAsync(cancellationToken);
+        var installed = await InstalledAsync(userId, cancellationToken);
+        var version = ParseVersion(configuration["Installation:Version"]);
+        var apps = new List<CatalogEntryDto>();
+        var problems = new List<string>();
+        DateTime? fetchedAt = null;
+        var stale = false;
+        var loaded = 0;
+
+        foreach (var source in enabled)
+        {
+            var (entry, failure) = await LoadSourceAsync(source, refresh, cancellationToken);
+            var label = enabled.Count > 1 ? $"{source.Name}: " : "";
+            if (entry is null)
+            {
+                problems.Add($"{label}{failure ?? "The catalog could not be loaded."}");
+                continue;
+            }
+            loaded++;
+            fetchedAt = fetchedAt is null || entry.FetchedAt < fetchedAt ? entry.FetchedAt : fetchedAt;
+            if (failure is not null)
+            {
+                stale = true;
+                problems.Add($"{label}{failure} Showing the list from {entry.FetchedAt:u}.");
+            }
+            apps.AddRange(entry.Document.Apps.Select(app => ToDto(app, entry.Document.Repo, installed, version, source)));
+        }
+
+        if (loaded == 0 && enabled.Count > 0)
+            return new CatalogResponse([], null, false, true, string.Join(" ", problems));
+        if (enabled.Count == 0)
+            return new CatalogResponse([], null, false, false, "No catalog source is turned on.");
+        return new CatalogResponse(apps, fetchedAt, stale, false, problems.Count == 0 ? null : string.Join(" ", problems));
+    }
+
+    private async Task<(CacheEntry? Entry, string? Failure)> LoadSourceAsync(CatalogSourceStore.SourceRef source, bool refresh, CancellationToken cancellationToken)
+    {
+        var cached = await LoadCacheAsync(source, cancellationToken);
         string? failure = null;
         // A forced refresh still waits out a short pause, so a signed-in user cannot make the server hammer GitHub.
         var age = cached is null ? TimeSpan.MaxValue : DateTime.UtcNow - cached.FetchedAt;
         if (cached is null || age > FreshFor || (refresh && age > TimeSpan.FromSeconds(configuration.GetValue("Catalog:MinimumRefreshSeconds", 30))))
         {
-            var (updated, error) = await FetchAsync(cached, cancellationToken);
+            var (updated, error) = await FetchAsync(source, cached, cancellationToken);
             failure = error;
+            if (updated is not null) await SaveCacheAsync(source, updated, cancellationToken);
             cached = updated ?? cached;
         }
-
-        if (cached is null)
-            return new CatalogResponse([], null, false, true, failure ?? "The catalog could not be loaded.");
-
-        var installed = await InstalledAsync(userId, cancellationToken);
-        var version = ParseVersion(configuration["Installation:Version"]);
-        var apps = cached.Document.Apps.Select(app => ToDto(app, cached.Document.Repo, installed, version)).ToList();
-        return new CatalogResponse(apps, cached.FetchedAt, failure is not null, false,
-            failure is null ? null : $"{failure} Showing the list from {cached.FetchedAt:u}.");
+        return (cached, failure);
     }
 
-    private async Task<(CacheEntry? Updated, string? Error)> FetchAsync(CacheEntry? cached, CancellationToken cancellationToken)
+    /// <summary>Reads a not yet saved source once, so an administrator hears at once that it cannot be used.</summary>
+    public async Task<string?> ProbeAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken)
     {
-        var url = configuration["Catalog:SourceUrl"] is { Length: > 0 } configured ? configured : DefaultSourceUrl;
+        var (entry, error) = await FetchAsync(source, null, cancellationToken);
+        if (entry is null) return error ?? "The catalog could not be loaded.";
+        await SaveCacheAsync(source, entry, cancellationToken);
+        return null;
+    }
+
+    /// <summary>The read token of a private source, only for an app that source's catalog lists at exactly that folder and commit.</summary>
+    public async Task<string?> TokenForAsync(string repo, string folder, string commit, CancellationToken cancellationToken)
+    {
+        foreach (var source in (await sources.EnabledAsync(cancellationToken)).Where(s => s.Token is not null
+                     && string.Equals(s.Repo, repo, StringComparison.OrdinalIgnoreCase)))
+        {
+            var cached = await LoadCacheAsync(source, cancellationToken);
+            if (cached?.Document.Apps.Any(app => app.Folder == folder && app.Commit == commit) == true) return source.Token;
+        }
+        return null;
+    }
+
+    private HttpRequestMessage RequestFor(CatalogSourceStore.SourceRef source, string? etag)
+    {
+        HttpRequestMessage request;
+        if (source.Official)
+        {
+            var url = configuration["Catalog:SourceUrl"] is { Length: > 0 } configured ? configured : DefaultSourceUrl;
+            request = new HttpRequestMessage(HttpMethod.Get, url);
+        }
+        else if (source.Token is not null)
+        {
+            var api = (configuration["Catalog:ApiBaseUrl"] is { Length: > 0 } a ? a : "https://api.github.com").TrimEnd('/');
+            request = new HttpRequestMessage(HttpMethod.Get, $"{api}/repos/{source.Repo}/contents/catalog.json?ref={Uri.EscapeDataString(source.Branch)}");
+            request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github.raw+json");
+            request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {source.Token}");
+        }
+        else
+        {
+            var raw = (configuration["Catalog:RawBaseUrl"] is { Length: > 0 } r ? r : "https://raw.githubusercontent.com").TrimEnd('/');
+            request = new HttpRequestMessage(HttpMethod.Get, $"{raw}/{source.Repo}/{source.Branch}/catalog.json");
+        }
+        request.Headers.UserAgent.ParseAdd("Automaton-Server");
+        if (etag is { Length: > 0 }) request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        return request;
+    }
+
+    private async Task<(CacheEntry? Updated, string? Error)> FetchAsync(CatalogSourceStore.SourceRef source, CacheEntry? cached, CancellationToken cancellationToken)
+    {
         try
         {
             using var client = httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.UserAgent.ParseAdd("Automaton-Server");
-            if (cached?.ETag is { Length: > 0 } etag) request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+            using var request = RequestFor(source, cached?.ETag);
 
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.StatusCode == System.Net.HttpStatusCode.NotModified && cached is not null)
-            {
-                var touched = cached with { FetchedAt = DateTime.UtcNow };
-                await SaveCacheAsync(touched, cancellationToken);
-                return (touched, null);
-            }
+                return (cached with { FetchedAt = DateTime.UtcNow }, null);
 
             if (!response.IsSuccessStatusCode)
-                return (null, $"The catalog source answered {(int)response.StatusCode}.");
+                return (null, source.Official
+                    ? $"The catalog source answered {(int)response.StatusCode}."
+                    : $"GitHub answered {(int)response.StatusCode} for {source.Repo} (branch {source.Branch}). Check the repository, the branch, that it has a catalog.json, and the token for a private repository.");
 
             var body = await ReadBoundedAsync(response, cancellationToken);
-            var document = Parse(body);
-            var entry = new CacheEntry(DateTime.UtcNow, response.Headers.ETag?.ToString(), body, document);
-            await SaveCacheAsync(entry, cancellationToken);
-            return (entry, null);
+            var document = Parse(body, source.Official ? null : source.Repo);
+            return (new CacheEntry(DateTime.UtcNow, response.Headers.ETag?.ToString(), body, document), null);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or InvalidDataException or JsonException)
         {
@@ -98,12 +170,15 @@ public sealed class AppCatalogService(
         return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    internal static CatalogDocument Parse(string body)
+    /// <param name="forcedRepo">For a custom source: entries always point at the source's own repository, whatever the file says,
+    /// so a catalog cannot send an installer (or a private token) to another repository.</param>
+    internal static CatalogDocument Parse(string body, string? forcedRepo = null)
     {
         var document = JsonSerializer.Deserialize<CatalogDocument>(body, Json)
             ?? throw new InvalidDataException("Empty catalog.");
         if (document.SchemaVersion != SupportedSchemaVersion)
             throw new InvalidDataException("Unsupported catalog schema version.");
+        if (forcedRepo is not null) document.Repo = forcedRepo;
         if (string.IsNullOrWhiteSpace(document.Repo))
             throw new InvalidDataException("The catalog has no repository.");
         // One bad entry must not hide the others.
@@ -111,14 +186,15 @@ public sealed class AppCatalogService(
         return document;
     }
 
-    private async Task<CacheEntry?> LoadCacheAsync(CancellationToken cancellationToken)
+    private async Task<CacheEntry?> LoadCacheAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken)
     {
-        var setting = await dbContext.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == CacheKey, cancellationToken);
+        var key = CacheKeyFor(source.Id);
+        var setting = await dbContext.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
         if (setting is null) return null;
         try
         {
             var stored = JsonSerializer.Deserialize<StoredCache>(setting.Value, Json);
-            return stored is null ? null : new CacheEntry(stored.FetchedAt, stored.ETag, stored.Body, Parse(stored.Body));
+            return stored is null ? null : new CacheEntry(stored.FetchedAt, stored.ETag, stored.Body, Parse(stored.Body, source.Official ? null : source.Repo));
         }
         catch (Exception exception) when (exception is JsonException or InvalidDataException)
         {
@@ -126,12 +202,13 @@ public sealed class AppCatalogService(
         }
     }
 
-    private async Task SaveCacheAsync(CacheEntry entry, CancellationToken cancellationToken)
+    private async Task SaveCacheAsync(CatalogSourceStore.SourceRef source, CacheEntry entry, CancellationToken cancellationToken)
     {
+        var key = CacheKeyFor(source.Id);
         var value = JsonSerializer.Serialize(new StoredCache(entry.FetchedAt, entry.ETag, entry.Body), Json);
-        var setting = await dbContext.Settings.FirstOrDefaultAsync(s => s.Key == CacheKey, cancellationToken);
+        var setting = await dbContext.Settings.FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
         if (setting is null)
-            dbContext.Settings.Add(new Setting { Key = CacheKey, Value = value, Description = "Last good copy of the app catalog.", UpdatedAt = DateTime.UtcNow });
+            dbContext.Settings.Add(new Setting { Key = key, Value = value, Description = "Last good copy of the app catalog.", UpdatedAt = DateTime.UtcNow });
         else
         {
             setting.Value = value;
@@ -145,7 +222,7 @@ public sealed class AppCatalogService(
         {
             // Usually another request stored the first copy at the same moment; that copy is just as good.
             logger.LogWarning("The catalog copy could not be saved: {Reason}", exception.Message);
-            foreach (var tracked in dbContext.ChangeTracker.Entries<Setting>().Where(e => e.Entity.Key == CacheKey).ToList())
+            foreach (var tracked in dbContext.ChangeTracker.Entries<Setting>().Where(e => e.Entity.Key == key).ToList())
                 tracked.State = EntityState.Detached;
         }
     }
@@ -162,13 +239,13 @@ public sealed class AppCatalogService(
         return result;
     }
 
-    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion)
+    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source)
     {
         var minimum = ParseVersion(app.MinServerVersion);
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
         Guid? installedId = installed.TryGetValue((repo, app.Folder), out var id) ? id : null;
         return new CatalogEntryDto(app.Id, app.Name, app.Summary, app.Category, repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId);
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official);
     }
 
     internal static Version? ParseVersion(string? text)

@@ -518,6 +518,26 @@ export interface CatalogEntry extends GitAppSource {
   permissions: string[]
   requiresNewerServer: boolean
   installedAppId: string | null
+  sourceId: string
+  sourceName: string
+  customSource: boolean
+}
+
+export interface CatalogSource {
+  id: string
+  name: string
+  repo: string
+  branch: string
+  official: boolean
+  enabled: boolean
+  hasToken: boolean
+}
+
+export interface CatalogSourceInput {
+  repo: string
+  branch?: string
+  name?: string
+  token?: string
 }
 
 export interface CatalogResponse {

@@ -14,7 +14,10 @@ public sealed record CatalogEntryDto(
     string MinServerVersion,
     IReadOnlyList<string> Permissions,
     bool RequiresNewerServer,
-    Guid? InstalledAppId);
+    Guid? InstalledAppId,
+    string SourceId,
+    string SourceName,
+    bool CustomSource);
 
 /// <summary>The catalog plus where it came from: fresh, the last good copy (Stale), or nothing at all (Unavailable).</summary>
 public sealed record CatalogResponse(
@@ -46,4 +49,20 @@ public sealed class CatalogInstallRequest
     public string Commit { get; set; } = string.Empty;
     public string? Name { get; set; }
     public Guid? RunnerId { get; set; }
+}
+
+/// <summary>A catalog source as an administrator sees it. The token is never returned, only whether one is saved.</summary>
+public sealed record CatalogSourceDto(string Id, string Name, string Repo, string Branch, bool Official, bool Enabled, bool HasToken);
+
+public sealed class CatalogSourceRequest
+{
+    public string Repo { get; set; } = string.Empty;
+    public string? Branch { get; set; }
+    public string? Name { get; set; }
+    public string? Token { get; set; }
+}
+
+public sealed class CatalogSourceEnabledRequest
+{
+    public bool Enabled { get; set; }
 }

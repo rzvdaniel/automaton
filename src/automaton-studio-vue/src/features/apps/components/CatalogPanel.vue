@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isAxiosError } from 'axios'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
+import CatalogSources from './CatalogSources.vue'
 import { appsService } from '../services/apps.service'
 import type { CatalogResponse } from '../types/apps.types'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 const catalog = ref<CatalogResponse | null>(null)
 const loading = ref(true)
 const failed = ref(false)
@@ -52,7 +56,8 @@ async function installFromUrl() {
   <div class="catalog flex flex-column gap-4">
     <p class="m-0 text-color-secondary">
       Apps you can install on this server, read from the official
-      <a href="https://github.com/rzvdaniel/automaton-apps" target="_blank" rel="noopener">automaton-apps</a> repository.
+      <a href="https://github.com/rzvdaniel/automaton-apps" target="_blank" rel="noopener">automaton-apps</a> repository
+      and any sources an administrator added.
       Installing fetches the app at the listed commit and asks for its settings, secrets and permissions first.
     </p>
 
@@ -76,6 +81,7 @@ async function installFromUrl() {
             <span class="flex align-items-center gap-2">
               <strong>{{ app.name }}</strong>
               <Tag :value="app.category" severity="secondary" />
+              <Tag v-if="app.customSource" :value="`Source: ${app.sourceName}`" severity="warn" icon="pi pi-link" />
               <Tag v-if="app.installedAppId" value="Installed" severity="success" icon="pi pi-check" />
             </span>
             <span class="text-color-secondary">{{ app.summary }}</span>
@@ -105,6 +111,8 @@ async function installFromUrl() {
         <small v-if="showTime" class="text-color-secondary">Read {{ showTime }}</small>
       </div>
     </template>
+
+    <CatalogSources v-if="isSystemAdministrator" @changed="load()" />
 
     <section class="catalog-git flex flex-column gap-2" aria-labelledby="catalog-git-title">
       <h3 id="catalog-git-title" class="m-0">Install from a Git address</h3>

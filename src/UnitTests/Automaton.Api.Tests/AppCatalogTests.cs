@@ -52,7 +52,7 @@ public sealed class AppCatalogTests
 
         await CreateService(db, handler).GetAsync(Guid.NewGuid(), refresh: true, default);
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Catalog:SourceUrl"] = "http://source.invalid/c.json", ["Catalog:MinimumRefreshSeconds"] = "0" }).Build();
-        await new AppCatalogService(db, new FakeFactory(handler), config, NullLogger<AppCatalogService>.Instance).GetAsync(Guid.NewGuid(), refresh: true, default);
+        await new AppCatalogService(db, new FakeFactory(handler), config, NullLogger<AppCatalogService>.Instance, new CatalogSourceStore(db, new FakeProtector())).GetAsync(Guid.NewGuid(), refresh: true, default);
 
         Assert.That(urls, Is.EqualTo(new[] { "https://raw.githubusercontent.com/rzvdaniel/automaton-apps/catalog/catalog.json", "http://source.invalid/c.json" }));
     }
@@ -143,7 +143,7 @@ public sealed class AppCatalogTests
         await using var db = CreateDb();
         var calls = 0;
         var handler = new FakeHandler(_ => { calls++; return Respond(CatalogJson, null); });
-        var service = new AppCatalogService(db, new FakeFactory(handler), Config(null, "30"), NullLogger<AppCatalogService>.Instance);
+        var service = new AppCatalogService(db, new FakeFactory(handler), Config(null, "30"), NullLogger<AppCatalogService>.Instance, new CatalogSourceStore(db, new FakeProtector()));
 
         await service.GetAsync(Guid.NewGuid(), refresh: true, default);
         await service.GetAsync(Guid.NewGuid(), refresh: true, default);
@@ -229,6 +229,231 @@ public sealed class AppCatalogTests
         Assert.That(failure!.Message, Does.Contain("automaton.json"));
     }
 
+    // --- custom catalog sources ---
+
+    private const string Token = "github_pat_secret123";
+    private const string Other = "{\"schemaVersion\":1,\"repo\":\"someone/else\",\"apps\":[{\"id\":\"tool\",\"name\":\"Tool\",\"summary\":\"s\",\"category\":\"Ops\",\"folder\":\"tool\",\"commit\":\"" + Commit + "\",\"minServerVersion\":\"0.0.1\",\"permissions\":[]}]}";
+
+    private static async Task<(AppCatalogService Service, CatalogSourceStore Store, ApplicationDbContext Db)> WithSourcesAsync(FakeHandler handler)
+    {
+        var db = CreateDb();
+        var store = new CatalogSourceStore(db, new FakeProtector());
+        return (new AppCatalogService(db, new FakeFactory(handler), Config(null), NullLogger<AppCatalogService>.Instance, store), store, db);
+    }
+
+    [Test]
+    public async Task APublicCustomSource_IsReadFromItsCatalogBranch_LabelledWithItsName_AndPinnedToItsOwnRepository()
+    {
+        var urls = new List<string>();
+        var handler = new FakeHandler(request =>
+        {
+            urls.Add(request.RequestUri!.ToString());
+            Assert.That(request.Headers.Authorization, Is.Null);
+            return Respond(request.RequestUri!.Host == "raw.githubusercontent.com" && request.RequestUri.AbsolutePath.StartsWith("/someone/") ? Other : CatalogJson, null);
+        });
+        var (service, store, db) = await WithSourcesAsync(handler);
+        await using var _ = db;
+        var candidate = CatalogSourceStore.Candidate("https://github.com/someone/apps.git", null, "Community store", null);
+        Assert.That(await service.ProbeAsync(candidate, default), Is.Null);
+        await store.AddAsync(candidate, Guid.NewGuid(), default);
+
+        var response = await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(urls, Does.Contain("https://raw.githubusercontent.com/someone/apps/catalog/catalog.json"));
+            Assert.That(response.Apps.Select(a => (a.Name, a.SourceName, a.CustomSource)), Is.EqualTo(new[] { ("Backup", "Official", false), ("Tool", "Community store", true) }));
+            // The file says "someone/else", but the entry must install from the source's own repository.
+            Assert.That(response.Apps.Last().Repo, Is.EqualTo("someone/apps"));
+        });
+    }
+
+    [Test]
+    public async Task APrivateSource_IsReadWithTheTokenOnTheServer_AndTheTokenIsStoredProtectedAndNeverListed()
+    {
+        var handler = new FakeHandler(request =>
+        {
+            if (request.RequestUri!.Host == "api.github.com")
+            {
+                Assert.That(request.RequestUri.AbsolutePath, Is.EqualTo("/repos/acme/apps/contents/catalog.json"));
+                Assert.That(request.Headers.Authorization!.ToString(), Is.EqualTo("Bearer " + Token));
+                return Respond(Other, null);
+            }
+            return Respond(CatalogJson, null);
+        });
+        var (service, store, db) = await WithSourcesAsync(handler);
+        await using var _ = db;
+        var candidate = CatalogSourceStore.Candidate("acme/apps", "catalog", null, Token);
+        Assert.That(await service.ProbeAsync(candidate, default), Is.Null);
+        await store.AddAsync(candidate, Guid.NewGuid(), default);
+
+        var listed = System.Text.Json.JsonSerializer.Serialize(await store.ListAsync(default));
+        var stored = string.Concat(db.Settings.AsNoTracking().Select(x => x.Value));
+        var response = await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(listed, Does.Not.Contain(Token));
+            Assert.That(listed, Does.Contain("\"HasToken\":true"));
+            Assert.That(stored, Does.Not.Contain(Token));
+            Assert.That(stored, Does.Contain("enc:"));
+            Assert.That(System.Text.Json.JsonSerializer.Serialize(response), Does.Not.Contain(Token));
+            Assert.That(response.Apps.Select(a => a.Name), Is.EquivalentTo(new[] { "Backup", "Tool" }));
+        });
+    }
+
+    [Test]
+    public async Task TheToken_IsOnlyHandedOutForAnAppThatSourceListsAtThatFolderAndCommit()
+    {
+        var (service, store, db) = await WithSourcesAsync(new FakeHandler(request => Respond(request.RequestUri!.Host == "api.github.com" ? Other : CatalogJson, null)));
+        await using var _ = db;
+        await store.AddAsync(CatalogSourceStore.Candidate("acme/apps", null, null, Token), Guid.NewGuid(), default);
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await service.TokenForAsync("acme/apps", "tool", Commit, default), Is.EqualTo(Token));
+            Assert.That(await service.TokenForAsync("ACME/apps", "tool", Commit, default), Is.EqualTo(Token));
+            Assert.That(await service.TokenForAsync("acme/apps", "secret-folder", Commit, default), Is.Null);
+            Assert.That(await service.TokenForAsync("acme/apps", "tool", new string('a', 40), default), Is.Null);
+            Assert.That(await service.TokenForAsync("owner/apps", "maintenance/backup", Commit, default), Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task AFolderTheSourceDoesNotList_NeverGetsTheToken()
+    {
+        var zip = Zip(("acme-apps-" + Commit + "/other-folder/automaton.json", "{\"name\":\"X\"}"));
+        var auths = new List<string?>();
+        var handler = new FakeHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath.Contains("/zip")) { auths.Add(request.Headers.Authorization?.ToString()); return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(zip) }; }
+            return Respond(request.RequestUri.Host == "api.github.com" ? Other : CatalogJson, null);
+        });
+        var (service, store, db) = await WithSourcesAsync(handler);
+        await using var _ = db;
+        await store.AddAsync(CatalogSourceStore.Candidate("acme/apps", null, null, Token), Guid.NewGuid(), default);
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+        var installer = new AppCatalogInstallService(null!, null!, null!, null!, null!, null!, new FakeFactory(handler), Config(null), service);
+
+        await installer.GetSourceAsync(new("acme/apps", "other-folder", Commit), default);
+
+        Assert.That(auths, Is.EqualTo(new string?[] { null }));
+    }
+
+    [Test]
+    public async Task ThePrivateDownload_UsesTheZipballEndpointWithTheBearerToken()
+    {
+        var zip = Zip(("acme-apps-" + Commit + "/tool/automaton.json", "{\"name\":\"Tool\"}"));
+        string? auth = null; string? path = null;
+        var handler = new FakeHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath.Contains("zipball")) { auth = request.Headers.Authorization?.ToString(); path = request.RequestUri.AbsolutePath; return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(zip) }; }
+            return Respond(request.RequestUri.Host == "api.github.com" ? Other : CatalogJson, null);
+        });
+        var (service, store, db) = await WithSourcesAsync(handler);
+        await using var _ = db;
+        await store.AddAsync(CatalogSourceStore.Candidate("acme/apps", null, null, Token), Guid.NewGuid(), default);
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+        var installer = new AppCatalogInstallService(null!, null!, null!, null!, null!, null!, new FakeFactory(handler), Config(null), service);
+
+        var model = await installer.GetSourceAsync(new("acme/apps", "tool", Commit), default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(path, Is.EqualTo($"/repos/acme/apps/zipball/{Commit}"));
+            Assert.That(auth, Is.EqualTo("Bearer " + Token));
+            Assert.That(model.Name, Is.EqualTo("Tool"));
+        });
+    }
+
+    [Test]
+    public async Task RemovingASource_DropsItsEntriesAndSavedCopy_ButNotAppsInstalledFromIt()
+    {
+        var (service, store, db) = await WithSourcesAsync(new FakeHandler(request => Respond(request.RequestUri!.AbsolutePath.StartsWith("/someone/") ? Other : CatalogJson, null)));
+        await using var _ = db;
+        var added = await store.AddAsync(CatalogSourceStore.Candidate("someone/apps", null, null, null), Guid.NewGuid(), default);
+        var owner = Guid.NewGuid();
+        var app = new WebApp { Id = Guid.NewGuid(), Name = "Tool", InstalledFromRepo = "someone/apps", InstalledFromFolder = "tool" };
+        db.WebApps.Add(app);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = app.Id, UserId = owner });
+        await db.SaveChangesAsync();
+        Assert.That((await service.GetAsync(owner, refresh: true, default)).Apps.Select(a => a.Name), Does.Contain("Tool"));
+
+        await store.RemoveAsync(added.Id, default);
+        var after = await service.GetAsync(owner, refresh: false, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(after.Apps.Select(a => a.Name), Is.EqualTo(new[] { "Backup" }));
+            Assert.That(db.Settings.Any(x => x.Key == AppCatalogService.CacheKeyFor(added.Id)), Is.False);
+            Assert.That(db.WebApps.Any(x => x.Id == app.Id), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task TheOfficialSource_CanBeTurnedOff_AndAnUnknownSourceIsNotFound()
+    {
+        var (service, store, db) = await WithSourcesAsync(new FakeHandler(_ => Respond(CatalogJson, null)));
+        await using var _ = db;
+
+        await store.SetEnabledAsync(CatalogSourceStore.OfficialId, false, default);
+        var response = await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(response.Apps, Is.Empty);
+            Assert.That(response.Message, Does.Contain("No catalog source"));
+            Assert.That(await store.SetEnabledAsync("nope", true, default), Is.Null);
+            Assert.That(await store.RemoveAsync("nope", default), Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task AddingTheSameRepositoryTwice_OrTheOfficialOne_IsRefused()
+    {
+        var (_, store, db) = await WithSourcesAsync(new FakeHandler(_ => Respond(CatalogJson, null)));
+        await using var __ = db;
+        await store.AddAsync(CatalogSourceStore.Candidate("acme/apps", null, null, null), Guid.NewGuid(), default);
+
+        Assert.ThrowsAsync<ArgumentException>(() => store.AddAsync(CatalogSourceStore.Candidate("ACME/apps", null, null, null), Guid.NewGuid(), default));
+        Assert.ThrowsAsync<ArgumentException>(() => store.AddAsync(CatalogSourceStore.Candidate("rzvdaniel/automaton-apps", null, null, null), Guid.NewGuid(), default));
+    }
+
+    [TestCase("acme")]
+    [TestCase("acme/apps/extra")]
+    [TestCase("https://gitlab.com/acme/apps")]
+    [TestCase("https://github.com.evil.example/acme/apps")]
+    [TestCase("acme/apps;rm")]
+    public void Candidate_RefusesAnythingButAGitHubRepository(string address) =>
+        Assert.Throws<ArgumentException>(() => CatalogSourceStore.Candidate(address, null, null, null));
+
+    [TestCase("../x")]
+    [TestCase("a..b")]
+    [TestCase("main branch")]
+    public void Candidate_RefusesAnUnsafeBranch(string branch) =>
+        Assert.Throws<ArgumentException>(() => CatalogSourceStore.Candidate("acme/apps", branch, null, null));
+
+    [Test]
+    public async Task ASourceThatCannotBeRead_IsNotAdded_AndSaysWhy()
+    {
+        var (service, _, db) = await WithSourcesAsync(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
+        await using var _ = db;
+
+        var problem = await service.ProbeAsync(CatalogSourceStore.Candidate("acme/missing", null, null, null), default);
+
+        Assert.That(problem, Does.Contain("404").And.Contain("catalog.json"));
+    }
+
+    [Test]
+    public void ManagingSources_NeedsASystemAdministrator()
+    {
+        var controller = typeof(Automaton.Api.Controllers.Admin.AdminCatalogSourcesController);
+        var authorize = controller.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true).Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().Single();
+        Assert.That(authorize.Roles, Is.EqualTo(Automaton.Api.Enums.UserRole.SystemAdministrator));
+        Assert.That(controller.GetMethods().Where(m => m.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), true).Any()), Is.Empty);
+    }
+
     private static HttpResponseMessage Respond(string body, string? etag)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
@@ -252,10 +477,10 @@ public sealed class AppCatalogTests
         new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
 
     private static AppCatalogService CreateService(ApplicationDbContext db, FakeHandler handler, string? version = null) =>
-        new(db, new FakeFactory(handler), Config(version), NullLogger<AppCatalogService>.Instance);
+        new(db, new FakeFactory(handler), Config(version), NullLogger<AppCatalogService>.Instance, new CatalogSourceStore(db, new FakeProtector()));
 
     private static AppCatalogInstallService CreateInstaller(FakeHandler handler) =>
-        new(null!, null!, null!, null!, null!, null!, new FakeFactory(handler), Config(null));
+        new(null!, null!, null!, null!, null!, null!, new FakeFactory(handler), Config(null), CreateService(CreateDb(), handler));
 
     private static IConfiguration Config(string? version, string refreshGap = "0") =>
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -269,6 +494,12 @@ public sealed class AppCatalogTests
         public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } = respond;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(Respond(request));
+    }
+
+    private sealed class FakeProtector : Automaton.Api.Services.Interfaces.ISecretProtector
+    {
+        public string Protect(string plaintext) => "enc:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(plaintext));
+        public string Unprotect(string protectedValue) => Encoding.UTF8.GetString(Convert.FromBase64String(protectedValue["enc:".Length..]));
     }
 
     private sealed class FakeFactory(HttpMessageHandler handler) : IHttpClientFactory

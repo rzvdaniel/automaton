@@ -24,7 +24,8 @@ public sealed partial class AppCatalogInstallService(
     RecentActivityService recentActivityService,
     Services.Interfaces.IAuditEventService auditEventService,
     IHttpClientFactory httpClientFactory,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    AppCatalogService catalog)
 {
     private Guid UserId => userContextService.GetUserId();
 
@@ -173,11 +174,15 @@ public sealed partial class AppCatalogInstallService(
     private async Task<ZipArchive> DownloadAsync(GitAppSource source, CancellationToken cancellationToken)
     {
         using var client = Client();
-        using var response = await client.GetAsync(
-            $"{Base("Catalog:ArchiveBaseUrl", "https://codeload.github.com")}/{source.Repo}/zip/{source.Commit}",
-            HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        // A private source's token is used only for an app its own catalog lists at exactly this folder and commit.
+        var token = await catalog.TokenForAsync(source.Repo, source.Folder, source.Commit, cancellationToken);
+        using var request = token is null
+            ? new HttpRequestMessage(HttpMethod.Get, $"{Base("Catalog:ArchiveBaseUrl", "https://codeload.github.com")}/{source.Repo}/zip/{source.Commit}")
+            : new HttpRequestMessage(HttpMethod.Get, $"{Base("Catalog:ApiBaseUrl", "https://api.github.com")}/repos/{source.Repo}/zipball/{source.Commit}");
+        if (token is not null) request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new ArgumentException("GitHub could not provide that commit. Only public repositories can be installed.");
+            throw new ArgumentException("GitHub could not provide that commit. Check that the repository is public or listed in a catalog source with a valid token.");
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         var buffer = new MemoryStream();
         var chunk = new byte[64 * 1024];
