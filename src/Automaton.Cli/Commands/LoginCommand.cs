@@ -183,7 +183,7 @@ public static class LoginCommand
         checks.Add(new CommandDiagnosticCheck(
             CommandDiagnosticCheckNames.Authentication, true, "browser/device authorization completed"));
         AddProfileCheck(checks, displayName);
-        WriteDeviceLoginSuccess(server, global, asJson, displayName, checks);
+        WriteDeviceLoginSuccess(server, global, asJson, displayName, checks, StoragePath(config, cwd, global));
     }
 
     private static void DisplayAuthorizationRequest(
@@ -313,7 +313,8 @@ public static class LoginCommand
         bool global,
         bool asJson,
         string displayName,
-        IEnumerable<CommandDiagnosticCheck> checks)
+        IEnumerable<CommandDiagnosticCheck> checks,
+        string storagePath)
     {
         if (asJson)
         {
@@ -339,10 +340,16 @@ public static class LoginCommand
 
         AnsiConsole.MarkupLine($"[green]✓[/] Signed in as [bold]{Markup.Escape(displayName)}[/]");
         AnsiConsole.MarkupLine("[green]✓[/] Automaton CLI authorized");
-        AnsiConsole.MarkupLine(global
-            ? $"[grey]✓ Credential saved securely to {Markup.Escape(ConfigService.DefaultGlobalConfigPath())}[/]"
-            : "[grey]✓ Credential saved securely to ./.automaton/config.json[/]");
+        AnsiConsole.MarkupLine(DeviceSavedMessage(storagePath));
     }
+
+    /// <summary>The file credentials are written to: the shared config (AUTOMATON_CONFIG_DIR aware) or this project's.</summary>
+    internal static string StoragePath(ConfigService config, string cwd, bool global) =>
+        global ? config.GlobalConfigPath : config.GetProjectLocalConfigPath(cwd);
+
+    internal static string KeySavedMessage(string path) => $"[grey]Credentials saved to {Markup.Escape(path)}[/]";
+
+    internal static string DeviceSavedMessage(string path) => $"[grey]✓ Credential saved securely to {Markup.Escape(path)}[/]";
 
     private static async Task LoginWithExistingKeyAsync(
         ConfigService config,
@@ -379,9 +386,7 @@ public static class LoginCommand
         }
 
         AnsiConsole.MarkupLine($"[green]✓[/] Authenticated as [bold]{Markup.Escape(displayName)}[/]");
-        AnsiConsole.MarkupLine(global
-            ? "[grey]Credentials saved to ~/.automaton/config.json[/]"
-            : "[grey]Credentials saved to ./.automaton/config.json[/]");
+        AnsiConsole.MarkupLine(KeySavedMessage(StoragePath(config, cwd, global)));
     }
 
     private static async Task SaveCredentialsAsync(

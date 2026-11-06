@@ -31,6 +31,9 @@ public class ConfigService
     private readonly string globalConfigFile;
     public string? ProfileOverride { get; set; }
 
+    /// <summary>The shared config file this instance reads and writes (AUTOMATON_CONFIG_DIR/config.json when set).</summary>
+    public string GlobalConfigPath => globalConfigFile;
+
     public ConfigService(string? globalConfigPath = null)
     {
         globalConfigFile = globalConfigPath ?? DefaultGlobalConfigPath();

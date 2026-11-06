@@ -47,9 +47,7 @@ public static class ConfigCommand
             var current = useLocal
                 ? config.LoadProjectLocalConfig(cwd)
                 : config.LoadGlobalConfig();
-            var sourcePath = useLocal
-                ? "./.automaton/config.json"
-                : "~/.automaton/config.json";
+            var sourcePath = LoginCommand.StoragePath(config, cwd, global);
 
             if (show || (server == null && key == null))
             {
@@ -80,18 +78,22 @@ public static class ConfigCommand
             if (useLocal)
             {
                 config.SaveProjectLocalConfig(cwd, updated);
-                AnsiConsole.MarkupLine("[green]✓[/] Configuration saved to ./.automaton/config.json");
+                AnsiConsole.MarkupLine(SavedMessage(sourcePath));
             }
             else
             {
                 config.SaveGlobalConfig(updated);
-                AnsiConsole.MarkupLine("[green]✓[/] Configuration saved to ~/.automaton/config.json");
+                AnsiConsole.MarkupLine(SavedMessage(sourcePath));
             }
 
         }, serverOption, keyOption, showOption, localOption, globalOption);
 
         return cmd;
     }
+
+    internal static string SavedMessage(string path) => $"[green]✓[/] Configuration saved to {Markup.Escape(path)}";
+
+    internal static string ProfileSavedMessage(string name, string path) => $"[green]✓[/] Profile {Markup.Escape(name)} saved to {Markup.Escape(path)}";
 
     private static void SaveGlobalServerProfile(ConfigService config, string server, string? key)
     {
@@ -106,7 +108,7 @@ public static class ConfigCommand
             return;
         }
         config.SaveProfile(name, new GlobalConfig { Server = server.TrimEnd('/'), ApiKey = key ?? existing?.ApiKey });
-        AnsiConsole.MarkupLine($"[green]✓[/] Profile {Markup.Escape(name)} saved to ~/.automaton/config.json");
+        AnsiConsole.MarkupLine(ProfileSavedMessage(name, config.GlobalConfigPath));
     }
 
     private static void AddRow(Table table, string name, string? value, string envVar, string fileSource)
