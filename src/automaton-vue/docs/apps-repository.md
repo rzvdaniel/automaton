@@ -98,9 +98,9 @@ automaton catalog build --repo owner/name --out /tmp/catalog.json
 
 The build fails, listing every problem, when the repository is unknown, a folder has no `automaton.json` or lies at the repository root (put the app in a subfolder), a name, summary or category is empty, `minServerVersion` is not `1.2.3`, two folders share a name, or a folder has no commit yet.
 
-## When `main` requires pull requests
+## Protected `main`
 
-The workflow from `catalog init` commits `catalog.json` straight to `main`, which a protected branch refuses. Instead let CI open a pull request and merge it itself: in the repository settings allow GitHub Actions to create pull requests, give the workflow `pull-requests: write`, push `catalog.json` to a `catalog-bot/update` branch, then run `gh pr create` and `gh pr merge --squash`. The [automaton-apps workflow](https://github.com/rzvdaniel/automaton-apps/blob/main/.github/workflows/catalog.yml) is a working example.
+`catalog.json` lives in `main`. The workflow from `catalog init` updates it through a pull request, because a protected branch refuses a direct push (and GitHub does not let the Actions identity bypass a personal repository's ruleset). It pushes `catalog.json` to a `catalog-bot/update` branch, opens a pull request labelled `catalog-bot` and squash-merges it. In the repository settings, turn on *Allow GitHub Actions to create and approve pull requests*; the workflow already has `pull-requests: write`. The [automaton-apps workflow](https://github.com/rzvdaniel/automaton-apps/blob/main/.github/workflows/catalog.yml) is a working example.
 
 ## Older servers
 

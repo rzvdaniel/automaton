@@ -41,7 +41,8 @@ public class CatalogCommandTests
             Assert.That(manifest.GetProperty("summary").GetString(), Is.Not.Empty);
             Assert.That(manifest.GetProperty("application").GetProperty("health").GetProperty("path").GetString(), Is.EqualTo("/health.txt"));
             var workflow = File.ReadAllText(Path.Combine(directory, ".github/workflows/catalog.yml"));
-            Assert.That(workflow, Does.Contain("automaton catalog build").And.Contain("branches: [main]"));
+            Assert.That(workflow, Does.Contain("automaton catalog build").And.Contain("branches: [main]")
+                .And.Contain("pull-requests: write").And.Contain("gh pr merge").And.Contain("catalog-bot"));
         });
     }
 
