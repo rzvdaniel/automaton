@@ -9,7 +9,7 @@ Automaton is early. These are the specific things to know before you rely on it.
 
 ## Platform
 
-- **x86_64 Linux only.** Ubuntu 22.04+ and Debian 12 are supported (apt, systemd, Docker Engine) for the server and the Runner host. Other x86_64 Linux with systemd and Docker may work but is untested, and you install Docker yourself. ARM and fully offline or private-only installs are not supported yet.
+- **x86_64 Linux only.** Ubuntu and Debian 12 are supported (apt, systemd, Docker Engine) for the server and the Runner host. Other x86_64 Linux with systemd and Docker may work but is untested, and you install Docker yourself. ARM and fully offline or private-only installs are not supported yet.
 - **Public DNS and HTTPS.** The server needs `api`, `studio`, `store`, `apps` and `*.apps` records and public ports 80, 443 and 5671.
 - **A Runner is the agent you install on a server to run apps.** With one Runner, `automaton deploy` uses it automatically; with several you pick one per app. There is no automatic balancing.
 - **No high availability.** The API, database and each Runner run on single machines. A machine that goes down takes its apps with it until you restore it.
