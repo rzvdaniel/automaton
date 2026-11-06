@@ -129,10 +129,16 @@ public sealed partial class AppCatalogInstallService(
         catch
         {
             // Do not leave an app without its files behind (it would also show as Installed in the catalog).
-            dbContext.WebApps.Remove(entity);
-            await dbContext.SaveChangesAsync(CancellationToken.None);
-            var directory = fileStorageService.GetAppSourceDirectoryPath(UserId, id);
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            try
+            {
+                dbContext.WebApps.Remove(entity);
+                await dbContext.SaveChangesAsync(CancellationToken.None);
+                await fileStorageService.DeleteAppAsync(UserId, id);
+            }
+            catch
+            {
+                // The install error below is the one to report.
+            }
             throw;
         }
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, id);
