@@ -38,7 +38,7 @@ On a server over SSH, or for an AI agent, use one of these. Neither needs a brow
 ```bash
 API=https://api.your-domain.com
 # URL printed by the CLI: .../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
-read -rp "Email: " EMAIL; read -rsp "Password: " PASSWORD; echo
+read -rp "Email: " EMAIL; read -rsp "Password: " PASSWORD; echo   # no terminal: PASSWORD=$(< /root/admin-password), a 0600 file; needs jq
 TOKEN=$(jq -n --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}' |
   curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
 curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/REQUEST_ID/approve" \

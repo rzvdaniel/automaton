@@ -21,7 +21,7 @@ This page updates the API, Worker, Studio and app store of your server to a newe
    automaton server update --wait
    ```
 
-   Pin a release with `--version server-vX.Y.Z`. The API restarts during the update; `--wait` follows it, then checks `/health` and the installed version, and exits nonzero on failure with the log tail and the recovery backup. `--timeout SECONDS` defaults to 1800.
+   Pin a release with `--version server-vX.Y.Z`. The API restarts during the update; `--wait` follows it, then checks `/health` and the installed version, and exits nonzero on failure, printing the cause (the last line of `update.log`), the log tail and the recovery backup. The full log is on the server at `/var/lib/automaton/update/status/update.log`. `--timeout SECONDS` defaults to 1800.
 
 2. In Studio instead: **Admin → Installation → Update** (the **Update to the latest release** button).
 
@@ -53,6 +53,6 @@ Expected: `ok`, and `Version:` shows the new release.
 
 - **Not picked up within two minutes.** On the server run `systemctl status automaton-update.path`.
 - **HTTP 409.** Another update is running; wait for it.
-- **Update failed.** The previous release and a recovery backup are kept; the log names the backup. Do not rerun blindly. Restore with [Back up and restore](./backup-restore) if a migration already ran.
+- **Update failed.** Read `/var/lib/automaton/update/status/update.log` (also shown by `automaton server update-status`). The previous release and a recovery backup are kept; the log names the backup. Do not rerun blindly. Restore with [Back up and restore](./backup-restore) if a migration already ran.
 
 How the trigger works (the API never runs as root), adopted installs and recovery: [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md#update-an-installed-server).

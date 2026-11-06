@@ -32,8 +32,6 @@ install -d -m 0700 "$install_dir/backups"
 if [[ -n "$archive" || -n "$key" ]]; then
     [[ -n "$archive" && -n "$key" ]] || { echo 'Specify both --archive and --key.' >&2; exit 2; }
     [[ -f "$archive" && -f "$key" ]] || { echo 'Archive or key file not found.' >&2; exit 1; }
-    python3 -c 'import inspect, tarfile; raise SystemExit(0 if "filter" in inspect.signature(tarfile.TarFile.extractall).parameters else 1)' \
-        || { echo 'Encrypted archive restore requires Python 3.12 or a security-backported tarfile extraction filter.' >&2; exit 1; }
     working=$(mktemp -d "$install_dir/backups/.restore.XXXXXX")
     trap 'rm -rf -- "$working"' EXIT
     age_image=$(grep -m1 '^AGE_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
@@ -41,6 +39,17 @@ if [[ -n "$archive" || -n "$key" ]]; then
     docker run --rm -i -v "$key:/identity:ro" "$age_image" age --decrypt -i /identity < "$archive" > "$working/backup.tar"
     python3 - "$working/backup.tar" "$working" <<'PY'
 import pathlib, re, sys, tarfile
+
+def extract(archive, destination, members=None):
+    # tarfile filter= exists only from Python 3.11.4; members were validated above (regular files and directories only).
+    try:
+        archive.extractall(destination, members=members, filter='data')
+    except TypeError:
+        for member in (members if members is not None else archive.getmembers()):
+            member.mode &= 0o755
+            member.uid = member.gid = 0
+            member.uname = member.gname = ''
+        archive.extractall(destination, members=members)
 archive, destination = sys.argv[1:]
 with tarfile.open(archive, 'r:') as source:
     members = source.getmembers()
@@ -56,7 +65,7 @@ with tarfile.open(archive, 'r:') as source:
             raise SystemExit('Archive contains an unsupported file type.')
     if len(roots) != 1:
         raise SystemExit('Archive must contain exactly one backup directory.')
-    source.extractall(destination, members=members, filter='data')
+    extract(source, destination, members)
 PY
     rm "$working/backup.tar"
     mapfile -t restored < <(find "$working" -mindepth 1 -maxdepth 1 -type d -name 'automaton-*' -printf '%f\n')

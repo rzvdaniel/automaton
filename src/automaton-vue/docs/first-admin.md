@@ -27,13 +27,16 @@ SMTP is not needed to start: the first administrator's email is confirmed by thi
 
 ## Without a browser (SSH or an AI agent)
 
-Studio's setup page calls two endpoints, and you can call them yourself. Run this on the server, in a shell where the password is typed at a hidden prompt, never given as an argument and never echoed:
+Studio's setup page calls two endpoints, and you can call them yourself. Needs `jq` and bash (process substitution): `sudo apt-get install -y jq`. Run this on the server, in a shell where the password is typed at a hidden prompt, never given as an argument and never echoed:
 
 ```bash
 API=https://api.example.com
 read -rp "Administrator email: " EMAIL
 read -rp "Name: " NAME
 read -rsp "Password (12+ characters, upper, lower, number, symbol): " PASSWORD; echo
+# No terminal (an AI agent or a script)? Read it from a file only you can read instead:
+#   PASSWORD=$(< /root/admin-password); (create it with: umask 077; read -rs p; printf %s "$p" > /root/admin-password)
+# or from standard input: IFS= read -r PASSWORD
 
 # 1. Optional: ask whether setup is open and whether a token is required.
 curl -s "$API/api/install/status"
@@ -51,6 +54,8 @@ unset PASSWORD
 `POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token stops working once setup is complete.
 
 Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
+
+The password never goes on the command line: `jq --arg` receives it from the shell variable, and the file in the comment above is mode 0600. Delete it afterwards.
 
 ## Verify it worked
 

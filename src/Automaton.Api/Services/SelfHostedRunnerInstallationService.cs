@@ -209,15 +209,22 @@ public sealed class SelfHostedRunnerInstallationService(
             "AUTOMATON_RUNNER_INSTALL");
     }
 
+    // The install needs a Linux host with a running Docker daemon that exposes /var/run/docker.sock and GNU stat.
+    // It does not depend on the distribution (Ubuntu and Debian are the tested ones), so check those, not the name.
     private static string BuildMachineHostPreflightCommands()
         => string.Join('\n',
-                "if [ \"$(uname -s)\" != 'Linux' ] || [ ! -r /etc/os-release ]; then",
-                "  echo 'Machine Management installation requires an Ubuntu Linux host.' >&2",
+                "host_name=unknown",
+                "if [ -r /etc/os-release ]; then host_name=$(. /etc/os-release && printf '%s' \"${PRETTY_NAME:-${ID:-unknown}}\"); fi",
+                "if [ \"$(uname -s)\" != 'Linux' ]; then",
+                "  echo \"Machine Management installation needs a Linux host with Docker (found: $(uname -s)). Ubuntu and Debian are supported.\" >&2",
                 "  exit 1",
                 "fi",
-                ". /etc/os-release",
-                "if [ \"${ID:-}\" != 'ubuntu' ]; then",
-                "  echo 'Machine Management installation currently supports Ubuntu. Use an Ubuntu host and retry.' >&2",
+                "if [ ! -S /var/run/docker.sock ]; then",
+                "  echo \"Machine Management installation needs the Docker socket at /var/run/docker.sock, which was not found on this host ($host_name). Ubuntu and Debian with Docker Engine are supported.\" >&2",
+                "  exit 1",
+                "fi",
+                "if ! stat -c '%g' /var/run/docker.sock >/dev/null 2>&1; then",
+                "  echo \"Machine Management installation needs GNU stat to read the Docker socket group, which is missing on this host ($host_name).\" >&2",
                 "  exit 1",
                 "fi");
 

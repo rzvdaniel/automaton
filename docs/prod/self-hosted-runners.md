@@ -26,8 +26,8 @@ only in this response and is stored by the API as a hash.
 
 For the supported self-hosted machine flow, open **Runners → Install Self-Hosted
 Runner**, choose **Machine Management**, acknowledge the Docker access warning, and
-run the generated command on the customer machine. Prepare an Ubuntu host with Docker
-Engine installed and running. The generated command checks Ubuntu and Docker
+run the generated command on the customer machine. Prepare an Ubuntu or Debian host with Docker
+Engine installed and running. The generated command checks Linux, Docker and the Docker socket
 availability before pulling the Runner image. ext4 is the tested storage baseline;
 other filesystems supported by the customer's working Docker installation, including
 XFS, do not need to be changed. The command does not install Docker, configure its

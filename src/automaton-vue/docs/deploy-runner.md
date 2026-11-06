@@ -10,7 +10,7 @@ A Runner is the trusted service on a machine that builds and runs your apps in D
 ## Prerequisites
 
 - A server with an administrator ([first administrator](./first-admin)) and the CLI signed in: `automaton login --server https://api.example.com` (see [Create your first app](./getting-started)).
-- An x86_64 Linux host with Docker running. It can be the Automaton server itself or another machine.
+- An x86_64 Linux host running **Ubuntu or Debian** (apt based, systemd) with Docker Engine running. It can be the Automaton server itself or another machine. The install does not check the distribution name: it needs a Linux host, a running Docker daemon and `/var/run/docker.sock`, so other distributions with Docker may work but are not tested. Otherwise it stops and names what is missing.
 - The Runner controls the host's Docker. Install it only on machines you trust.
 
 ## Steps
@@ -28,7 +28,7 @@ automaton runners install --name main --ssh user@host
 automaton runners install --name main --print-command
 ```
 
-The CLI asks you to confirm the Docker access. Add `--yes` for automation (required when not interactive). Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds for the Runner to connect (`--timeout` changes this) and prints its Runner ID. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
+The CLI asks you to confirm the Docker access. Add `--yes` for automation (required when not interactive). Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds for the Runner to connect (`--timeout` changes this) and prints its Runner ID. `--print-command` also asks for confirmation, so give it `--yes` when there is no terminal, and it then waits for the Runner to enroll: run the printed command on the host within `--timeout` seconds (default 300), or the CLI times out. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
 
 You can also use Studio: **Runners → Install Machine Management Runner**.
 

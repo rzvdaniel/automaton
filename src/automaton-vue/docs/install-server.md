@@ -11,7 +11,8 @@ Already have a team server? Ask its administrator for the API URL and go to [Cre
 
 ## Prerequisites
 
-- An x86_64 Linux server with systemd, sudo access, outbound internet, at least 2 GB of RAM and 10 GiB of free disk space. On Ubuntu and Debian the installer adds Docker itself; on other distributions, [install Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/) first.
+- An x86_64 Linux server with systemd, sudo access, outbound internet, at least 2 GB of RAM and 10 GiB of free disk space. Ubuntu 22.04 or newer and Debian 12 are supported and tested; the installer adds Docker itself there. On other distributions, [install Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/) first (not tested).
+- `curl` and `python3` (3.8 or newer; Debian 12's 3.11.2 works). `jq` is needed only for the headless snippets in [first administrator](./first-admin) and [CLI login](./automaton-cli#log-in-without-a-browser): `sudo apt-get install -y jq` (not preinstalled on Debian).
 - A domain you can edit DNS for, and an email for certificate notices.
 - Inbound TCP ports 80 and 443 (HTTPS) and 5671 (TLS Runner broker). Keep the `api` hostname directly reachable on 5671.
 - DNS records pointing to the server's public IP, set to DNS only (no proxy). Pick one of:
@@ -38,7 +39,7 @@ Private-only, offline and ARM installs are not supported.
    sudo bash install-automaton.sh --domain example.com --email owner@example.com
    ```
 
-3. Wait for it to finish. It installs Docker if missing, downloads the latest stable release, verifies its checksum, starts the stack and prints a one-time first-administrator setup link. Open that link in the next step. The link contains a live setup token: do not paste the terminal output into chats, tickets or logs.
+3. Wait for it to finish. It installs Docker if missing, downloads the latest stable release, verifies its checksum, starts the stack and prints a one-time first-administrator setup link. Open that link in the next step. The link contains a live setup token: do not paste the terminal output into chats, tickets or logs. To keep it out of a log or an agent's output, run the installer with output to a private file (`umask 077; sudo bash install-automaton.sh ... > ~/install.out 2>&1`), read only what you need, then delete the file. You never need the link itself: the token is also stored in `/etc/automaton/secrets/setup-token` and [First administrator](./first-admin) reads it from there.
 
 Options: `--version server-vX.Y.Z` pins a release; `--public-ip ADDRESS` is for servers behind NAT (repeat for IPv6); `--tls-mode cloudflare` uses a Cloudflare wildcard certificate (enter the DNS token only at the hidden prompt). Never pass secrets as command arguments.
 
@@ -48,7 +49,7 @@ Options: `--version server-vX.Y.Z` pins a release; `--public-ip ADDRESS` is for 
 curl -fsS https://api.example.com/health
 ```
 
-Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-v0.2.22"}` (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
+Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-vX.Y.Z"}` where the version is the release you installed (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
 
 ## Common errors
 

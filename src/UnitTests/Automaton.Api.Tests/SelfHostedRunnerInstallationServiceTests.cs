@@ -98,12 +98,13 @@ public sealed class SelfHostedRunnerInstallationServiceTests
             Assert.That(response.InstallationCommand, Does.Contain("--group-add \"$docker_socket_gid\""));
             Assert.That(response.InstallationCommand, Does.Contain("volume:/automaton/storage"));
             Assert.That(response.InstallationCommand, Does.Contain("[ \"$(uname -s)\" != 'Linux' ]"));
-            Assert.That(response.InstallationCommand, Does.Contain("[ \"${ID:-}\" != 'ubuntu' ]"));
+            Assert.That(response.InstallationCommand, Does.Not.Contain("'ubuntu'"));
+            Assert.That(response.InstallationCommand, Does.Contain("[ ! -S /var/run/docker.sock ]"));
             Assert.That(response.InstallationCommand, Does.Contain("command -v docker"));
             Assert.That(response.InstallationCommand, Does.Contain("docker info >/dev/null 2>&1"));
             Assert.That(response.InstallationCommand, Does.Not.Contain("findmnt"));
             Assert.That(response.InstallationCommand, Does.Not.Contain("docker_storage_fs"));
-            Assert.That(response.InstallationCommand.IndexOf("${ID:-}", StringComparison.Ordinal),
+            Assert.That(response.InstallationCommand.IndexOf("[ ! -S /var/run/docker.sock ]", StringComparison.Ordinal),
                 Is.LessThan(response.InstallationCommand.IndexOf("docker pull", StringComparison.Ordinal)));
             Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
             Assert.That(response.InstallationCommand, Does.Contain(

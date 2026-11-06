@@ -81,6 +81,7 @@ public class ServerUpdateRunnerTests
         Assert.That(outcome.Success, Is.False);
         Assert.That(outcome.Message, Does.Contain("/opt/automaton-server/backups/server-v0.2.0-x"));
         Assert.That(outcome.Message, Does.Contain("boom"));
+        Assert.That(outcome.Message, Does.Contain("Cause (last line of update.log): failed to start api"));
         Assert.That(outcome.Log, Does.Contain("failed to start api"));
     }
 

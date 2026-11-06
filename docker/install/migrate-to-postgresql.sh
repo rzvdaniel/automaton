@@ -290,12 +290,23 @@ else
     (cd "$working" && sha256sum -c automaton-server.tar.gz.sha256)
     python3 - "$working/automaton-server.tar.gz" "$working" <<'PY'
 import pathlib, sys, tarfile
+
+def extract(archive, destination, members=None):
+    # tarfile filter= exists only from Python 3.11.4; members were validated above (regular files and directories only).
+    try:
+        archive.extractall(destination, members=members, filter='data')
+    except TypeError:
+        for member in (members if members is not None else archive.getmembers()):
+            member.mode &= 0o755
+            member.uid = member.gid = 0
+            member.uname = member.gname = ''
+        archive.extractall(destination, members=members)
 with tarfile.open(sys.argv[1], 'r:gz') as archive:
     for member in archive.getmembers():
         parts = pathlib.PurePosixPath(member.name).parts
         if not parts or parts[0] != 'automaton-server' or '..' in parts or not (member.isdir() or member.isfile()):
             raise SystemExit('Invalid release bundle entry.')
-    archive.extractall(sys.argv[2], filter='data')
+    extract(archive, sys.argv[2])
 PY
     bundle="$working/automaton-server"
 fi

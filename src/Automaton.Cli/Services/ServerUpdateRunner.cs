@@ -122,7 +122,9 @@ internal sealed partial class ServerUpdateRunner(
     {
         var run = status.Run!;
         var backup = run.RecoveryBackup is null ? "" : $" Recovery backup: {run.RecoveryBackup}.";
-        return $"The update failed{(run.ExitCode is { } code ? $" (exit code {code})" : "")}. {run.Message}{backup} " +
+        var cause = status.Log?.Split('\n').Select(line => line.Trim()).LastOrDefault(line => line.Length > 0);
+        var causeText = cause is null ? "" : $" Cause (last line of update.log): {cause}.";
+        return $"The update failed{(run.ExitCode is { } code ? $" (exit code {code})" : "")}. {run.Message}{causeText}{backup} " +
                "The previous release is kept; see docs/prod/install-automaton.md for recovery.";
     }
 

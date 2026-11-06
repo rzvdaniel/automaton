@@ -56,6 +56,8 @@ automaton listing show
 
 Or put `"summary"` and `"description"` at the top level of `automaton.json`: `automaton deploy` copies them to the listing while the app has none set in Studio or with `automaton listing`.
 
+Installing a published tool app: in Studio open **Apps → Install apps**, which lists published installable apps (including those with no web page), choose one, name it and select **Install**; Studio creates the app, deploys it on a Runner and shows each step. This needs an online Runner ([Add a Runner](./deploy-runner)). The store's **Install** button opens the same page.
+
 To let other people install a copy of your published app on their server, publish with `automaton publish --install` (`--forkable` still works). The store then shows an **Install** button; an app with no web page (Actions only) shows only **Install**, an installable web app shows **Open** and **Install**.
 
 `automaton deploy` and `automaton publish` refuse an app that declares no runtime command, static site or Action.
