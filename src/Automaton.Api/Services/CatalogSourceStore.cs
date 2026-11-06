@@ -52,37 +52,52 @@ public sealed partial class CatalogSourceStore(ApplicationDbContext dbContext, I
         return list;
     }
 
+    private static bool IsValidToken(string? token) => token is null || (token.Length <= 500 && !token.Any(char.IsWhiteSpace));
+
+    private static bool IsValidBranch(string branch) =>
+        branch.Length <= 100 && BranchPattern().IsMatch(branch) && !branch.Contains("..") && !HasDotOnlyPart(branch);
+
+    private static bool HasDotOnlyPart(string path) => path.Split('/').Any(part => part.All(c => c == '.'));
+
     /// <summary>A candidate source, validated but not saved: the caller checks that it can be read first.</summary>
     public static SourceRef Candidate(string address, string? branch, string? name, string? token)
     {
         var text = (address ?? "").Trim();
         var url = RepoUrlPattern().Match(text);
         var repo = url.Success ? $"{url.Groups[1].Value}/{url.Groups[2].Value}" : text;
-        if (!RepoPattern().IsMatch(repo))
+        if (!RepoPattern().IsMatch(repo) || HasDotOnlyPart(repo))
             throw new ArgumentException("Enter a GitHub repository as owner/name or https://github.com/owner/name.");
         var branchName = string.IsNullOrWhiteSpace(branch) ? DefaultBranch : branch.Trim();
-        if (branchName.Length > 100 || !BranchPattern().IsMatch(branchName) || branchName.Contains(".."))
+        if (!IsValidBranch(branchName))
             throw new ArgumentException("That branch name is not valid.");
         var label = string.IsNullOrWhiteSpace(name) ? repo : name.Trim();
-        if (label.Length > 100) throw new ArgumentException("The name can be at most 100 characters.");
         var secret = string.IsNullOrWhiteSpace(token) ? null : token.Trim();
-        if (secret is not null && (secret.Length > 500 || secret.Any(char.IsWhiteSpace)))
-            throw new ArgumentException("That token is not valid.");
+        if (label.Length > 100) throw new ArgumentException("The name can be at most 100 characters.");
+        if (!IsValidToken(secret)) throw new ArgumentException("That token is not valid.");
         return new SourceRef(Guid.NewGuid().ToString("N"), label, repo, branchName, false, secret);
     }
+
+    /// <summary>Refuses a duplicate or one source too many, so the caller can say so before it reads the repository.</summary>
+    public async Task EnsureAddableAsync(SourceRef candidate, CancellationToken cancellationToken) =>
+        EnsureAddable(await LoadAsync(cancellationToken), candidate);
 
     public async Task<CatalogSourceDto> AddAsync(SourceRef candidate, Guid userId, CancellationToken cancellationToken)
     {
         var document = await LoadAsync(cancellationToken);
+        EnsureAddable(document, candidate);
+        document.Sources.Add(new SourceRecord(Guid.Parse(candidate.Id), candidate.Name, candidate.Repo, candidate.Branch, true,
+            candidate.Token is null ? null : protector.Protect(candidate.Token), DateTime.UtcNow, userId));
+        await SaveAsync(document, cancellationToken);
+        return new CatalogSourceDto(candidate.Id, candidate.Name, candidate.Repo, candidate.Branch, false, true, candidate.Token is not null);
+    }
+
+    private static void EnsureAddable(SourcesDocument document, SourceRef candidate)
+    {
         if (document.Sources.Count >= MaximumSources)
             throw new ArgumentException($"At most {MaximumSources} custom sources can be added.");
         if (string.Equals(candidate.Repo, OfficialRepo, StringComparison.OrdinalIgnoreCase) && candidate.Branch == DefaultBranch
             || document.Sources.Any(s => string.Equals(s.Repo, candidate.Repo, StringComparison.OrdinalIgnoreCase) && s.Branch == candidate.Branch))
             throw new ArgumentException("That repository is already a catalog source.");
-        document.Sources.Add(new SourceRecord(Guid.Parse(candidate.Id), candidate.Name, candidate.Repo, candidate.Branch, true,
-            candidate.Token is null ? null : protector.Protect(candidate.Token), DateTime.UtcNow, userId));
-        await SaveAsync(document, cancellationToken);
-        return new CatalogSourceDto(candidate.Id, candidate.Name, candidate.Repo, candidate.Branch, false, true, candidate.Token is not null);
     }
 
     public async Task<CatalogSourceDto?> SetEnabledAsync(string id, bool enabled, CancellationToken cancellationToken)

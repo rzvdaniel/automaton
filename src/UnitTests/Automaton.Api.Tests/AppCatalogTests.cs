@@ -416,6 +416,7 @@ public sealed class AppCatalogTests
         await using var __ = db;
         await store.AddAsync(CatalogSourceStore.Candidate("acme/apps", null, null, null), Guid.NewGuid(), default);
 
+        Assert.ThrowsAsync<ArgumentException>(() => store.EnsureAddableAsync(CatalogSourceStore.Candidate("ACME/apps", null, null, null), default));
         Assert.ThrowsAsync<ArgumentException>(() => store.AddAsync(CatalogSourceStore.Candidate("ACME/apps", null, null, null), Guid.NewGuid(), default));
         Assert.ThrowsAsync<ArgumentException>(() => store.AddAsync(CatalogSourceStore.Candidate("rzvdaniel/automaton-apps", null, null, null), Guid.NewGuid(), default));
     }
@@ -425,11 +426,15 @@ public sealed class AppCatalogTests
     [TestCase("https://gitlab.com/acme/apps")]
     [TestCase("https://github.com.evil.example/acme/apps")]
     [TestCase("acme/apps;rm")]
+    [TestCase("acme/..")]
+    [TestCase("../apps")]
     public void Candidate_RefusesAnythingButAGitHubRepository(string address) =>
         Assert.Throws<ArgumentException>(() => CatalogSourceStore.Candidate(address, null, null, null));
 
     [TestCase("../x")]
     [TestCase("a..b")]
+    [TestCase("a/../b")]
+    [TestCase(".")]
     [TestCase("main branch")]
     public void Candidate_RefusesAnUnsafeBranch(string branch) =>
         Assert.Throws<ArgumentException>(() => CatalogSourceStore.Candidate("acme/apps", branch, null, null));

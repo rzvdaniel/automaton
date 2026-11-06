@@ -25,6 +25,7 @@ public sealed class AdminCatalogSourcesController(CatalogSourceStore sources, Ap
         try
         {
             var candidate = CatalogSourceStore.Candidate(request.Repo, request.Branch, request.Name, request.Token);
+            await sources.EnsureAddableAsync(candidate, cancellationToken);
             if (await catalog.ProbeAsync(candidate, cancellationToken) is { } problem)
                 return BadRequest(new { message = problem });
             var added = await sources.AddAsync(candidate, GetUserId(), cancellationToken);
