@@ -117,25 +117,25 @@ async function remove(source: CatalogSource) {
     </ul>
     <form class="flex flex-column gap-3" @submit.prevent="add">
       <div class="source-field">
-        <div class="flex align-items-center gap-1"><label for="source-repo" class="field-label">Repository address</label><button type="button" class="info-button" v-tooltip.top.focus="repoHelp" aria-label="More about the repository address"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
+        <div class="flex align-items-center gap-1"><label for="source-repo" class="field-label">Repository address</label><button type="button" class="info-button" v-tooltip.top="repoHelp" aria-label="More about the repository address"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
         <InputText id="source-repo" v-model="repo" placeholder="https://github.com/acme/apps" aria-describedby="source-repo-help" />
         <small id="source-repo-help" class="text-color-secondary">The GitHub repository that holds the catalog, for example https://github.com/acme/apps. It needs a catalog.json at its root (see the <a :href="docsUrl" target="_blank" rel="noopener">apps-repository format</a>).</small>
       </div>
       <div class="flex gap-3 flex-wrap">
         <div class="source-field flex-1">
-          <div class="flex align-items-center gap-1"><label for="source-branch" class="field-label">Branch (optional)</label><button type="button" class="info-button" v-tooltip.top.focus="branchHelp" aria-label="More about the branch"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
+          <div class="flex align-items-center gap-1"><label for="source-branch" class="field-label">Branch (optional)</label><button type="button" class="info-button" v-tooltip.top="branchHelp" aria-label="More about the branch"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
           <InputText id="source-branch" v-model="branch" placeholder="main" aria-describedby="source-branch-help" />
           <small id="source-branch-help" class="text-color-secondary">The branch that holds catalog.json. Leave empty to use the main branch.</small>
         </div>
         <div class="source-field flex-1">
-          <div class="flex align-items-center gap-1"><label for="source-name" class="field-label">Name (optional)</label><button type="button" class="info-button" v-tooltip.top.focus="nameHelp" aria-label="More about the name"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
+          <div class="flex align-items-center gap-1"><label for="source-name" class="field-label">Name (optional)</label><button type="button" class="info-button" v-tooltip.top="nameHelp" aria-label="More about the name"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
           <InputText id="source-name" v-model="name" placeholder="Acme apps" aria-describedby="source-name-help" />
           <small id="source-name-help" class="text-color-secondary">How the source is shown in the Catalog tab. Leave empty to use the repository name.</small>
         </div>
       </div>
       <div class="source-field">
-        <div class="flex align-items-center gap-1"><label for="source-token" class="field-label">Read token (private repositories only)</label><button type="button" class="info-button" v-tooltip.top.focus="tokenHelp" aria-label="More about the read token"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
-        <Password v-model="token" :feedback="false" toggle-mask autocomplete="new-password" input-id="source-token" input-class="catalog-token" aria-describedby="source-token-help" />
+        <div class="flex align-items-center gap-1"><label for="source-token" class="field-label">Read token (private repositories only)</label><button type="button" class="info-button" v-tooltip.top="tokenHelp" aria-label="More about the read token"><i class="pi pi-info-circle" aria-hidden="true" /></button></div>
+        <Password v-model="token" :feedback="false" toggle-mask autocomplete="new-password" input-id="source-token" input-class="catalog-token" :input-props="{ 'aria-describedby': 'source-token-help' }" />
         <small id="source-token-help" class="text-color-secondary">
           Leave empty for a public repository. For a private one create a fine-grained token limited to that repository with read-only Contents access
           (<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">create it on GitHub</a>: pick the repository, then Repository permissions, Contents, Read-only).
