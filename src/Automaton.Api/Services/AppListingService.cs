@@ -21,7 +21,21 @@ internal sealed class AppListingService(
     {
         var now = DateTime.UtcNow;
         var rows = await LoadRowsAsync(projectId, cancellationToken);
-        return rows.Select(row => MapRow(row, now)).ToArray();
+        var items = rows.Select(row => MapRow(row, now)).ToArray();
+        // Only Action-only apps show their last run, so look it up for those apps alone.
+        for (var index = 0; index < items.Length; index++)
+        {
+            if (!items[index].ActionsOnly) continue;
+            var appId = items[index].Id;
+            var run = await dataContext.AppModuleExecutions.AsNoTracking()
+                .Where(execution => execution.AppId == appId)
+                .OrderByDescending(execution => execution.CreatedAtUtc)
+                .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
+                .FirstOrDefaultAsync(cancellationToken);
+            items[index] = items[index].WithLastActionRun(run);
+        }
+
+        return items;
     }
 
     private Task<List<AppListQueryRow>> LoadRowsAsync(
@@ -42,11 +56,6 @@ internal sealed class AppListingService(
                 Updated = app.Updated,
                 ProjectId = app.ProjectId,
                 ContractJson = app.ApplicationContractJson,
-                LastActionRun = dataContext.AppModuleExecutions
-                    .Where(run => run.AppId == app.Id)
-                    .OrderByDescending(run => run.CreatedAtUtc)
-                    .Select(run => new AppListActionRunDto { ModuleKey = run.ModuleKey, Status = run.Status, CreatedAtUtc = run.CreatedAtUtc })
-                    .FirstOrDefault(),
                 CanLaunchPublicly = app.IsPublished &&
                     app.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     app.AccessStatus == AppAccessStatuses.Active,
@@ -101,7 +110,6 @@ internal sealed class AppListingService(
             Runner = row.Runner == null ? null : MapRunner(row.Runner, now),
             LiveEnvironment = row.LiveTarget == null ? null : MapLiveTarget(row.Id, row.LiveTarget, now),
             ActionsOnly = IsActionsOnly(row.ContractJson),
-            LastActionRun = row.LastActionRun,
             Runtime = new AppListRuntimeDto
             {
                 GenericRuntimeDeployed = row.LiveTarget?.GenericRuntimeDeployed == true
@@ -161,7 +169,6 @@ internal sealed class AppListingService(
         public Guid? ProjectId { get; init; }
         public bool CanLaunchPublicly { get; init; }
         public string? ContractJson { get; init; }
-        public AppListActionRunDto? LastActionRun { get; init; }
         public AppListRunnerRow? Runner { get; init; }
         public AppListTargetRow? LiveTarget { get; init; }
     }

@@ -84,7 +84,7 @@ const liveStatusLabel = computed(() => {
   if (!environment.genericRuntimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 })
-const liveStatusClass = computed(() => (props.app.actionsOnly || ['Running', 'Available'].includes(liveStatusLabel.value))
+const liveStatusClass = computed(() => (props.app.actionsOnly ? props.app.lastActionRun?.status === 'Succeeded' : ['Running', 'Available'].includes(liveStatusLabel.value))
   ? 'runner-status--online'
   : 'runner-status--offline')
 const liveDestinationLabel = computed(() => {
