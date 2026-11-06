@@ -18,9 +18,6 @@ class Decide(unittest.TestCase):
     def test_server_not_in_release_kept(self):
         self.assertEqual(cri.decide(5, {"verified"}, [pr("server", server=False)], CTX)[0], "skip")
 
-    def test_unknown_compare_is_not_closed(self):
-        self.assertEqual(cri.decide(5, {"verified"}, [pr("server", server=None)], CTX)[0], "skip")
-
     def test_one_pr_missing_blocks(self):
         prs = [pr("server", server=True), pr("server", server=False)]
         self.assertEqual(cri.decide(5, {"verified"}, prs, CTX)[0], "skip")
@@ -55,6 +52,16 @@ class Helpers(unittest.TestCase):
         self.assertEqual(cri.classify_files(["docs/a.md", "src/Server/x.cs"]), "server")
         self.assertEqual(cri.classify_files(["a"], repo_is_apps=True), "apps")
         self.assertIsNone(cri.classify_files([]))
+
+    def test_compare_failure_needs_human(self):
+        self.assertEqual(cri.decide(5, {"verified"}, [pr("server", server=None)], CTX)[0], "human")
+
+    def test_failed_label_wins(self):
+        self.assertEqual(cri.decide(5, {"verified", "verification-failed"}, [pr("server", server=True)], CTX)[0], "skip")
+
+    def test_apps_refs_must_be_qualified(self):
+        self.assertFalse(cri.references("Refs #12", 12, "o/main", True))
+        self.assertTrue(cri.references("Refs o/main#12", 12, "o/main", True))
 
     def test_references(self):
         self.assertTrue(cri.references("Refs #12", 12))

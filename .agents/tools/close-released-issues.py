@@ -44,14 +44,19 @@ def classify_files(paths, repo_is_apps=False):
     return "website" if all(p.startswith(WEBSITE_PREFIXES) for p in paths) else "server"
 
 
-def references(body, number):
-    return re.search(rf"\b(?:Refs|Part of)\s+(?:[\w.-]+/[\w.-]+)?#{number}\b", body or "", re.I) is not None
+def references(body, number, main_repo=None, qualified_only=False):
+    """True when body says Refs/Part of #N. In another repo (qualified_only) it must name main_repo#N."""
+    repo = re.escape(main_repo) if main_repo else r"[\w.-]+/[\w.-]+"
+    prefix = rf"(?:{repo})" if qualified_only else rf"(?:{repo})?"
+    return re.search(rf"\b(?:Refs|Part of)\s+{prefix}#{number}\b", body or "", re.I) is not None
 
 
 def decide(number, labels, prs, ctx):
     """Return (action, reason). action: close | skip | human.
     prs: list of {"number", "kind", "in_release": {"server": bool|None, "website": bool|None}}.
     ctx: {"accept": set of ints, "reason": str, "published": set of ints, "website_sha": str|None}."""
+    if "verification-failed" in labels:
+        return "skip", "verification-failed"
     if "verified" not in labels:
         if "verified-partial" in labels:
             if number not in ctx["accept"]:
@@ -70,9 +75,13 @@ def decide(number, labels, prs, ctx):
         elif kind == "website":
             if not ctx["website_sha"]:
                 return "human", f"PR #{pr['number']} is website/docs only: give --website-sha"
+            if pr["in_release"].get("website") is None:
+                return "human", f"PR #{pr['number']}: compare failed"
             if pr["in_release"].get("website") is not True:
                 return "skip", f"PR #{pr['number']} not in the deployed website commit"
         elif kind == "server":
+            if pr["in_release"].get("server") is None:
+                return "human", f"PR #{pr['number']}: compare failed"
             if pr["in_release"].get("server") is not True:
                 return "skip", f"PR #{pr['number']} not in the release"
         else:
@@ -94,19 +103,19 @@ def production_version():
         return json.load(response)["version"]
 
 
-def find_prs(number, repos):
+def find_prs(number, repos, main_repo):
     found = {}
     for repo in repos:
         result = api("search/issues", "-X", "GET", "-f", f"q=repo:{repo} is:pr is:merged \"#{number}\"", "-f", "per_page=50")
         for item in result["items"]:
-            if references(item.get("body"), number):
+            if references(item.get("body"), number, main_repo, repo != main_repo):
                 found[(repo, item["number"])] = item
     return found
 
 
 def build_prs(number, repo, apps_repo, version, website_sha):
     prs = []
-    for (pr_repo, pr_number), _ in find_prs(number, [repo, apps_repo]).items():
+    for (pr_repo, pr_number), _ in find_prs(number, [repo, apps_repo], repo).items():
         pr = api(f"repos/{pr_repo}/pulls/{pr_number}")
         files = [f["filename"] for f in api(f"repos/{pr_repo}/pulls/{pr_number}/files?per_page=100")]
         kind = classify_files(files, pr_repo == apps_repo)
@@ -130,8 +139,8 @@ def board_items(repo, number):
 def set_done(item):
     query = """query($p:ID!){node(id:$p){... on ProjectV2{field(name:"Status"){... on ProjectV2SingleSelectField{id options{id name}}}}}}"""
     field = api("graphql", "-f", f"query={query}", "-f", f"p={item['project']['id']}")["data"]["node"]["field"]
-    option = next((o["id"] for o in field["options"] if o["name"] == "Done"), None)
-    if not field or not option:
+    option = next((o["id"] for o in (field or {}).get("options", []) if o["name"] == "Done"), None)
+    if not option:
         return False
     mutation = """mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){projectV2Item{id}}}"""
     api("graphql", "-f", f"query={mutation}", "-f", f"p={item['project']['id']}", "-f", f"i={item['id']}",
