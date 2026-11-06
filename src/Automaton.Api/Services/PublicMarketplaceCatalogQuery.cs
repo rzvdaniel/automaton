@@ -30,6 +30,7 @@ public sealed class PublicMarketplaceCatalogQuery(ApplicationDbContext dbContext
             .ThenByDescending(app => app.StarCount)
             .ThenByDescending(app => app.ViewCount)
             .ThenByDescending(app => app.PublishedAt)
+            .ThenBy(app => app.Id)
             .Skip(skip)
             .Take(Math.Clamp(take, 1, 100))
             .Select(app => new MarketplaceAppCardDto

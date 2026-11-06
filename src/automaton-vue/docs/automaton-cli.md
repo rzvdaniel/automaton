@@ -46,7 +46,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/REQ
 unset PASSWORD TOKEN
 ```
 
-`200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. the waiting CLI notices within about five seconds. Codes expire after a few minutes, so approve soon after `login` prints it.
+`200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. Codes expire after a few minutes, so approve soon after `login` prints it.
 
 **API key.** Create a key in Studio (**API Keys**) or with `POST /api/ApiKeys` (`{"name": "my-cli"}`, bearer token as above; the response `apiKey` is shown once). Then:
 
