@@ -145,8 +145,8 @@ public sealed class AppCatalogService(
         {
             // Usually another request stored the first copy at the same moment; that copy is just as good.
             logger.LogWarning("The catalog copy could not be saved: {Reason}", exception.Message);
-            foreach (var entry in dbContext.ChangeTracker.Entries<Setting>().Where(e => e.Entity.Key == CacheKey).ToList())
-                entry.State = EntityState.Detached;
+            foreach (var tracked in dbContext.ChangeTracker.Entries<Setting>().Where(e => e.Entity.Key == CacheKey).ToList())
+                tracked.State = EntityState.Detached;
         }
     }
 
