@@ -239,7 +239,7 @@ public sealed partial class AppCatalogInstallService(
             string? Text(string property) => root.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
             var name = Text("name") ?? source.Folder.Split('/').Last();
             if (string.IsNullOrWhiteSpace(name)) name = source.Repo.Split('/').Last();
-            return new Manifest(name, Text("summary"), Text("description"), contract);
+            return new Manifest(name, Text("summary"), Text("description") ?? string.Empty, contract);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {

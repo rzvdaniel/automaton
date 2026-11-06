@@ -197,6 +197,18 @@ public sealed class AppCatalogTests
         Assert.ThrowsAsync<ArgumentException>(() => CreateInstaller(new FakeHandler(_ => throw new InvalidOperationException())).ResolveUrlAsync(url, default));
 
     [Test]
+    public async Task GetSource_GivesAnEmptyDescription_WhenTheManifestHasNone()
+    {
+        // WebApps.Description is NOT NULL: a manifest without a description (the catalog init template) must not install as null.
+        var zip = Zip(("apps-" + Commit + "/hello/automaton.json", """{"name":"Hello","summary":"s","application":{}}"""));
+        var handler = new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(zip) });
+
+        var model = await CreateInstaller(handler).GetSourceAsync(new("owner/apps", "hello", Commit), default);
+
+        Assert.That(model.Description, Is.EqualTo(string.Empty));
+    }
+
+    [Test]
     public async Task GetSource_ReadsTheManifestFromTheFolderAtTheCommit()
     {
         var zip = Zip(("apps-" + Commit + "/maintenance/backup/automaton.json",
