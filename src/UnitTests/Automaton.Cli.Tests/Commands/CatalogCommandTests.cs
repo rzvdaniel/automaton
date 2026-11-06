@@ -19,7 +19,7 @@ public class CatalogCommandTests
 
     [Test]
     public void CatalogCommand_HasInitAndBuild() =>
-        Assert.That(CatalogCommand.Build(new ConfigService()).Subcommands.Select(c => c.Name), Is.EquivalentTo(new[] { "init", "build" }));
+        Assert.That(CatalogCommand.Build(new ConfigService()).Subcommands.Select(c => c.Name), Is.EquivalentTo(new[] { "init", "build", "sources" }));
 
     [Test]
     public void Init_WritesTheSkeletonAndNothingElse()

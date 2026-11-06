@@ -77,6 +77,10 @@ public sealed partial class CatalogSourceStore(ApplicationDbContext dbContext, I
         return new SourceRef(Guid.NewGuid().ToString("N"), label, repo, branchName, false, secret);
     }
 
+    /// <summary>What a dry run reports for a candidate: the source as it would be saved, without an id.</summary>
+    public static CatalogSourceDto Preview(SourceRef candidate) =>
+        new(string.Empty, candidate.Name, candidate.Repo, candidate.Branch, false, true, candidate.Token is not null);
+
     /// <summary>Refuses a duplicate or one source too many, so the caller can say so before it reads the repository.</summary>
     public async Task EnsureAddableAsync(SourceRef candidate, CancellationToken cancellationToken) =>
         EnsureAddable(await LoadAsync(cancellationToken), candidate);

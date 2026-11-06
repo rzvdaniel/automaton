@@ -8,10 +8,11 @@ public static class CatalogCommand
 {
     public static Command Build(ConfigService config)
     {
-        var command = new Command("catalog", "Create and build an apps repository for use as a catalog source")
+        var command = new Command("catalog", "Create and build an apps repository for use as a catalog source, and manage the server's catalog sources")
         {
             BuildInit(config),
-            BuildBuild()
+            BuildBuild(),
+            CatalogSourcesCommand.Build(config)
         };
         return command;
     }

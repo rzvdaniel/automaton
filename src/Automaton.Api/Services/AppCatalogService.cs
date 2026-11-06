@@ -105,12 +105,12 @@ public sealed class AppCatalogService(
         return (cached, failure);
     }
 
-    /// <summary>Reads a not yet saved source once, so an administrator hears at once that it cannot be used.</summary>
-    public async Task<(string? Problem, int Apps)> ProbeAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken)
+    /// <summary>Reads a not yet saved source once, so an administrator hears at once that it cannot be used. With save false (a dry run) nothing is stored.</summary>
+    public async Task<(string? Problem, int Apps)> ProbeAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken, bool save = true)
     {
         var (entry, error) = await FetchAsync(source, null, cancellationToken);
         if (entry is null) return (error ?? "The catalog could not be loaded.", 0);
-        await SaveCacheAsync(source, entry, cancellationToken);
+        if (save) await SaveCacheAsync(source, entry, cancellationToken);
         return (null, entry.Document.Apps.Count);
     }
 

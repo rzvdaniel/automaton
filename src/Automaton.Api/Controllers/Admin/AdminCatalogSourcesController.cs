@@ -1,3 +1,4 @@
+using Automaton.Api.Authentication;
 using Automaton.Api.Constants;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
@@ -11,7 +12,7 @@ namespace Automaton.Api.Controllers.Admin;
 /// <summary>Catalog sources (GitHub repositories) of this instance. A system administrator manages them; the token of a private one is never returned.</summary>
 [ApiController]
 [Route("api/admin/catalog/sources")]
-[Authorize(Roles = UserRole.SystemAdministrator)]
+[Authorize(Policy = CatalogSourcesAccess.PolicyName, Roles = UserRole.SystemAdministrator)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class AdminCatalogSourcesController(CatalogSourceStore sources, AppCatalogService catalog, IAuditEventService audit) : BaseController
 {
@@ -19,15 +20,17 @@ public sealed class AdminCatalogSourcesController(CatalogSourceStore sources, Ap
     public async Task<ActionResult<IReadOnlyList<CatalogSourceDto>>> List(CancellationToken cancellationToken) =>
         Ok(await sources.ListAsync(cancellationToken));
 
+    /// <summary>Adds a source. With dryRun=true it only checks the address, branch, catalog.json and token and answers with what would be added (200); nothing is saved.</summary>
     [HttpPost]
-    public async Task<ActionResult<CatalogSourceDto>> Add([FromBody] CatalogSourceRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<CatalogSourceDto>> Add([FromBody] CatalogSourceRequest request, CancellationToken cancellationToken, [FromQuery] bool dryRun = false)
     {
         try
         {
             var candidate = CatalogSourceStore.Candidate(request.Repo, request.Branch, request.Name, request.Token);
             await sources.EnsureAddableAsync(candidate, cancellationToken);
-            var (problem, appCount) = await catalog.ProbeAsync(candidate, cancellationToken);
+            var (problem, appCount) = await catalog.ProbeAsync(candidate, cancellationToken, save: !dryRun);
             if (problem is not null) return BadRequest(new { message = problem });
+            if (dryRun) return Ok(CatalogSourceStore.Preview(candidate) with { AppCount = appCount });
             var added = await sources.AddAsync(candidate, GetUserId(), cancellationToken);
             await Audit(AuditActions.Added, added, cancellationToken);
             return Created($"/api/admin/catalog/sources/{added.Id}", added with { AppCount = appCount });

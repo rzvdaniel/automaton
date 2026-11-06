@@ -23,6 +23,22 @@ A system administrator then opens **Apps → Catalog → Catalog sources** in St
 
 Only add sources you trust: an app is code that runs on your Runners.
 
+## Manage sources from the terminal
+
+A system administrator (or an AI agent working for one) can manage sources with the CLI after `automaton login`:
+
+```bash
+automaton catalog sources list
+automaton catalog sources add https://github.com/acme/apps --dry-run      # check only, adds nothing
+automaton catalog sources add https://github.com/acme/apps --name "Acme apps"
+automaton catalog sources add https://github.com/acme/apps --private --token-file ~/catalog-token
+automaton catalog sources disable <id>      # also: enable, remove
+```
+
+Add `--json` for machine-readable output. The token of a private repository is read only from `--token-file`, `--token-stdin` or a hidden prompt (`--private` without a file), never from an argument or the environment, and it is never printed. **The token must come from you, not from an AI assistant**: create a fine-grained, read-only Contents token for that one repository, save it to a file only you can read, and run the command yourself. When an agent runs `add` for a repository that turns out to be private, the command stops, adds nothing and prints the exact command to run. `--dry-run` checks the address, branch, `catalog.json` and token and prints what would be added.
+
+These commands call `api/admin/catalog/sources`. They accept a system administrator's login or the administrator's own CLI key (the Developer scope `automaton login` creates, or a full-access key); a key of any other user, or a read-only, execute, runner or web-app key, gets 403.
+
 ## Layout
 
 ```text

@@ -258,6 +258,11 @@ internal static class ApiAuthorizationRegistration
                 .RequireAssertion(context => context.User.FindFirst("api_key_scope")?.Value
                     is null or nameof(Automaton.Core.Enums.ApiKeyScope.Developer)));
 
+            options.AddPolicy(CatalogSourcesAccess.PolicyName, policy =>
+                policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+                    .RequireAuthenticatedUser()
+                    .RequireAssertion(context => CatalogSourcesAccess.IsAllowed(context.User)));
+
             options.AddPolicy(SelfHostedRunnerInstallationAuthorization.PolicyName, policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
                     .RequireAuthenticatedUser()

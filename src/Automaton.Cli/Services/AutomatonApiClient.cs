@@ -1,4 +1,5 @@
 using Automaton.Core.Models;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Authentication;
 using System.Net.Sockets;
@@ -591,6 +592,54 @@ public class AutomatonApiClient : IDisposable
         using var resp = await PostJsonAsync($"api/apps/{appId}/versions/snapshot", payload, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
+    }
+
+    // ── Catalog sources (system administrator) ───────────────────────────────
+
+    public async Task<JsonElement> ListCatalogSourcesAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/admin/catalog/sources", ct);
+        await EnsureCatalogSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Adds a source, or with dryRun only checks it and reports what would be added. The token goes in the body, never in a URL.</summary>
+    public async Task<JsonElement> AddCatalogSourceAsync(string repo, string? branch, string? name, string? token, bool dryRun, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { repo, branch, name, token }, JsonOptions);
+        using var resp = await PostJsonAsync("api/admin/catalog/sources" + (dryRun ? "?dryRun=true" : ""), payload, ct);
+        await EnsureCatalogSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> SetCatalogSourceEnabledAsync(string id, bool enabled, CancellationToken ct = default)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new { enabled }, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/admin/catalog/sources/{Uri.EscapeDataString(id)}/enabled", content, ct);
+        await EnsureCatalogSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task RemoveCatalogSourceAsync(string id, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/admin/catalog/sources/{Uri.EscapeDataString(id)}", ct);
+        await EnsureCatalogSuccessAsync(resp);
+    }
+
+    /// <summary>Turns the answer into a message a person can act on: the server's reason, or who may do this.</summary>
+    private static async Task EnsureCatalogSuccessAsync(HttpResponseMessage resp)
+    {
+        if (resp.IsSuccessStatusCode) return;
+        var body = await resp.Content.ReadAsStringAsync();
+        string? reason = null;
+        try { reason = JsonDocument.Parse(body).RootElement.GetProperty("message").GetString(); } catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException) { }
+        throw new InvalidOperationException(resp.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized => "The server did not accept this login. Run automaton login again.",
+            HttpStatusCode.Forbidden => "Only a system administrator can manage catalog sources, with a key made by automaton login (a read-only or runner key is refused).",
+            HttpStatusCode.NotFound when reason is null => "No catalog source with that id. Run automaton catalog sources list.",
+            _ => reason ?? $"The server answered {(int)resp.StatusCode}."
+        });
     }
 
     // ── Projects ──────────────────────────────────────────────────────────────
