@@ -44,7 +44,7 @@ public sealed class AppCatalogTests
     }
 
     [Test]
-    public async Task Get_ReadsTheCatalogBranchOfTheOfficialRepoByDefault_AndTheConfiguredSourceWhenSet()
+    public async Task Get_ReadsTheMainBranchOfTheOfficialRepoByDefault_AndTheConfiguredSourceWhenSet()
     {
         await using var db = CreateDb();
         var urls = new List<string>();
@@ -242,7 +242,7 @@ public sealed class AppCatalogTests
     }
 
     [Test]
-    public async Task APublicCustomSource_IsReadFromItsCatalogBranch_LabelledWithItsName_AndPinnedToItsOwnRepository()
+    public async Task APublicCustomSource_IsReadFromItsMainBranchByDefault_LabelledWithItsName_AndPinnedToItsOwnRepository()
     {
         var urls = new List<string>();
         var handler = new FakeHandler(request =>
