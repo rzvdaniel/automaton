@@ -9,7 +9,7 @@ This page installs your own Automaton server on one x86_64 Linux machine. Next s
 
 Already have a team server? Ask its administrator for the API URL and go to [Create your first app](./getting-started).
 
-Measured on 6 November 2026 on Hetzner CX23 servers (2 vCPU, 4 GB RAM, about €6.64 per month): the installer took 118 seconds on Ubuntu 22.04 and about 90 seconds on Debian 12. The Runner installation took 31–32 seconds; memory use after installation was about 1.0 GB. The Ubuntu run updated server 0.2.21 to 0.2.22 in 32 seconds; the Debian run updated 0.2.28 to 0.2.29 in 26 seconds. These are observations from the [fresh-server runs](https://github.com/rzvdaniel/automaton/issues/561), not guaranteed times or minimum requirements. A full pass after the latest fixes is still pending.
+Measured on 6 November 2026 on Hetzner CX23 servers (2 vCPU, 4 GB RAM, about â‚¬6.64 per month): the installer took 118 seconds on Ubuntu 22.04 and about 90 seconds on Debian 12. The Runner installation took 31â€“32 seconds; memory use after installation was about 1.0 GB. The Ubuntu run updated server 0.2.21 to 0.2.22 in 32 seconds; the Debian run updated 0.2.28 to 0.2.29 in 26 seconds. These are observations from the [fresh-server runs](https://github.com/rzvdaniel/automaton/issues/561), not guaranteed times or minimum requirements. A full pass after the latest fixes is still pending.
 
 ## Prerequisites
 
