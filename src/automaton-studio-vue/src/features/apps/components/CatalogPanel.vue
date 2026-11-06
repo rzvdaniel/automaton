@@ -4,6 +4,8 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isAxiosError } from 'axios'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
@@ -20,6 +22,8 @@ const failed = ref(false)
 const gitUrl = ref('')
 const gitError = ref<string | null>(null)
 const resolving = ref(false)
+const showSources = ref(false)
+const showGit = ref(false)
 
 const showTime = computed(() => (catalog.value?.fetchedAt ? new Date(catalog.value.fetchedAt).toLocaleString() : ''))
 
@@ -54,12 +58,18 @@ async function installFromUrl() {
 
 <template>
   <div class="catalog flex flex-column gap-4">
+    <div class="flex align-items-start justify-content-between gap-3 flex-wrap">
     <p class="m-0 text-color-secondary">
       Apps you can install on this server, read from the official
       <a href="https://github.com/rzvdaniel/automaton-apps" target="_blank" rel="noopener">automaton-apps</a> repository
       and any sources an administrator added.
       Installing fetches the app at the listed commit and asks for its settings, secrets and permissions first.
     </p>
+    <div class="flex gap-2 flex-shrink-0">
+      <Button v-if="isSystemAdministrator" label="Manage sources" icon="pi pi-cog" severity="secondary" outlined @click="showSources = true" />
+      <Button label="Install from URL" icon="pi pi-link" severity="secondary" outlined @click="showGit = true" />
+    </div>
+    </div>
 
     <p v-if="loading" class="m-0 text-color-secondary">Loading…</p>
 
@@ -67,7 +77,7 @@ async function installFromUrl() {
       <strong>The catalog could not be loaded</strong>
       <span class="text-color-secondary">
         {{ catalog?.message ?? 'The server could not answer.' }} This server reads the list from GitHub and has no saved copy yet.
-        Check that the server can reach github.com, then try again. You can also install straight from a Git address below.
+        Check that the server can reach github.com, then try again. You can also use Install from URL.
       </span>
       <div><Button label="Retry" icon="pi pi-refresh" @click="load(true)" /></div>
     </div>
@@ -112,19 +122,22 @@ async function installFromUrl() {
       </div>
     </template>
 
-    <CatalogSources v-if="isSystemAdministrator" @changed="load()" />
+    <Drawer v-if="isSystemAdministrator" v-model:visible="showSources" position="right" header="Catalog sources" class="catalog-drawer">
+      <CatalogSources @changed="load()" />
+    </Drawer>
 
-    <section class="catalog-git flex flex-column gap-2" aria-labelledby="catalog-git-title">
-      <h3 id="catalog-git-title" class="m-0">Install from a Git address</h3>
-      <small class="text-color-secondary">
-        A public GitHub repository (or <code>/tree/branch/folder</code>) with an <code>automaton.json</code>. It is pinned to its current commit and shown to you before anything is created.
-      </small>
-      <form class="flex gap-2" @submit.prevent="installFromUrl">
-        <InputText v-model="gitUrl" class="flex-1" placeholder="https://github.com/owner/name" aria-label="Git address" />
-        <Button type="submit" label="Continue" icon="pi pi-arrow-right" icon-pos="right" :loading="resolving" :disabled="!gitUrl.trim()" />
-      </form>
-      <Message v-if="gitError" severity="error" :closable="false">{{ gitError }}</Message>
-    </section>
+    <Dialog v-model:visible="showGit" modal header="Install from a Git address" :style="{ width: '32rem' }">
+      <div class="flex flex-column gap-2">
+        <small class="text-color-secondary">
+          A public GitHub repository (or <code>/tree/branch/folder</code>) with an <code>automaton.json</code>. It is pinned to its current commit and shown to you before anything is created.
+        </small>
+        <form class="flex gap-2" @submit.prevent="installFromUrl">
+          <InputText v-model="gitUrl" class="flex-1" placeholder="https://github.com/owner/name" aria-label="Git address" />
+          <Button type="submit" label="Continue" icon="pi pi-arrow-right" icon-pos="right" :loading="resolving" :disabled="!gitUrl.trim()" />
+        </form>
+        <Message v-if="gitError" severity="error" :closable="false">{{ gitError }}</Message>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -138,8 +151,7 @@ async function installFromUrl() {
   gap: 0.75rem;
 }
 .catalog-row,
-.catalog-empty,
-.catalog-git {
+.catalog-empty {
   padding: 1rem;
   border: 1px solid var(--p-content-border-color);
   border-radius: var(--p-content-border-radius);

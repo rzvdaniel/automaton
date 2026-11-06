@@ -16,7 +16,8 @@ import CatalogPanel from './CatalogPanel.vue'
 
 const RouterLink = { props: ['to'], template: '<a class="link" :data-to="JSON.stringify(to)"><slot /></a>' }
 const entry = { id: 'backup', name: 'Off-site Backup', summary: 'Copies backups away', category: 'Maintenance', repo: 'o/apps', folder: 'm/backup', commit: '0123456789abcdef0123456789abcdef01234567', minServerVersion: '0.2.31', permissions: ['backups:read'], requiresNewerServer: false, installedAppId: null, sourceId: 'official', sourceName: 'Official', customSource: false }
-const mountPanel = () => mount(CatalogPanel, { global: { plugins: [PrimeVue], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
+const mountPanel = () => mount(CatalogPanel, { attachTo: document.body, global: { plugins: [PrimeVue], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
+const button = (label: string) => document.body.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
 
 describe('CatalogPanel', () => {
   beforeEach(() => { vi.clearAllMocks(); roles.value = [] })
@@ -65,16 +66,23 @@ describe('CatalogPanel', () => {
     expect(wrapper.find('.link').exists()).toBe(false)
   })
 
-  it('pins a pasted Git address and opens the install page', async () => {
+  it('keeps the Git address form out of the list until Install from URL is opened, then pins it', async () => {
     getCatalog.mockResolvedValue({ apps: [], fetchedAt: null, stale: false, unavailable: false, message: null })
     resolveGitUrl.mockResolvedValue({ repo: 'o/r', folder: '', commit: 'a'.repeat(40) })
     const wrapper = mountPanel()
     await flushPromises()
-    await wrapper.find('input').setValue('https://github.com/o/r')
-    await wrapper.find('form').trigger('submit')
+    expect(document.body.querySelector('input[aria-label="Git address"]')).toBeNull()
+    button('Install from URL')!.click()
+    await flushPromises()
+    const input = document.body.querySelector<HTMLInputElement>('input[aria-label="Git address"]')!
+    input.value = 'https://github.com/o/r'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    document.body.querySelector('form')!.dispatchEvent(new Event('submit'))
     await flushPromises()
     expect(resolveGitUrl).toHaveBeenCalledWith('https://github.com/o/r')
     expect(push).toHaveBeenCalledWith({ name: 'app-install-source', query: { repo: 'o/r', folder: undefined, commit: 'a'.repeat(40) } })
+    wrapper.unmount()
   })
 
   it('styles panels and links with the Studio theme tokens, not undefined legacy ones', () => {
@@ -90,14 +98,20 @@ describe('CatalogPanel', () => {
     expect(wrapper.text()).toContain('Source: Acme store')
   })
 
-  it('shows the source management only to a system administrator', async () => {
+  it('offers Manage sources only to a system administrator and opens the sources panel from it', async () => {
     getCatalog.mockResolvedValue({ apps: [entry], fetchedAt: null, stale: false, unavailable: false, message: null })
     const plain = mountPanel()
     await flushPromises()
-    expect(plain.find('.sources-stub').exists()).toBe(false)
+    expect(button('Manage sources')).toBeUndefined()
+    expect(button('Install from URL')).toBeDefined()
+    plain.unmount()
     roles.value = ['SysAdmin']
     const admin = mountPanel()
     await flushPromises()
-    expect(admin.find('.sources-stub').exists()).toBe(true)
+    expect(document.body.querySelector('.sources-stub')).toBeNull()
+    button('Manage sources')!.click()
+    await flushPromises()
+    expect(document.body.querySelector('.sources-stub')).not.toBeNull()
+    admin.unmount()
   })
 })
