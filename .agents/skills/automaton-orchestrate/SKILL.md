@@ -50,7 +50,7 @@ It does **not** write product code (exception: skills, docs and small chores the
 6. After each task: read the report, check the evidence, fix or re-queue gaps, then do the release or production step.
 
 ## Closing issues
-`verified` (end-to-end proof) plus the merge gate: update production, add `live`, close naming the version.
+`verified` (end-to-end proof) plus the merge gate: update production, then run `python .agents/tools/close-released-issues.py` (dry run, then `--apply`) to add `live` and close naming the version.
 `verified-partial` closes only when the owner accepts the gap, written in the closing comment. `verification-failed` goes
 back to an agent. Do not accept gaps yourself. See `automaton-implement-issue` (gates) and `production-deployment`.
 
