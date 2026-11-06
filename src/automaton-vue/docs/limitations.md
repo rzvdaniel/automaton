@@ -25,7 +25,7 @@ Automaton is early. These are the specific things to know before you rely on it.
 
 ## Security and teams
 
-- **Built for people you trust.** Public multi-tenant hosting is out of scope. Isolation between users of one server is being formally accepted ([#521](https://github.com/rzvdaniel/automaton/issues/521)); until then do not host untrusted users.
+- **Built for people you trust.** Public multi-tenant hosting is out of scope. Two-user isolation and restart checks passed on the test server ([#521](https://github.com/rzvdaniel/automaton/issues/521)); that does not make the platform suitable for hosting strangers' code.
 - **No self sign-up.** Users are added by an administrator.
 - **The Runner is trusted.** The Runner controls the machine's Docker, so treat Runner machines as part of your trusted base. See the [security overview](./security).
 
