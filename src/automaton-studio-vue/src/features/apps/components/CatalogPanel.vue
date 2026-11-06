@@ -122,11 +122,11 @@ async function installFromUrl() {
       </div>
     </template>
 
-    <Drawer v-if="isSystemAdministrator" v-model:visible="showSources" position="right" header="Catalog sources" class="catalog-drawer">
+    <Drawer v-if="isSystemAdministrator" v-model:visible="showSources" position="right" header="Catalog sources" :style="{ width: '32rem', maxWidth: '100vw' }">
       <CatalogSources @changed="load()" />
     </Drawer>
 
-    <Dialog v-model:visible="showGit" modal header="Install from a Git address" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="showGit" modal header="Install from a Git address" :style="{ width: '32rem', maxWidth: '100vw' }" @hide="gitError = null; gitUrl = ''">
       <div class="flex flex-column gap-2">
         <small class="text-color-secondary">
           A public GitHub repository (or <code>/tree/branch/folder</code>) with an <code>automaton.json</code>. It is pinned to its current commit and shown to you before anything is created.
