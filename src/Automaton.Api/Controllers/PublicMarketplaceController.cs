@@ -50,7 +50,7 @@ public class PublicMarketplaceController : ControllerBase
         var result = new List<MarketplaceAppCardDto>();
 
         // The web-page rule is read from each app's contract, so page through the catalog until enough apps pass it.
-        // The public store lists apps a visitor can open; tools without a web page are for Studio's Install apps page.
+        // The public store lists apps a visitor can open; tools without a web page are installed from the Catalog tab or this list.
         // At most five batches (500 apps) are scanned per request.
         const int batchSize = 100;
         for (var skip = 0; result.Count < wanted && skip < 5 * batchSize; skip += batchSize)

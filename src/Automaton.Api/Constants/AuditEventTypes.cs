@@ -21,6 +21,7 @@ public static class AuditEventTypes
     public const string AppUnpublished = "AppUnpublished";
     public const string AppSlugChanged = "AppSlugChanged";
     public const string AppForked = "AppForked";
+    public const string AppInstalledFromSource = "AppInstalledFromSource";
     public const string AppDeployStarted = "AppDeployStarted";
     public const string AppDeploySucceeded = "AppDeploySucceeded";
     public const string AppDeployFailed = "AppDeployFailed";

@@ -7,11 +7,12 @@ import { appsService } from '../services/apps.service'
 import { actionSchedulesService } from '../services/action-schedules.service'
 import { adminAppsService } from '@/features/admin/services/adminAppsService'
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { sourceAppId: 'src-1' } }), useRouter: () => ({ push: vi.fn() }) }))
+const routeState = vi.hoisted(() => ({ route: { params: { sourceAppId: 'src-1' } as Record<string, string>, query: {} as Record<string, string> } }))
+vi.mock('vue-router', () => ({ useRoute: () => routeState.route, useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/features/auth/stores/auth.store', () => ({ useAuthStore: () => ({ user: { roles: ['SysAdmin'] } }) }))
 vi.mock('../services/apps.service', () => ({
   appsService: {
-    getInstallSource: vi.fn(), install: vi.fn(), setSecret: vi.fn(), deployStoredSource: vi.fn(), getDeploymentOperation: vi.fn(),
+    getInstallSource: vi.fn(), getGitInstallSource: vi.fn(), installFromGit: vi.fn(), install: vi.fn(), setSecret: vi.fn(), deployStoredSource: vi.fn(), getDeploymentOperation: vi.fn(),
   },
 }))
 vi.mock('@/features/runners/services/runners.service', () => ({ runnersService: { list: vi.fn().mockResolvedValue([{ id: 'r1', name: 'Runner', status: 'Online', purpose: 'MachineManagement', applicationProfile: 'MachineManagement' }]) } }))
@@ -69,5 +70,31 @@ describe('InstallAppView', () => {
     expect(wrapper.find('.install-progress').exists()).toBe(false)
     expect(wrapper.text()).toContain('Name already used')
     expect(wrapper.find('#install-name').exists()).toBe(true)
+  })
+
+  it('installs from a pinned Git source, shows where it comes from and never calls the store install', async () => {
+    const commit = 'a'.repeat(40)
+    routeState.route = { params: {}, query: { repo: 'o/apps', folder: 'm/backup', commit } }
+    vi.mocked(appsService.getGitInstallSource).mockResolvedValue({
+      id: '', name: 'Backup', git: { repo: 'o/apps', folder: 'm/backup', commit }, application: { permissions: ['backups:read'] },
+    })
+    vi.mocked(appsService.installFromGit).mockResolvedValue({ id: 'new-2' } as never)
+    vi.mocked(appsService.deployStoredSource).mockResolvedValue({ operationId: 'op', status: 'Pending' })
+    vi.mocked(appsService.getDeploymentOperation).mockResolvedValue({ operationId: 'op', status: 'Succeeded' })
+    vi.mocked(appsService.install).mockClear()
+    const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
+    await flushPromises()
+
+    expect(appsService.getGitInstallSource).toHaveBeenCalledWith({ repo: 'o/apps', folder: 'm/backup', commit })
+    expect(wrapper.text()).toContain('o/apps')
+    expect(wrapper.text()).toContain('a'.repeat(12))
+    expect(wrapper.text()).toContain('backups:read')
+    await wrapper.findAll('button').find((b) => b.text().includes('Install'))!.trigger('click')
+    await flushPromises()
+
+    expect(appsService.installFromGit).toHaveBeenCalledWith({ repo: 'o/apps', folder: 'm/backup', commit }, 'Backup', 'r1')
+    expect(appsService.install).not.toHaveBeenCalled()
+    expect(adminAppsService.setPermission).toHaveBeenCalledWith('new-2', 'backups:read', true)
+    routeState.route = { params: { sourceAppId: 'src-1' }, query: {} }
   })
 })

@@ -5,7 +5,8 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
   InstallSource,
-  InstallableApp,
+  CatalogResponse,
+  GitAppSource,
   DeploymentOperation,
   AppPermissionsResponse,
   AppSecretSummary,
@@ -232,6 +233,32 @@ class AppsService {
     return data
   }
 
+  /** The catalog read by the server from the official automaton-apps repository (or its last good copy). */
+  async getCatalog(refresh = false): Promise<CatalogResponse> {
+    const { data } = await apiClient.get<CatalogResponse>('/api/catalog', { params: refresh ? { refresh: true } : undefined })
+    return data
+  }
+
+  /** Pins a pasted GitHub address to a commit. */
+  async resolveGitUrl(url: string): Promise<GitAppSource> {
+    const { data } = await apiClient.get<GitAppSource>('/api/catalog/resolve', { params: { url } })
+    return data
+  }
+
+  /** What an app at a pinned commit needs from an installer (read from its automaton.json). */
+  async getGitInstallSource(source: GitAppSource): Promise<InstallSource> {
+    const { data } = await apiClient.get<InstallSource & { repo: string; folder: string; commit: string }>('/api/catalog/install-source', {
+      params: { repo: source.repo, folder: source.folder || undefined, commit: source.commit },
+    })
+    return { ...data, id: '', git: { repo: data.repo, folder: data.folder, commit: data.commit } }
+  }
+
+  /** Installs an app from a pinned Git source as a new app of the current user. */
+  async installFromGit(source: GitAppSource, name: string, runnerId?: string): Promise<App> {
+    const { data } = await apiClient.post<App>('/api/catalog/install', { ...source, name, runnerId })
+    return data
+  }
+
   /** Deploys the app from the source the server stores for it; returns the pending operation. */
   async deployStoredSource(id: string, targetSlug?: string): Promise<DeploymentOperation> {
     const { data } = await apiClient.post<DeploymentOperation>(`/api/apps/${id}/deploy`, null, {
@@ -356,13 +383,6 @@ class AppsService {
     await apiClient.put(`/api/apps/${id}/runner`, { executionRunnerId: runnerId })
   }
 
-  /** Published, forkable tools without a web page: the public store hides them, Studio's Install apps page lists them. */
-  async getInstallableApps(): Promise<InstallableApp[]> {
-    const { data } = await apiClient.get<InstallableApp[]>('/api/public/marketplace/apps', {
-      params: { installableOnly: true, take: 100 },
-    })
-    return data ?? []
-  }
 
   async getMarketplaceCategories(): Promise<string[]> {
     const response = await apiClient.get<string[]>('/api/public/marketplace/categories')

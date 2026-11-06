@@ -112,6 +112,15 @@ public class WebApp
     public string? ForkedFromAppName { get; set; }
     public string? ForkedFromAuthorName { get; set; }
 
+    /// <summary>Catalog or Git source this app was installed from (owner/name), if any.</summary>
+    public string? InstalledFromRepo { get; set; }
+
+    /// <summary>Folder inside <see cref="InstalledFromRepo"/> the app came from; empty for the repository root.</summary>
+    public string? InstalledFromFolder { get; set; }
+
+    /// <summary>The pinned commit the app's files were fetched at.</summary>
+    public string? InstalledFromCommit { get; set; }
+
     /// <summary>
     /// Total tokens used in AI chat sessions for this app
     /// </summary>

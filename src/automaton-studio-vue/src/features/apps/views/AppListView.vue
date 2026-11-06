@@ -15,7 +15,7 @@ import InputIcon from 'primevue/inputicon'
 import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
 import CopyCommand from '../components/CopyCommand.vue'
-import InstallAppsPanel from '../components/InstallAppsPanel.vue'
+import CatalogPanel from '../components/CatalogPanel.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
@@ -63,14 +63,14 @@ const viewOptions = ref([
 ])
 
 // Tab state
-const activeTabIndex = ref(route.meta.appsTab === 'install' ? 1 : 0)
+const activeTabIndex = ref(route.meta.appsTab === 'catalog' ? 1 : 0)
 const tabItems = ref([
   { label: 'My Apps', icon: 'pi pi-th-large' },
-  { label: 'Install apps', icon: 'pi pi-download' },
+  { label: 'Catalog', icon: 'pi pi-download' },
   { label: 'Local setup', icon: 'pi pi-book' },
 ])
 
-watch(() => route.meta.appsTab, (tab) => { activeTabIndex.value = tab === 'install' ? 1 : 0 })
+watch(() => route.meta.appsTab, (tab) => { activeTabIndex.value = tab === 'catalog' ? 1 : 0 })
 
 // Local state
 const searchQuery = ref('')
@@ -376,8 +376,8 @@ const handleRetry = async () => {
     </template><!-- /v-else -->
     </template><!-- /v-if="activeTabIndex === 0" -->
 
-    <!-- ─── INSTALL APPS TAB ─────────────────────────────────────────── -->
-    <InstallAppsPanel v-if="activeTabIndex === 1" />
+    <!-- ─── CATALOG TAB ──────────────────────────────────────────────── -->
+    <CatalogPanel v-if="activeTabIndex === 1" />
 
     <!-- ─── LOCAL SETUP TAB ──────────────────────────────────────────── -->
     <template v-if="activeTabIndex === 2">

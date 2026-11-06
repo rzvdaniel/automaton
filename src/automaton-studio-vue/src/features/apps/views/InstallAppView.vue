@@ -19,7 +19,11 @@ import type { InstallManifest, InstallSource } from '../types/apps.types'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const sourceId = String(route.params.sourceAppId)
+const sourceId = String(route.params.sourceAppId ?? '')
+// A catalog entry or a pasted Git address arrives as repo, folder and commit in the address.
+const gitSource = route.query.repo
+  ? { repo: String(route.query.repo), folder: String(route.query.folder ?? ''), commit: String(route.query.commit ?? '') }
+  : null
 
 const source = ref<InstallSource | null>(null)
 const loadError = ref<string | null>(null)
@@ -46,7 +50,7 @@ const missingRequired = computed(() => [
 
 onMounted(async () => {
   try {
-    source.value = await appsService.getInstallSource(sourceId)
+    source.value = gitSource ? await appsService.getGitInstallSource(gitSource) : await appsService.getInstallSource(sourceId)
     try {
       runnerOptions.value = getDeploymentTargetRunnerOptions(await runnersService.list())
       runnerId.value = runnerOptions.value.find((option) => !option.disabled)?.value ?? null
@@ -57,7 +61,7 @@ onMounted(async () => {
     for (const item of manifest.value.settings ?? []) settings[item.name] = item.default ?? ''
     for (const item of manifest.value.schedules ?? []) schedules[item.name] = true
   } catch (failure) {
-    loadError.value = message(failure, 'This app cannot be installed: it is not published, not forkable, or has no source.')
+    loadError.value = message(failure, gitSource ? 'This app cannot be installed from that source.' : 'This app cannot be installed: it is not published, not forkable, or has no source.')
   }
 })
 
@@ -143,7 +147,7 @@ async function install() {
   steps.value = planSteps(values.length > 0)
   installing.value = true
   try {
-    const app = await step('create', () => appsService.install(sourceId, name.value.trim(), runnerId.value ?? undefined))
+    const app = await step('create', () => gitSource ? appsService.installFromGit(gitSource, name.value.trim(), runnerId.value ?? undefined) : appsService.install(sourceId, name.value.trim(), runnerId.value ?? undefined))
     installedAppId.value = app.id
     if (values.length > 0)
       await step('values', async () => {
@@ -282,6 +286,12 @@ function openInstalledApp() {
           <section class="install-summary flex flex-column gap-2" aria-labelledby="install-about">
             <h3 id="install-about" class="m-0">About this app</h3>
             <p v-if="source.summary" class="m-0">{{ source.summary }}</p>
+            <dl v-if="source.git" class="install-source m-0">
+              <dt>Source</dt>
+              <dd><a :href="`https://github.com/${source.git.repo}`" target="_blank" rel="noopener">{{ source.git.repo }}</a><template v-if="source.git.folder"> / {{ source.git.folder }}</template></dd>
+              <dt>Pinned commit</dt>
+              <dd><a :href="`https://github.com/${source.git.repo}/tree/${source.git.commit}/${source.git.folder}`" target="_blank" rel="noopener"><code>{{ source.git.commit.slice(0, 12) }}</code></a></dd>
+            </dl>
             <small class="text-color-secondary">You get your own copy; you can install the same app more than once.</small>
           </section>
 
@@ -351,6 +361,16 @@ function openInstalledApp() {
   border: 1px solid var(--p-content-border-color);
   border-radius: var(--p-content-border-radius);
   background: var(--p-content-background);
+}
+
+.install-source dt {
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
+}
+
+.install-source dd {
+  margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
 }
 
 .install-progress {

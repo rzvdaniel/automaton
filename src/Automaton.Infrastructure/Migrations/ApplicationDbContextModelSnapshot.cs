@@ -17,7 +17,7 @@ namespace Automaton.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.11")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
@@ -4121,6 +4121,18 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<Guid?>("ForkedFromAuthorUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("InstalledFromCommit")
+                        .HasMaxLength(40)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("InstalledFromFolder")
+                        .HasMaxLength(300)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("InstalledFromRepo")
+                        .HasMaxLength(200)
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsFeatured")
                         .ValueGeneratedOnAdd()

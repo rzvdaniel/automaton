@@ -505,6 +505,8 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<CustomStepsService>();
         services.AddScoped<CustomStepRunnerExecutionService>();
         services.AddScoped<AppForkingService>();
+        services.AddScoped<AppCatalogService>();
+        services.AddScoped<AppCatalogInstallService>();
         services.AddScoped<AppMutationService>();
         services.AddScoped<AppMutationAuditService>();
         services.AddScoped<AppDeletionService>();

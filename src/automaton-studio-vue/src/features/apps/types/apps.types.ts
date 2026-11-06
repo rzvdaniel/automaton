@@ -491,21 +491,41 @@ export interface DeploymentOperation {
   result?: { message?: string | null } | null
 }
 
-export interface InstallableApp {
-  id: string
-  name: string
-  summary?: string | null
-  description?: string | null
-  creatorDisplayName?: string | null
-}
-
 export interface InstallSource {
   id: string
   name: string
   summary?: string | null
   description?: string | null
-  creatorDisplayName: string
+  creatorDisplayName?: string
   application?: InstallManifest | null
+  /** Set when the app comes from a Git repository (a catalog entry or a pasted URL) rather than this server. */
+  git?: GitAppSource
+}
+
+/** A public GitHub repository folder pinned to one commit. */
+export interface GitAppSource {
+  repo: string
+  folder: string
+  commit: string
+}
+
+export interface CatalogEntry extends GitAppSource {
+  id: string
+  name: string
+  summary: string
+  category: string
+  minServerVersion: string
+  permissions: string[]
+  requiresNewerServer: boolean
+  installedAppId: string | null
+}
+
+export interface CatalogResponse {
+  apps: CatalogEntry[]
+  fetchedAt: string | null
+  stale: boolean
+  unavailable: boolean
+  message: string | null
 }
 
 export interface InstallManifest {

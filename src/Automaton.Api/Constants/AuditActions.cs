@@ -23,6 +23,7 @@ public static class AuditActions
     public const string Published = "Published";
     public const string Unpublished = "Unpublished";
     public const string Forked = "Forked";
+    public const string InstalledFromSource = "InstalledFromSource";
     public const string Assigned = "Assigned";
     public const string Unassigned = "Unassigned";
     public const string Delivered = "Delivered";

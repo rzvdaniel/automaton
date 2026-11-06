@@ -18,10 +18,17 @@ export const appsRoutes: RouteRecordRaw[] = [
     redirect: { name: 'apps' },
   },
   {
-    path: '/apps/install',
-    name: 'install-apps',
+    path: '/apps/catalog',
+    name: 'apps-catalog',
     component: () => import('./views/AppListView.vue'),
-    meta: { appsTab: 'install' },
+    meta: { appsTab: 'catalog' },
+  },
+  // The Catalog tab used to be called Install apps.
+  { path: '/apps/install', redirect: { name: 'apps-catalog' } },
+  {
+    path: '/apps/install-source',
+    name: 'app-install-source',
+    component: () => import('./views/InstallAppView.vue'),
   },
   {
     path: '/apps/install/:sourceAppId',

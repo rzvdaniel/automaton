@@ -96,6 +96,12 @@ internal static class SchedulingModelConfiguration
                     .HasMaxLength(200);
                 entity.Property(e => e.ForkedFromAuthorName)
                     .HasMaxLength(200);
+                entity.Property(e => e.InstalledFromRepo)
+                    .HasMaxLength(200);
+                entity.Property(e => e.InstalledFromFolder)
+                    .HasMaxLength(300);
+                entity.Property(e => e.InstalledFromCommit)
+                    .HasMaxLength(40);
 
                 // Index for sample apps queries
                 entity.HasIndex(e => new { e.IsSample, e.IsPublished });
