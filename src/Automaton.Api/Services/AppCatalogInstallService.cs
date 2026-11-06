@@ -46,7 +46,7 @@ public sealed partial class AppCatalogInstallService(
         && IsValidFolder(folder);
 
     private static bool IsValidFolder(string? folder) =>
-        string.IsNullOrEmpty(folder) || (FolderPattern().IsMatch(folder) && !folder.Split('/').Any(part => part is "." or ".."));
+        string.IsNullOrEmpty(folder) || (folder.Length <= 300 && FolderPattern().IsMatch(folder) && !folder.Split('/').Any(part => part is "." or ".."));
 
     /// <summary>Turns a pasted https://github.com/owner/repo[/tree/ref[/folder]] URL into a pinned source.</summary>
     public async Task<GitAppSource> ResolveUrlAsync(string url, CancellationToken cancellationToken)
@@ -122,7 +122,19 @@ public sealed partial class AppCatalogInstallService(
         }
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await WriteSourceAsync(package, source, id, cancellationToken);
+        try
+        {
+            await WriteSourceAsync(package, source, id, cancellationToken);
+        }
+        catch
+        {
+            // Do not leave an app without its files behind (it would also show as Installed in the catalog).
+            dbContext.WebApps.Remove(entity);
+            await dbContext.SaveChangesAsync(CancellationToken.None);
+            var directory = fileStorageService.GetAppSourceDirectoryPath(UserId, id);
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            throw;
+        }
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, id);
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {

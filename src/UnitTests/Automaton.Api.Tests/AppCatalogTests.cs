@@ -123,7 +123,35 @@ public sealed class AppCatalogTests
         });
     }
 
+    [Test]
+    public async Task Get_ASecondForcedRefreshInsideTheGapUsesTheCopyWithoutCallingGitHub()
+    {
+        await using var db = CreateDb();
+        var calls = 0;
+        var handler = new FakeHandler(_ => { calls++; return Respond(CatalogJson, null); });
+        var service = new AppCatalogService(db, new FakeFactory(handler), Config(null, "30"), NullLogger<AppCatalogService>.Instance);
+
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.That(calls, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task Get_SkipsAnInvalidEntryButKeepsTheRest()
+    {
+        await using var db = CreateDb();
+        var bad = "{\"id\":\"bad\",\"name\":\"Bad\",\"summary\":\"s\",\"category\":\"c\",\"folder\":\"../x\",\"commit\":\"" + Commit + "\",\"minServerVersion\":\"0.0.1\",\"permissions\":[]},";
+        var body = CatalogJson.Replace("\"apps\":[", "\"apps\":[" + bad);
+        var service = CreateService(db, new FakeHandler(_ => Respond(body, null)));
+
+        var response = await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.That(response.Apps.Select(app => app.Id), Is.EqualTo(new[] { "backup" }));
+    }
+
     [TestCase("owner/apps", "maintenance/backup", Commit, true)]
+    [TestCase("owner/apps", "aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa/aaaaaaaaaa", Commit, false)]
     [TestCase("owner/apps", "", Commit, true)]
     [TestCase("owner/apps", "../x", Commit, false)]
     [TestCase("owner/apps", "a/./b", Commit, false)]
@@ -215,8 +243,12 @@ public sealed class AppCatalogTests
     private static AppCatalogInstallService CreateInstaller(FakeHandler handler) =>
         new(null!, null!, null!, null!, null!, null!, new FakeFactory(handler), Config(null));
 
-    private static IConfiguration Config(string? version) =>
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Installation:Version"] = version }).Build();
+    private static IConfiguration Config(string? version, string refreshGap = "0") =>
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Installation:Version"] = version,
+            ["Catalog:MinimumRefreshSeconds"] = refreshGap
+        }).Build();
 
     private sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {

@@ -27,7 +27,9 @@ public sealed class AppCatalogService(
     {
         var cached = await LoadCacheAsync(cancellationToken);
         string? failure = null;
-        if (refresh || cached is null || DateTime.UtcNow - cached.FetchedAt > FreshFor)
+        // A forced refresh still waits out a short pause, so a signed-in user cannot make the server hammer GitHub.
+        var age = cached is null ? TimeSpan.MaxValue : DateTime.UtcNow - cached.FetchedAt;
+        if (cached is null || age > FreshFor || (refresh && age > TimeSpan.FromSeconds(configuration.GetValue("Catalog:MinimumRefreshSeconds", 30))))
         {
             var (updated, error) = await FetchAsync(cached, cancellationToken);
             failure = error;
@@ -102,8 +104,10 @@ public sealed class AppCatalogService(
             ?? throw new InvalidDataException("Empty catalog.");
         if (document.SchemaVersion != SupportedSchemaVersion)
             throw new InvalidDataException("Unsupported catalog schema version.");
-        if (string.IsNullOrWhiteSpace(document.Repo) || document.Apps.Any(app => !AppCatalogInstallService.IsValidSource(document.Repo, app.Folder, app.Commit)))
-            throw new InvalidDataException("The catalog has an invalid entry.");
+        if (string.IsNullOrWhiteSpace(document.Repo))
+            throw new InvalidDataException("The catalog has no repository.");
+        // One bad entry must not hide the others.
+        document.Apps.RemoveAll(app => !AppCatalogInstallService.IsValidSource(document.Repo, app.Folder, app.Commit));
         return document;
     }
 
@@ -133,7 +137,14 @@ public sealed class AppCatalogService(
             setting.Value = value;
             setting.UpdatedAt = DateTime.UtcNow;
         }
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Another request stored the first copy at the same moment; that copy is just as good.
+        }
     }
 
     private async Task<Dictionary<(string Repo, string Folder), Guid>> InstalledAsync(Guid userId, CancellationToken cancellationToken)
