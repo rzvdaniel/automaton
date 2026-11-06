@@ -8,6 +8,7 @@ using Automaton.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.Api.Tests;
 
@@ -569,6 +570,26 @@ public sealed class AppCatalogTests
         Assert.That(preview?.AppCount, Is.EqualTo(1));
         Assert.That(preview?.HasToken, Is.True);
         Assert.That(await store.ListAsync(default), Has.Count.EqualTo(1));
+        Assert.That(db.Settings.Any(setting => setting.Key.StartsWith("Apps.Catalog.Cache")), Is.False, "a dry run stores no catalog copy");
+    }
+
+    [TestCase(null, true)]
+    [TestCase("Developer", true)]
+    [TestCase("FullAccess", true)]
+    [TestCase("ReadOnly", false)]
+    [TestCase("Runner", false)]
+    public async Task TheRegisteredPolicy_AcceptsAnAdministratorsDeveloperKey_AndRefusesOtherScopes(string? scope, bool allowed)
+    {
+        var services = new ServiceCollection().AddLogging();
+        Automaton.Api.Extensions.ApiAuthorizationRegistration.AddApiAuthorization(services);
+        await using var provider = services.BuildServiceProvider();
+        var claims = scope is null ? [] : new[] { new System.Security.Claims.Claim("api_key_scope", scope) };
+        var user = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "test"));
+
+        var result = await provider.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
+            .AuthorizeAsync(user, null, Automaton.Api.Authentication.CatalogSourcesAccess.PolicyName);
+
+        Assert.That(result.Succeeded, Is.EqualTo(allowed));
     }
 
     [Test]
