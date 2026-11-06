@@ -52,7 +52,8 @@ internal static class LogoutCommandHandler
             ? new[] { "Unset AUTOMATON_SERVER and/or AUTOMATON_API_KEY if you want a fully logged-out state" }
             : [];
         return new LogoutResult(scope, clearLocal, clearGlobal, clearedLocal, clearedGlobal,
-            envServer, envApiKey, checks, nextSteps);
+            envServer, envApiKey, checks, nextSteps,
+            config.GetProjectLocalConfigPath(cwd), config.GlobalConfigPath);
     }
 
     private static void WriteScopeConflict(bool asJson)
@@ -81,16 +82,16 @@ internal static class LogoutCommandHandler
     private static void WriteSuccessText(LogoutResult result)
     {
         if (result.ClearLocal)
-            AnsiConsole.MarkupLine(result.ClearedLocal
-                ? "[green]✓[/] Cleared project-local credentials from ./.automaton/config.json"
-                : "[grey]-[/] No project-local credentials found in ./.automaton/config.json");
+            AnsiConsole.MarkupLine(CredentialsMessage(result.ClearedLocal, "project-local", result.LocalPath));
         if (result.ClearGlobal)
-            AnsiConsole.MarkupLine(result.ClearedGlobal
-                ? "[green]✓[/] Cleared global credentials from ~/.automaton/config.json"
-                : "[grey]-[/] No global credentials found in ~/.automaton/config.json");
+            AnsiConsole.MarkupLine(CredentialsMessage(result.ClearedGlobal, "global", result.GlobalPath));
         if (result.EnvOverridesActive)
             WriteEnvironmentWarning(result.EnvServer, result.EnvApiKey);
     }
+
+    internal static string CredentialsMessage(bool cleared, string kind, string path) => cleared
+        ? $"[green]✓[/] Cleared {kind} credentials from {Markup.Escape(path)}"
+        : $"[grey]-[/] No {kind} credentials found in {Markup.Escape(path)}";
 
     private static void WriteEnvironmentWarning(bool hasServer, bool hasApiKey)
     {
@@ -121,7 +122,8 @@ internal static class LogoutCommandHandler
 
     private sealed record LogoutResult(
         string Scope, bool ClearLocal, bool ClearGlobal, bool ClearedLocal, bool ClearedGlobal,
-        bool EnvServer, bool EnvApiKey, List<CommandDiagnosticCheck> Checks, string[] NextSteps)
+        bool EnvServer, bool EnvApiKey, List<CommandDiagnosticCheck> Checks, string[] NextSteps,
+        string LocalPath, string GlobalPath)
     {
         internal bool EnvOverridesActive => EnvServer || EnvApiKey;
     }

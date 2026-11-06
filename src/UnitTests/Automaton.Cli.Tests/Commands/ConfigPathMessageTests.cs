@@ -96,6 +96,22 @@ public class ConfigPathMessageTests
     }
 
     [Test]
+    public void Logout_Cleared_NamesTheFileInConfigDir()
+    {
+        var message = LogoutCommandHandler.CredentialsMessage(true, "global", config.GlobalConfigPath);
+        Assert.Multiple(() =>
+        {
+            Assert.That(message, Does.Contain($"Cleared global credentials from {GlobalFile}"));
+            Assert.That(message, Does.Not.Contain("~/.automaton"));
+        });
+    }
+
+    [Test]
+    public void Logout_NothingToClear_NamesTheProjectFile() =>
+        Assert.That(LogoutCommandHandler.CredentialsMessage(false, "project-local", config.GetProjectLocalConfigPath(Project)),
+            Does.Contain($"No project-local credentials found in {LocalFile}"));
+
+    [Test]
     public void AnExplicitConfigFile_IsWhatTheMessagesName()
     {
         var explicitFile = Path.Combine(configDirectory, "other", "shared.json");
