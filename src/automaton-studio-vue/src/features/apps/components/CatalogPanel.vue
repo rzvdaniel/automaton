@@ -144,6 +144,7 @@ async function installFromUrl() {
             option-value="value"
             option-label="label"
             aria-label="Source"
+            placeholder="All sources"
             class="catalog-source"
             @update:model-value="show({ source: $event, page: 1 })"
           >

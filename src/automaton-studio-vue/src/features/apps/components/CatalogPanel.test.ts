@@ -139,6 +139,7 @@ describe('CatalogPanel', () => {
     expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Maintenance (10)')
     expect(wrapper.text()).toContain('Installed')
+    expect(wrapper.find('.catalog-source').text()).toContain('All sources')
     expect(wrapper.find('.p-paginator').exists()).toBe(true)
   })
 
