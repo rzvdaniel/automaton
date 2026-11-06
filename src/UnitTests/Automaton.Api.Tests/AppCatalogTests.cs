@@ -44,6 +44,20 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task Get_ReadsTheCatalogBranchOfTheOfficialRepoByDefault_AndTheConfiguredSourceWhenSet()
+    {
+        await using var db = CreateDb();
+        var urls = new List<string>();
+        var handler = new FakeHandler(request => { urls.Add(request.RequestUri!.ToString()); return Respond(CatalogJson, null); });
+
+        await CreateService(db, handler).GetAsync(Guid.NewGuid(), refresh: true, default);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Catalog:SourceUrl"] = "http://source.invalid/c.json", ["Catalog:MinimumRefreshSeconds"] = "0" }).Build();
+        await new AppCatalogService(db, new FakeFactory(handler), config, NullLogger<AppCatalogService>.Instance).GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.That(urls, Is.EqualTo(new[] { "https://raw.githubusercontent.com/rzvdaniel/automaton-apps/catalog/catalog.json", "http://source.invalid/c.json" }));
+    }
+
+    [Test]
     public async Task Get_WithNothingCachedAndTheSourceDown_IsUnavailable()
     {
         await using var db = CreateDb();

@@ -16,7 +16,7 @@ public sealed class AppCatalogService(
     IConfiguration configuration,
     ILogger<AppCatalogService> logger)
 {
-    public const string DefaultSourceUrl = "https://raw.githubusercontent.com/rzvdaniel/automaton-apps/main/catalog.json";
+    public const string DefaultSourceUrl = "https://raw.githubusercontent.com/rzvdaniel/automaton-apps/catalog/catalog.json";
     internal const string CacheKey = "Apps.Catalog.Cache";
     internal const int SupportedSchemaVersion = 1;
     private const long MaximumBytes = 1024 * 1024;
