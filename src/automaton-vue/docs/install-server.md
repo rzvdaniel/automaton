@@ -61,4 +61,3 @@ Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-vX.Y.Z"}`
 - **Retrying.** Rerun the same command with the same domain and email; generated credentials are kept. Never run `docker compose down -v`: it deletes data.
 
 For custom paths, protected settings, adopted installs and recovery, see the [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md). To update or restore later: [Update the server](./update-server), [Back up and restore](./backup-restore).
-
