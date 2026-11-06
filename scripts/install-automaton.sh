@@ -10,6 +10,7 @@ email=''
 version=''
 tls_mode=http
 configure_only=false
+quiet=false
 status_only=false
 public_ips=()
 bundle_dir="${AUTOMATON_RELEASE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
@@ -25,8 +26,9 @@ while (($#)); do
         --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
         --install-docker) shift ;; # Accepted for commands written before Docker installation became automatic.
         --configure-only) configure_only=true; shift ;;
+        --quiet) quiet=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -242,9 +244,13 @@ with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
         broker.sendall(b'AMQP\x00\x00\x09\x01')
         if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
 PYBROKER
-setup_token=$(tr -d '\r\n' < "$config_dir/secrets/setup-token")
-printf '\nHTTPS certificates are ready. Open the first-administrator setup link:\nhttps://studio.%s/install#token=%s\n' "$domain" "$setup_token"
-printf 'For an older release that cannot open the link, visit https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
+if $quiet; then
+    printf '\nHTTPS certificates are ready. The setup link is not printed (--quiet). Open https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
+else
+    setup_token=$(tr -d '\r\n' < "$config_dir/secrets/setup-token")
+    printf '\nHTTPS certificates are ready. Open the first-administrator setup link:\nhttps://studio.%s/install#token=%s\n' "$domain" "$setup_token"
+    printf 'For an older release that cannot open the link, visit https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
+fi
 # Nightly database and key backups are on by default; take the first one now.
 if [[ -f "$install_dir/backup.sh" ]]; then
     bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && bash "$install_dir/backup.sh" --install-dir "$install_dir" \

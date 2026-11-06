@@ -557,10 +557,13 @@ public sealed class DeployService
             NextSteps = nextSteps.ToList(),
             RuntimeUploaded = uploadResult,
             Runtime = runtimeResult,
+            IsStaticSite = IsStaticSite(projectConfig),
             HasWarnings = checks.Any(check => !check.Success && check.IsWarning),
             RuntimeRunning = runtimeResult?.Success == true && runtimeResult.RunnerCount > 0
         };
     }
+
+    private static bool IsStaticSite(Models.AutomatonConfig? projectConfig) => projectConfig?.Application?.IsStaticSite == true;
 
     private static string BuildSummary(bool success, IEnumerable<DeployCheckResult> checks)
     {

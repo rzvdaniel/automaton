@@ -57,6 +57,8 @@ public sealed class DeployResult
 
     public bool Clean { get; init; }
 
+    public bool IsStaticSite { get; init; }
+
     public IReadOnlyList<DeployCheckResult> Checks { get; init; } = [];
 
     public IReadOnlyList<string> NextSteps { get; init; } = [];

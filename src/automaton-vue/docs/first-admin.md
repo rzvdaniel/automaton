@@ -37,6 +37,8 @@ read -rsp "Password (12+ characters, upper, lower, number, symbol): " PASSWORD; 
 # No terminal (an AI agent or a script)? Read it from a file only you can read instead:
 #   PASSWORD=$(< /root/admin-password); (create it with: umask 077; read -rs p; printf %s "$p" > /root/admin-password)
 # or from standard input: IFS= read -r PASSWORD
+# An agent can generate a compliant password straight into a mode-600 file (never echoed):
+#   (umask 077; { printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n='; } > /root/admin-password)
 
 # 1. Optional: ask whether setup is open and whether a token is required.
 curl -s "$API/api/install/status"

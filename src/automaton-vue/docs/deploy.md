@@ -14,7 +14,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
 
 ## Steps
 
-1. Validate and deploy. The deployment is asynchronous; wait for `Succeeded`.
+1. Validate and deploy. The deployment is asynchronous; wait for `Succeeded` in `automaton status` (the `Deploy complete` line `deploy` prints means the package was applied, not that the app is running).
 
    ```bash
    automaton validate
@@ -37,6 +37,8 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
    automaton publish --yes --slug my-app
    ```
 
+   The *private address* is the `app-<id>.apps...` URL that `automaton status` shows. It needs about a minute for its certificate. A static site (`--template static`) has no process behind it, so that URL answers `503` until you publish; after `automaton publish` the public URL answers.
+
    `automaton deploy --publish` deploys and publishes in one step.
 
 ## Verify it worked
@@ -55,6 +57,8 @@ automaton listing show
 ```
 
 Or put `"summary"` and `"description"` at the top level of `automaton.json`: `automaton deploy` copies them to the listing while the app has none set in Studio or with `automaton listing`.
+
+A fresh server's **Install apps** tab is empty: nothing is preinstalled. A first tool app comes from the [automaton-apps repository](https://github.com/rzvdaniel/automaton-apps). For Off-site Backup: clone the repository, `cd maintenance/offsite-backup`, run `automaton create` (it creates the remote app for that folder), then `automaton deploy` and `automaton publish --install --yes --slug offsite-backup`. The app then appears under **Install apps**.
 
 Installing a published tool app: in Studio open **Apps → Install apps**, which lists published installable apps (including those with no web page), choose one, name it and select **Install**; Studio creates the app, deploys it on a Runner and shows each step. This needs an online Runner ([Add a Runner](./deploy-runner)). The store's **Install** button opens the same page.
 

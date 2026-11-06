@@ -37,6 +37,22 @@ public class DeployServiceTests
     }
 
     [Test]
+    public async Task DeployAsync_ForStaticSite_FlagsResultAsStatic()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        var application = ApplicationContractTestFactory.Create();
+        application.Runtime.Command = null;
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig { Name = "App", Application = application });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", string.Empty, Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+
+        var result = await new DeployService(configService).DeployAsync(projectRoot, clean: false, directoryOverride: null);
+
+        Assert.That(result.IsStaticSite, Is.True);
+    }
+
+    [Test]
     public async Task DeployAsync_WhenCredentialsAreMissing_FailsBeforeBuild()
     {
         var projectRoot = CreateProjectRoot();

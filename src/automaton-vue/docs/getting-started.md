@@ -10,7 +10,7 @@ This page installs the CLI, signs in and creates an app folder with `automaton.j
 ## Prerequisites
 
 - A server and a Runner ([install](./install-server), [Runner](./deploy-runner)), or an API URL from your administrator.
-- The .NET 10 SDK or later on your computer (for the NuGet tool only).
+- The .NET 10 SDK or later on your computer (for the NuGet tool only). Ubuntu 22.04 and Debian 12 have no .NET 10 package in apt: install it per user with the commands in [Install and authenticate](./automaton-cli#install-and-authenticate).
 
 ## Steps
 
@@ -26,6 +26,8 @@ This page installs the CLI, signs in and creates an app folder with `automaton.j
    ```bash
    automaton login --server https://api.example.com
    ```
+
+   On a server without a browser (SSH, an AI agent) use `automaton login --device --server https://api.example.com`. It prints an approval URL and a code, then waits; approve it from a signed-in session or with the terminal snippet in [Log in without a browser](./automaton-cli#log-in-without-a-browser). The `--device` output contains the code: do not share it.
 
    Several servers: add `--profile NAME`, list with `automaton profiles`, switch with `automaton profiles use NAME` or the `AUTOMATON_PROFILE` environment variable. See [CLI reference](./automaton-cli#several-servers).
 

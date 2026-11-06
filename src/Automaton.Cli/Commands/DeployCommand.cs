@@ -18,6 +18,7 @@ namespace Automaton.Cli.Commands;
 /// </summary>
 public static class DeployCommand
 {
+    private const string StaticSiteNote = "Static site: its files are served only after publishing, so the private app URL answers 503 until then. Run: automaton publish --yes --slug NAME";
     private static readonly Stopwatch managedRunnerWaitTimer = new();
     private static int managedRunnerSpinnerFrame;
     private static DateTime managedRunnerLastNonInteractiveUpdateUtc;
@@ -265,6 +266,7 @@ public static class DeployCommand
                     ? "[yellow bold]Deploy complete with warnings.[/]"
                     : "[green bold]Deploy complete.[/]");
             }
+            WriteStaticSiteNote(result, rich: true);
         }
     }
 
@@ -458,7 +460,15 @@ public static class DeployCommand
             {
                 Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
             }
+            WriteStaticSiteNote(result, rich: false);
         }
+    }
+
+    private static void WriteStaticSiteNote(DeployResult result, bool rich)
+    {
+        if (!result.IsStaticSite) return;
+        if (rich) AnsiConsole.MarkupLine(StaticSiteNote);
+        else Console.WriteLine(StaticSiteNote);
     }
 
     private static void WriteSkippedSection(string title, DeployUploadResult? uploadResult)

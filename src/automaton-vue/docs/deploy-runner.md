@@ -15,6 +15,8 @@ A Runner is the trusted service on a machine that builds and runs your apps in D
 
 ## Steps
 
+The `automaton` commands below need a signed-in CLI. On a host without a browser run `automaton login --device --server https://api.example.com`, then approve the printed URL and code from a signed-in session or with the terminal snippet in [Log in without a browser](./automaton-cli#log-in-without-a-browser). The `--device` output contains the code: do not share it.
+
 Pick the one that matches where you run the command.
 
 ```bash
