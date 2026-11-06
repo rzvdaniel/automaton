@@ -54,7 +54,7 @@ public sealed class AppCatalogTests
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Catalog:SourceUrl"] = "http://source.invalid/c.json", ["Catalog:MinimumRefreshSeconds"] = "0" }).Build();
         await new AppCatalogService(db, new FakeFactory(handler), config, NullLogger<AppCatalogService>.Instance, new CatalogSourceStore(db, new FakeProtector())).GetAsync(Guid.NewGuid(), refresh: true, default);
 
-        Assert.That(urls, Is.EqualTo(new[] { "https://raw.githubusercontent.com/rzvdaniel/automaton-apps/catalog/catalog.json", "http://source.invalid/c.json" }));
+        Assert.That(urls, Is.EqualTo(new[] { "https://raw.githubusercontent.com/rzvdaniel/automaton-apps/main/catalog.json", "http://source.invalid/c.json" }));
     }
 
     [Test]
@@ -261,7 +261,7 @@ public sealed class AppCatalogTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(urls, Does.Contain("https://raw.githubusercontent.com/someone/apps/catalog/catalog.json"));
+            Assert.That(urls, Does.Contain("https://raw.githubusercontent.com/someone/apps/main/catalog.json"));
             Assert.That(response.Apps.Select(a => (a.Name, a.SourceName, a.CustomSource)), Is.EqualTo(new[] { ("Backup", "Official", false), ("Tool", "Community store", true) }));
             // The file says "someone/else", but the entry must install from the source's own repository.
             Assert.That(response.Apps.Last().Repo, Is.EqualTo("someone/apps"));
@@ -283,7 +283,7 @@ public sealed class AppCatalogTests
         });
         var (service, store, db) = await WithSourcesAsync(handler);
         await using var _ = db;
-        var candidate = CatalogSourceStore.Candidate("acme/apps", "catalog", null, Token);
+        var candidate = CatalogSourceStore.Candidate("acme/apps", "main", null, Token);
         Assert.That(await service.ProbeAsync(candidate, default), Is.Null);
         await store.AddAsync(candidate, Guid.NewGuid(), default);
 

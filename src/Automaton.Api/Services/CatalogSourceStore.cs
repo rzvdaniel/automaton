@@ -16,7 +16,7 @@ public sealed partial class CatalogSourceStore(ApplicationDbContext dbContext, I
 {
     public const string OfficialId = "official";
     public const string OfficialRepo = "rzvdaniel/automaton-apps";
-    public const string DefaultBranch = "catalog";
+    public const string DefaultBranch = "main";
     internal const string SettingKey = "Apps.Catalog.Sources";
     private const int MaximumSources = 20;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

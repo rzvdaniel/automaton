@@ -110,7 +110,7 @@ async function remove(source: CatalogSource) {
         <Button type="submit" label="Add source" icon="pi pi-plus" :loading="busy" :disabled="!repo.trim()" />
       </div>
       <small class="text-color-secondary">
-        The repository needs a <code>catalog.json</code> on its catalog branch. A token (fine-grained, read-only Contents access) is stored encrypted, used only by this server, and never shown again.
+        The repository needs a <code>catalog.json</code> in its main branch (another branch can be named). A token (fine-grained, read-only Contents access) is stored encrypted, used only by this server, and never shown again.
       </small>
     </form>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
