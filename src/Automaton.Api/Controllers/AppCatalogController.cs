@@ -10,8 +10,8 @@ namespace Automaton.Api.Controllers;
 public class CatalogController(AppCatalogService catalog, AppCatalogInstallService installer) : BaseController
 {
     [HttpGet]
-    public async Task<ActionResult<CatalogResponse>> Get([FromQuery] bool refresh = false, CancellationToken cancellationToken = default) =>
-        Ok(await catalog.GetAsync(GetUserId(), refresh, cancellationToken));
+    public async Task<ActionResult<CatalogResponse>> Get([FromQuery] CatalogQuery query, [FromQuery] bool refresh = false, CancellationToken cancellationToken = default) =>
+        Ok(await catalog.GetAsync(GetUserId(), refresh, cancellationToken, query));
 
     [HttpGet("resolve")]
     public async Task<ActionResult<GitAppSource>> Resolve([FromQuery] string url, CancellationToken cancellationToken)

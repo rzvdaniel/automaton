@@ -56,6 +56,10 @@ You edit this file. Each entry names an app folder:
 - `minServerVersion` (required): the oldest Automaton Server that can run the app, as `1.2.3`. Servers older than that show the entry but do not offer Install.
 - `repo` (optional): `owner/name`. When it is missing the build uses `--repo` or the `GITHUB_REPOSITORY` variable that GitHub Actions sets.
 
+## Large catalogs
+
+The Catalog tab shows apps as cards, 24 to a page. Once the catalogs together list more than 12 apps it adds a search box (name, summary and tags), category chips, a source dropdown and an **Installed** switch; the address keeps the filters, so a filtered view can be bookmarked. The server does the filtering and paging from its saved copy of the catalogs, so `GET /api/Catalog` takes `q`, `category`, `source`, `installed`, `page` and `pageSize` (at most 100) and returns the page plus `total`, `totalApps` and the `categories` and `sources` with their counts. A `catalog.json` entry may also carry `tags` (a list of words the search matches) and `icon`; servers ignore fields they do not know.
+
 ## The app manifest
 
 Each folder has an `automaton.json` ([reference](./automaton-json)). The catalog takes the app's `name`, its `summary` (one line) and `application.permissions` (what the app asks for) from it, so keep them accurate. Run `automaton validate` inside the app folder: the `applicationContract` check must pass (the link checks apply only once you deploy the app from that folder). Installing an app creates the installer's own copy; permissions are never granted by the catalog and need a system administrator's approval.

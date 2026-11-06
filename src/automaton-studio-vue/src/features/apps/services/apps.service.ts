@@ -5,6 +5,7 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
   InstallSource,
+  CatalogQuery,
   CatalogResponse,
   CatalogSource,
   CatalogSourceInput,
@@ -236,8 +237,8 @@ class AppsService {
   }
 
   /** The catalog read by the server from the official automaton-apps repository (or its last good copy). */
-  async getCatalog(refresh = false): Promise<CatalogResponse> {
-    const { data } = await apiClient.get<CatalogResponse>('/api/catalog', { params: refresh ? { refresh: true } : undefined })
+  async getCatalog(refresh = false, query: CatalogQuery = {}): Promise<CatalogResponse> {
+    const { data } = await apiClient.get<CatalogResponse>('/api/catalog', { params: { ...query, installed: query.installed || undefined, refresh: refresh || undefined } })
     return data
   }
 

@@ -521,6 +521,24 @@ export interface CatalogEntry extends GitAppSource {
   sourceId: string
   sourceName: string
   customSource: boolean
+  tags?: string[]
+  icon?: string | null
+}
+
+/** The filters and page the Catalog tab sends; the server filters and pages. */
+export interface CatalogQuery {
+  q?: string
+  category?: string
+  source?: string
+  installed?: boolean
+  page?: number
+  pageSize?: number
+}
+
+export interface CatalogFacet {
+  value: string
+  label: string
+  count: number
 }
 
 export interface CatalogSource {
@@ -546,6 +564,14 @@ export interface CatalogResponse {
   stale: boolean
   unavailable: boolean
   message: string | null
+  /** Apps matching the filters; `apps` is one page of them. */
+  total?: number
+  /** Apps in the whole catalog. */
+  totalApps?: number
+  page?: number
+  pageSize?: number
+  categories?: CatalogFacet[]
+  sources?: CatalogFacet[]
 }
 
 export interface InstallManifest {

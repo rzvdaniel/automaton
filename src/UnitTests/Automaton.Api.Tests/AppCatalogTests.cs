@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -40,6 +41,43 @@ public sealed class AppCatalogTests
             Assert.That(cached.Stale, Is.True);
             Assert.That(cached.Unavailable, Is.False);
             Assert.That(cached.Message, Does.Contain("could not be reached"));
+        });
+    }
+
+    [Test]
+    public async Task Get_FiltersAndPagesOnTheServer_AndCountsTheWholeCatalog()
+    {
+        await using var db = CreateDb();
+        var apps = string.Join(",", Enumerable.Range(0, 30).Select(i =>
+            $"{{\"id\":\"a{i}\",\"name\":\"App {i:00}\",\"summary\":\"{(i % 5 == 0 ? "Backs up things" : "Does stuff")}\",\"category\":\"{(i % 3 == 0 ? "Maintenance" : "Tools")}\",\"folder\":\"m/a{i}\",\"commit\":\"{Commit}\",\"minServerVersion\":\"0.0.1\",\"permissions\":[],\"tags\":[\"{(i == 7 ? "Needle" : "plain")}\"]}}"));
+        var service = CreateService(db, new FakeHandler(_ => Respond($"{{\"schemaVersion\":1,\"repo\":\"owner/apps\",\"apps\":[{apps}]}}", null)));
+        var user = Guid.NewGuid();
+
+        var first = await service.GetAsync(user, true, default, new CatalogQuery { PageSize = 10 });
+        var last = await service.GetAsync(user, false, default, new CatalogQuery { PageSize = 10, Page = 99 });
+        var search = await service.GetAsync(user, false, default, new CatalogQuery { Q = "backs UP" });
+        var tag = await service.GetAsync(user, false, default, new CatalogQuery { Q = "needle" });
+        var both = await service.GetAsync(user, false, default, new CatalogQuery { Q = "backs up", Category = "maintenance", Source = "official" });
+        var otherSource = await service.GetAsync(user, false, default, new CatalogQuery { Source = "nope" });
+        var installed = await service.GetAsync(user, false, default, new CatalogQuery { Installed = true });
+        var oversize = await service.GetAsync(user, false, default, new CatalogQuery { PageSize = 5000 });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Apps, Has.Count.EqualTo(10));
+            Assert.That(first.Apps[0].Name, Is.EqualTo("App 00"));
+            Assert.That((first.Total, first.TotalApps, first.Page, first.PageSize), Is.EqualTo((30, 30, 1, 10)));
+            Assert.That(last.Page, Is.EqualTo(3));
+            Assert.That(last.Apps, Has.Count.EqualTo(10));
+            Assert.That(search.Total, Is.EqualTo(6));
+            Assert.That(tag.Apps.Single().Name, Is.EqualTo("App 07"));
+            Assert.That(both.Apps.Select(a => a.Name), Is.EqualTo(new[] { "App 00", "App 15" }));
+            Assert.That(otherSource.Total, Is.EqualTo(0));
+            Assert.That(otherSource.TotalApps, Is.EqualTo(30));
+            Assert.That(installed.Total, Is.EqualTo(0));
+            Assert.That(oversize.PageSize, Is.EqualTo(CatalogQuery.MaximumPageSize));
+            Assert.That(first.Categories.Select(c => (c.Value, c.Count)), Is.EqualTo(new[] { ("Maintenance", 10), ("Tools", 20) }));
+            Assert.That(first.Sources!.Single().Count, Is.EqualTo(30));
         });
     }
 

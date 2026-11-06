@@ -5,10 +5,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 const getCatalog = vi.fn()
 const resolveGitUrl = vi.fn()
 const push = vi.fn()
+const replace = vi.fn()
+const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }))
 const roles = vi.hoisted(() => ({ value: [] as string[] }))
 vi.mock('@/features/auth/stores/auth.store', () => ({ useAuthStore: () => ({ user: { roles: roles.value } }) }))
 vi.mock('../services/apps.service', () => ({ appsService: { getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a) } }))
-vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push }) }))
+vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push, replace }), useRoute: () => ({ query: routeQuery.value }) }))
 
 import source from './CatalogPanel.vue?raw'
 import PrimeVue from 'primevue/config'
@@ -20,7 +22,8 @@ const mountPanel = () => mount(CatalogPanel, { attachTo: document.body, global: 
 const button = (label: string) => document.body.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
 
 describe('CatalogPanel', () => {
-  beforeEach(() => { vi.clearAllMocks(); roles.value = [] })
+  beforeEach(() => {
+    window.matchMedia ??= (() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia; vi.clearAllMocks(); roles.value = []; routeQuery.value = {} })
 
   it('lists catalog entries with source, commit, permissions and an Install link pinned to the commit', async () => {
     getCatalog.mockResolvedValue({ apps: [entry], fetchedAt: null, stale: false, unavailable: false, message: null })
@@ -55,7 +58,7 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('The catalog could not be loaded')
     await wrapper.findAll('button').find((b) => b.text() === 'Retry')!.trigger('click')
-    expect(getCatalog).toHaveBeenLastCalledWith(true)
+    expect(getCatalog).toHaveBeenLastCalledWith(true, expect.objectContaining({ page: 1 }))
   })
 
   it('marks entries that need a newer server instead of offering Install', async () => {
@@ -114,5 +117,61 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(document.body.querySelector('.sources-stub')).not.toBeNull()
     admin.unmount()
+  })
+
+  const many = (count: number) => Array.from({ length: count }, (_, i) => ({ ...entry, id: `a${i}`, name: `App ${i}`, folder: `m/a${i}` }))
+  const facets = { categories: [{ value: 'Maintenance', label: 'Maintenance', count: 10 }, { value: 'Tools', label: 'Tools', count: 20 }], sources: [{ value: 'official', label: 'Official', count: 30 }] }
+  const big = (extra: object = {}) => ({ apps: many(24), fetchedAt: null, stale: false, unavailable: false, message: null, total: 30, totalApps: 30, page: 1, pageSize: 24, ...facets, ...extra })
+
+  it('hides the filters and the pager while the catalog has 12 apps or fewer', async () => {
+    getCatalog.mockResolvedValue({ ...big({ apps: many(3), total: 3, totalApps: 3 }) })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Installed')
+    expect(wrapper.find('.p-paginator').exists()).toBe(false)
+  })
+
+  it('shows search, category chips, source, Installed toggle and a pager once the catalog is bigger than 12', async () => {
+    getCatalog.mockResolvedValue(big())
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Maintenance (10)')
+    expect(wrapper.text()).toContain('Installed')
+    expect(wrapper.find('.p-paginator').exists()).toBe(true)
+  })
+
+  it('asks the server for the filters in the address and keeps them in the query string', async () => {
+    routeQuery.value = { q: 'back', category: 'Tools', source: 'official', installed: '1', page: '2' }
+    getCatalog.mockResolvedValue(big({ page: 2 }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(getCatalog).toHaveBeenCalledWith(false, { q: 'back', category: 'Tools', source: 'official', installed: true, page: 2, pageSize: 24 })
+    expect((wrapper.find('input[aria-label="Search apps"]').element as HTMLInputElement).value).toBe('back')
+    await wrapper.findAll('button').find((b) => b.text() === 'Maintenance (10)')!.trigger('click')
+    expect(replace).toHaveBeenCalledWith({ query: { q: 'back', category: 'Maintenance', source: 'official', installed: '1' } })
+  })
+
+  it('waits for a pause in typing before searching', async () => {
+    vi.useFakeTimers()
+    getCatalog.mockResolvedValue(big())
+    const wrapper = mountPanel()
+    await flushPromises()
+    await wrapper.find('input[aria-label="Search apps"]').setValue('back')
+    expect(replace).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(350)
+    expect(replace).toHaveBeenCalledWith({ query: { q: 'back' } })
+    vi.useRealTimers()
+  })
+
+  it('says nothing matches and clears the filters', async () => {
+    routeQuery.value = { q: 'zzz' }
+    getCatalog.mockResolvedValue(big({ apps: [], total: 0 }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.text()).toContain('No apps match')
+    await wrapper.findAll('button').find((b) => b.text() === 'Clear filters')!.trigger('click')
+    expect(replace).toHaveBeenCalledWith({ query: {} })
   })
 })

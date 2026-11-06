@@ -26,7 +26,7 @@ public sealed class AppCatalogService(
 
     internal static string CacheKeyFor(string sourceId) => sourceId == CatalogSourceStore.OfficialId ? CacheKey : $"{CacheKey}.{sourceId}";
 
-    public async Task<CatalogResponse> GetAsync(Guid userId, bool refresh, CancellationToken cancellationToken)
+    public async Task<CatalogResponse> GetAsync(Guid userId, bool refresh, CancellationToken cancellationToken, CatalogQuery? query = null)
     {
         var enabled = await sources.EnabledAsync(cancellationToken);
         var installed = await InstalledAsync(userId, cancellationToken);
@@ -60,7 +60,33 @@ public sealed class AppCatalogService(
             return new CatalogResponse([], null, false, true, string.Join(" ", problems));
         if (enabled.Count == 0)
             return new CatalogResponse([], null, false, false, "No catalog source is turned on.");
-        return new CatalogResponse(apps, fetchedAt, stale, false, problems.Count == 0 ? null : string.Join(" ", problems));
+        var message = problems.Count == 0 ? null : string.Join(" ", problems);
+        return Shape(apps, query ?? new CatalogQuery(), fetchedAt, stale, message);
+    }
+
+    /// <summary>Applies the filters and the page to the whole catalog and adds the filter options with their counts.</summary>
+    internal static CatalogResponse Shape(List<CatalogEntryDto> all, CatalogQuery query, DateTime? fetchedAt, bool stale, string? message)
+    {
+        var text = query.Q?.Trim();
+        var matches = all.Where(app =>
+            (string.IsNullOrEmpty(text)
+                || app.Name.Contains(text, StringComparison.OrdinalIgnoreCase)
+                || app.Summary.Contains(text, StringComparison.OrdinalIgnoreCase)
+                || app.Tags?.Any(tag => tag.Contains(text, StringComparison.OrdinalIgnoreCase)) == true)
+            && (string.IsNullOrEmpty(query.Category) || string.Equals(app.Category, query.Category, StringComparison.OrdinalIgnoreCase))
+            && (string.IsNullOrEmpty(query.Source) || app.SourceId == query.Source)
+            && (!query.Installed || app.InstalledAppId is not null)).ToList();
+
+        var pageSize = query.PageSize <= 0 ? CatalogQuery.DefaultPageSize : Math.Min(query.PageSize, CatalogQuery.MaximumPageSize);
+        var lastPage = Math.Max(1, (int)Math.Ceiling(matches.Count / (double)pageSize));
+        var page = Math.Clamp(query.Page, 1, lastPage);
+        var categories = all.Where(app => app.Category.Length > 0).GroupBy(app => app.Category, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase).Select(g => new CatalogFacet(g.Key, g.Key, g.Count())).ToList();
+        var sources = all.GroupBy(app => (app.SourceId, app.SourceName))
+            .OrderBy(g => g.Key.SourceName, StringComparer.OrdinalIgnoreCase).Select(g => new CatalogFacet(g.Key.SourceId, g.Key.SourceName, g.Count())).ToList();
+
+        return new CatalogResponse(matches.OrderBy(app => app.Name, StringComparer.OrdinalIgnoreCase).Skip((page - 1) * pageSize).Take(pageSize).ToList(),
+            fetchedAt, stale, false, message, matches.Count, all.Count, page, pageSize, categories, sources);
     }
 
     private async Task<(CacheEntry? Entry, string? Failure)> LoadSourceAsync(CatalogSourceStore.SourceRef source, bool refresh, CancellationToken cancellationToken)
@@ -245,7 +271,7 @@ public sealed class AppCatalogService(
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
         Guid? installedId = installed.TryGetValue((repo, app.Folder), out var id) ? id : null;
         return new CatalogEntryDto(app.Id, app.Name, app.Summary, app.Category, repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official);
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags, app.Icon);
     }
 
     internal static Version? ParseVersion(string? text)
@@ -275,5 +301,7 @@ public sealed class AppCatalogService(
         public string Commit { get; set; } = string.Empty;
         public string MinServerVersion { get; set; } = "0.0.0";
         public List<string> Permissions { get; set; } = [];
+        public List<string> Tags { get; set; } = [];
+        public string? Icon { get; set; }
     }
 }
