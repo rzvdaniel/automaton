@@ -9,6 +9,8 @@ This page installs your own Automaton server on one x86_64 Linux machine. Next s
 
 Already have a team server? Ask its administrator for the API URL and go to [Create your first app](./getting-started).
 
+Measured on 3 November 2026 with release 0.2.0: the installer finished in 90 seconds on a Hetzner CPX22 (2 vCPU, 4 GB RAM, 80 GB disk). A first public app was live about 10 minutes after the server was created. The server and Runner used about 1.2 GB of memory at idle with one small app. These are measurements for that setup, not minimum requirements. See the [measurement summary](./is-automaton-for-you#what-it-costs) for its price and scope ([fresh-server pass](https://github.com/rzvdaniel/automaton/issues/561)).
+
 ## Prerequisites
 
 - An x86_64 Linux server with systemd, sudo access, outbound internet, at least 2 GB of RAM and 10 GiB of free disk space. Ubuntu and Debian 12 are supported (Ubuntu 24.04 and Debian 12 are the tested releases); the installer adds Docker itself there. On other distributions, [install Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/) first (not tested).
@@ -59,3 +61,4 @@ Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-vX.Y.Z"}`
 - **Retrying.** Rerun the same command with the same domain and email; generated credentials are kept. Never run `docker compose down -v`: it deletes data.
 
 For custom paths, protected settings, adopted installs and recovery, see the [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md). To update or restore later: [Update the server](./update-server), [Back up and restore](./backup-restore).
+

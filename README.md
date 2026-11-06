@@ -14,7 +14,7 @@ Automaton is a self-hosted platform where you or your AI agent build, deploy and
 - WebSockets or streamed responses (apps cannot use them);
 - a hosted service to sign up for, or hosting for untrusted users.
 
-> **Early access.** The app lifecycle runs on our own production server. A restore onto a different clean server is not yet proven, and backups stay on the same server unless you copy them. A fresh server installs in 90 seconds (measured on a Hetzner CPX22). See [limitations](https://automaton.monster/docs/limitations), [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you) and the [FAQ](https://automaton.monster/docs/faq).
+> **Early access.** The app lifecycle runs on our own production server. A restore from an off-site archive onto a clean second server has been proven. Nightly backups stay on the server by default; copy them and the backup key to encrypted off-site storage for recovery. A fresh server installs in 90 seconds (measured on a Hetzner CPX22). See [limitations](https://automaton.monster/docs/limitations), [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you) and the [FAQ](https://automaton.monster/docs/faq).
 
 ## Quickstart
 
