@@ -32,6 +32,7 @@ internal static partial class CatalogBuildService
         JsonElement config;
         try { config = JsonDocument.Parse(File.ReadAllText(configPath)).RootElement; }
         catch (JsonException exception) { return (null, [$"{ConfigFileName} is not valid JSON: {exception.Message}"]); }
+        if (config.ValueKind != JsonValueKind.Object) return (null, [$"{ConfigFileName} must be a JSON object with an \"apps\" list."]);
 
         var repo = repoOverride ?? Text(config, "repo") ?? Environment.GetEnvironmentVariable("GITHUB_REPOSITORY");
         if (repo is null || !Repo().IsMatch(repo))
@@ -66,6 +67,7 @@ internal static partial class CatalogBuildService
         try
         {
             var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath)).RootElement;
+            if (manifest.ValueKind != JsonValueKind.Object) { problems.Add($"{folder}: automaton.json must be a JSON object."); return; }
             entries.Add(new Entry(folder.Split('/').Last(), Text(manifest, "name") ?? "", Text(manifest, "summary") ?? "",
                 Text(item, "category") ?? "", folder, pin(folder), Text(item, "minServerVersion") ?? "", Permissions(manifest)));
         }
@@ -91,13 +93,13 @@ internal static partial class CatalogBuildService
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     private static IReadOnlyList<string> Permissions(JsonElement manifest) =>
-        manifest.TryGetProperty("application", out var application) && application.TryGetProperty("permissions", out var list) && list.ValueKind == JsonValueKind.Array
+        manifest.TryGetProperty("application", out var application) && application.ValueKind == JsonValueKind.Object && application.TryGetProperty("permissions", out var list) && list.ValueKind == JsonValueKind.Array
             ? list.EnumerateArray().Where(p => p.ValueKind == JsonValueKind.String).Select(p => p.GetString()!).ToList()
             : [];
 
     private static string LastCommit(string directory, string folder)
     {
-        var info = new ProcessStartInfo("git") { WorkingDirectory = directory, RedirectStandardOutput = true, RedirectStandardError = true };
+        var info = new ProcessStartInfo("git") { WorkingDirectory = directory, RedirectStandardOutput = true };
         foreach (var argument in new[] { "log", "-1", "--format=%H", "--", folder }) info.ArgumentList.Add(argument);
         try
         {

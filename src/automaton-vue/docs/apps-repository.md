@@ -17,7 +17,7 @@ git init -b main && git add . && git commit -m "First apps repository"
 git remote add origin https://github.com/<you>/my-apps.git && git push -u origin main
 ```
 
-`catalog init` writes an example app (`apps/hello`, a static page), `catalog-apps.json`, the `Catalog` GitHub workflow and a README, and refuses to overwrite existing files. The workflow runs on each push to `main`: it builds `catalog.json` with `automaton catalog build` and commits it to `main`. Wait for the run to finish (Actions tab) so that `catalog.json` exists in `main`.
+`catalog init` writes an example app (`apps/hello`, a static page), `catalog-apps.json`, the `Catalog` GitHub workflow and a README, and refuses to overwrite existing files. The workflow runs on each push to `main`: it builds `catalog.json` with `automaton catalog build` and commits it to `main` (it installs the Automaton CLI from NuGet, so it needs a CLI release that has `automaton catalog`: Automaton Server 0.2.36 or newer). Wait for the run to finish (Actions tab) so that `catalog.json` exists in `main`.
 
 A system administrator then opens **Apps → Catalog → Catalog sources** in Studio and adds `https://github.com/<you>/my-apps`. The server reads `catalog.json` before saving the source and says why if it cannot. For a private repository, add a fine-grained, read-only token with Contents access to that one repository: the server stores it encrypted, uses it only to read the catalog and to download apps the catalog lists, and never shows it again. The source's apps then appear in the Catalog tab with the source's name; select **Install** to install one. See [Deploy and publish an app](./deploy).
 
@@ -96,7 +96,7 @@ automaton catalog build --validate # only checks the entries
 automaton catalog build --repo owner/name --out /tmp/catalog.json
 ```
 
-The build fails, listing every problem, when a folder has no `automaton.json`, a name or summary is empty, `minServerVersion` is not `1.2.3`, two folders share a name, or a folder has no commit yet.
+The build fails, listing every problem, when the repository is unknown, a folder has no `automaton.json` or lies at the repository root (put the app in a subfolder), a name, summary or category is empty, `minServerVersion` is not `1.2.3`, two folders share a name, or a folder has no commit yet.
 
 ## When `main` requires pull requests
 

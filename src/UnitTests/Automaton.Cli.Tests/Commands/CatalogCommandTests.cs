@@ -33,7 +33,7 @@ public class CatalogCommandTests
             Assert.That(written, Is.EquivalentTo(new[]
             {
                 ".github/workflows/catalog.yml", "README.md", "catalog-apps.json",
-                "apps/hello/automaton.json", "apps/hello/index.html", "apps/hello/health.txt"
+                "apps/hello/automaton.json", "apps/hello/.automatonignore", "apps/hello/index.html", "apps/hello/health.txt"
             }));
             Assert.That(Directory.Exists(Path.Combine(directory, ".git")), Is.False, "init never runs git");
             var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "apps/hello/automaton.json"))).RootElement;
@@ -131,6 +131,22 @@ public class CatalogCommandTests
 
         Assert.That(json, Is.Null);
         Assert.That(string.Join(" ", problems), Does.Contain("no pinned commit"));
+    }
+
+    [TestCase("[]", "catalog-apps.json", "must be a JSON object")]
+    [TestCase("""{"name":"T","summary":"s","application":"x"}""", "a/tool/automaton.json", "no pinned commit|permissions")]
+    [TestCase("[]", "a/tool/automaton.json", "must be a JSON object")]
+    public void Build_ReportsMalformedJsonShapesInsteadOfCrashing(string contents, string file, string expected)
+    {
+        Directory.CreateDirectory(Path.Combine(directory, "a/tool"));
+        File.WriteAllText(Path.Combine(directory, "catalog-apps.json"), """{"apps":[{"folder":"a/tool","category":"Ops","minServerVersion":"1.2.3"}]}""");
+        File.WriteAllText(Path.Combine(directory, "a/tool/automaton.json"), """{"name":"Tool","summary":"s"}""");
+        File.WriteAllText(Path.Combine(directory, file), contents);
+
+        var (json, problems) = CatalogBuildService.Build(directory, "acme/apps", _ => file == "a/tool/automaton.json" && contents.Contains("application") ? Sha : "");
+
+        if (contents.Contains("application")) Assert.That(json, Is.Not.Null, "a non-object application just has no permissions");
+        else Assert.That(string.Join(" ", problems), Does.Match(expected));
     }
 
     [Test]

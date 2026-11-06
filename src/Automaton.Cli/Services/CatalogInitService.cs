@@ -20,7 +20,8 @@ internal static class CatalogInitService
         };
         foreach (var (name, contents) in template.Files) files[$"{ExampleFolder}/{name}"] = contents + "\n";
         var manifest = $"{ExampleFolder}/automaton.json";
-        foreach (var path in files.Keys.Append(manifest).Append($"{ExampleFolder}/.automatonignore"))
+        var ignoreFile = $"{ExampleFolder}/.automatonignore";
+        foreach (var path in files.Keys.Append(manifest).Append(ignoreFile))
             if (Path.Exists(Path.Combine(directory, path)))
                 throw new IOException($"'{path}' already exists. Choose an empty directory.");
 
@@ -36,7 +37,7 @@ internal static class CatalogInitService
             Summary = "A tiny static page that shows your catalog works.",
             Application = template.Contract
         }, overwrite: false);
-        return [.. files.Keys.Append(manifest).Order()];
+        return [.. files.Keys.Append(manifest).Append(ignoreFile).Order()];
     }
 
     private static string CatalogList => $$"""
@@ -58,7 +59,8 @@ internal static class CatalogInitService
 
         1. Push this repository to GitHub (`git init`, `git add .`, `git commit`, `git push`).
         2. The `Catalog` workflow runs on every push to `main`: it builds `catalog.json` with `automaton catalog build`
-           and commits it to `main`. If `main` requires pull requests, CI cannot push there: see the apps repository
+           and commits it to `main` (it needs an Automaton CLI that has `automaton catalog`, so a CLI published from
+           Automaton Server 0.2.36 on). If `main` requires pull requests, CI cannot push there: see the apps repository
            format in the Automaton docs for a variant that opens and merges a pull request.
         3. As a system administrator, open **Apps → Catalog → Catalog sources** in Studio and add
            `https://github.com/<you>/<this repository>`. A private repository needs a fine-grained read-only token
@@ -68,7 +70,7 @@ internal static class CatalogInitService
 
         Create a folder with the app and its `automaton.json` (`name` and `summary` are required for the catalog), add it to
         `catalog-apps.json` with a category and the oldest Automaton Server version that can run it, and run
-        `automaton validate` inside the app folder. `automaton catalog build --validate` checks the list.
+        `automaton validate` inside the app folder (its `applicationContract` check must pass; the link checks apply once you deploy the app). `automaton catalog build --validate` checks the list.
 
         Each catalog entry is pinned to the last commit that changed its folder. Commit your app before building.
         """;
