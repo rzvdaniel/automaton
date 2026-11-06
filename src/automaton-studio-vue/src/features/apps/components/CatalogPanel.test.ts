@@ -8,6 +8,7 @@ const push = vi.fn()
 vi.mock('../services/apps.service', () => ({ appsService: { getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a) } }))
 vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push }) }))
 
+import source from './CatalogPanel.vue?raw'
 import PrimeVue from 'primevue/config'
 import CatalogPanel from './CatalogPanel.vue'
 
@@ -72,5 +73,11 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(resolveGitUrl).toHaveBeenCalledWith('https://github.com/o/r')
     expect(push).toHaveBeenCalledWith({ name: 'app-install-source', query: { repo: 'o/r', folder: undefined, commit: 'a'.repeat(40) } })
+  })
+
+  it('styles panels and links with the Studio theme tokens, not undefined legacy ones', () => {
+    expect(source).toContain('var(--p-content-background)')
+    expect(source).toContain('var(--p-primary-color)')
+    expect(source).not.toMatch(/var\(--surface-/)
   })
 })

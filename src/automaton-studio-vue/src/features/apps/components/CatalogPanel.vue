@@ -133,9 +133,12 @@ async function installFromUrl() {
 .catalog-empty,
 .catalog-git {
   padding: 1rem;
-  border: 1px solid var(--surface-border);
-  border-radius: 12px;
-  background: var(--surface-card);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-content-border-radius);
+  background: var(--p-content-background);
+}
+.catalog a:not(.p-button) {
+  color: var(--p-primary-color);
 }
 .catalog-row {
   display: flex;

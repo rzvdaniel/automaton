@@ -363,6 +363,10 @@ function openInstalledApp() {
   background: var(--p-content-background);
 }
 
+.install-source a {
+  color: var(--p-primary-color);
+}
+
 .install-source dt {
   color: var(--p-text-muted-color);
   font-size: 0.85rem;
