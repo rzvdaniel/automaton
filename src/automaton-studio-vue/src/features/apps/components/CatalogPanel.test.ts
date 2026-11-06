@@ -67,6 +67,7 @@ describe('CatalogPanel', () => {
   })
 
   it('keeps the Git address form out of the list until Install from URL is opened, then pins it', async () => {
+    roles.value = ['SysAdmin']
     getCatalog.mockResolvedValue({ apps: [], fetchedAt: null, stale: false, unavailable: false, message: null })
     resolveGitUrl.mockResolvedValue({ repo: 'o/r', folder: '', commit: 'a'.repeat(40) })
     const wrapper = mountPanel()
@@ -103,7 +104,7 @@ describe('CatalogPanel', () => {
     const plain = mountPanel()
     await flushPromises()
     expect(button('Manage sources')).toBeUndefined()
-    expect(button('Install from URL')).toBeDefined()
+    expect(button('Install from URL')).toBeUndefined()
     plain.unmount()
     roles.value = ['SysAdmin']
     const admin = mountPanel()

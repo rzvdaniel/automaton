@@ -65,8 +65,8 @@ async function installFromUrl() {
       and any sources an administrator added.
       Installing fetches the app at the listed commit and asks for its settings, secrets and permissions first.
     </p>
-    <div class="flex gap-2 flex-shrink-0">
-      <Button v-if="isSystemAdministrator" label="Manage sources" icon="pi pi-cog" severity="secondary" outlined @click="showSources = true" />
+    <div v-if="isSystemAdministrator" class="flex gap-2 flex-shrink-0">
+      <Button label="Manage sources" icon="pi pi-cog" severity="secondary" outlined @click="showSources = true" />
       <Button label="Install from URL" icon="pi pi-link" severity="secondary" outlined @click="showGit = true" />
     </div>
     </div>
@@ -77,7 +77,7 @@ async function installFromUrl() {
       <strong>The catalog could not be loaded</strong>
       <span class="text-color-secondary">
         {{ catalog?.message ?? 'The server could not answer.' }} This server reads the list from GitHub and has no saved copy yet.
-        Check that the server can reach github.com, then try again. You can also use Install from URL.
+        Check that the server can reach github.com, then try again.
       </span>
       <div><Button label="Retry" icon="pi pi-refresh" @click="load(true)" /></div>
     </div>
@@ -126,7 +126,7 @@ async function installFromUrl() {
       <CatalogSources @changed="load()" />
     </Drawer>
 
-    <Dialog v-model:visible="showGit" modal header="Install from a Git address" :style="{ width: '32rem', maxWidth: '100vw' }" @hide="gitError = null; gitUrl = ''">
+    <Dialog v-if="isSystemAdministrator" v-model:visible="showGit" modal header="Install from a Git address" :style="{ width: '32rem', maxWidth: '100vw' }" @hide="gitError = null; gitUrl = ''">
       <div class="flex flex-column gap-2">
         <small class="text-color-secondary">
           A public GitHub repository (or <code>/tree/branch/folder</code>) with an <code>automaton.json</code>. It is pinned to its current commit and shown to you before anything is created.
