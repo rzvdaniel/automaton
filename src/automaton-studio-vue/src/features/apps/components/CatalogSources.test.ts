@@ -38,6 +38,12 @@ describe('CatalogSources', () => {
     expect(wrapper.find('[aria-label="Remove Acme"]').exists()).toBe(true)
   })
 
+  it('does not repeat the panel title inside the form', async () => {
+    const wrapper = mountSources()
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Catalog sources')
+  })
+
   it('adds a source with its token, clears the token field and tells the catalog to reload', async () => {
     addCatalogSource.mockResolvedValue(custom)
     const wrapper = mountSources()

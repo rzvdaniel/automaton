@@ -78,8 +78,7 @@ async function remove(source: CatalogSource) {
 </script>
 
 <template>
-  <section class="catalog-sources flex flex-column gap-3" aria-labelledby="catalog-sources-title">
-    <h3 id="catalog-sources-title" class="m-0">Catalog sources</h3>
+  <section class="catalog-sources flex flex-column gap-3" aria-label="Catalog sources">
     <small class="text-color-secondary">
       Only add sources you trust: an app is code that runs on your Runners. Every install shows its source, pinned commit and permissions, and permissions always need your approval.
     </small>
