@@ -6,14 +6,14 @@ const getInstallableApps = vi.fn()
 vi.mock('../services/apps.service', () => ({ appsService: { getInstallableApps: () => getInstallableApps() } }))
 
 import PrimeVue from 'primevue/config'
-import InstallAppsView from './InstallAppsView.vue'
+import InstallAppsPanel from './InstallAppsPanel.vue'
 
 const RouterLink = { props: ['to'], template: '<a class="link" :data-to="JSON.stringify(to)"><slot /></a>' }
 
-describe('InstallAppsView', () => {
+describe('InstallAppsPanel', () => {
   it('lists installable apps with an Install link to the install page', async () => {
     getInstallableApps.mockResolvedValue([{ id: 'a1', name: 'Off-site Backup', summary: 'Copies backups away' }])
-    const wrapper = mount(InstallAppsView, { global: { plugins: [PrimeVue], stubs: { RouterLink } } })
+    const wrapper = mount(InstallAppsPanel, { global: { plugins: [PrimeVue], stubs: { RouterLink } } })
     await flushPromises()
     expect(wrapper.text()).toContain('Off-site Backup')
     expect(wrapper.text()).toContain('Copies backups away')
@@ -22,7 +22,7 @@ describe('InstallAppsView', () => {
 
   it('says so when nothing is installable', async () => {
     getInstallableApps.mockResolvedValue([])
-    const wrapper = mount(InstallAppsView, { global: { plugins: [PrimeVue], stubs: { RouterLink } } })
+    const wrapper = mount(InstallAppsPanel, { global: { plugins: [PrimeVue], stubs: { RouterLink } } })
     await flushPromises()
     expect(wrapper.text()).toContain('No installable apps')
   })

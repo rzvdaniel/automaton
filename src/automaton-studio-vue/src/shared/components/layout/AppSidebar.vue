@@ -51,7 +51,6 @@ const mainNavItems: NavItem[] = [
 ]
 
 const collaborationNavItems: NavItem[] = [
-  { label: 'Install apps', icon: 'pi pi-download', to: '/apps/install', hideForAppUser: true },
   { label: 'My Apps', icon: 'pi pi-th-large', to: '/my-apps', hideForAppUser: false },
 ]
 
@@ -192,10 +191,6 @@ const isActive = (to: string) => {
   }
   if (to === '/') {
     return route.path === '/'
-  }
-  // Install apps lives under /apps but is its own page.
-  if (to === '/apps' && route.path.startsWith('/apps/install')) {
-    return false
   }
   return route.path.startsWith(to)
 }

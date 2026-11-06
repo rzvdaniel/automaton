@@ -50,4 +50,24 @@ describe('AppCard', () => {
     expect(wrapper.text()).toContain('View local setup')
     expect(wrapper.findAll('button').some((button) => button.text() === 'Deploy')).toBe(false)
   })
+
+  it('shows Actions only and the last Action run for apps without a web page', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/apps/:id', component: { template: '<div />' } }] })
+    const wrapper = mount(AppCard, {
+      props: {
+        app: app({
+          actionsOnly: true,
+          summary: 'Checks things nightly',
+          lastActionRun: { moduleKey: 'check', status: 'Succeeded', createdAtUtc: '2026-11-01T00:00:00Z' },
+        }),
+      },
+      global: { plugins: [router, createPinia(), PrimeVue], stubs: { Menu: true, AppCoverPlaceholder: true } },
+    })
+    const text = wrapper.text()
+    expect(text).toContain('Actions only')
+    expect(text).toContain('Last run check: Succeeded')
+    expect(text).toContain('Checks things nightly')
+    expect(text).not.toContain('Not deployed yet')
+    expect(text).not.toContain('Unassigned')
+  })
 })

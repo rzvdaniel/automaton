@@ -19,6 +19,7 @@ public sealed class AppForkingSafetyTests
         var copiedContract = ApplicationContractSerialization.Deserialize(
             (await fixture.Db.WebApps.SingleAsync(app => app.Id == fork.Id)).ApplicationContractJson);
 
+        Assert.That(fork.Summary, Is.EqualTo("Source summary"));
         AssertEnvironmentCleared(preview.Application!);
         AssertEnvironmentCleared(copiedContract);
     }
@@ -63,7 +64,7 @@ public sealed class AppForkingSafetyTests
             {
                 Id = sourceId,
                 Name = "Source",
-                Summary = string.Empty,
+                Summary = "Source summary",
                 Description = string.Empty,
                 Definition = "{}",
                 ApplicationContractJson = ApplicationContractSerialization.Serialize(CreateContract(compose)),

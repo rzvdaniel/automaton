@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
@@ -15,6 +15,7 @@ import InputIcon from 'primevue/inputicon'
 import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
 import CopyCommand from '../components/CopyCommand.vue'
+import InstallAppsPanel from '../components/InstallAppsPanel.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
@@ -25,6 +26,7 @@ import { appsService } from '../services/apps.service'
 const publicDocsUrl = 'https://automaton.monster/docs'
 const publicCliDocsUrl = `${publicDocsUrl}/automaton-cli`
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
@@ -61,11 +63,14 @@ const viewOptions = ref([
 ])
 
 // Tab state
-const activeTabIndex = ref(0)
+const activeTabIndex = ref(route.meta.appsTab === 'install' ? 1 : 0)
 const tabItems = ref([
   { label: 'My Apps', icon: 'pi pi-th-large' },
+  { label: 'Install apps', icon: 'pi pi-download' },
   { label: 'Local setup', icon: 'pi pi-book' },
 ])
+
+watch(() => route.meta.appsTab, (tab) => { activeTabIndex.value = tab === 'install' ? 1 : 0 })
 
 // Local state
 const searchQuery = ref('')
@@ -363,7 +368,7 @@ const handleRetry = async () => {
             <p class="text-color-secondary mb-4">
               Create an app in a local project with Automaton CLI, then manage its deployment and runtime in Studio.
             </p>
-            <Button label="View local setup" icon="pi pi-book" @click="activeTabIndex = 1" />
+            <Button label="View local setup" icon="pi pi-book" @click="activeTabIndex = 2" />
           </div>
         </template>
       </Card>
@@ -371,8 +376,11 @@ const handleRetry = async () => {
     </template><!-- /v-else -->
     </template><!-- /v-if="activeTabIndex === 0" -->
 
+    <!-- ─── INSTALL APPS TAB ─────────────────────────────────────────── -->
+    <InstallAppsPanel v-if="activeTabIndex === 1" />
+
     <!-- ─── LOCAL SETUP TAB ──────────────────────────────────────────── -->
-    <template v-if="activeTabIndex === 1">
+    <template v-if="activeTabIndex === 2">
       <Card class="quick-start-card">
         <template #content>
           <div class="quick-start-header mb-3">
@@ -423,7 +431,7 @@ const handleRetry = async () => {
 
         </template>
       </Card>
-    </template><!-- /v-if="activeTabIndex === 1" -->
+    </template><!-- /v-if="activeTabIndex === 2" -->
 
   </div>
 </template>

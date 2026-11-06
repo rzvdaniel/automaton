@@ -22,13 +22,10 @@ onMounted(async () => {
 
 <template>
   <div class="install-apps flex flex-column gap-4">
-    <header class="flex flex-column gap-1">
-      <h1 class="m-0">Install apps</h1>
-      <p class="m-0 text-color-secondary">
-        Tools published on this server that run in the background and have no web page, such as backups and checks.
-        Install one to run it on your own server.
-      </p>
-    </header>
+    <p class="m-0 text-color-secondary">
+      Tools published on this server that run in the background and have no web page, such as backups and checks.
+      Install one to run it on your own server.
+    </p>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <p v-else-if="loading" class="m-0 text-color-secondary">Loading…</p>
     <p v-else-if="apps.length === 0" class="m-0 text-color-secondary">No installable apps are published on this server yet.</p>

@@ -175,6 +175,9 @@ export interface AppListItem {
     routePath: string
   } | null
   runtime: { genericRuntimeDeployed: boolean }
+  /** No web runtime or static site: the app only has Actions. */
+  actionsOnly?: boolean
+  lastActionRun?: { moduleKey: string; status: string; createdAtUtc: string } | null
 }
 
 export const DeploymentTargetStatus = {

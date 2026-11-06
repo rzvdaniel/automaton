@@ -18,6 +18,16 @@ public sealed class AppListItemDto
     public AppListRunnerDto? Runner { get; init; }
     public AppListEnvironmentDto? LiveEnvironment { get; init; }
     public AppListRuntimeDto Runtime { get; init; } = new();
+    /// <summary>The app has no web runtime or static site, only Actions.</summary>
+    public bool ActionsOnly { get; init; }
+    public AppListActionRunDto? LastActionRun { get; init; }
+}
+
+public sealed class AppListActionRunDto
+{
+    public string ModuleKey { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public DateTime CreatedAtUtc { get; init; }
 }
 
 public sealed class AppListEnvironmentDto

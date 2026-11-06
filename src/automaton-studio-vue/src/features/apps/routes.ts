@@ -20,7 +20,8 @@ export const appsRoutes: RouteRecordRaw[] = [
   {
     path: '/apps/install',
     name: 'install-apps',
-    component: () => import('./views/InstallAppsView.vue'),
+    component: () => import('./views/AppListView.vue'),
+    meta: { appsTab: 'install' },
   },
   {
     path: '/apps/install/:sourceAppId',

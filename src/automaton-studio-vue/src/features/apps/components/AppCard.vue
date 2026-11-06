@@ -68,21 +68,27 @@ const updatedAgo = computed(() => {
   return `Updated: ${diffWeeks}w ago`
 })
 const deploymentSummary = computed(() => {
+  if (props.app.actionsOnly) return 'Actions only, no web app'
   return props.app.runtime.genericRuntimeDeployed ? 'Generic runtime deployed' : 'Not deployed yet'
 })
 
 const liveEnvironment = computed(() => props.app.liveEnvironment)
 const liveStatusLabel = computed(() => {
+  if (props.app.actionsOnly) {
+    const run = props.app.lastActionRun
+    return run ? `Last run ${run.moduleKey}: ${run.status}` : 'No Action has run yet'
+  }
   const environment = liveEnvironment.value
   if (!environment) return props.app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
   if (!environment.genericRuntimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 })
-const liveStatusClass = computed(() => ['Running', 'Available'].includes(liveStatusLabel.value)
+const liveStatusClass = computed(() => (props.app.actionsOnly || ['Running', 'Available'].includes(liveStatusLabel.value))
   ? 'runner-status--online'
   : 'runner-status--offline')
 const liveDestinationLabel = computed(() => {
+  if (props.app.actionsOnly) return 'Actions only'
   const environment = liveEnvironment.value
   if (!environment || environment.status === 'Unassigned') return 'No runtime assigned'
   if (environment.isHostedRunner) return 'Retired hosted destination'
@@ -94,6 +100,8 @@ const canOpenPublicApp = computed(() => props.app.canLaunchPublicly === true && 
 const canOpenApp = computed(() => canOpenPublicApp.value || canOpenPrivateApp.value)
 const primaryAction = computed(() => canOpenApp.value
   ? { label: 'Open', icon: 'pi pi-external-link' }
+  : props.app.actionsOnly
+  ? { label: 'Manage', icon: 'pi pi-cog' }
   : { label: 'View local setup', icon: 'pi pi-terminal' })
 const openAppUrl = computed(() => {
   if (canOpenPublicApp.value) {
@@ -295,7 +303,7 @@ const menuItems = computed(() => {
           <div class="app-icon" aria-hidden="true">{{ initials }}</div>
           <div class="app-title-group min-w-0">
             <div class="app-title text-overflow-ellipsis white-space-nowrap overflow-hidden">{{ app.name }}</div>
-            <div class="app-summary">{{ app.summary || 'No summary' }}</div>
+            <div class="app-summary">{{ app.summary || (app.actionsOnly ? 'Runs Actions, no web page' : 'No summary') }}</div>
           </div>
         </div>
 
