@@ -72,6 +72,20 @@ public class CatalogSourcesCommandTests
             Is.EqualTo("automaton catalog sources add https://github.com/acme/apps --branch dev --name 'Acme apps' --private --token-file ~/catalog-token"));
 
     [Test]
+    public void TheList_ShowsEachIdInFullEvenInANarrowTerminal()
+    {
+        var writer = new StringWriter();
+        var console = Spectre.Console.AnsiConsole.Create(new Spectre.Console.AnsiConsoleSettings { Out = new Spectre.Console.AnsiConsoleOutput(writer), Ansi = Spectre.Console.AnsiSupport.No, ColorSystem = Spectre.Console.ColorSystemSupport.NoColors });
+        console.Profile.Width = 60;
+        const string id = "77b5f1fb3b404a9a87449386ef76e502";
+        var sources = System.Text.Json.JsonDocument.Parse("[{\"id\":\"" + id + "\",\"name\":\"Acme apps\",\"repo\":\"acme/apps\",\"branch\":\"main\",\"enabled\":true,\"hasToken\":true}]").RootElement;
+
+        CatalogSourcesCommand.RenderList(sources, console);
+
+        Assert.That(writer.ToString(), Does.Contain(id));
+    }
+
+    [Test]
     public async Task TheClient_SendsATokenInTheBody_ADryRunInTheQuery_AndExplainsAForbiddenKey()
     {
         var requests = new List<(HttpMethod Method, string Url, string Body)>();

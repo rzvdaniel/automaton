@@ -30,13 +30,19 @@ public static class CatalogSourcesCommand
             using var client = Connect(config);
             var sources = await client.ListCatalogSourcesAsync();
             if (asJson) { CliJson.Write(new { success = true, sources }); return; }
-            var table = new Table().AddColumns("Id", "Name", "Repository", "Branch", "State", "Private");
-            foreach (var source in sources.EnumerateArray())
-                table.AddRow(Text(source, "id"), Markup.Escape(Text(source, "name")), Markup.Escape(Text(source, "repo")), Markup.Escape(Text(source, "branch")),
-                    source.GetProperty("enabled").GetBoolean() ? "[green]enabled[/]" : "[grey]disabled[/]", source.GetProperty("hasToken").GetBoolean() ? "yes" : "");
-            AnsiConsole.Write(table);
+            RenderList(sources, AnsiConsole.Console);
         }), json);
         return command;
+    }
+
+    /// <summary>The id column never wraps: the id is what enable, disable and remove take.</summary>
+    internal static void RenderList(JsonElement sources, IAnsiConsole console)
+    {
+        var table = new Table().AddColumn(new TableColumn("Id").NoWrap()).AddColumns("Name", "Repository", "Branch", "State", "Private");
+        foreach (var source in sources.EnumerateArray())
+            table.AddRow(Text(source, "id"), Markup.Escape(Text(source, "name")), Markup.Escape(Text(source, "repo")), Markup.Escape(Text(source, "branch")),
+                source.GetProperty("enabled").GetBoolean() ? "[green]enabled[/]" : "[grey]disabled[/]", source.GetProperty("hasToken").GetBoolean() ? "yes" : "");
+        console.Write(table);
     }
 
     private static Command BuildAdd(ConfigService config)
