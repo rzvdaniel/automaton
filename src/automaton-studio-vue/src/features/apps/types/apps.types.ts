@@ -549,6 +549,8 @@ export interface CatalogSource {
   official: boolean
   enabled: boolean
   hasToken: boolean
+  /** Only in the answer to adding a source: how many apps its catalog lists. */
+  appCount?: number | null
 }
 
 export interface CatalogSourceInput {

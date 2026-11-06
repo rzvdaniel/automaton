@@ -26,11 +26,11 @@ public sealed class AdminCatalogSourcesController(CatalogSourceStore sources, Ap
         {
             var candidate = CatalogSourceStore.Candidate(request.Repo, request.Branch, request.Name, request.Token);
             await sources.EnsureAddableAsync(candidate, cancellationToken);
-            if (await catalog.ProbeAsync(candidate, cancellationToken) is { } problem)
-                return BadRequest(new { message = problem });
+            var (problem, appCount) = await catalog.ProbeAsync(candidate, cancellationToken);
+            if (problem is not null) return BadRequest(new { message = problem });
             var added = await sources.AddAsync(candidate, GetUserId(), cancellationToken);
             await Audit(AuditActions.Added, added, cancellationToken);
-            return Created($"/api/admin/catalog/sources/{added.Id}", added);
+            return Created($"/api/admin/catalog/sources/{added.Id}", added with { AppCount = appCount });
         }
         catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
     }

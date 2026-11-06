@@ -106,12 +106,12 @@ public sealed class AppCatalogService(
     }
 
     /// <summary>Reads a not yet saved source once, so an administrator hears at once that it cannot be used.</summary>
-    public async Task<string?> ProbeAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken)
+    public async Task<(string? Problem, int Apps)> ProbeAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken)
     {
         var (entry, error) = await FetchAsync(source, null, cancellationToken);
-        if (entry is null) return error ?? "The catalog could not be loaded.";
+        if (entry is null) return (error ?? "The catalog could not be loaded.", 0);
         await SaveCacheAsync(source, entry, cancellationToken);
-        return null;
+        return (null, entry.Document.Apps.Count);
     }
 
     /// <summary>The read token of a private source, only for an app that source's catalog lists at exactly that folder and commit.</summary>

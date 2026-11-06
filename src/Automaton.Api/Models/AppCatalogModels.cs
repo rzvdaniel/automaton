@@ -80,7 +80,7 @@ public sealed class CatalogInstallRequest
 }
 
 /// <summary>A catalog source as an administrator sees it. The token is never returned, only whether one is saved.</summary>
-public sealed record CatalogSourceDto(string Id, string Name, string Repo, string Branch, bool Official, bool Enabled, bool HasToken);
+public sealed record CatalogSourceDto(string Id, string Name, string Repo, string Branch, bool Official, bool Enabled, bool HasToken, int? AppCount = null);
 
 public sealed class CatalogSourceRequest
 {

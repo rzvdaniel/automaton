@@ -324,7 +324,9 @@ public sealed class AppCatalogTests
         var (service, store, db) = await WithSourcesAsync(handler);
         await using var _ = db;
         var candidate = CatalogSourceStore.Candidate("https://github.com/someone/apps.git", null, "Community store", null);
-        Assert.That(await service.ProbeAsync(candidate, default), Is.Null);
+        var probe = await service.ProbeAsync(candidate, default);
+        Assert.That(probe.Problem, Is.Null);
+        Assert.That(probe.Apps, Is.GreaterThan(0));
         await store.AddAsync(candidate, Guid.NewGuid(), default);
 
         var response = await service.GetAsync(Guid.NewGuid(), refresh: true, default);
@@ -354,7 +356,7 @@ public sealed class AppCatalogTests
         var (service, store, db) = await WithSourcesAsync(handler);
         await using var _ = db;
         var candidate = CatalogSourceStore.Candidate("acme/apps", "main", null, Token);
-        Assert.That(await service.ProbeAsync(candidate, default), Is.Null);
+        Assert.That((await service.ProbeAsync(candidate, default)).Problem, Is.Null);
         await store.AddAsync(candidate, Guid.NewGuid(), default);
 
         var listed = System.Text.Json.JsonSerializer.Serialize(await store.ListAsync(default));
@@ -515,7 +517,7 @@ public sealed class AppCatalogTests
         var (service, _, db) = await WithSourcesAsync(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
         await using var _ = db;
 
-        var problem = await service.ProbeAsync(CatalogSourceStore.Candidate("acme/missing", null, null, null), default);
+        var (problem, _) = await service.ProbeAsync(CatalogSourceStore.Candidate("acme/missing", null, null, null), default);
 
         Assert.That(problem, Does.Contain("404").And.Contain("catalog.json"));
     }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { isAxiosError } from 'axios'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -7,6 +7,7 @@ import Message from 'primevue/message'
 import Password from 'primevue/password'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
+import Tooltip from 'primevue/tooltip'
 import { appsService } from '../services/apps.service'
 import type { CatalogSource } from '../types/apps.types'
 
@@ -19,6 +20,15 @@ const name = ref('')
 const token = ref('')
 const error = ref<string | null>(null)
 const busy = ref(false)
+const success = ref<string | null>(null)
+
+const vTooltip = Tooltip
+const docsUrl = 'https://automaton.monster/docs/apps-repository'
+const repoHelp = 'Use the address of the GitHub repository (https://github.com/owner/name, or just owner/name). The server reads catalog.json from its root before saving the source and tells you why if it cannot. Create a catalog with "automaton catalog init".'
+const branchHelp = 'Only fill this in when the catalog.json you want lives on a branch other than the default one. It is the name of a Git branch, not the word "catalog".'
+const nameHelp = 'A short label for the source. It appears next to each app and in the source filter of the Catalog tab.'
+const tokenHelp = 'GitHub, Settings, Developer settings, Fine-grained tokens: Generate new token, choose Only select repositories and pick this one, then Repository permissions, Contents: Read-only. Paste the token here. It is encrypted on this server, used only to read the catalog and download its apps, and never shown again.'
+const blocked = computed(() => (repo.value.trim() ? '' : 'Enter the repository address to add a source.'))
 
 async function load() {
   try {
@@ -36,15 +46,19 @@ function describe(failure: unknown, fallback: string) {
 
 async function add() {
   error.value = null
+  success.value = null
   busy.value = true
   try {
-    await appsService.addCatalogSource({
+    const added = await appsService.addCatalogSource({
       repo: repo.value.trim(),
       branch: branch.value.trim() || undefined,
       name: name.value.trim() || undefined,
       token: token.value.trim() || undefined,
     })
     repo.value = branch.value = name.value = token.value = ''
+    success.value = added.appCount === undefined || added.appCount === null
+      ? `Added ${added.name}.`
+      : `Added ${added.name}: ${added.appCount} ${added.appCount === 1 ? 'app' : 'apps'} found in its catalog.`
     await load()
     emit('changed')
   } catch (failure) {
@@ -56,6 +70,7 @@ async function add() {
 
 async function toggle(source: CatalogSource, enabled: boolean) {
   error.value = null
+  success.value = null
   try {
     await appsService.setCatalogSourceEnabled(source.id, enabled)
     await load()
@@ -67,6 +82,7 @@ async function toggle(source: CatalogSource, enabled: boolean) {
 
 async function remove(source: CatalogSource) {
   error.value = null
+  success.value = null
   try {
     await appsService.removeCatalogSource(source.id)
     await load()
@@ -98,20 +114,40 @@ async function remove(source: CatalogSource) {
         </div>
       </li>
     </ul>
-    <form class="flex flex-column gap-2" @submit.prevent="add">
-      <div class="flex gap-2 flex-wrap">
-        <InputText v-model="repo" class="flex-1" placeholder="https://github.com/owner/name" aria-label="Source repository" />
-        <InputText v-model="branch" placeholder="Branch (catalog)" aria-label="Source branch" />
-        <InputText v-model="name" placeholder="Name (optional)" aria-label="Source name" />
+    <form class="flex flex-column gap-3" @submit.prevent="add">
+      <div class="source-field">
+        <label for="source-repo" class="field-label">Repository address <i class="pi pi-info-circle" v-tooltip.top="repoHelp" aria-label="More about the repository address" tabindex="0" /></label>
+        <InputText id="source-repo" v-model="repo" placeholder="https://github.com/acme/apps" aria-label="Source repository" aria-describedby="source-repo-help" />
+        <small id="source-repo-help" class="text-color-secondary">The GitHub repository that holds the catalog, for example https://github.com/acme/apps. It needs a catalog.json at its root (see the <a :href="docsUrl" target="_blank" rel="noopener">apps-repository format</a>).</small>
       </div>
-      <div class="flex gap-2 flex-wrap align-items-center">
-        <Password v-model="token" :feedback="false" toggle-mask autocomplete="new-password" placeholder="Read token for a private repository (optional)" input-class="catalog-token" aria-label="Read token" />
-        <Button type="submit" label="Add source" icon="pi pi-plus" :loading="busy" :disabled="!repo.trim()" />
+      <div class="flex gap-3 flex-wrap">
+        <div class="source-field flex-1">
+          <label for="source-branch" class="field-label">Branch (optional) <i class="pi pi-info-circle" v-tooltip.top="branchHelp" aria-label="More about the branch" tabindex="0" /></label>
+          <InputText id="source-branch" v-model="branch" placeholder="main" aria-label="Source branch" aria-describedby="source-branch-help" />
+          <small id="source-branch-help" class="text-color-secondary">The branch that holds catalog.json. Leave empty to use the default branch (main).</small>
+        </div>
+        <div class="source-field flex-1">
+          <label for="source-name" class="field-label">Name (optional) <i class="pi pi-info-circle" v-tooltip.top="nameHelp" aria-label="More about the name" tabindex="0" /></label>
+          <InputText id="source-name" v-model="name" placeholder="Acme apps" aria-label="Source name" aria-describedby="source-name-help" />
+          <small id="source-name-help" class="text-color-secondary">How the source is shown in the Catalog tab. Leave empty to use the repository name.</small>
+        </div>
       </div>
-      <small class="text-color-secondary">
-        The repository needs a <code>catalog.json</code> in its main branch (another branch can be named). A token (fine-grained, read-only Contents access) is stored encrypted, used only by this server, and never shown again.
-      </small>
+      <div class="source-field">
+        <label for="source-token" class="field-label">Read token (private repositories only) <i class="pi pi-info-circle" v-tooltip.top="tokenHelp" aria-label="More about the read token" tabindex="0" /></label>
+        <Password v-model="token" :feedback="false" toggle-mask autocomplete="new-password" input-id="source-token" input-class="catalog-token" aria-label="Read token" aria-describedby="source-token-help" />
+        <small id="source-token-help" class="text-color-secondary">
+          Leave empty for a public repository. For a private one create a fine-grained token limited to that repository with read-only Contents access
+          (<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">create it on GitHub</a>: pick the repository, then Repository permissions, Contents, Read-only).
+          It is stored encrypted, used only by this server and never shown again.
+        </small>
+      </div>
+      <div class="flex gap-3 flex-wrap align-items-center">
+        <Button type="submit" label="Add source" icon="pi pi-plus" :loading="busy" :disabled="!!blocked" />
+        <small v-if="blocked" class="text-color-secondary" data-testid="add-hint">{{ blocked }}</small>
+        <a class="ml-auto" :href="docsUrl" target="_blank" rel="noopener">How do I make my own catalog?</a>
+      </div>
     </form>
+    <Message v-if="success" severity="success" :closable="false">{{ success }}</Message>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
   </section>
 </template>
@@ -135,5 +171,18 @@ async function remove(source: CatalogSource) {
   justify-content: space-between;
   gap: 1rem;
   background: transparent;
+}
+.source-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.field-label {
+  font-weight: 600;
+}
+.field-label .pi {
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+  cursor: help;
 }
 </style>

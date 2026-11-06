@@ -68,6 +68,34 @@ describe('CatalogSources', () => {
     expect(wrapper.emitted('changed')).toBeUndefined()
   })
 
+  it('labels every field, explains each one and why Add is disabled', async () => {
+    const wrapper = mountSources()
+    await flushPromises()
+    const text = wrapper.text()
+    for (const label of ['Repository address', 'Branch (optional)', 'Name (optional)', 'Read token (private repositories only)'])
+      expect(text).toContain(label)
+    expect(wrapper.find('label[for="source-repo"]').exists()).toBe(true)
+    expect(text).toContain('Leave empty to use the default branch (main).')
+    expect(text).toContain('Leave empty to use the repository name.')
+    expect(text).toContain('read-only Contents access')
+    expect(text).toContain('How do I make my own catalog?')
+    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="add-hint"]').text()).toContain('Enter the repository address')
+    await wrapper.find('[aria-label="Source repository"]').setValue('acme/apps')
+    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-testid="add-hint"]').exists()).toBe(false)
+  })
+
+  it('says how many apps an added source brought', async () => {
+    addCatalogSource.mockResolvedValue({ ...custom, appCount: 3 })
+    const wrapper = mountSources()
+    await flushPromises()
+    await wrapper.find('[aria-label="Source repository"]').setValue('acme/apps')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Added Acme: 3 apps found in its catalog.')
+  })
+
   it('removes a custom source', async () => {
     removeCatalogSource.mockResolvedValue(undefined)
     const wrapper = mountSources()
