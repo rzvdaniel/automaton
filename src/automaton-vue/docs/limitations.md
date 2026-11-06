@@ -21,13 +21,13 @@ Automaton is early. These are the specific things to know before you rely on it.
 
 - **Updates cause brief interruptions.** An update replaces the API, Worker, Studio and the app store; they can be unavailable for a short time.
 - **Updates are not fully automatic.** Infrastructure changes and Runner-machine upgrades are separate steps you run.
-- **Backups stay on the same server.** Nightly backups of the database and keys (not your apps' data files) are kept for 7 days on the server. Off-server copies and your hosting provider's snapshots are yours to arrange; a built-in off-site backup is planned ([#486](https://github.com/rzvdaniel/automaton/issues/486)).
+- **Backups need an off-site copy.** Nightly backups of the database and keys (not your apps' data files) are kept for 7 days on the server. An [off-site backup app](./backup-restore) is available from the catalog, but you must install and configure it or arrange your own off-site copies.
 
 ## Security and teams
 
 - **Built for people you trust.** Public multi-tenant hosting is out of scope. Isolation between users of one server is being formally accepted ([#521](https://github.com/rzvdaniel/automaton/issues/521)); until then do not host untrusted users.
 - **No self sign-up.** Users are added by an administrator.
-- **The Runner is trusted.** The Runner controls the machine's Docker, so treat Runner machines as part of your trusted base. A security overview is planned ([#562](https://github.com/rzvdaniel/automaton/issues/562)).
+- **The Runner is trusted.** The Runner controls the machine's Docker, so treat Runner machines as part of your trusted base. See the [security overview](./security).
 
 ## Tooling
 

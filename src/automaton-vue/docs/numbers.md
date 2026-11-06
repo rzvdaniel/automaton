@@ -18,7 +18,7 @@ These figures describe specific tests, not guarantees or a capacity benchmark. T
 
 ## Supported systems
 
-The server installer supports x86_64 Linux with systemd. Ubuntu and Debian 12 are supported, with Docker installed automatically if needed; Ubuntu 24.04 and Debian 12 are the releases named as tested in the [install guide](./install-server). Other distributions require Docker Engine and Compose preinstalled and have not been tested. ARM, offline and private-only installs are not supported. The Ubuntu 22.04 and Debian 12 timings above are individual runs, not a complete supported-system matrix.
+The server installer supports x86_64 Linux with systemd. Ubuntu and Debian 12 are supported, with Docker installed automatically if needed; Ubuntu 22.04, Ubuntu 24.04 and Debian 12 have been tested as described in the [install guide](./install-server). Other distributions require Docker Engine and Compose preinstalled and have not been tested. ARM, offline and private-only installs are not supported. The Ubuntu 22.04 and Debian 12 timings above are individual runs, not a complete supported-system matrix.
 
 ## Project activity
 

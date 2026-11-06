@@ -39,6 +39,8 @@ Choose Automaton when control and data location matter more to you than managed 
 
 ### What it costs
 
+For the more recent CX23 install, memory and update measurements, see [Automaton by the numbers](./numbers). The table below records an earlier run on a different server plan.
+
 | Setup | Monthly cost | Install time |
 | --- | --- | --- |
 | Server and Runner on one Hetzner CPX22 (2 vCPU, 4 GB RAM, 80 GB disk, Helsinki) | €24.19 (server €23.58 + IPv4 €0.61, incl. 21% VAT), plus your domain | 90 seconds for the server installer; about 10 minutes from a new server to a first public app |

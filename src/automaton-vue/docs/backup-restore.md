@@ -25,6 +25,8 @@ sudo systemctl list-timers automaton-backup.timer    # next scheduled run
 
 These backups live on the same server. Also turn on your hosting provider's backups and copy `/opt/automaton-server/backups/nightly` and `/etc/automaton` to encrypted storage elsewhere.
 
+The **Off-site Backup** app is available in **Apps → Catalog**. Install and configure it with your own storage destination if you want automated encrypted copies. Keep its backup key separately so a clean server can decrypt an archive.
+
 ## Restore
 
 Restoring replaces the whole database and keys. Everything written after that backup is lost.

@@ -68,9 +68,9 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             </div>
             <ul class="facts" aria-label="At a glance">
               <li>Apache 2.0</li>
-              <li>One Ubuntu server to start</li>
+              <li>One Ubuntu or Debian server to start</li>
               <li>No cloud account needed</li>
-              <li>Installs in about 90 seconds</li>
+              <li>Installed in 90–118 seconds in recent tests</li>
             </ul>
           </div>
 
@@ -119,11 +119,11 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
         <div class="wrap">
           <div class="section-head">
             <p class="eyebrow">Get started</p>
-            <h2 id="start-title">Install in about 90 seconds, update with one command</h2>
+            <h2 id="start-title">Install in one command, update in one command</h2>
             <p>
-              Measured on a fresh Ubuntu 24.04 server (2 vCPU, 4 GB RAM): the installer finished in
-              90 seconds, and a first public app was live about 10 minutes after the server was created.
-              At idle with one small app, the server and a Runner used about 1.2 GB of memory.
+              On fresh 2 vCPU, 4 GB servers, installation took 118 seconds on Ubuntu 22.04 and about
+              90 seconds on Debian 12. Runner installation took 31–32 seconds. See the
+              <a href="/docs/numbers">measurements and sources</a>.
             </p>
           </div>
 
@@ -138,7 +138,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
               <span class="where">on your server</span>
               <div class="cmd">
                 <button class="copy" type="button" @click="copy(installCommand)">Copy</button>
-                <pre><span class="c"># download, read, then run (about 90 s)</span>
+                <pre><span class="c"># download, read, then run</span>
 {{ installCommand }}</pre>
               </div>
             </li>
@@ -189,7 +189,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             </p>
           </div>
           <ul class="req">
-            <li><span>Server</span><span>x86_64, Ubuntu 24.04+</span></li>
+            <li><span>Server</span><span>x86_64 Linux, Ubuntu or Debian 12</span></li>
             <li><span>Free disk space</span><span>10 GiB or more</span></li>
             <li><span>DNS records</span><span>api, studio, store, apps, *.apps</span></li>
             <li><span>Open ports</span><span>TCP 80, 443, 5671</span></li>
@@ -376,10 +376,11 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
               </p>
             </div>
             <div class="limit">
-              <h3>Tested on one server</h3>
+              <h3>Plan recovery yourself</h3>
               <p>
-                The full app lifecycle runs on a production server today. Multi-machine and recovery
-                testing are still limited.
+                A restore from an off-site archive onto a clean second server has been tested.
+                Keep your backup key and off-site archives safe; see the
+                <a href="/docs/backup-restore">restore guide</a>.
               </p>
             </div>
           </div>
@@ -395,9 +396,8 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
               <p class="eyebrow">For coding agents</p>
               <h2 id="agents-title">Point your agent here</h2>
               <p>
-                Everything on this page is also published as plain text at
-                <a :href="publicAppConfig.llmsUrl">llms.txt</a>. Paste this prompt into your agent to
-                build your first app.
+                Start with <a :href="publicAppConfig.llmsUrl">llms.txt</a> for a plain-text guide to
+                the documentation. Paste this prompt into your agent to build your first app.
               </p>
               <dl class="facts-table">
                 <dt>what</dt>
