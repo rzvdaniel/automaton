@@ -26,7 +26,7 @@ export function markColors(id: string) {
     hash ^= id.charCodeAt(index)
     hash = Math.imul(hash, 0x01000193) >>> 0
   }
-  return markPalette[hash % markPalette.length]
+  return markPalette[hash % markPalette.length] ?? markPalette[0]
 }
 
 export function markInitial(name: string): string {
