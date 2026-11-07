@@ -3,7 +3,6 @@ import { createPinia } from 'pinia'
 
 // PrimeVue imports - MUST be in this order
 import PrimeVue from 'primevue/config'
-import Aura from '@primevue/themes/aura'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 import Tooltip from 'primevue/tooltip'
@@ -11,7 +10,9 @@ import 'primeicons/primeicons.css'
 import 'primeflex/primeflex.css'
 
 // Application styles - AFTER PrimeVue imports
+import './assets/styles/tokens.css'
 import './assets/styles/main.css'
+import { StudioPreset } from './assets/styles/studio-preset'
 
 import App from './App.vue'
 import router from './router'
@@ -37,10 +38,10 @@ setUnauthorizedCallback(() => {
   })
 })
 
-// PrimeVue with Aura theme (default)
+// PrimeVue with the Aura preset mapped to the Studio design tokens
 app.use(PrimeVue, {
   theme: {
-    preset: Aura,
+    preset: StudioPreset,
     options: {
       darkModeSelector: '.app-dark',
     },

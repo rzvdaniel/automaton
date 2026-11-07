@@ -1,8 +1,7 @@
-/* Global styles */
+/* Global styles. Colours, fonts and radii come from tokens.css. */
 :root {
-  /* System font stack - uses native OS fonts for best performance */
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-  --font-family-mono: 'SF Mono', 'Fira Code', Consolas, Monaco, 'Courier New', monospace;
+  --font-family: var(--body);
+  --font-family-mono: var(--mono);
 
   font-family: var(--font-family);
   font-synthesis: none;
@@ -18,10 +17,20 @@
   box-sizing: border-box;
 }
 
-/* Body styles */
+/* Body styles: Instrument Sans at 14px on the warm app background */
 body {
   margin: 0;
   min-height: 100vh;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--app-bg);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  letter-spacing: -0.01em;
 }
 
 /* App container */
@@ -36,37 +45,30 @@ body {
 .font-mono,
 code,
 pre {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--mono);
 }
 
-/* App shell layout */
+/* Cards are white (panel in dark mode) with a 1px line instead of a shadow */
+.p-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+}
+
+/* App shell layout: dark rail on the left, page on the app background */
 .app-shell {
   display: flex;
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  background-color: var(--p-surface-50);
-}
-
-.app-dark .app-shell {
-  background-color: var(--p-surface-950);
+  background-color: var(--app-bg);
 }
 
 .app-sidebar {
-  width: 64px;
+  width: 232px;
   flex-shrink: 0;
-  transition: width 0.2s ease;
-  background-color: var(--p-surface-0);
-  border-right: 1px solid var(--p-surface-200);
-}
-
-.app-dark .app-sidebar {
-  background-color: var(--p-surface-900);
-  border-right-color: var(--p-surface-700);
-}
-
-.app-sidebar.expanded {
-  width: 236px;
+  background-color: var(--rail);
+  color: var(--rail-ink);
 }
 
 .app-content {
@@ -75,26 +77,17 @@ pre {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  margin-left: 64px; /* Account for fixed sidebar width */
-}
-
-.app-sidebar.expanded ~ .app-content {
-  margin-left: 236px;
+  margin-left: 232px; /* Account for fixed rail width */
 }
 
 .app-toolbar {
   position: sticky;
   top: 0;
-  height: 64px;
+  height: 56px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--p-surface-200);
-  background-color: var(--p-surface-0);
+  background-color: transparent;
+  border: 0;
   z-index: 999;
-}
-
-.app-dark .app-toolbar {
-  border-bottom-color: var(--p-surface-700);
-  background-color: var(--p-surface-900);
 }
 
 .app-main {
@@ -110,22 +103,27 @@ pre {
   overflow: hidden;
 }
 
-/* Sidebar navigation divider dark mode */
-.app-dark .nav-divider {
-  background-color: var(--p-surface-700);
-}
-
+/* Phone and tablet: the rail stacks above the page and the page scrolls with the window */
 @media (max-width: 1023px) {
-  .app-content {
-    margin-left: 0;
+  .app-shell {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
   }
 
-  .app-sidebar.expanded ~ .app-content {
+  .app-sidebar {
+    position: static !important;
+    width: 100%;
+    height: auto !important;
+  }
+
+  .app-content {
     margin-left: 0;
   }
 
   .app-main {
     padding: 1rem;
+    overflow: visible;
   }
 }
 

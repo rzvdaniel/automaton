@@ -31,7 +31,6 @@ import { getEnvironmentDisplayName } from '../utils/environment-display'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 import { getPublishingConsistencyIssue } from '../utils/publishing-state'
 import { resolveViewingTarget } from '../utils/viewing-target'
-import { useSidebarState } from '@/shared/composables/useSidebarState'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const route = useRoute()
@@ -39,7 +38,6 @@ const router = useRouter()
 const confirm = useConfirm()
 const toast = useToast()
 const editorStore = useAppEditorStore()
-const { closeMobile, setHovered } = useSidebarState()
 
 const appId = computed(() => String(route.params.id ?? ''))
 const publishingStateLabel = computed(() => editorStore.currentApp && getPublishingConsistencyIssue(editorStore.currentApp)
@@ -67,8 +65,6 @@ watch(() => route.query.target, () => {
 })
 
 onMounted(async () => {
-  closeMobile()
-  setHovered(false)
   await router.replace({ query: withoutAuthoringQuery(route.query) })
 
   unsubscribeBackendRuntimeLogs = backendRuntimeLogClient.onLog((event) => {

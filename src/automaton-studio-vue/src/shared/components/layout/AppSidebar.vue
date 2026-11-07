@@ -1,319 +1,102 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { watch } from 'vue'
-import Button from 'primevue/button'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
-import { apiKeysService } from '@/features/settings/services/apikeys.service'
-import { useSidebarState } from '@/shared/composables/useSidebarState'
+import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
+import { railItems, roleLabel, type RailItem } from './rail-items'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const { isExpanded, isPinned, isMobile, isMobileOpen, setHovered, togglePinned, closeMobile } = useSidebarState()
-
-// Load organization roles for access control
 const { isAppUserOnly, loadOrganizations, loading } = useOrganizationRole()
 
-// Refresh organizations on route changes to reveal menu after creation
-watch(() => route.fullPath, async () => {
-  await loadOrganizations()
-})
+onMounted(loadOrganizations)
 
-interface NavItem {
-  label: string
-  icon: string
-  to: string
-  external?: boolean
-  hideForAppUser?: boolean
-  accent?: 'green'
-  badge?: string | null
+const roles = computed(() => authStore.user?.roles ?? [])
+const visible = computed(() => railItems({ roles: roles.value, appUserOnly: isAppUserOnly.value }))
+const userName = computed(() => authStore.userName || authStore.userEmail || 'User')
+const userRole = computed(() => roleLabel(roles.value, isAppUserOnly.value))
+
+const isActive = (item: RailItem) => !item.external && item.match(route.path)
+
+function go(item: RailItem) {
+  if (item.external) window.open(publicDocsUrl, '_blank', 'noopener')
+  else void router.push(item.to)
 }
 
-interface NavSection {
-  key: string
-  items: NavItem[]
-}
-
-const mainNavItems: NavItem[] = [
-  { label: 'Apps', icon: 'pi pi-globe', to: '/apps' },
-  { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true, accent: 'green' },
-  { label: 'Runners', icon: 'pi pi-desktop', to: '/runners', hideForAppUser: true },
-  { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
-]
-
-const adminNavItems: NavItem[] = [
-  { label: 'Admin', icon: 'pi pi-shield', to: '/admin', hideForAppUser: true },
-]
-
-const utilityNavItems: NavItem[] = [
-  { label: 'CLI', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
-  { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
-  { label: 'Documentation', icon: 'pi pi-book', to: publicDocsUrl, external: true },
-]
-
-// API keys count for the sidebar badge
-const apiKeysCount = ref(0)
-
-async function loadApiKeysCount() {
-  try {
-    const keys = await apiKeysService.list()
-    apiKeysCount.value = keys.length
-  } catch {
-    apiKeysCount.value = 0
-  }
-}
-
-onMounted(async () => {
-  // Load organizations to determine user's roles
-  await loadOrganizations()
-  await Promise.all([
-    loadApiKeysCount(),
-  ])
-})
-
-const isAdmin = computed(() => {
-  const roles = authStore.user?.roles
-  if (!roles) return false
-  return roles.includes('Admin') || roles.includes('SysAdmin')
-})
-
-const apiKeysBadge = computed(() => {
-  if (apiKeysCount.value <= 0) return 'Setup'
-  return apiKeysCount.value > 9 ? '9+' : String(apiKeysCount.value)
-})
-
-const apiKeysNavItem = computed<NavItem>(() => ({
-  ...mainNavItems[1]!,
-  accent: 'green',
-  badge: apiKeysBadge.value,
-}))
-
-const primaryNavItems = computed<NavItem[]>(() => [
-  mainNavItems[0]!,
-  apiKeysNavItem.value,
-  mainNavItems[2]!,
-  mainNavItems[3]!,
+const userMenu = ref<InstanceType<typeof Menu> | null>(null)
+const userMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: 'Public profile',
+    icon: 'pi pi-external-link',
+    command: () => {
+      if (authStore.publicUsername) window.open(getPublicStoreUrl(authStore.publicUsername), '_blank', 'noopener')
+      else void router.push('/settings')
+    },
+  },
+  { separator: true },
+  {
+    label: 'Sign out',
+    icon: 'pi pi-sign-out',
+    command: async () => {
+      await authStore.logout()
+      await router.push('/login')
+    },
+  },
 ])
-
-function filterItems(items: NavItem[]) {
-  let filtered = items
-
-  if (isAppUserOnly.value) {
-    filtered = filtered.filter((item) => !item.hideForAppUser)
-  }
-
-  if (!isAdmin.value) {
-    filtered = filtered.filter((item) => item.to !== '/admin')
-  }
-
-  return filtered
-}
-
-const visibleSections = computed<NavSection[]>(() => {
-  const sections: NavSection[] = [
-    { key: 'main', items: filterItems(primaryNavItems.value) },
-  ]
-
-  return sections.filter((section) => section.items.length > 0)
-})
-
-const visibleBottomNavItems = computed(() => filterItems(utilityNavItems))
-const visibleAdminNavItems = computed(() => filterItems(adminNavItems))
-
-const hasTopDividerAfter = (index: number) => {
-  return index < visibleSections.value.length - 1
-}
-
-const sidebarClass = computed(() => ({
-  'app-sidebar': true,
-  expanded: isExpanded.value,
-  pinned: isPinned.value,
-  mobile: isMobile.value,
-  'mobile-open': isMobileOpen.value,
-}))
-
-const shellBackdropClass = computed(() => ({
-  'sidebar-backdrop': true,
-  visible: isMobileOpen.value && isMobile.value,
-}))
-
-const tooltipOptions = (label: string) =>
-  !isExpanded.value && !isMobile.value
-    ? { value: label, showDelay: 0, hideDelay: 0, pt: { text: { style: 'white-space: nowrap;' } } }
-    : undefined
-
-const navigate = (item: NavItem) => {
-  if (item.external) {
-    window.open(item.to, '_blank', 'noopener')
-  } else {
-    router.push(item.to)
-  }
-
-  if (isMobile.value) {
-    closeMobile()
-  }
-}
-
-const isActive = (to: string) => {
-  if (to.startsWith('http')) {
-    return false
-  }
-  return route.path.startsWith(to)
-}
-
 </script>
 
 <template>
-  <div :class="shellBackdropClass" @click="closeMobile"></div>
-  <aside :class="sidebarClass" @mouseenter="setHovered(true)" @mouseleave="setHovered(false)">
-    <div class="sidebar-content">
-      <div class="sidebar-logo">
-        <div class="sidebar-brand">
-          <img src="/logo.svg" alt="Automaton" class="sidebar-brand-logo" />
-          <span v-if="isExpanded" class="logo-text">Automaton</span>
-        </div>
-        <Button
-          v-if="isExpanded && !isMobile"
-          v-tooltip.left="isPinned ? 'Unpin sidebar' : 'Pin sidebar'"
-          :aria-label="isPinned ? 'Unpin sidebar' : 'Pin sidebar'"
-          :icon="isPinned ? 'pi pi-lock' : 'pi pi-thumbtack'"
-          text
-          rounded
-          severity="secondary"
-          class="sidebar-pin"
-          @click="togglePinned"
-        />
+  <aside class="app-sidebar" aria-label="Studio">
+    <div class="rail">
+      <div class="rail-brand">
+        <span class="rail-mark" aria-hidden="true">&gt;_</span>
+        <span class="rail-name">Studio</span>
       </div>
 
-      <nav class="sidebar-nav">
-        <div v-if="loading" class="nav-loading">
-          <span v-if="isExpanded">Loading menu...</span>
-        </div>
-        <template v-else>
-          <div v-for="(section, sectionIndex) in visibleSections" :key="section.key" class="nav-section">
-            <div v-for="item in section.items" :key="item.to" class="nav-item-wrapper">
-              <Button
-                v-tooltip.right="tooltipOptions(item.label)"
-                :aria-label="item.label"
-                :class="[
-                  'nav-item',
-                  {
-                    active: isActive(item.to),
-                    'nav-item-accent-green': item.accent === 'green' && !isActive(item.to),
-                    'nav-item-accent-green-active': item.accent === 'green' && isActive(item.to),
-                  },
-                ]"
-                :severity="isActive(item.to) ? 'primary' : 'secondary'"
-                :text="!isActive(item.to)"
-                rounded
-                @click="navigate(item)"
-              >
-                <span
-                  class="nav-icon-wrap"
-                  :class="{
-                    'nav-icon-wrap-green': item.accent === 'green',
-                    'nav-icon-wrap-green-active': item.accent === 'green' && isActive(item.to),
-                  }"
-                >
-                  <i :class="item.icon"></i>
-                </span>
-                <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
-                <span
-                  v-if="isExpanded && item.badge"
-                  class="nav-badge"
-                  :class="{ 'nav-badge-green': item.accent === 'green' }"
-                >
-                  {{ item.badge }}
-                </span>
-              </Button>
-            </div>
-            <div v-if="hasTopDividerAfter(sectionIndex)" class="nav-divider"></div>
-          </div>
+      <nav class="rail-nav" aria-label="Main">
+        <template v-if="!loading">
+          <a
+            v-for="item in visible.main"
+            :key="item.to"
+            :href="item.to"
+            class="rail-item"
+            :class="{ active: isActive(item) }"
+            :aria-current="isActive(item) ? 'page' : undefined"
+            @click.prevent="go(item)"
+          >
+            <i :class="item.icon" aria-hidden="true"></i>
+            <span>{{ item.label }}</span>
+          </a>
+          <div v-if="visible.more.length" class="rail-group">More</div>
+          <a
+            v-for="item in visible.more"
+            :key="item.to"
+            :href="item.to"
+            class="rail-item rail-item-quiet"
+            :class="{ active: isActive(item) }"
+            :aria-current="isActive(item) ? 'page' : undefined"
+            @click.prevent="go(item)"
+          >
+            <i :class="item.icon" aria-hidden="true"></i>
+            <span>{{ item.label }}</span>
+          </a>
         </template>
       </nav>
 
-      <div class="sidebar-spacer"></div>
-
-      <nav class="sidebar-nav sidebar-nav-bottom">
-        <div class="nav-divider"></div>
-        <div v-for="item in visibleBottomNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
-          <Button
-            v-tooltip.right="tooltipOptions(item.label)"
-            :aria-label="item.label"
-            :class="[
-              'nav-item',
-              {
-                active: isActive(item.to),
-                'nav-item-accent-green': item.accent === 'green' && !isActive(item.to),
-                'nav-item-accent-green-active': item.accent === 'green' && isActive(item.to),
-              },
-            ]"
-            :severity="isActive(item.to) ? 'primary' : 'secondary'"
-            :text="!isActive(item.to)"
-            rounded
-            @click="navigate(item)"
-          >
-            <span
-              class="nav-icon-wrap"
-              :class="{
-                'nav-icon-wrap-green': item.accent === 'green',
-                'nav-icon-wrap-green-active': item.accent === 'green' && isActive(item.to),
-              }"
-            >
-              <i :class="item.icon"></i>
-            </span>
-            <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
-            <span
-              v-if="isExpanded && item.badge"
-              class="nav-badge"
-              :class="{ 'nav-badge-green': item.accent === 'green' }"
-            >
-              {{ item.badge }}
-            </span>
-          </Button>
-        </div>
-        <div v-if="visibleAdminNavItems.length > 0" class="nav-divider"></div>
-        <div v-for="item in visibleAdminNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
-          <Button
-            v-tooltip.right="tooltipOptions(item.label)"
-            :aria-label="item.label"
-            :class="[
-              'nav-item',
-              {
-                active: isActive(item.to),
-                'nav-item-accent-green': item.accent === 'green' && !isActive(item.to),
-                'nav-item-accent-green-active': item.accent === 'green' && isActive(item.to),
-              },
-            ]"
-            :severity="isActive(item.to) ? 'primary' : 'secondary'"
-            :text="!isActive(item.to)"
-            rounded
-            @click="navigate(item)"
-          >
-            <span
-              class="nav-icon-wrap"
-              :class="{
-                'nav-icon-wrap-green': item.accent === 'green',
-                'nav-icon-wrap-green-active': item.accent === 'green' && isActive(item.to),
-              }"
-            >
-              <i :class="item.icon"></i>
-            </span>
-            <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
-            <span
-              v-if="isExpanded && item.badge"
-              class="nav-badge"
-              :class="{ 'nav-badge-green': item.accent === 'green' }"
-            >
-              {{ item.badge }}
-            </span>
-          </Button>
-        </div>
-      </nav>
+      <button type="button" class="rail-user" aria-haspopup="menu" @click="(event) => userMenu?.toggle(event)">
+        <span class="rail-user-text">
+          <span class="rail-user-name">{{ userName }}</span>
+          <span class="rail-user-role">{{ userRole }}</span>
+        </span>
+        <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
+      </button>
+      <Menu ref="userMenu" :model="userMenuItems" popup />
     </div>
   </aside>
 </template>
@@ -324,280 +107,175 @@ const isActive = (to: string) => {
   top: 0;
   left: 0;
   height: 100vh;
-  overflow: hidden;
   z-index: 1000;
+  font-family: var(--body);
 }
 
-.sidebar-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.48);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.18s ease;
-  z-index: 998;
-}
-
-.sidebar-backdrop.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.sidebar-content {
+.rail {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0.75rem 0.625rem;
+  padding: 1rem 0.75rem;
+  gap: 0.25rem;
   overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
-.sidebar-logo {
+.rail-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.35rem 0.45rem;
-  margin-bottom: 0.9rem;
-}
-
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.sidebar-brand-logo {
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 2rem;
-  display: block;
-}
-
-.logo-text {
-  font-weight: 700;
-  font-size: 1.125rem;
-  white-space: nowrap;
-}
-
-.sidebar-pin {
-  flex-shrink: 0;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.24rem;
-}
-
-.nav-badge {
-  margin-left: auto;
-  font-size: 0.64rem;
-  font-weight: 700;
-  padding: 0.14rem 0.42rem;
-  border-radius: 999px;
-  background: var(--p-surface-200);
-  color: var(--p-text-muted-color);
-}
-
-.nav-badge-green {
-  background: #dcfce7;
-  color: #047857;
-}
-
-.nav-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.12rem;
-}
-
-.sidebar-spacer {
-  flex: 1;
-  min-height: 0.5rem;
-}
-
-.nav-item-wrapper {
-  width: 100%;
-}
-
-.nav-item {
-  width: 100%;
-  justify-content: flex-start;
   gap: 0.6rem;
-  padding: 0.46rem 0.62rem;
-  border-radius: 0.7rem;
-  transition: all 0.15s ease;
-  position: relative;
+  padding: 0.25rem 0.5rem 1rem;
 }
 
-.nav-item i {
-  font-size: 1.125rem;
-  min-width: 1.25rem;
-}
-
-.nav-icon-wrap {
-  width: 1.55rem;
-  height: 1.55rem;
-  border-radius: 0.58rem;
+.rail-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font: 500 0.95rem var(--mono);
 }
 
-.nav-icon-wrap-green {
-  background: #dcfce7;
-  color: #047857;
+.rail-name {
+  font: 700 1.15rem var(--display);
+  letter-spacing: -0.01em;
+  color: var(--rail-ink);
 }
 
-.nav-icon-wrap-green-active {
-  background: rgba(255, 255, 255, 0.2);
-  color: currentColor;
+.rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
 }
 
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0.35rem;
-  top: 0.5rem;
-  bottom: 0.5rem;
-  width: 3px;
-  border-radius: 999px;
-  background: var(--p-primary-500);
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  color: var(--rail-ink-soft);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.app-sidebar:not(.expanded) .sidebar-content {
-  padding-inline: 0.5rem;
+.rail-item:hover {
+  color: var(--rail-ink);
 }
 
-.app-sidebar:not(.expanded) .sidebar-logo {
-  justify-content: center;
-  padding-inline: 0;
+.rail-item.active {
+  color: var(--rail-active-ink);
+  background: var(--rail-active);
 }
 
-.app-sidebar:not(.expanded) .nav-item {
-  justify-content: center;
-  padding: 0.22rem 0.35rem;
-  min-height: 2.2rem;
+.rail-item:focus-visible,
+.rail-user:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
 }
 
-.app-sidebar:not(.expanded) .nav-item.active::before {
-  display: none;
+.rail-item i {
+  font-size: 1rem;
+  width: 1.1rem;
+  text-align: center;
 }
 
-.app-sidebar:not(.expanded) .nav-icon-wrap {
-  width: 1.95rem;
-  height: 1.95rem;
-  border-radius: 0.68rem;
+.rail-item-quiet {
+  font-size: 0.9rem;
 }
 
-.nav-label {
-  font-size: 0.93rem;
-  white-space: nowrap;
+.rail-group {
+  margin: 1rem 0.7rem 0.25rem;
+  font: 500 0.7rem var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rail-ink-soft);
+}
+
+.rail-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.7rem;
+  border: 0;
+  border-top: 1px solid var(--rail-line);
+  background: transparent;
+  color: var(--rail-ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rail-user-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rail-user-name {
+  color: var(--rail-ink);
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.nav-loading {
-  padding: 0.5rem;
-  color: var(--p-text-muted-color);
-  font-size: 0.875rem;
+.rail-user-role {
+  font: 400 0.75rem var(--mono);
+  color: var(--rail-ink-soft);
 }
 
-.nav-item-accent-green {
-  background: linear-gradient(135deg, #16a34a, #059669);
-  border: 1px solid #22c55e;
-  color: #f0fdf4;
-  box-shadow: 0 10px 22px rgba(22, 163, 74, 0.22);
-}
-
-.nav-item-accent-green:hover {
-  background: linear-gradient(135deg, #15803d, #047857);
-  border-color: #34d399;
-  color: #ffffff;
-}
-
-.nav-item-accent-green-active {
-  background: linear-gradient(135deg, #15803d, #059669);
-}
-
-.nav-item-accent-green :deep(.p-button-label),
-.nav-item-accent-green-active :deep(.p-button-label) {
-  color: inherit;
-}
-
-.nav-divider {
-  height: 1px;
-  background-color: var(--p-surface-200);
-  margin: 0.28rem 0;
-}
-
-.sidebar-nav-bottom {
-  margin-top: auto;
-}
-
-:global(.app-dark) .nav-item-accent-green {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--p-green-500) 68%, #052e16),
-    color-mix(in srgb, var(--p-emerald-500) 62%, #022c22)
-  );
-  border: 1px solid color-mix(in srgb, var(--p-green-400) 54%, transparent);
-  color: #d1fae5;
-  box-shadow: 0 12px 28px rgba(5, 150, 105, 0.28);
-}
-
-:global(.app-dark) .nav-item-accent-green:hover {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--p-green-500) 78%, #052e16),
-    color-mix(in srgb, var(--p-emerald-500) 72%, #022c22)
-  );
-  border-color: color-mix(in srgb, var(--p-green-300) 62%, transparent);
-  color: #ecfdf5;
-}
-
-:global(.app-dark) .nav-icon-wrap-green {
-  background: rgba(255, 255, 255, 0.14);
-  color: #ecfdf5;
-}
-
-.sidebar-content::-webkit-scrollbar {
-  width: 10px;
-}
-
-.sidebar-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--p-surface-400) 55%, transparent);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--p-surface-500) 65%, transparent);
-  background-clip: padding-box;
-}
-
-:global(.app-dark) .sidebar-content::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--p-surface-500) 55%, transparent);
-  background-clip: padding-box;
-}
-
+/* Phone and tablet: the rail becomes a header with one scrolling row of items */
 @media (max-width: 1023px) {
   .app-sidebar {
-    width: 272px !important;
-    transform: translateX(-100%);
-    transition: transform 0.18s ease;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+    height: auto;
   }
 
-  .app-sidebar.mobile-open {
-    transform: translateX(0);
+  .rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    overflow: visible;
+  }
+
+  .rail-brand {
+    padding: 0;
+  }
+
+  .rail-user {
+    margin: 0 0 0 auto;
+    padding: 0.35rem 0.5rem;
+    border-top: 0;
+    max-width: 50%;
+  }
+
+  .rail-nav {
+    order: 3;
+    flex: 1 0 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: none;
+  }
+
+  .rail-item {
+    flex: none;
+    padding: 0.45rem 0.75rem;
+    white-space: nowrap;
+  }
+
+  .rail-group {
+    display: none;
   }
 }
-
 </style>

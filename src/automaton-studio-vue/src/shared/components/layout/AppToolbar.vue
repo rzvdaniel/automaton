@@ -1,184 +1,71 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
-import { useAuthStore } from '@/features/auth/stores/auth.store'
-import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
-import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
-import Menu from 'primevue/menu'
-import type { MenuItem } from 'primevue/menuitem'
-import { useSidebarState } from '@/shared/composables/useSidebarState'
 import { pageTitleForRoute } from './page-title'
 
 const { isDark, toggleDarkMode } = useUserSettings()
-const authStore = useAuthStore()
 const route = useRoute()
-const router = useRouter()
-const { isMobile, toggleMobile } = useSidebarState()
 
-// User menu reference
-const userMenu = ref<InstanceType<typeof Menu> | null>(null)
-
-// Computed page title from route
 const pageTitle = computed(() => pageTitleForRoute(route.name as string | undefined, route.meta.title))
-
-// User display name
-const userDisplayName = computed(() => authStore.userName || authStore.userEmail || 'User')
-
-// User menu items
-const userMenuItems = computed<MenuItem[]>(() => {
-  const items: MenuItem[] = [
-    {
-      label: userDisplayName.value,
-      disabled: true,
-      class: 'font-bold',
-    },
-    {
-      separator: true,
-    },
-    {
-      label: 'View Profile',
-      icon: 'pi pi-external-link',
-      command: () => {
-        if (authStore.publicUsername) {
-          window.open(getPublicStoreUrl(authStore.publicUsername), '_blank', 'noopener')
-        } else {
-          router.push('/settings')
-        }
-      },
-    },
-    {
-      label: 'Settings',
-      icon: 'pi pi-cog',
-      command: () => router.push('/settings'),
-    },
-    {
-      separator: true,
-    },
-    {
-      label: 'Logout',
-      icon: 'pi pi-sign-out',
-      command: handleLogout,
-    },
-  ]
-
-  return items
-})
-
-// Toggle user menu
-function toggleUserMenu(event: Event) {
-  userMenu.value?.toggle(event)
-}
-
-// Handle logout
-async function handleLogout() {
-  await authStore.logout()
-  await router.push('/login')
-}
-
-// Navigate to settings
-function goToSettings() {
-  router.push('/settings')
-}
 </script>
 
 <template>
-  <Toolbar class="app-toolbar border-noround">
-    <template #start>
-      <div class="flex items-center gap-3">
-        <Button
-          v-if="isMobile"
-          icon="pi pi-bars"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Open Navigation"
-          @click="toggleMobile"
-        />
-        <div class="border-right" style="height: 1.5rem"></div>
-        <span
-          v-tooltip.bottom="'Developer Preview\nAPIs and features may change as the platform evolves.'"
-          class="preview-badge"
-        >
-          <span class="preview-badge__full">Developer Preview</span>
-          <span class="preview-badge__compact">Preview</span>
-        </span>
-      </div>
-    </template>
-
-    <template #center>
-      <span class="text-color-secondary">{{ pageTitle }}</span>
-    </template>
-
-    <template #end>
-      <div class="flex items-center gap-2">
-        <Button
-          :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Toggle Dark Mode"
-          @click="toggleDarkMode"
-        />
-        <Button
-          icon="pi pi-cog"
-          severity="secondary"
-          text
-          rounded
-          aria-label="Settings"
-          @click="goToSettings"
-        />
-        <Button
-          icon="pi pi-user"
-          severity="secondary"
-          text
-          rounded
-          aria-label="User Menu"
-          @click="toggleUserMenu"
-        />
-        <Menu ref="userMenu" :model="userMenuItems" :popup="true" />
-      </div>
-    </template>
-  </Toolbar>
+  <header class="app-toolbar">
+    <span class="toolbar-title">{{ pageTitle }}</span>
+    <div class="toolbar-end">
+      <span
+        v-tooltip.bottom="'Developer Preview\nAPIs and features may change as the platform evolves.'"
+        class="preview-tag"
+      >
+        Preview
+      </span>
+      <Button
+        :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'"
+        severity="secondary"
+        text
+        rounded
+        aria-label="Toggle Dark Mode"
+        @click="toggleDarkMode"
+      />
+    </div>
+  </header>
 </template>
 
 <style scoped>
-/* Dark mode styles handled in main.css */
 .app-toolbar {
-  padding: 0 1rem;
-}
-
-.preview-badge {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  min-height: 1.75rem;
-  padding: 0 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--p-cyan-500) 34%, transparent);
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1.5rem;
+}
+
+.toolbar-title {
+  font: 700 0.95rem var(--display);
+  color: var(--ink-soft);
+}
+
+.toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.preview-tag {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--p-cyan-500) 10%, transparent);
-  color: var(--p-cyan-700);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
+  color: var(--signal-ink);
+  font: 500 0.72rem var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.preview-badge__compact {
-  display: none;
-}
-
-:global(.app-dark) .preview-badge {
-  color: var(--p-cyan-200);
-}
-
-@media (max-width: 900px) {
-  .preview-badge__full {
-    display: none;
-  }
-
-  .preview-badge__compact {
-    display: inline;
+@media (max-width: 1023px) {
+  .app-toolbar {
+    padding: 0 1rem;
   }
 }
 </style>

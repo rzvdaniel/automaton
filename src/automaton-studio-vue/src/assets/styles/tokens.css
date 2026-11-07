@@ -1,0 +1,41 @@
+/* Studio design tokens. The colours and fonts are the website's (src/automaton-vue/src/assets/site.css);
+   tokens.test.ts fails when the values drift apart. Studio switches dark mode with the .app-dark class on
+   <html>, the website with prefers-color-scheme, so the values are repeated here rather than imported. */
+:root {
+  --paper: #fdfdfb;
+  --panel: #f3f2ee;
+  --ink: #17181c;
+  --ink-soft: #55565e;
+  --line: #e2e0da;
+  --signal: #f26a1b;
+  --signal-ink: #a23d05;
+  --on-signal: #17181c;
+
+  /* Studio only */
+  --app-bg: #f3f2ee;
+  --rail: #17181c;
+  --rail-line: #2c2d33;
+  --rail-ink: #f1f0eb;
+  --rail-ink-soft: #a9aab1;
+  --rail-active: #23242a;
+  --rail-active-ink: #ff7a2e;
+  --radius-card: 16px;
+
+  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+.app-dark {
+  --paper: #121316;
+  --panel: #1b1c20;
+  --ink: #f1f0eb;
+  --ink-soft: #a9aab1;
+  --line: #2c2d33;
+  --signal: #ff7a2e;
+  --signal-ink: #ffa36b;
+
+  --app-bg: #121316;
+  --rail: #0b0c0e;
+  --rail-line: #23242a;
+}
