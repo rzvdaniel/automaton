@@ -220,12 +220,13 @@ if $configure_only; then
     exit 0
 fi
 "${compose[@]}" pull
+certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 "${compose[@]}" up -d --wait --wait-timeout 600
 # Validate actual public HTTPS/API routing as well as container health.
 echo 'Waiting for HTTPS certificates…'
 explain_https_failure() {
     printf 'The HTTPS check failed at %s. The services may be healthy, but HTTPS is not ready.\n' "$1" >&2
-    "${compose[@]}" logs --no-color --tail 300 traefik 2>/dev/null \
+    "${compose[@]}" logs --no-color --since "$certificate_attempt_started" --tail 300 traefik 2>/dev/null \
         | python3 "$bundle_dir/explain_certificate_failure.py" "$domain" || true
     exit 1
 }
