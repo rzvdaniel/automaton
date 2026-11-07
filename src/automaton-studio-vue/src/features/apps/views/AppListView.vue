@@ -1,68 +1,32 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
-import Dropdown from 'primevue/dropdown'
-import MultiSelect from 'primevue/multiselect'
+import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
-import SelectButton from 'primevue/selectbutton'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
 import TabMenu from 'primevue/tabmenu'
-import AppCard from '../components/AppCard.vue'
+import AppRow from '../components/AppRow.vue'
 import CopyCommand from '../components/CopyCommand.vue'
 import CatalogPanel from '../components/CatalogPanel.vue'
 import SharedAppsSection from '../components/SharedAppsSection.vue'
 import { organizationsService, type OrganizationAppSummary } from '@/features/organizations/services/organizationsService'
 import { useAppsStore } from '../stores/apps.store'
-import { useAuthStore } from '@/features/auth/stores/auth.store'
-import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
-import type { AppListItem } from '../types/apps.types'
-import { appsService } from '../services/apps.service'
+import {
+  appAccess, appDescription, appState, matchesFilter, matchesSearch, type AppFilter,
+} from '../utils/app-list-display'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
 const publicCliDocsUrl = `${publicDocsUrl}/automaton-cli`
 const router = useRouter()
 const route = useRoute()
-const toast = useToast()
 const appsStore = useAppsStore()
-const authStore = useAuthStore()
-
-const getDeploymentSummary = (app: AppListItem) => {
-  return app.runtime.genericRuntimeDeployed ? 'Generic runtime deployed' : 'Not deployed yet'
-}
-
-const getLiveDestinationLabel = (app: AppListItem) => {
-  const environment = app.liveEnvironment
-  if (!environment || environment.status === 'Unassigned') return 'No runtime assigned'
-  if (environment.isHostedRunner) return 'Retired hosted destination'
-  return 'Self-hosted · Machine Management'
-}
-
-const getLiveStatusLabel = (app: AppListItem) => {
-  const environment = app.liveEnvironment
-  if (!environment) return app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
-  if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
-  if (!environment.genericRuntimeDeployed) return 'Unassigned'
-  return environment.status === 'Running' ? 'Running' : environment.status
-}
 
 function openExternal(url: string) {
   window.open(url, '_blank', 'noopener')
 }
 
-// View mode state
-const viewMode = ref('grid')
-const viewOptions = ref([
-  { icon: 'pi pi-th-large', value: 'grid' },
-  { icon: 'pi pi-list', value: 'list' },
-])
-
-// Tab state
+// Tab state: the Apps list, the Catalog and the local setup guide ("New app").
 const activeTabIndex = ref(route.meta.appsTab === 'catalog' ? 1 : 0)
 const tabItems = ref([
   { label: 'My Apps', icon: 'pi pi-th-large' },
@@ -72,78 +36,18 @@ const tabItems = ref([
 
 watch(() => route.meta.appsTab, (tab) => { activeTabIndex.value = tab === 'catalog' ? 1 : 0 })
 
-// Local state
+// Search and filter pills
 const searchQuery = ref('')
-const selectedStatus = ref<'all' | 'published' | 'draft'>('all')
-const selectedRunner = ref<string | null>(null)
-const selectedTags = ref<string[]>([])
-const selectedTagGroup = ref<string | null>(null)
-const tagSuggestions = ref<string[]>([])
-const unassignedRunnerFilter = '__unassigned__'
-const runnerOptions = computed(() => [
-  { label: 'All Runners', value: null },
-  { label: 'Unassigned', value: unassignedRunnerFilter },
-  ...Array.from(new Map(appsStore.listApps.map((app) => [app.runner?.id, app.runner?.name || 'No Runner'])))
-    .filter(([id]) => id)
-    .map(([value, label]) => ({ label, value })),
+const filter = ref<AppFilter>('all')
+
+const searched = computed(() => appsStore.listApps.filter((app) => matchesSearch(app, searchQuery.value)))
+const visibleApps = computed(() => searched.value.filter((app) => matchesFilter(app, filter.value)))
+const filterPills = computed(() => [
+  { value: 'all' as const, label: `All · ${appsStore.listApps.length}` },
+  { value: 'web' as const, label: 'Web apps' },
+  { value: 'actions' as const, label: 'Actions' },
+  { value: 'stopped' as const, label: 'Stopped' },
 ])
-
-const statusOptions = ref([
-  { label: 'All', value: 'all' },
-  { label: 'Published', value: 'published' },
-  { label: 'Unpublished', value: 'draft' },
-])
-
-const tagOptions = computed(() => {
-  const tags = new Map<string, string>()
-  for (const tag of [...tagSuggestions.value, ...appsStore.listApps.flatMap((app) => app.tags)]) {
-    const key = tag.toLocaleLowerCase()
-    if (!tags.has(key)) tags.set(key, tag)
-  }
-
-  return Array.from(tags.values())
-    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }))
-    .map((tag) => ({ label: tag, value: tag }))
-})
-
-// Watch for filter changes
-watch(searchQuery, (value) => {
-  appsStore.setSearchFilter(value)
-})
-
-watch(selectedStatus, (value) => {
-  appsStore.setStatusFilter(value)
-})
-
-const hasTag = (app: AppListItem, tag: string) =>
-  app.tags.some((appTag) => appTag.localeCompare(tag, undefined, { sensitivity: 'accent' }) === 0)
-
-const visibleApps = computed(() => {
-  let apps = selectedRunner.value
-    ? selectedRunner.value === unassignedRunnerFilter
-      ? appsStore.filteredApps.filter((app) => !app.runner)
-      : appsStore.filteredApps.filter((app) => app.runner?.id === selectedRunner.value)
-    : appsStore.filteredApps
-
-  if (selectedTags.value.length) {
-    apps = apps.filter((app) => selectedTags.value.some((tag) => hasTag(app, tag)))
-  }
-
-  return selectedTagGroup.value
-    ? apps.filter((app) => hasTag(app, selectedTagGroup.value!))
-    : apps
-})
-
-const showEmptySearch = computed(() => {
-  const hasActiveFilter =
-    Boolean(searchQuery.value) ||
-    selectedStatus.value !== 'all' ||
-    selectedRunner.value !== null ||
-    selectedTags.value.length > 0 ||
-    selectedTagGroup.value !== null
-
-  return visibleApps.value.length === 0 && appsStore.hasApps && hasActiveFilter
-})
 
 // Apps other people shared with the user (organization assignments), minus the ones the user owns.
 const sharedApps = ref<OrganizationAppSummary[]>([])
@@ -160,13 +64,9 @@ async function loadSharedApps() {
 
 onMounted(async () => {
   try {
-    const [, suggestions] = await Promise.all([
-      appsStore.fetchApps(),
-      appsService.getTagSuggestions(),
-    ])
-    tagSuggestions.value = suggestions
+    await appsStore.fetchApps()
   } catch {
-    tagSuggestions.value = []
+    // Error is handled in the store
   }
   await loadSharedApps()
 })
@@ -175,20 +75,8 @@ onUnmounted(() => {
   appsStore.clearFilters()
 })
 
-// Handlers
-const viewPublicApps = () => {
-  if (authStore.publicUsername) {
-    window.open(getPublicStoreUrl(authStore.publicUsername), '_blank', 'noopener')
-  } else {
-    toast.add({
-      severity: 'warn',
-      summary: 'Profile not set',
-      detail: 'Set your public username in Settings to view your public apps.',
-      life: 4000,
-    })
-    router.push('/settings')
-  }
-}
+const goToCatalog = () => router.push({ name: 'apps-catalog' })
+const newApp = () => { activeTabIndex.value = 2 }
 
 const handleRetry = async () => {
   appsStore.clearError()
@@ -202,186 +90,84 @@ const handleRetry = async () => {
 
 <template>
   <div class="apps-view">
-    <!-- Page Header -->
-    <div class="flex align-items-center justify-content-between mb-5">
-      <div>
-        <h1 class="text-3xl font-bold m-0">Apps</h1>
-        <p class="text-color-secondary mt-1 mb-0">Operate and publish your applications</p>
-      </div>
-      <div class="flex gap-2">
-        <Button
-          label="View Public Apps"
-          icon="pi pi-external-link"
-          outlined
-          @click="viewPublicApps"
-        />
-      </div>
-    </div>
-
-    <TabMenu v-model:active-index="activeTabIndex" :model="tabItems" class="mb-4" />
+    <TabMenu v-if="activeTabIndex !== 0" v-model:active-index="activeTabIndex" :model="tabItems" class="mb-4" />
 
     <!-- ─── MY APPS TAB ────────────────────────────────────────────── -->
     <template v-if="activeTabIndex === 0">
-
-    <!-- Apps List Header -->
-    <div class="apps-list-header flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-      <div class="apps-list-title flex align-items-center gap-3">
-        <span class="font-semibold">Your Apps</span>
-        <Tag :value="`${visibleApps.length} apps`" severity="secondary" />
-      </div>
-      <div class="apps-list-filters flex flex-wrap align-items-center gap-3">
-        <IconField>
-          <InputIcon class="pi pi-search" />
-          <InputText v-model="searchQuery" placeholder="Search apps..." />
-        </IconField>
-        <Dropdown
-          v-model="selectedStatus"
-          :options="statusOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Status"
-          class="w-10rem"
-        />
-        <Dropdown
-          v-model="selectedRunner"
-          :options="runnerOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Runner"
-          class="w-12rem"
-        />
-        <MultiSelect
-          v-model="selectedTags"
-          :options="tagOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Tags"
-          display="chip"
-          :show-toggle-all="false"
-          class="w-12rem"
-        />
-        <Dropdown
-          v-model="selectedTagGroup"
-          :options="tagOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Group by tag"
-          show-clear
-          class="w-12rem"
-        />
-        <SelectButton v-model="viewMode" :options="viewOptions" option-value="value">
-          <template #option="{ option }">
-            <i :class="option.icon"></i>
-          </template>
-        </SelectButton>
-      </div>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="appsStore.isLoading">
-      <div class="grid">
-        <div v-for="i in 6" :key="i" class="col-12 md:col-6 lg:col-4">
-          <Card class="h-full">
-            <template #content>
-              <div class="flex flex-column gap-3">
-                <div class="flex align-items-center gap-2">
-                  <Skeleton shape="circle" size="1.5rem" />
-                  <Skeleton width="60%" height="1.25rem" />
-                </div>
-                <Skeleton width="100%" height="2.5rem" />
-                <Skeleton width="5rem" height="1.5rem" border-radius="1rem" />
-                <Skeleton width="8rem" height="1rem" />
-                <div class="flex gap-2 mt-2">
-                  <Skeleton width="50%" height="2rem" />
-                  <Skeleton width="50%" height="2rem" />
-                </div>
-              </div>
-            </template>
-          </Card>
+      <header class="apps-head">
+        <div>
+          <h1 class="apps-head__title">Apps</h1>
+          <p class="apps-head__line">Everything running on your server. Ask your AI to add one, or install from the catalog.</p>
         </div>
-      </div>
-    </div>
+        <div class="apps-head__buttons">
+          <Button label="From the catalog" outlined class="btn-outline" @click="goToCatalog" />
+          <Button label="New app" class="btn-ink" @click="newApp" />
+        </div>
+      </header>
 
-    <!-- Error State -->
-    <Message v-else-if="appsStore.error" severity="error" :closable="false">
-      <div class="flex align-items-center justify-content-between w-full">
-        <span>{{ appsStore.error }}</span>
-        <Button label="Retry" severity="danger" size="small" outlined @click="handleRetry" />
-      </div>
-    </Message>
-
-    <!-- Content -->
-    <template v-else>
-      <SharedAppsSection :apps="sharedApps" />
-      <div v-if="selectedTagGroup" class="text-color-secondary text-sm mb-3">
-        Showing tag group: <span class="font-semibold">{{ selectedTagGroup }}</span>
-      </div>
-      <!-- Apps Grid -->
-      <div v-if="visibleApps.length > 0" :class="viewMode === 'list' ? 'app-list' : 'grid apps-grid'">
-        <div
-          v-for="app in visibleApps"
-          :key="app.id"
-          :class="viewMode === 'grid' ? 'col-12 md:col-6 lg:col-4' : 'col-12'"
-        >
-          <AppCard v-if="viewMode === 'grid'" :app="app" />
-          <div v-else class="app-list-row flex flex-column md:flex-row md:align-items-center gap-3 p-3 border-1 surface-border border-round">
-            <i class="pi pi-globe text-primary text-xl" />
-            <div class="flex-1 min-w-0">
-              <div class="flex align-items-center gap-2">
-                <div class="font-semibold text-overflow-ellipsis overflow-hidden white-space-nowrap">{{ app.name }}</div>
-                <Tag :value="app.isPublished ? 'Published' : 'Unpublished'" :severity="app.isPublished ? 'success' : 'secondary'" class="text-xs" />
-              </div>
-              <div class="text-color-secondary text-sm">Live · {{ getLiveDestinationLabel(app) }} · {{ getLiveStatusLabel(app) }}</div>
-              <div v-if="app.tags.length" class="flex flex-wrap gap-1 mt-1">
-                <Tag v-for="tag in app.tags.slice(0, 2)" :key="tag" :value="tag" severity="secondary" class="text-xs" />
-              </div>
-            </div>
-            <div class="text-sm text-color-secondary">{{ getDeploymentSummary(app) }}</div>
-            <Button label="Manage" icon="pi pi-cog" size="small" outlined @click="router.push(`/apps/${app.id}`)" />
-          </div>
+      <div v-if="appsStore.hasApps" class="apps-toolbar">
+        <label class="apps-search">
+          <span class="sr-only">Search apps</span>
+          <i class="pi pi-search" aria-hidden="true" />
+          <input v-model="searchQuery" type="search" placeholder="Search apps" />
+        </label>
+        <div class="apps-pills" role="group" aria-label="Filter apps">
+          <button
+            v-for="pill in filterPills"
+            :key="pill.value"
+            type="button"
+            class="apps-pill"
+            :class="{ 'apps-pill--active': filter === pill.value }"
+            :aria-pressed="filter === pill.value"
+            @click="filter = pill.value"
+          >{{ pill.label }}</button>
         </div>
       </div>
 
-      <!-- Empty Search Results -->
-      <Card v-else-if="showEmptySearch">
-        <template #content>
-          <div class="text-center py-5">
-            <i class="pi pi-search text-5xl text-color-secondary mb-4"></i>
-            <h3 class="text-xl font-semibold mb-2">No apps found</h3>
-            <p class="text-color-secondary mb-4">Try adjusting your search or filters</p>
-            <Button
-              label="Clear Filters"
-              icon="pi pi-filter-slash"
-              outlined
-              @click="
-                () => {
-                  searchQuery = ''
-                  selectedStatus = 'all'
-                  selectedTags = []
-                  selectedTagGroup = null
-                }
-              "
-            />
-          </div>
-        </template>
-      </Card>
+      <div v-if="appsStore.isLoading" class="apps-card" aria-busy="true">
+        <Skeleton v-for="i in 4" :key="i" height="68px" border-radius="12px" />
+      </div>
 
-      <!-- Empty State (No Apps) -->
-      <Card v-else-if="!appsStore.hasApps && sharedApps.length === 0">
-        <template #content>
-          <div class="text-center py-5">
-            <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>
-            <h3 class="text-xl font-semibold mb-2">No apps yet</h3>
-            <p class="text-color-secondary mb-4">
-              Create an app in a local project with Automaton CLI, then manage its deployment and runtime in Studio.
-            </p>
-            <Button label="View local setup" icon="pi pi-book" @click="activeTabIndex = 2" />
-          </div>
-        </template>
-      </Card>
+      <Message v-else-if="appsStore.error" severity="error" :closable="false">
+        <div class="flex align-items-center justify-content-between w-full">
+          <span>{{ appsStore.error }}</span>
+          <Button label="Retry" severity="danger" size="small" outlined @click="handleRetry" />
+        </div>
+      </Message>
 
-    </template><!-- /v-else -->
-    </template><!-- /v-if="activeTabIndex === 0" -->
+      <template v-else>
+        <div v-if="visibleApps.length > 0" class="apps-card">
+          <AppRow
+            v-for="app in visibleApps"
+            :id="app.id"
+            :key="app.id"
+            :to="`/apps/${app.id}`"
+            :name="app.name"
+            :line="appDescription(app)"
+            :image-url="app.thumbnailUrl"
+            :access="appAccess(app)"
+            :state="appState(app)"
+          />
+        </div>
+
+        <div v-else-if="appsStore.hasApps" class="apps-card apps-empty">
+          <p class="apps-empty__title">No apps match</p>
+          <p class="apps-empty__line">Try another search or filter.</p>
+          <Button label="Clear filters" outlined class="btn-outline" @click="searchQuery = ''; filter = 'all'" />
+        </div>
+
+        <div v-else-if="sharedApps.length === 0" class="apps-card apps-empty">
+          <p class="apps-empty__title">No apps yet</p>
+          <p class="apps-empty__line">Ask your AI to add one, or install a ready-made app from the catalog.</p>
+          <div class="apps-head__buttons">
+            <Button label="From the catalog" outlined class="btn-outline" @click="goToCatalog" />
+            <Button label="New app" class="btn-ink" @click="newApp" />
+          </div>
+        </div>
+
+        <SharedAppsSection :apps="sharedApps" />
+      </template>
+    </template>
 
     <!-- ─── CATALOG TAB ──────────────────────────────────────────────── -->
     <CatalogPanel v-if="activeTabIndex === 1" />
@@ -645,4 +431,37 @@ const handleRetry = async () => {
     justify-self: start;
   }
 }
+</style>
+
+<style scoped>
+.apps-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.apps-head__title { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); }
+.apps-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; max-width: 52ch; }
+.apps-head__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-ink.p-button { background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; }
+.btn-ink.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
+.btn-outline.p-button { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; }
+.apps-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.apps-search { position: relative; flex: 1 1 240px; max-width: 360px; }
+.apps-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); }
+.apps-search input {
+  width: 100%; min-height: 40px; padding: 8px 12px 8px 34px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px;
+}
+.apps-search input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.apps-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.apps-pill {
+  min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: transparent; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
+}
+.apps-pill--active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.apps-pill:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.apps-card {
+  display: flex; flex-direction: column; gap: 8px; padding: 16px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 18px;
+}
+.apps-empty { align-items: center; text-align: center; padding: 40px 16px; }
+.apps-empty__title { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 600; }
+.apps-empty__line { margin: 0 0 8px; color: var(--ink-soft); }
 </style>
