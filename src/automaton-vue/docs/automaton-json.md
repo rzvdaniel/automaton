@@ -89,7 +89,7 @@ An app's private address (`app-<id>.apps.<domain>`) asks every visitor to sign i
 "application": { "openPaths": ["/hooks/*", "/oauth/callback"] }
 ```
 
-`/oauth/callback` opens exactly that path; `/hooks/*` opens `/hooks/` and everything below it. Use only letters, digits and `/ - _ . ~ %`, at most 20 paths. Those paths answer anyone who knows the address, so the app must check the caller itself (a signature or secret). Everything else stays behind sign-in, and publishing the app still makes the whole public address open. The routes update with the next deployment.
+`/oauth/callback` opens exactly that path; `/hooks/*` opens `/hooks/` and everything below it. Name at least one folder or file (`/` and `/*` are refused) using only letters, digits and `/ - _ . ~`, at most 20 paths. Requests with `..` or encoded slashes never match an open path. Those paths answer anyone who knows the address, so the app must check the caller itself (a signature or secret). Everything else stays behind sign-in, and publishing the app still makes the whole public address open. The routes update with the next deployment.
 
 ## App secrets
 

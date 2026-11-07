@@ -155,6 +155,9 @@ public class BackendRouteConfigService
             ? $"PathPrefix(`{openPath[..^1]}`)"
             : $"Path(`{openPath}`)";
 
+    // Never let a request climb out of an open path with dot segments or encoded slashes.
+    private const string OpenPathTraversalGuard = " && !PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)";
+
     private async Task WriteRoutesAsync(List<RouteTarget> routes, CancellationToken cancellationToken)
     {
         var rootPath = ResolveRootPath();
@@ -238,7 +241,7 @@ public class BackendRouteConfigService
             for (var index = 0; index < route.OpenPaths.Count; index++)
             {
                 AppendRuntimeRouter(builder, route, $"{key}-open{index}", host, string.Empty, 60, false,
-                    BuildOpenPathRule(route.OpenPaths[index]), $"{key}-rewrite");
+                    BuildOpenPathRule(route.OpenPaths[index]) + OpenPathTraversalGuard, $"{key}-rewrite");
             }
         }
 

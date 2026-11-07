@@ -330,9 +330,12 @@ public static class ApplicationContractValidator
     /// <summary>True for <c>/exact/path</c> or <c>/folder/*</c>, using only URL path characters.</summary>
     public static bool IsValidOpenPath(string? path)
     {
-        if (string.IsNullOrEmpty(path) || path.Length > 200 || path[0] != '/' || path.Contains("..", StringComparison.Ordinal)) return false;
-        var body = path.EndsWith("/*", StringComparison.Ordinal) ? path[..^1] : path;
-        return body.All(c => c is '/' or '-' or '_' or '.' or '~' or '%' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'));
+        if (string.IsNullOrEmpty(path) || path.Length > 200 || path[0] != '/' || path.Contains("..", StringComparison.Ordinal)
+            || path.Contains("//", StringComparison.Ordinal)) return false;
+        var body = path.EndsWith("/*", StringComparison.Ordinal) ? path[..^2] : path;
+        // "/" and "/*" would open the whole app; a declared path names at least one folder or file.
+        return body.Length > 1
+            && body.All(c => c is '/' or '-' or '_' or '.' or '~' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'));
     }
 
     private static void ValidateOpenPaths(List<string>? paths, ICollection<string> errors)

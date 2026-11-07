@@ -132,8 +132,9 @@ public class BackendRouteConfigServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(content, Does.Contain("&& PathPrefix(`/hooks/`)\"" + Environment.NewLine + "      priority: 60"));
-            Assert.That(content, Does.Contain("&& Path(`/callback`)\"" + Environment.NewLine + "      priority: 60"));
+            Assert.That(content, Does.Contain("&& PathPrefix(`/hooks/`) && !PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)\"" + Environment.NewLine + "      priority: 60"));
+            Assert.That(content, Does.Contain("&& Path(`/callback`) && !PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)\"" + Environment.NewLine + "      priority: 60"));
+            Assert.That(content, Does.Contain("!PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)"));
             Assert.That(content, Does.Contain($"private-{appId}-open0-runtime"));
             Assert.That(content, Does.Contain($"middlewares: [\"private-{appId}-rewrite\"]"));
         });
