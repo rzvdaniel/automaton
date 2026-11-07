@@ -60,6 +60,41 @@ public class TunnelForwarderServiceTests
     }
 
     [Test]
+    public void CreateRuntimeGatewayHandler_ReturnsRedirectsToTheVisitor()
+    {
+        var handler = (HttpClientHandler)TunnelForwarderService.CreateRuntimeGatewayHandler();
+
+        Assert.That(handler.AllowAutoRedirect, Is.False);
+    }
+
+    [Test]
+    public async Task ForwardAsync_PassesRedirectStatusAndLocationThrough()
+    {
+        var service = new TunnelForwarderService(
+            Options.Create(new TunnelForwarderConfig()),
+            new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)),
+            new StubHandler(_ =>
+            {
+                var redirect = new HttpResponseMessage(HttpStatusCode.Found);
+                redirect.Headers.Location = new Uri("/login/", UriKind.Relative);
+                return redirect;
+            }));
+        var response = await service.ForwardAsync(new TunnelRequest
+        {
+            Destination = TunnelDestinations.RuntimeGateway,
+            RuntimeAppId = Guid.NewGuid(),
+            RuntimeDeploymentTargetId = Guid.NewGuid(),
+            RuntimePath = string.Empty
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(302));
+            Assert.That(response.HeaderValues["Location"], Is.EqualTo(new[] { "/login/" }));
+        });
+    }
+
+    [Test]
     public async Task ForwardAsync_EnforcesResponseLimit()
     {
         var service = new TunnelForwarderService(
