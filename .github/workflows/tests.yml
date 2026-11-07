@@ -65,6 +65,7 @@ jobs:
       - run: python3 scripts/tests/mysql-to-postgres-conversion-test.py
       - run: python3 scripts/tests/postgres-migration-override-test.py
       - run: python3 scripts/tests/server-install-dns-test.py
+      - run: python3 scripts/tests/server-install-certificate-test.py
       - run: bash -n docker/install/migrate-to-postgresql.sh
       - run: bash -n docker/install/update-from-request.sh
       - run: python3 scripts/tests/server-update-request-test.py
