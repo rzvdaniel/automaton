@@ -45,7 +45,16 @@ internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeReg
         var connectionTokens = GetConnectionTokens(context.Request.Headers["Connection"]);
         foreach (var header in context.Request.Headers)
             CopyRequestHeader(request, header.Key, header.Value, connectionTokens);
+        ApplyPublicHost(request, context.Request.Headers["X-Forwarded-Host"].FirstOrDefault());
         return request;
+    }
+
+    // Apps that pick a site or tenant by Host (GoatCounter) or check Origin against it (Django) need the address the
+    // visitor used, not the loopback address of this gateway. The API sets X-Forwarded-Host to that public host.
+    internal static void ApplyPublicHost(HttpRequestMessage request, string? forwardedHost)
+    {
+        if (!string.IsNullOrWhiteSpace(forwardedHost) && !forwardedHost.Contains(',') && !forwardedHost.Contains(' '))
+            request.Headers.Host = forwardedHost;
     }
 
     private static void CopyRequestHeader(
