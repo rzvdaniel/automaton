@@ -75,6 +75,8 @@ describe('AppListView', () => {
     expect(rows(wrapper)).toHaveLength(1)
     await wrapper.find('input[type="search"]').setValue('zzz')
     expect(wrapper.text()).toContain('No apps match')
+    await wrapper.find('.apps-empty button').trigger('click')
+    expect(rows(wrapper)).toHaveLength(3)
   })
 
   it('labels the search box for screen readers', async () => {
@@ -85,7 +87,8 @@ describe('AppListView', () => {
   it('shows the shared apps in the same row style', async () => {
     const wrapper = await mountView(apps)
     expect(wrapper.find('section[aria-label="Shared with you"]').text()).toContain('Shared Tool')
-    expect(wrapper.find('section .app-row').exists()).toBe(true)
+    const row = wrapper.find('section .app-row')
+    expect(row.element.tagName).toBe('BUTTON')
   })
 
   it('shows a friendly empty state with both buttons when there are no apps', async () => {

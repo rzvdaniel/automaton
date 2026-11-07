@@ -20,6 +20,8 @@
   --rail-active: #23242a;
   --rail-active-ink: #ff7a2e;
   --radius-card: 16px;
+  --row-line: #ecebe6;
+  --ok: #1f6b4f;
 
   --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
   --body: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
@@ -37,5 +39,7 @@
 
   --app-bg: #121316;
   --rail: #0b0c0e;
+  --row-line: #2c2d33;
+  --ok: #4fb98c;
   --rail-line: #23242a;
 }

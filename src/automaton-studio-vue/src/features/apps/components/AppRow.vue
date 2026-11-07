@@ -36,7 +36,7 @@ defineProps<{
   width: 100%;
   min-height: 44px;
   padding: 12px 14px;
-  border: 1px solid var(--row-line, #ecebe6);
+  border: 1px solid var(--row-line);
   border-radius: 12px;
   background: transparent;
   color: var(--ink);
@@ -61,9 +61,8 @@ defineProps<{
 }
 .app-row__tag { border: 1px solid var(--line); color: var(--ink-soft); }
 .app-row__state--live { background: var(--signal); color: var(--on-signal); font-weight: 600; }
-.app-row__state--ok { border: 1px solid var(--ok, #1f6b4f); color: var(--ok, #1f6b4f); }
-.app-row__state--stopped { background: var(--row-line, #ecebe6); color: var(--ink-soft); }
-:global(.app-dark) .app-row { --row-line: #2c2d33; --ok: #4fb98c; }
+.app-row__state--ok { border: 1px solid var(--ok); color: var(--ok); }
+.app-row__state--stopped { background: var(--row-line); color: var(--ink-soft); }
 @media (max-width: 640px) {
   .app-row { flex-wrap: wrap; }
   .app-row__text { flex-basis: calc(100% - 60px); }

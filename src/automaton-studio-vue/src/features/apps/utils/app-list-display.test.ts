@@ -44,6 +44,7 @@ describe('app list display', () => {
     expect(appState(app({ actionsOnly: true })).label).toBe('no runs yet')
     const run = { moduleKey: 'm', status: 'Succeeded', createdAtUtc: new Date(Date.now() - 3 * 3600_000).toISOString() }
     expect(appState(app({ actionsOnly: true, lastActionRun: run }))).toEqual({ label: 'ran 3h ago', tone: 'ok' })
+    expect(appState(app({ actionsOnly: true, lastActionRun: { ...run, status: 'Failed' } }))).toEqual({ label: 'failed 3h ago', tone: 'stopped' })
   })
 
   it('filters by kind and stopped state', () => {
