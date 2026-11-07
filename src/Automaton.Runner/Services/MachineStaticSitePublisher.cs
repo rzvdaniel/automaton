@@ -266,6 +266,10 @@ public sealed class MachineStaticSitePublisher
         builder.AppendLine($"    listen {port};");
         builder.AppendLine("    server_name _;");
         builder.AppendLine("    autoindex off;");
+        builder.AppendLine("    gzip on;");
+        builder.AppendLine("    gzip_vary on;");
+        builder.AppendLine("    gzip_comp_level 6;");
+        builder.AppendLine("    gzip_types application/javascript text/css;");
         builder.AppendLine("    location = /healthz { access_log off; return 204; }");
         foreach (var (appId, releaseId) in sites.OrderBy(pair => pair.Key))
         {
