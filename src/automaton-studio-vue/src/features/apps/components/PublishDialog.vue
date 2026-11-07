@@ -31,7 +31,7 @@ const emit = defineEmits<{
 }>()
 
 const slug = ref('')
-const requiresAuthentication = computed(() => props.requiresAuth ?? false)
+const requiresAuthentication = ref(false)
 const publishRuntime = ref(true)
 const listInMarketplace = ref(true)
 const validationError = ref<string | null>(null)
@@ -75,10 +75,15 @@ watch(isVisible, (visible) => {
     props.currentRuntimeVisibility,
     props.currentCatalogVisibility,
   )
+  requiresAuthentication.value = props.requiresAuth ?? false
   publishRuntime.value = requiresAuthentication.value ? false : visibilityState.publishRuntime
   listInMarketplace.value = visibilityState.listInMarketplace
   validationError.value = null
 }, { immediate: true })
+
+watch(requiresAuthentication, (required) => {
+  if (required) publishRuntime.value = false
+})
 
 function handlePublish() {
   if (!isValidSlug.value) return
@@ -157,6 +162,17 @@ function close() {
       </div>
 
       <div class="field mb-4">
+        <label for="requiresAuthentication" class="block font-semibold mb-2">Sign-in</label>
+        <div class="flex align-items-center gap-3">
+          <InputSwitch id="requiresAuthentication" v-model="requiresAuthentication" />
+          <label for="requiresAuthentication">Require sign-in</label>
+        </div>
+        <small class="text-color-secondary block mt-1 ml-6">
+          People opening the private app address must sign in when this is on.
+        </small>
+      </div>
+
+      <div class="field mb-4">
         <label for="listInMarketplace" class="block font-semibold mb-2">Marketplace visibility</label>
         <div class="flex align-items-center gap-3">
           <InputSwitch id="listInMarketplace" v-model="listInMarketplace" />
@@ -166,10 +182,6 @@ function close() {
           {{ !publishRuntime && listInMarketplace ? 'Private runtime — visitors can view media, but cannot launch it.' : 'Use unlisted to keep the app out of public discovery.' }}
         </small>
       </div>
-
-      <p v-if="requiresAuthentication" class="text-color-secondary text-sm">
-        Sign-in is currently required. This dialog preserves that setting and keeps the runtime private.
-      </p>
 
       <Message
         v-if="publishRuntime && !requiresAuthentication"
