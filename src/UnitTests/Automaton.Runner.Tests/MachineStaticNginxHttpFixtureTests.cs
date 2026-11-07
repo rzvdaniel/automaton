@@ -25,7 +25,7 @@ public sealed class MachineStaticNginxHttpFixtureTests
         await File.WriteAllTextAsync(Path.Combine(siteRoot, "index.html"), "spa entry");
         await File.WriteAllTextAsync(Path.Combine(siteRoot, "assets", "site.css"), "body { color: green; }");
         await File.WriteAllTextAsync(configPath,
-            MachineStaticSitePublisher.BuildNginxConfiguration(new Dictionary<Guid, Guid> { [appId] = releaseId }, 8080));
+            MachineStaticSitePublisher.BuildNginxConfiguration(new Dictionary<Guid, Guid> { [appId] = releaseId }, 8080, new HashSet<Guid> { appId }));
 
         try
         {

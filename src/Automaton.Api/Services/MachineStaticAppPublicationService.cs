@@ -40,7 +40,8 @@ public sealed class MachineStaticAppPublicationService(
             RelativePath: contract.Build.OutputDirectory!,
             DeploymentTargetId: target.Id,
             DeploymentOperationId: operationId,
-            MinimumFreeDiskMb: resourceOptions.MinimumFreeDiskMb);
+            MinimumFreeDiskMb: resourceOptions.MinimumFreeDiskMb,
+            SinglePageApp: contract.Build.SinglePageApp);
         var (_, result) = await transfers.ExecuteAsync(
             operationId, target.RunnerId, ownerId, command, input: null, cancellationToken, TimeSpan.FromMinutes(15));
         if (result.FileTransferResult is not { Success: true })

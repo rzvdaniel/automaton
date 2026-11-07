@@ -48,10 +48,11 @@ public sealed class MachineStaticSitePublisher
         Guid targetId,
         string outputDirectory,
         CancellationToken cancellationToken,
-        int minimumFreeDiskMb = 1024)
+        int minimumFreeDiskMb = 1024,
+        bool singlePageApp = false)
     {
         await operationGate.WaitAsync(cancellationToken);
-        try { return await PublishCoreAsync(operationId, appId, targetId, outputDirectory, cancellationToken, minimumFreeDiskMb); }
+        try { return await PublishCoreAsync(operationId, appId, targetId, outputDirectory, cancellationToken, minimumFreeDiskMb, singlePageApp); }
         finally { operationGate.Release(); }
     }
 
@@ -61,7 +62,8 @@ public sealed class MachineStaticSitePublisher
         Guid targetId,
         string outputDirectory,
         CancellationToken cancellationToken,
-        int minimumFreeDiskMb)
+        int minimumFreeDiskMb,
+        bool singlePageApp)
     {
         var scope = CreateScope(appId, targetId);
         if (!ValidIdentity(operationId, scope) || !settings.IsValid()) return null;
@@ -76,7 +78,7 @@ public sealed class MachineStaticSitePublisher
         var files = EnumerateSafeFiles(sourceRoot, cancellationToken);
         EnsureIndexFileExists(files);
 
-        return await StageAndPublishAsync(index, appId, operationId, scope, files, cancellationToken);
+        return await StageAndPublishAsync(index, appId, operationId, scope, files, singlePageApp, cancellationToken);
     }
 
     private async Task<MachineStaticServerEndpoint?> EnsureExistingPublicationAsync(
@@ -97,6 +99,7 @@ public sealed class MachineStaticSitePublisher
         Guid operationId,
         HostContainerScope scope,
         IReadOnlyCollection<StaticFile> files,
+        bool singlePageApp,
         CancellationToken cancellationToken)
     {
         var sitesRoot = workspace.GetPublishedStaticSitesRoot();
@@ -113,13 +116,14 @@ public sealed class MachineStaticSitePublisher
             Directory.CreateDirectory(Path.GetDirectoryName(releaseRoot)!);
             if (Directory.Exists(releaseRoot)) DeleteTreeWithoutFollowingLinks(releaseRoot);
             Directory.Move(stageRoot, releaseRoot);
+            if (singlePageApp) File.WriteAllText(SinglePageMarker(releaseRoot), string.Empty);
 
             var updated = new Dictionary<Guid, Guid>(index) { [appId] = operationId };
             configurationUpdateStarted = true;
             var endpoint = await TryActivatePublicationAsync(updated, index, scope, cancellationToken);
             if (endpoint is null)
             {
-                DeleteTreeWithoutFollowingLinks(releaseRoot);
+                DeleteRelease(releaseRoot);
                 return null;
             }
 
@@ -171,7 +175,7 @@ public sealed class MachineStaticSitePublisher
             }
         }
         if (!previousSites.TryGetValue(appId, out var previous) || previous != operationId)
-            DeleteTreeWithoutFollowingLinks(releaseRoot);
+            DeleteRelease(releaseRoot);
     }
 
     public async Task<bool> UnpublishAsync(
@@ -252,7 +256,8 @@ public sealed class MachineStaticSitePublisher
         return endpoint is null ? null : WithSitePath(endpoint, appId, releaseId);
     }
 
-    internal static string BuildNginxConfiguration(IReadOnlyDictionary<Guid, Guid> sites, int port)
+    internal static string BuildNginxConfiguration(
+        IReadOnlyDictionary<Guid, Guid> sites, int port, IReadOnlySet<Guid>? singlePageApps = null)
     {
         var builder = new StringBuilder();
         builder.AppendLine("server {");
@@ -267,7 +272,9 @@ public sealed class MachineStaticSitePublisher
             builder.AppendLine($"    location ^~ /{app}/{release}/ {{");
             builder.AppendLine("        root /sites;");
             builder.AppendLine("        index index.html;");
-            builder.AppendLine($"        try_files $uri $uri/ /{app}/{release}/index.html;");
+            builder.AppendLine(singlePageApps?.Contains(appId) == true
+                ? $"        try_files $uri $uri/ /{app}/{release}/index.html;"
+                : "        try_files $uri $uri/ =404;");
             builder.AppendLine("    }");
         }
         builder.AppendLine("    location / { return 404; }");
@@ -289,7 +296,7 @@ public sealed class MachineStaticSitePublisher
         var nginxRoot = Path.Combine(metadata, "nginx");
         Directory.CreateDirectory(nginxRoot);
         var configPath = Path.Combine(nginxRoot, "default.conf");
-        await WriteAtomicallyAsync(configPath, BuildNginxConfiguration(sites, settings.ContainerPort), cancellationToken);
+        await WriteAtomicallyAsync(configPath, BuildNginxConfiguration(sites, settings.ContainerPort, ReadSinglePageApps(sites)), cancellationToken);
         await WriteIndexAsync(sites, cancellationToken);
     }
 
@@ -320,6 +327,11 @@ public sealed class MachineStaticSitePublisher
         await RestoreConfigurationAsync(previous, scope, CancellationToken.None);
         return null;
     }
+
+    private HashSet<Guid> ReadSinglePageApps(IReadOnlyDictionary<Guid, Guid> sites)
+        => sites.Where(site => File.Exists(SinglePageMarker(
+                Path.Combine(workspace.GetPublishedStaticSiteVersionsRoot(site.Key), site.Value.ToString("D")))))
+            .Select(site => site.Key).ToHashSet();
 
     private Dictionary<Guid, Guid> ReadIndex()
     {
@@ -412,8 +424,17 @@ public sealed class MachineStaticSitePublisher
         foreach (var directory in Directory.EnumerateDirectories(root))
         {
             if (Guid.TryParse(Path.GetFileName(directory), out var id) && id != current && id != previous)
-                DeleteTreeWithoutFollowingLinks(directory);
+                DeleteRelease(directory);
         }
+    }
+
+    // A release served as a single-page app has a sibling marker file; it is outside the served release directory.
+    private static string SinglePageMarker(string releaseRoot) => releaseRoot + ".spa";
+
+    private static void DeleteRelease(string releaseRoot)
+    {
+        DeleteTreeWithoutFollowingLinks(releaseRoot);
+        File.Delete(SinglePageMarker(releaseRoot));
     }
 
     private static void DeleteTreeWithoutFollowingLinks(string path)

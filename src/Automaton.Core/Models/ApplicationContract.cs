@@ -162,6 +162,9 @@ public sealed class ApplicationBuildSpec
     public string? Image { get; set; }
     public ApplicationCommandSpec? Command { get; set; }
     public string? OutputDirectory { get; set; }
+
+    /// <summary>True when the static site is a single-page app: unknown paths get index.html instead of 404.</summary>
+    public bool SinglePageApp { get; set; }
     public int TimeoutSeconds { get; set; } = 900;
 
     [JsonExtensionData]

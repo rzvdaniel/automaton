@@ -144,7 +144,7 @@ internal sealed class RunnerFileTransferExecutor(IServiceScopeFactory scopes)
         using var scope = scopes.CreateScope();
         var publisher = scope.ServiceProvider.GetRequiredService<MachineStaticSitePublisher>();
         var endpoint = await publisher.PublishAsync(operationId, appId, targetId, outputDirectory, token,
-            command.MinimumFreeDiskMb ?? 0);
+            command.MinimumFreeDiskMb ?? 0, command.SinglePageApp);
         return endpoint is null
             ? new() { Success = false, Error = "The Machine Management Runner could not start its bounded static-serving container." }
             : new() { Success = true, SessionId = command.SessionId };
