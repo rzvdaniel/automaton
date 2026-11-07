@@ -45,10 +45,10 @@ describe('AppRuntimeView runtime bootstrap', () => {
     expect(iframe.attributes('src')).not.toContain('/api/apps/app-id/launch-runtime')
   })
 
-  it('keeps unprotected runtime loading direct without bootstrap', async () => {
+  it('still hands out the session cookie when the app does not require sign-in, because its private address always asks for it', async () => {
     const wrapper = await mountView(false)
 
-    expect(mocks.createRuntimeLaunch).not.toHaveBeenCalled()
+    expect(mocks.createRuntimeLaunch).toHaveBeenCalledWith('app-id')
     expect(wrapper.get('iframe').attributes('src')).not.toContain('/api/apps/app-id/launch-runtime')
   })
 

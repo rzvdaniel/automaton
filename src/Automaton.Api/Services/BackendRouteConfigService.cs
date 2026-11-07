@@ -208,7 +208,7 @@ public class BackendRouteConfigService
             var host = PublishedAppHostNames.BuildPrivateAppHost(
                 route.AppId, publishedAppsConfig.PublicBaseUrlHost);
             AppendRuntimeRouter(builder, route, key, host,
-                PublishedAppHostNames.BuildPrivateTargetPath(route.AppId, route.DeploymentTargetId, true), 50);
+                PublishedAppHostNames.BuildPrivateTargetPath(route.AppId, route.DeploymentTargetId, true), 50, true);
         }
 
         foreach (var route in routes.Where(route => !route.IsDefault))
@@ -217,7 +217,7 @@ public class BackendRouteConfigService
             var prefix = BuildTargetRoutePrefix(route.AppId, route.DeploymentTargetId);
             var host = PublishedAppHostNames.BuildPrivateAppHost(
                 route.AppId, publishedAppsConfig.PublicBaseUrlHost);
-            AppendRuntimeRouter(builder, route, key, host, prefix, 110);
+            AppendRuntimeRouter(builder, route, key, host, prefix, 110, true);
         }
 
         foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
@@ -225,7 +225,7 @@ public class BackendRouteConfigService
             var key = $"slug-{route.AppId:N}";
             var host = PublishedAppHostNames.BuildPublishedAppHost(
                 route.Slug!, publishedAppsConfig.PublicBaseUrlHost);
-            AppendRuntimeRouter(builder, route, key, host, "/", 50);
+            AppendRuntimeRouter(builder, route, key, host, "/", 50, route.RequiresAuthentication);
         }
 
     }
@@ -233,14 +233,15 @@ public class BackendRouteConfigService
     private void AppendMiddlewares(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
     {
         builder.AppendLine("  middlewares:");
-        foreach (var route in routes.Where(route => route.RequiresAuthentication))
+        // The private address always asks for sign-in; the public address only when the app requires it.
+        foreach (var route in routes)
         {
             var key = route.IsDefault
                 ? $"private-{route.AppId:N}"
                 : $"target-{route.DeploymentTargetId:N}";
             AppendRuntimeAuthorization(builder, route, key);
 
-            if (!string.IsNullOrWhiteSpace(route.Slug))
+            if (route.RequiresAuthentication && !string.IsNullOrWhiteSpace(route.Slug))
             {
                 AppendRuntimeAuthorization(builder, route, $"slug-{route.AppId:N}");
             }
@@ -273,7 +274,8 @@ public class BackendRouteConfigService
         string key,
         string host,
         string pathPrefix,
-        int priority)
+        int priority,
+        bool authenticated)
     {
         builder.AppendLine($"    {key}-runtime:");
         builder.AppendLine("      entryPoints:");
@@ -284,7 +286,7 @@ public class BackendRouteConfigService
         builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`{pathPrefix}`)\"");
         builder.AppendLine($"      priority: {priority}");
         builder.AppendLine($"      service: \"{route.RuntimeServiceName}\"");
-        var middlewares = route.RequiresAuthentication
+        var middlewares = authenticated
             ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{key}-rewrite\"]"
             : $"[\"{key}-rewrite\"]";
         builder.AppendLine($"      middlewares: {middlewares}");
@@ -303,6 +305,7 @@ public class BackendRouteConfigService
         builder.AppendLine("        trustForwardHeader: true");
         builder.AppendLine("        authRequestHeaders:");
         builder.AppendLine("          - Cookie");
+        builder.AppendLine("          - Accept");
         builder.AppendLine("          - X-App-Id");
         builder.AppendLine("          - X-Automaton-Runtime-Auth");
         builder.AppendLine($"    {key}-auth-strip:");

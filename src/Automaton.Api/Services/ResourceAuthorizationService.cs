@@ -68,7 +68,17 @@ public class ResourceAuthorizationService
     /// <summary>Checks app runtime use, including explicit organization assignment, without granting app administration.</summary>
     public async Task<bool> CanUseAppRuntimeAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
         => await CanAccessAppAsync(appId, userId, cancellationToken) ||
-           await CanExecuteAssignedOrganizationAppAsync(appId, userId, cancellationToken);
+           await CanExecuteAssignedOrganizationAppAsync(appId, userId, cancellationToken) ||
+           await IsAdministratorAsync(userId, cancellationToken);
+
+    public async Task<bool> AppExistsAsync(Guid appId, CancellationToken cancellationToken = default)
+        => await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.DeletionClaimId == null, cancellationToken);
+
+    /// <summary>True for administrators and system administrators, who may open every app on the server.</summary>
+    public async Task<bool> IsAdministratorAsync(Guid userId, CancellationToken cancellationToken = default)
+        => await dbContext.UserRoles.AnyAsync(membership => membership.UserId == userId &&
+            dbContext.Roles.Any(role => role.Id == membership.RoleId &&
+                (role.Name == UserRole.Administrator || role.Name == UserRole.SystemAdministrator)), cancellationToken);
 
     /// <summary>
     /// Check if user can update/modify an app

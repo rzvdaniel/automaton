@@ -85,7 +85,47 @@ public class BackendRouteConfigServiceTests
             .Count(line => line == expectedLine);
 
     [Test]
-    public async Task RefreshAsync_DoesNotAuthorizeUnrestrictedRoute()
+    public async Task RefreshAsync_PrivateAddressAsksForSignIn_EvenWhenAppDoesNotRequireIt()
+    {
+        var content = await RefreshWithAppAsync(app => app.RequiresAuthentication = false);
+        var appId = AppIdOf(content);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Does.Contain($"private-{appId}-auth:"));
+            Assert.That(content, Does.Contain(
+                $"middlewares: [\"private-{appId}-auth-headers\", \"private-{appId}-auth\", \"private-{appId}-auth-strip\", \"private-{appId}-rewrite\"]"));
+        });
+    }
+
+    [Test]
+    public async Task RefreshAsync_PublicAddressStaysOpen_WhenAppDoesNotRequireSignIn()
+    {
+        var content = await RefreshWithAppAsync(app =>
+        {
+            app.RequiresAuthentication = false;
+            app.IsPublished = true;
+            app.PublicUrl = "open-site";
+            app.RuntimeVisibility = AppRuntimeVisibilities.Public;
+            app.AccessStatus = AppAccessStatuses.Active;
+        });
+        var appId = AppIdOf(content);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Does.Contain($"slug-{appId}-runtime"));
+            Assert.That(content, Does.Not.Contain($"slug-{appId}-auth"));
+            Assert.That(content, Does.Contain($"private-{appId}-auth:"));
+        });
+    }
+
+    private static string AppIdOf(string content)
+    {
+        var start = content.IndexOf("private-", StringComparison.Ordinal) + "private-".Length;
+        return content.Substring(start, 32);
+    }
+
+    private async Task<string> RefreshWithAppAsync(Action<WebApp> configure)
     {
         var rootPath = CreateTempDirectory();
         await using var dbContext = CreateDbContext();
@@ -95,19 +135,11 @@ public class BackendRouteConfigServiceTests
         target.GenericRuntimeDeployed = true;
         AddMachineRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
-        dbContext.WebApps.Local.Single().RequiresAuthentication = false;
+        configure(dbContext.WebApps.Local.Single());
         await dbContext.SaveChangesAsync();
 
         await CreateService(dbContext, rootPath).RefreshAsync();
-        var content = await File.ReadAllTextAsync(Path.Combine(rootPath, "managed-runtime-routes.yml"));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(content, Does.Contain($"private-{appId:N}-runtime"));
-            Assert.That(content, Does.Contain($"private-{appId:N}-rewrite"));
-            Assert.That(content, Does.Not.Contain($"private-{appId:N}-auth"));
-            Assert.That(content, Does.Not.Contain("forwardAuth:"));
-        });
+        return await File.ReadAllTextAsync(Path.Combine(rootPath, "managed-runtime-routes.yml"));
     }
 
     [Test]

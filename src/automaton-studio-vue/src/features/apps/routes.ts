@@ -41,6 +41,12 @@ export const appsRoutes: RouteRecordRaw[] = [
     component: () => import('./views/AppEditorView.vue'),
   },
   {
+    path: '/apps/:id/launch',
+    name: 'app-launch',
+    component: () => import('./views/AppLaunchView.vue'),
+    meta: { layout: 'none' },
+  },
+  {
     path: '/apps/:id/application',
     name: 'app-runtime',
     component: () => import('./views/AppRuntimeView.vue'),

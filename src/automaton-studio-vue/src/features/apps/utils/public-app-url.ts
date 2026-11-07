@@ -45,6 +45,13 @@ export function getDeployedAppUrl(appId?: string | null): string {
   return baseUrl.toString()
 }
 
+/** The private address of an app plus the page the visitor asked for; only a path on that address is accepted. */
+export function getLaunchTargetUrl(appId: string, path: string): string {
+  const base = getDeployedAppUrl(appId)
+  const safePath = path.startsWith('/') && !path.startsWith('//') ? path : '/'
+  return new URL(safePath, base).toString()
+}
+
 export function getDeploymentTargetUrl(appId?: string | null, routePath?: string | null): string {
   const deployedAppUrl = getDeployedAppUrl(appId)
   const normalizedRoutePath = routePath?.trim()

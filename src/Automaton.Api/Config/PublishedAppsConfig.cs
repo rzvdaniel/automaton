@@ -33,6 +33,20 @@ public class PublishedAppsConfig
             : "localhost";
 
     /// <summary>
+    /// Address of Studio, where visitors of a private app sign in: the apps address without its "apps." label.
+    /// </summary>
+    public string StudioBaseUrl
+    {
+        get
+        {
+            if (!Uri.TryCreate(PublicBaseUrl, UriKind.Absolute, out var uri)) return "http://localhost:5173";
+            var host = uri.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase) ? uri.Host["apps.".Length..] : uri.Host;
+            return new UriBuilder(uri) { Host = host, Path = "/", Query = string.Empty, Fragment = string.Empty }
+                .Uri.GetLeftPart(UriPartial.Authority);
+        }
+    }
+
+    /// <summary>
     /// API base URL injected into published apps so they can call Automaton runtime APIs.
     /// </summary>
     public string ApiBaseUrl { get; set; } = "https://localhost:7091";

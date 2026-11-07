@@ -58,14 +58,14 @@ public class InternalRuntimeController : ControllerBase
         if (string.IsNullOrWhiteSpace(cookie))
         {
             logger.LogDebug("Runtime auth failed for app {AppId}: missing cookie.", appId);
-            return Unauthorized();
+            return SignInRequired(appId);
         }
 
         var validation = runtimeCookieService.ValidateRuntimeCookie(cookie, appId);
         if (!validation.IsValid)
         {
             logger.LogDebug("Runtime auth failed for app {AppId}: invalid cookie.", appId);
-            return Unauthorized();
+            return SignInRequired(appId);
         }
 
         var appExists = await dbContext.WebApps
@@ -80,10 +80,25 @@ public class InternalRuntimeController : ControllerBase
         if (!await authorizationService.CanUseAppRuntimeAsync(appId, validation.UserId, cancellationToken))
         {
             logger.LogDebug("Runtime auth forbidden for app {AppId} and user {UserId}.", appId, validation.UserId);
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden);
         }
 
         return NoContent();
+    }
+
+    /// <summary>A browser opening a page goes to Studio to sign in and come back; anything else gets 401.</summary>
+    private IActionResult SignInRequired(Guid appId)
+    {
+        var method = Request.Headers["X-Forwarded-Method"].ToString();
+        var accept = Request.Headers.Accept.ToString();
+        var uri = Request.Headers["X-Forwarded-Uri"].ToString();
+        var isPageLoad = string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
+            && accept.Contains("text/html", StringComparison.OrdinalIgnoreCase);
+        if (!isPageLoad) return Unauthorized();
+
+        var returnTo = uri.StartsWith('/') && !uri.StartsWith("//", StringComparison.Ordinal) ? uri : "/";
+        var studio = publishedAppsConfig.StudioBaseUrl.TrimEnd('/');
+        return Redirect($"{studio}/apps/{appId}/launch?to={Uri.EscapeDataString(returnTo)}");
     }
 
     private bool IsAuthorizedProxyRequest(string? providedValue)

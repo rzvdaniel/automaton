@@ -22,10 +22,7 @@ public sealed class AppsRuntimeController(
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> CreateRuntimeLaunch(Guid id, CancellationToken cancellationToken)
     {
-        if (!await CanUseAppAsync(id, cancellationToken))
-        {
-            return NotFound(new { message = "App not found" });
-        }
+        if (await DenyAsync(id, cancellationToken) is { } denied) return denied;
 
         AppendRuntimeCookie(id);
         return Ok(new { runtimeToken = string.Empty });
@@ -34,20 +31,26 @@ public sealed class AppsRuntimeController(
     [HttpGet("{id}/launch-runtime")]
     public async Task<IActionResult> LaunchRuntime(Guid id, CancellationToken cancellationToken)
     {
-        if (!await CanUseAppAsync(id, cancellationToken))
-        {
-            return NotFound(new { message = "App not found" });
-        }
+        if (await DenyAsync(id, cancellationToken) is { } denied) return denied;
 
         AppendRuntimeCookie(id);
         return Redirect(BuildRestrictedRuntimeUrl(id));
+    }
+
+    /// <summary>Null when the signed-in user may open the app; 403 when the app exists but is not theirs.</summary>
+    private async Task<IActionResult?> DenyAsync(Guid appId, CancellationToken cancellationToken)
+    {
+        if (await CanUseAppAsync(appId, cancellationToken)) return null;
+        return await authorizationService.AppExistsAsync(appId, cancellationToken)
+            ? StatusCode(StatusCodes.Status403Forbidden, new { message = "You do not have access to this app." })
+            : NotFound(new { message = "App not found" });
     }
 
     private async Task<bool> CanUseAppAsync(Guid appId, CancellationToken cancellationToken)
     {
         var userId = userContextService.GetUserId();
         return await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken) is not null ||
-               await authorizationService.CanExecuteAssignedOrganizationAppAsync(appId, userId, cancellationToken);
+               await authorizationService.CanUseAppRuntimeAsync(appId, userId, cancellationToken);
     }
 
     private void AppendRuntimeCookie(Guid appId)

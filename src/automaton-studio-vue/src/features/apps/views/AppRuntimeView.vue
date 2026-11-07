@@ -39,9 +39,8 @@ async function loadRuntimeView() {
       return
     }
 
-    if (app.value.requiresAuthentication) {
-      await appsService.createRuntimeLaunch(appId.value)
-    }
+    // The private address always asks for sign-in, so the session cookie is always handed out.
+    await appsService.createRuntimeLaunch(appId.value)
 
     applicationUrl.value = new URL(getOpenAppUrl(app.value), window.location.origin).toString()
   } catch (err) {

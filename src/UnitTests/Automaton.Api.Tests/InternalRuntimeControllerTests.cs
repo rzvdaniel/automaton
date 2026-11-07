@@ -48,6 +48,58 @@ public class InternalRuntimeControllerTests
     }
 
     [Test]
+    public async Task AuthorizeRuntimeRequest_WithoutCookie_SendsBrowsersToSignInAndGivesApiCalls401()
+    {
+        var appId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        var request = CreateAuthorizedRequest(appId, Guid.NewGuid());
+        request.HttpContext.Request.Headers.Cookie = string.Empty;
+        request.HttpContext.Request.Headers["X-Forwarded-Method"] = "GET";
+        request.HttpContext.Request.Headers["X-Forwarded-Uri"] = "/board?x=1";
+        request.HttpContext.Request.Headers.Accept = "text/html,application/xhtml+xml";
+        var controller = CreateController(dbContext, request.HttpContext, request.CookieService);
+        var ids = request.HttpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray();
+        var key = request.HttpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray();
+
+        var browser = await controller.AuthorizeRuntimeRequest(ids, key, CancellationToken.None);
+        request.HttpContext.Request.Headers.Accept = "application/json";
+        var api = await controller.AuthorizeRuntimeRequest(ids, key, CancellationToken.None);
+
+        Assert.That(browser, Is.InstanceOf<RedirectResult>());
+        Assert.That(((RedirectResult)browser).Url, Does.StartWith("http://localhost:5173/apps/" + appId + "/launch?to=%2Fboard%3Fx%3D1"));
+        Assert.That(api, Is.InstanceOf<UnauthorizedResult>());
+    }
+
+    [Test]
+    public async Task AuthorizeRuntimeRequest_SignedInUserWithoutAccess_Gets403_AndAdministratorGetsThrough()
+    {
+        var appId = Guid.NewGuid();
+        var owner = Guid.NewGuid();
+        var stranger = Guid.NewGuid();
+        var admin = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        await SeedRestrictedAppAsync(dbContext, appId, owner);
+        var roleId = Guid.NewGuid();
+        dbContext.Roles.Add(new ApplicationRole { Id = roleId, Name = UserRole.Administrator, NormalizedName = UserRole.Administrator.ToUpperInvariant() });
+        dbContext.UserRoles.Add(new ApplicationUserRole { UserId = admin, RoleId = roleId });
+        await dbContext.SaveChangesAsync();
+
+        async Task<IActionResult> AuthorizeAs(Guid userId)
+        {
+            var request = CreateAuthorizedRequest(appId, userId);
+            var controller = CreateController(dbContext, request.HttpContext, request.CookieService);
+            return await controller.AuthorizeRuntimeRequest(
+                request.HttpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
+                request.HttpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
+                CancellationToken.None);
+        }
+
+        Assert.That(await AuthorizeAs(stranger), Is.InstanceOf<StatusCodeResult>().With.Property("StatusCode").EqualTo(403));
+        Assert.That(await AuthorizeAs(admin), Is.InstanceOf<NoContentResult>());
+        Assert.That(await AuthorizeAs(owner), Is.InstanceOf<NoContentResult>());
+    }
+
+    [Test]
     public async Task AuthorizeRuntimeRequest_WithProxyAuthHeaderAndValidCookie_ReturnsNoContent()
     {
         var appId = Guid.NewGuid();
@@ -192,8 +244,8 @@ internal static class AssignedRuntimeScenario
             var assignmentRevoked = await AuthorizeAsync(controller, request);
             return new AssignedRuntimeEvidence(
                 allowed is NoContentResult,
-                membershipRevoked is ForbidResult,
-                assignmentRevoked is ForbidResult);
+                membershipRevoked is StatusCodeResult { StatusCode: 403 },
+                assignmentRevoked is StatusCodeResult { StatusCode: 403 });
         }
     }
 
