@@ -95,7 +95,9 @@ public class InternalRuntimeController : ControllerBase
         var method = Request.Headers["X-Forwarded-Method"].ToString();
         var accept = Request.Headers.Accept.ToString();
         var uri = Request.Headers["X-Forwarded-Uri"].ToString();
-        var isPageLoad = string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
+        // Traefik's own hop to the API strips X-Forwarded-Method/Uri on installations where the API is reached through
+        // the proxy again, so an absent method counts as GET and an absent URI sends the visitor to the app's start page.
+        var isPageLoad = (method.Length == 0 || string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase))
             && accept.Contains("text/html", StringComparison.OrdinalIgnoreCase);
         if (!isPageLoad) return Unauthorized();
 
