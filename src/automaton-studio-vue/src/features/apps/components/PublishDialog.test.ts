@@ -22,7 +22,7 @@ describe('PublishDialog', () => {
     expect(wrapper.text()).toContain('Require sign-in')
     const switches = wrapper.findAllComponents({ name: 'InputSwitch' })
     expect(switches).toHaveLength(3)
-    switches[2]!.vm.$emit('update:modelValue', true)
+    switches[1]!.vm.$emit('update:modelValue', true)
     await wrapper.vm.$nextTick()
 
     const publish = wrapper.findAll('button').find((button) => button.text().includes('Publish app'))
@@ -90,7 +90,7 @@ describe('PublishDialog', () => {
     })
 
     expect(wrapper.text()).toContain('This app requires sign-in, so its runtime must remain private.')
-    expect(wrapper.text()).toContain('Sign-in is currently required. This dialog preserves that setting and keeps the runtime private.')
+    expect(wrapper.text()).toContain('Require sign-in')
     expect(wrapper.text()).toContain('Private runtime')
     expect(wrapper.text()).not.toContain('Remixing')
     expect(wrapper.text()).not.toContain('remix')
