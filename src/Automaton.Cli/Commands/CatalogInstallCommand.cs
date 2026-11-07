@@ -71,8 +71,9 @@ public static class CatalogInstallCommand
     private static async Task InstallAsync(ConfigService config, string id, string? sourceId, string? name, string? runnerReference,
         string[] settingArguments, string? secretsFile, bool secretsStdin, bool wait, bool asJson)
     {
-        var settings = CatalogInstallValues.ParseSettings(settingArguments);
-        var secrets = CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin);
+        // An empty value counts as not given (Studio skips them too), so it is asked for or refused before anything is created.
+        var settings = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ParseSettings(settingArguments));
+        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin));
         using var client = Connect(config);
         var entry = Pick(await AllAsync(client, null, null, sourceId, false), id, sourceId);
         if (entry.TryGetProperty("requiresNewerServer", out var newer) && newer.ValueKind == JsonValueKind.True)
@@ -116,8 +117,9 @@ public static class CatalogInstallCommand
             if (asJson) CliJson.Write(new { success = true, appId, name = Text(app, "name"), commit, permissions, deployed = wait, operationId = operationId.Length > 0 ? operationId : null });
             else Console.WriteLine(wait ? $"Installed and deployed {Text(app, "name")} (app id {appId})." : $"Installed {Text(app, "name")} (app id {appId}); deployment started. Check it with: automaton apps");
         }
-        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
+            // Includes a timeout while waiting and an unreadable answer: the person must still learn the app id.
             throw new InvalidOperationException($"{exception.Message}\nThe app was created (app id {appId}); fix the problem in Studio or with automaton pull {appId}, then deploy again.", exception);
         }
     }
@@ -182,7 +184,7 @@ public static class CatalogInstallCommand
     private static async Task RunAsync(bool asJson, Func<Task> action)
     {
         try { await action(); }
-        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or IOException or InvalidDataException)
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or IOException or InvalidDataException or JsonException or TaskCanceledException)
         {
             if (asJson) CliJson.Write(new { success = false, error = exception.Message });
             else Console.Error.WriteLine($"Error: {exception.Message}");

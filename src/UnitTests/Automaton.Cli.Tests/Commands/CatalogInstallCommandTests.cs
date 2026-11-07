@@ -101,4 +101,19 @@ public class CatalogInstallCommandTests
 
         Assert.That(writer.ToString(), Does.Contain("flow-check").And.Contain("official").And.Contain("network").And.Contain("automaton catalog install"));
     }
+
+    [Test]
+    public void EmptyValuesCountAsNotGiven_SoTheyAreCaughtBeforeAnythingIsCreated()
+    {
+        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ParseLines("TOKEN=\nSITE=  \nKEEP=x", "file"));
+
+        var (_, missingSettings, missingSecrets) = CatalogInstallValues.Check(Application, secrets, secrets);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(secrets.Keys, Is.EqualTo(new[] { "KEEP" }));
+            Assert.That(missingSettings, Is.EqualTo(new[] { "SITE" }));
+            Assert.That(missingSecrets, Is.EqualTo(new[] { "TOKEN" }));
+        });
+    }
 }

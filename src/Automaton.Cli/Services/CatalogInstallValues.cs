@@ -29,6 +29,9 @@ public static class CatalogInstallValues
         return values;
     }
 
+    public static Dictionary<string, string> WithoutEmpty(Dictionary<string, string> values)
+        => values.Where(item => item.Value.Trim().Length > 0).ToDictionary(item => item.Key, item => item.Value);
+
     public static Dictionary<string, string> ParseSettings(IEnumerable<string> arguments)
         => ParseLines(string.Join('\n', arguments), "--setting");
 
