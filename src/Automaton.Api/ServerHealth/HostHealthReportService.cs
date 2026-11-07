@@ -31,7 +31,7 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
     public async Task<MachineHostHealth?> LatestAsync(CancellationToken token)
     {
         var json = await db.Runners.AsNoTracking()
-            .Where(item => item.ApplicationProfile == RunnerApplicationProfiles.MachineManagement && item.MachineHostHealthJson != null)
+            .Where(item => item.ApplicationProfile == RunnerApplicationProfiles.MachineManagement && item.MachineHostHealthJson != null && item.DeletionRequestedAtUtc == null)
             .OrderByDescending(item => item.MachineHostHealthMeasuredAtUtc)
             .Select(item => item.MachineHostHealthJson).FirstOrDefaultAsync(token);
         if (json is null) return null;

@@ -15,7 +15,7 @@ public sealed class HostHealthCollector
     private const string HelperScript =
         "echo '[os]'; cat /host/os-release 2>/dev/null; " +
         "echo '[updates]'; cat /host/updates/updates-available 2>/dev/null; " +
-        "if [ -e /host/run/reboot-required ]; then echo '[reboot]'; stat -c %Y /host/run/reboot-required; fi";
+        "if [ -e /host/reboot-required ]; then echo '[reboot]'; stat -c %Y /host/reboot-required; fi";
 
     public async Task<MachineHostHealth> CollectAsync(CancellationToken token)
     {
@@ -84,16 +84,16 @@ public sealed class HostHealthCollector
         return result?.ExitCode == 0 ? result.Output : null;
     }
 
-    // Each attempt mounts fewer host paths: docker refuses a bind mount whose source is missing (Debian has no update-notifier).
+    // Each attempt mounts fewer host paths: docker refuses a bind mount whose source is missing (no reboot-required file
+    // when no restart is pending, no update-notifier on Debian).
     private static async Task<Dictionary<string, string>> ReadHostFilesAsync(CancellationToken token)
     {
         var image = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE");
         if (string.IsNullOrWhiteSpace(image)) return [];
-        (string Source, string Target)[][] attempts =
-        [
-            [("/etc/os-release", "/host/os-release"), ("/run", "/host/run"), ("/var/lib/update-notifier", "/host/updates")],
-            [("/etc/os-release", "/host/os-release"), ("/run", "/host/run")]
-        ];
+        var os = ("/etc/os-release", "/host/os-release");
+        var reboot = ("/run/reboot-required", "/host/reboot-required");
+        var updates = ("/var/lib/update-notifier", "/host/updates");
+        (string Source, string Target)[][] attempts = [[os, reboot, updates], [os, reboot], [os, updates], [os]];
         foreach (var mounts in attempts)
         {
             var args = new List<string>

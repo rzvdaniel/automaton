@@ -18,7 +18,7 @@ public sealed partial class LatestReleaseClient(IHttpClientFactory httpClientFac
         if (cache.TryGetValue(nameof(LatestReleaseClient), out string? cached)) return cached;
         string? latest = null;
         try { latest = await FetchAsync(token); }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException or TaskCanceledException)
+        catch (Exception exception) when (exception is HttpRequestException or JsonException || exception is TaskCanceledException && !token.IsCancellationRequested)
         {
             // Unreachable registry: report "unknown" and retry sooner.
         }

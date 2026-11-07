@@ -32,8 +32,7 @@ public sealed class CertificateExpiryProbe(IMemoryCache cache)
             // Only the date is read, so an expired or untrusted certificate is still reported instead of failing.
             await using var tls = new SslStream(client.GetStream(), false, (_, certificate, _, _) =>
             {
-                notAfter = certificate?.GetExpirationDateString() is { } text && DateTime.TryParse(text, out var parsed)
-                    ? parsed.ToUniversalTime() : null;
+                notAfter = certificate is null ? null : new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate).NotAfter.ToUniversalTime();
                 return true;
             });
             await tls.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = host }, timeout.Token);
