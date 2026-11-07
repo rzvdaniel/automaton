@@ -21,7 +21,6 @@ public sealed class MachineStaticAppPublicationService(
 
     public async Task<bool> PublishIfAssignedAsync(
         WebApp app,
-        string runtimeVisibility,
         Guid ownerId,
         CancellationToken cancellationToken)
     {

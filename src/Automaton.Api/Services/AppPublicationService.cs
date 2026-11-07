@@ -59,8 +59,9 @@ public sealed class AppPublicationService(
         if (executionRunnerId.HasValue)
             await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId, cancellationToken);
 
-        var isMachineStaticPublication = machineStaticPublication is not null
-            && await machineStaticPublication.PublishIfAssignedAsync(entity, runtimeVisibility, UserId, cancellationToken);
+        var isMachineStaticPublication = runtimeVisibility == AppRuntimeVisibilities.Public
+            && machineStaticPublication is not null
+            && await machineStaticPublication.PublishIfAssignedAsync(entity, UserId, cancellationToken);
         await EnsureAuthenticatedPublicationSupportedAsync(
             id, runtimeVisibility, requiresAuthentication, isMachineStaticPublication, cancellationToken);
 

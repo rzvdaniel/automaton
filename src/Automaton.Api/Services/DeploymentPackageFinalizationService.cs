@@ -68,7 +68,7 @@ public sealed class DeploymentPackageFinalizationService(
             .AnyAsync(target => target.Id == deploymentTargetId && target.IsDefault, cancellationToken);
         if (!isLive) return;
         var app = await dataContext.WebApps.SingleAsync(app => app.Id == appId, cancellationToken);
-        await staticPublication.PublishIfAssignedAsync(app, app.RuntimeVisibility, ownerId, cancellationToken);
+        await staticPublication.PublishIfAssignedAsync(app, ownerId, cancellationToken);
     }
 
     /// <summary>
