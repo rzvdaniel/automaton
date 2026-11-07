@@ -8,6 +8,7 @@ using Automaton.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -29,7 +30,8 @@ public class InternalRuntimeControllerTests
             Options.Create(new PublishedAppsConfig
             {
                 RuntimeProxyAuthKey = "expected-proxy-key"
-            }))
+            }),
+            StudioConfiguration())
         {
             ControllerContext = new ControllerContext
             {
@@ -66,7 +68,7 @@ public class InternalRuntimeControllerTests
         var api = await controller.AuthorizeRuntimeRequest(ids, key, CancellationToken.None);
 
         Assert.That(browser, Is.InstanceOf<RedirectResult>());
-        Assert.That(((RedirectResult)browser).Url, Does.StartWith("http://localhost:5173/apps/" + appId + "/launch?to=%2Fboard%3Fx%3D1"));
+        Assert.That(((RedirectResult)browser).Url, Does.StartWith("https://studio.test/apps/" + appId + "/launch?to=%2Fboard%3Fx%3D1"));
         Assert.That(api, Is.InstanceOf<UnauthorizedResult>());
     }
 
@@ -170,6 +172,11 @@ public class InternalRuntimeControllerTests
         await dbContext.SaveChangesAsync();
     }
 
+    private static ConfigurationService StudioConfiguration() => new(
+        new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["AppConfig:WebsiteUrl"] = "https://studio.test" })
+            .Build());
+
     internal static AuthorizedRuntimeRequest CreateAuthorizedRequest(Guid appId, Guid userId)
     {
         var cookieService = CreateRuntimeCookieService();
@@ -193,7 +200,8 @@ public class InternalRuntimeControllerTests
             authorizationService,
             cookieService,
             NullLogger<InternalRuntimeController>.Instance,
-            Options.Create(new PublishedAppsConfig { RuntimeProxyAuthKey = "expected-proxy-key" }))
+            Options.Create(new PublishedAppsConfig { RuntimeProxyAuthKey = "expected-proxy-key" }),
+            StudioConfiguration())
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

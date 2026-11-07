@@ -21,14 +21,17 @@ public class InternalRuntimeController : ControllerBase
     private readonly RuntimeCookieService runtimeCookieService;
     private readonly ILogger<InternalRuntimeController> logger;
     private readonly PublishedAppsConfig publishedAppsConfig;
+    private readonly ConfigurationService configurationService;
 
     public InternalRuntimeController(
         ApplicationDbContext dbContext,
         ResourceAuthorizationService authorizationService,
         RuntimeCookieService runtimeCookieService,
         ILogger<InternalRuntimeController> logger,
-        IOptions<PublishedAppsConfig> publishedAppsConfig)
+        IOptions<PublishedAppsConfig> publishedAppsConfig,
+        ConfigurationService configurationService)
     {
+        this.configurationService = configurationService;
         this.dbContext = dbContext;
         this.authorizationService = authorizationService;
         this.runtimeCookieService = runtimeCookieService;
@@ -98,7 +101,7 @@ public class InternalRuntimeController : ControllerBase
 
         var returnTo = uri.StartsWith('/') && !uri.StartsWith("//", StringComparison.Ordinal)
             && !uri.Any(character => character == '\\' || char.IsControl(character)) ? uri : "/";
-        var studio = publishedAppsConfig.StudioBaseUrl.TrimEnd('/');
+        var studio = configurationService.WebsiteUrl.TrimEnd('/');
         return Redirect($"{studio}/apps/{appId}/launch?to={Uri.EscapeDataString(returnTo)}");
     }
 
