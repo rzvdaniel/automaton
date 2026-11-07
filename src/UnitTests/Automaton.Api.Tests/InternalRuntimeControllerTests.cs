@@ -70,6 +70,28 @@ public class InternalRuntimeControllerTests
         Assert.That(api, Is.InstanceOf<UnauthorizedResult>());
     }
 
+    [TestCase("//evil.test/x")]
+    [TestCase("/\\evil.test/x")]
+    [TestCase("/a\tb")]
+    public async Task AuthorizeRuntimeRequest_SignInRedirect_NeverCarriesAReturnPathToAnotherHost(string forwardedUri)
+    {
+        var appId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        var request = CreateAuthorizedRequest(appId, Guid.NewGuid());
+        request.HttpContext.Request.Headers.Cookie = string.Empty;
+        request.HttpContext.Request.Headers["X-Forwarded-Method"] = "GET";
+        request.HttpContext.Request.Headers["X-Forwarded-Uri"] = forwardedUri;
+        request.HttpContext.Request.Headers.Accept = "text/html";
+        var controller = CreateController(dbContext, request.HttpContext, request.CookieService);
+
+        var result = await controller.AuthorizeRuntimeRequest(
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
+            CancellationToken.None);
+
+        Assert.That(((RedirectResult)result).Url, Does.EndWith("/launch?to=%2F"));
+    }
+
     [Test]
     public async Task AuthorizeRuntimeRequest_SignedInUserWithoutAccess_Gets403_AndAdministratorGetsThrough()
     {

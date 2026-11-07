@@ -96,7 +96,8 @@ public class InternalRuntimeController : ControllerBase
             && accept.Contains("text/html", StringComparison.OrdinalIgnoreCase);
         if (!isPageLoad) return Unauthorized();
 
-        var returnTo = uri.StartsWith('/') && !uri.StartsWith("//", StringComparison.Ordinal) ? uri : "/";
+        var returnTo = uri.StartsWith('/') && !uri.StartsWith("//", StringComparison.Ordinal)
+            && !uri.Any(character => character == '\\' || char.IsControl(character)) ? uri : "/";
         var studio = publishedAppsConfig.StudioBaseUrl.TrimEnd('/');
         return Redirect($"{studio}/apps/{appId}/launch?to={Uri.EscapeDataString(returnTo)}");
     }

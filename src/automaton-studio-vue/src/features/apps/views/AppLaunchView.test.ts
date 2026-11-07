@@ -44,6 +44,14 @@ describe('AppLaunchView', () => {
     expect(target.pathname).toBe('/')
   })
 
+  it.each(['/\\evil.test/x', '/\t/evil.test', 'https://evil.test/x'])('never leaves the app address for %j', async (path) => {
+    mocks.createRuntimeLaunch.mockResolvedValue({ runtimeToken: '' })
+    await mountView(`?to=${encodeURIComponent(path)}`)
+
+    const target = new URL(replace.mock.calls[0]![0] as string)
+    expect(target.host).toMatch(/^app-/)
+  })
+
   it('tells a signed-in user without access that the app is not theirs', async () => {
     mocks.createRuntimeLaunch.mockRejectedValue({ response: { status: 403 } })
     const wrapper = await mountView('')
