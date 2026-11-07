@@ -6,7 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Automaton.Api.Controllers;
 
 /// <summary>The app catalog (read from the official automaton-apps repository) and installing from it or from a Git URL.</summary>
-[Authorize]
+// A development API key (the scope automaton login creates) may list and install catalog apps, so the CLI and AI agents can do what Studio does; read-only, runner and web-app keys are refused.
+[Authorize(Policy = "DeveloperApiAccess")]
 public class CatalogController(AppCatalogService catalog, AppCatalogInstallService installer) : BaseController
 {
     [HttpGet]

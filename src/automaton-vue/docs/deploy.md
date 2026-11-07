@@ -64,6 +64,8 @@ Every server lists installable apps under **Apps → Catalog**. The list is read
 
 To install, choose an entry and select **Install**, or paste a public GitHub address (`https://github.com/owner/name`, optionally `/tree/branch/folder`, where the branch name has no slash) under **Install from a Git address**. Studio shows the source repository, the pinned commit (the server fetches exactly that commit) and the requested permissions, then asks for the name, Runner, settings, secrets and schedules. A system administrator can approve the permissions right there. **Install** creates your own copy, deploys it on a Runner and shows each step. This needs an online Runner ([Add a Runner](./deploy-runner)). Installing the same app again makes an independent copy. Updates are never applied automatically.
 
+From a terminal or an AI agent: `automaton catalog list` shows the entries with their ids, and `automaton catalog install <id> --name NAME --runner RUNNER --setting NAME=VALUE --secrets-file FILE --wait` installs one, saves its settings and secrets and deploys it. Secrets come only from a file, standard input (`--secrets-stdin`) or a hidden prompt, never from an argument. See the [CLI reference](./automaton-cli).
+
 Installing a tool app that another user published on this server: the store's **Install** button opens the same install page.
 
 To let other people install a copy of your published app on their server, publish with `automaton publish --install` (`--forkable` still works). The store then shows an **Install** button; an app with no web page (Actions only) shows only **Install**, an installable web app shows **Open** and **Install**.

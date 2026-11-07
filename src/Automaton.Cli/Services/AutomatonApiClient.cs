@@ -642,6 +642,47 @@ public class AutomatonApiClient : IDisposable
         });
     }
 
+    // ── Catalog (installing apps) ─────────────────────────────────────────────
+
+    /// <summary>One page of the catalog as the signed-in user sees it.</summary>
+    public async Task<JsonElement> GetCatalogPageAsync(string? search, string? category, string? source, bool installed, int page, CancellationToken ct = default)
+    {
+        var query = new List<string> { $"page={page}", "pageSize=100" };
+        if (!string.IsNullOrWhiteSpace(search)) query.Add("q=" + Uri.EscapeDataString(search));
+        if (!string.IsNullOrWhiteSpace(category)) query.Add("category=" + Uri.EscapeDataString(category));
+        if (!string.IsNullOrWhiteSpace(source)) query.Add("source=" + Uri.EscapeDataString(source));
+        if (installed) query.Add("installed=true");
+        using var resp = await _http.GetAsync("api/catalog?" + string.Join('&', query), ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>The pinned source of a catalog entry with its settings, secrets and permissions, before anything is created.</summary>
+    public async Task<JsonElement> GetCatalogInstallSourceAsync(string repo, string folder, string commit, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync(
+            $"api/catalog/install-source?repo={Uri.EscapeDataString(repo)}&commit={Uri.EscapeDataString(commit)}&folder={Uri.EscapeDataString(folder)}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> InstallCatalogAppAsync(string repo, string folder, string commit, string? name, string? runnerId, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { repo, folder, commit, name, runnerId }, JsonOptions);
+        using var resp = await PostJsonAsync("api/catalog/install", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Deploys the app's stored source to its default target; returns the operation id, and with wait the finished result.</summary>
+    public async Task<JsonElement> DeployStoredSourceAsync(string appId, bool wait, CancellationToken ct = default)
+    {
+        using var resp = await _http.PostAsync($"api/apps/{appId}/deploy", null, ct);
+        if (wait) return await WaitForDeploymentResultAsync(appId, resp, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     // ── Projects ──────────────────────────────────────────────────────────────
 
     public async Task<JsonElement> ListProjectsAsync(CancellationToken ct = default)

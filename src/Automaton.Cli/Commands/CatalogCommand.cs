@@ -12,6 +12,8 @@ public static class CatalogCommand
         {
             BuildInit(config),
             BuildBuild(),
+            CatalogInstallCommand.BuildList(config),
+            CatalogInstallCommand.BuildInstall(config),
             CatalogSourcesCommand.Build(config)
         };
         return command;
