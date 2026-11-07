@@ -64,7 +64,7 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertIn('PathPrefix(`/api/`)', edge['http']['routers']['studio-api']['rule'])
         self.assertNotIn('PathPrefix(`/api`)', edge['http']['routers']['studio-api']['rule'])
         pages = json.loads((self.root / 'dynamic/studio-paths.yml').read_text())['http']
-        self.assertEqual(pages['routers']['studio-pages']['rule'], 'Host(`studio.example.com`) && PathRegexp(`^/api[^/]`)')
+        self.assertEqual(pages['routers']['studio-pages']['rule'], r'HostRegexp(`^studio\.`) && PathRegexp(`^/api[^/]`)')
         self.assertGreater(pages['routers']['studio-pages']['priority'], edge['http']['routers']['studio-api']['priority'])
         self.assertEqual(pages['services']['studio-pages']['loadBalancer']['servers'], [{'url': 'http://studio:80'}])
         self.assertNotEqual(password, (self.root / 'secrets/rabbitmq-password').read_text())
@@ -129,7 +129,7 @@ class InstallationConfigurationTests(unittest.TestCase):
         # An installation from before this router, with a hand-written YAML installation.yml that must stay untouched.
         installation_path = self.root / 'dynamic/installation.yml'
         installation_path.write_text('http:\n  routers: {}\n')
-        (self.root / 'dynamic/studio-paths.yml').unlink()
+        (self.root / 'dynamic/studio-paths.yml').write_text('{"http": {"routers": {"studio-pages": {"rule": "Host(`studio.example.com`) && PathRegexp(`^/api[^/]`)"}}}}')
 
         module.ensure_studio_paths(self.root)
 

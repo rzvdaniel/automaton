@@ -16,6 +16,8 @@ import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
 import CopyCommand from '../components/CopyCommand.vue'
 import CatalogPanel from '../components/CatalogPanel.vue'
+import SharedAppsSection from '../components/SharedAppsSection.vue'
+import { organizationsService, type OrganizationAppSummary } from '@/features/organizations/services/organizationsService'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
@@ -143,6 +145,19 @@ const showEmptySearch = computed(() => {
   return visibleApps.value.length === 0 && appsStore.hasApps && hasActiveFilter
 })
 
+// Apps other people shared with the user (organization assignments), minus the ones the user owns.
+const sharedApps = ref<OrganizationAppSummary[]>([])
+
+async function loadSharedApps() {
+  try {
+    const assigned = await organizationsService.getMyAssignedApps()
+    const ownIds = new Set(appsStore.listApps.map((app) => app.id))
+    sharedApps.value = assigned.filter((app) => !ownIds.has(app.id))
+  } catch {
+    sharedApps.value = []
+  }
+}
+
 onMounted(async () => {
   try {
     const [, suggestions] = await Promise.all([
@@ -153,6 +168,7 @@ onMounted(async () => {
   } catch {
     tagSuggestions.value = []
   }
+  await loadSharedApps()
 })
 
 onUnmounted(() => {
@@ -296,6 +312,7 @@ const handleRetry = async () => {
 
     <!-- Content -->
     <template v-else>
+      <SharedAppsSection :apps="sharedApps" />
       <div v-if="selectedTagGroup" class="text-color-secondary text-sm mb-3">
         Showing tag group: <span class="font-semibold">{{ selectedTagGroup }}</span>
       </div>
@@ -350,7 +367,7 @@ const handleRetry = async () => {
       </Card>
 
       <!-- Empty State (No Apps) -->
-      <Card v-else-if="!appsStore.hasApps">
+      <Card v-else-if="!appsStore.hasApps && sharedApps.length === 0">
         <template #content>
           <div class="text-center py-5">
             <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>

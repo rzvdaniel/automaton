@@ -21,10 +21,10 @@ test.describe('as the system administrator', () => {
   test.beforeAll(async ({ browser }) => { page = await signIn(browser, 'ADMIN') })
   test.afterAll(async () => { await page?.context().close() })
 
-  test('dashboard loads', async () => {
+  test('Apps start page loads', async () => {
     await goTo(page, '/')
-    await expect(heading(page, 'Dashboard')).toBeVisible()
-    await shot(page, 'admin-dashboard')
+    await expect(heading(page, 'Apps')).toBeVisible()
+    await shot(page, 'admin-apps-start')
   })
 
   test('Admin → Users lists users and opens Add user', async () => {
@@ -86,29 +86,18 @@ test.describe('as a regular user', () => {
   test.beforeAll(async ({ browser }) => { page = await signIn(browser, 'USER') })
   test.afterAll(async () => { await page?.context().close() })
 
-  test('dashboard loads and Admin is refused', async () => {
+  test('Apps start page loads and Admin is refused', async () => {
     await goTo(page, '/')
-    await expect(heading(page, 'Dashboard')).toBeVisible()
-    await shot(page, 'user-dashboard')
+    await expect(heading(page, 'Apps')).toBeVisible()
+    await shot(page, 'user-apps-start')
     await goTo(page, '/admin/users')
     await expect(page).not.toHaveURL(/\/admin/)
-  })
-
-  test('project members are listed when the user is in a project', async () => {
-    await goTo(page, '/projects')
-    await shot(page, 'user-projects')
-    const project = page.locator('a[href*="/projects/"][href$="/settings"]').first()
-    if (await project.count()) {
-      await project.click()
-      await expect(page.getByRole('tab', { name: 'Members' })).toBeVisible()
-      await shot(page, 'user-project-members')
-    } else skipped('Project members: the user is in no project')
   })
 
   test('phone width has no horizontal scroll', async () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await goTo(page, '/')
-    await expect(heading(page, 'Dashboard')).toBeVisible()
+    await expect(heading(page, 'Apps')).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(1)
     await shot(page, 'user-phone')

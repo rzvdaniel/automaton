@@ -55,7 +55,8 @@ def store_router(domain, resolver):
 def studio_paths_router(domain, resolver):
     # Studio pages whose path starts with "api" (e.g. /apikeys) belong to Studio, not the API. The studio-api router
     # matches PathPrefix(`/api`) as plain text on installations configured before this router existed.
-    return dict(entryPoints=['websecure'], rule=f'Host(`studio.{domain}`) && PathRegexp(`^/api[^/]`)',
+    # Any studio.* host: a server can also answer on extra hostnames (the test server has studio.test.<domain>).
+    return dict(entryPoints=['websecure'], rule=r'HostRegexp(`^studio\.`) && PathRegexp(`^/api[^/]`)',
                 service='studio-pages', tls={'certResolver': resolver}, priority=300)
 
 
@@ -66,10 +67,16 @@ def ensure_studio_paths(root):
     (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
     # A separate dynamic file with its own service: adopted installations keep a hand-written installation.yml
     # whose Studio service may have another name.
-    write_new(root / 'dynamic' / 'studio-paths.yml', json.dumps({'http': {
+    path = root / 'dynamic' / 'studio-paths.yml'
+    content = json.dumps({'http': {
         'routers': {'studio-pages': studio_paths_router(state['domain'], resolver)},
         'services': {'studio-pages': {'loadBalancer': {'servers': [{'url': 'http://studio:80'}]}}},
-    }}))
+    }})
+    # Unlike the other files, this one is ours and is replaced when its rule changes (earlier versions matched one host).
+    if not path.exists() or path.read_text() != content:
+        with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
+            stream.write(content)
+        os.replace(stream.name, path)
 
 
 def ensure_store(root):
