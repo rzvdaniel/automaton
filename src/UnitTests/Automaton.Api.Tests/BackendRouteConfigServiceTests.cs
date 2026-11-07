@@ -119,6 +119,26 @@ public class BackendRouteConfigServiceTests
         });
     }
 
+    [Test]
+    public async Task RefreshAsync_DeclaredOpenPaths_SkipSignInOnPrivateAddress()
+    {
+        var content = await RefreshWithAppAsync(app =>
+        {
+            var contract = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
+            contract.OpenPaths = ["/hooks/*", "/callback"];
+            app.ApplicationContractJson = ApplicationContractSerialization.Serialize(contract);
+        });
+        var appId = AppIdOf(content);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Does.Contain("&& PathPrefix(`/hooks/`)\"" + Environment.NewLine + "      priority: 60"));
+            Assert.That(content, Does.Contain("&& Path(`/callback`)\"" + Environment.NewLine + "      priority: 60"));
+            Assert.That(content, Does.Contain($"private-{appId}-open0-runtime"));
+            Assert.That(content, Does.Contain($"middlewares: [\"private-{appId}-rewrite\"]"));
+        });
+    }
+
     private static string AppIdOf(string content)
     {
         var start = content.IndexOf("private-", StringComparison.Ordinal) + "private-".Length;

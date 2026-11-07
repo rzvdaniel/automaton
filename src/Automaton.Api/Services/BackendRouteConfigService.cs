@@ -2,6 +2,7 @@ using System.Text;
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Enums;
+using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -22,7 +23,8 @@ public class BackendRouteConfigService
         bool IsDefault,
         string RuntimeServiceName,
         string? Slug,
-        bool RequiresAuthentication);
+        bool RequiresAuthentication,
+        IReadOnlyList<string> OpenPaths);
 
     public BackendRouteConfigService(
         ApplicationDbContext dbContext,
@@ -108,6 +110,7 @@ public class BackendRouteConfigService
                 candidate.Target.Id,
                 candidate.Target.IsDefault,
                 RequiresAuthentication = candidate.Target.WebApp.RequiresAuthentication,
+                candidate.Target.WebApp.ApplicationContractJson,
                 Slug = candidate.Target.IsDefault &&
                     candidate.Target.WebApp.IsPublished &&
                     candidate.Target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
@@ -127,9 +130,30 @@ public class BackendRouteConfigService
                 candidate.IsDefault,
                 publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
                 candidate.Slug,
-                candidate.RequiresAuthentication))
+                candidate.RequiresAuthentication,
+                ReadOpenPaths(candidate.ApplicationContractJson)))
             .ToList();
     }
+
+    private static IReadOnlyList<string> ReadOpenPaths(string contractJson)
+    {
+        try
+        {
+            return ApplicationContractSerialization.Deserialize(contractJson).OpenPaths
+                .Where(ApplicationContractValidator.IsValidOpenPath)
+                .Take(ApplicationContractValidator.MaxOpenPaths)
+                .ToList();
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or InvalidOperationException)
+        {
+            return [];
+        }
+    }
+
+    private static string BuildOpenPathRule(string openPath)
+        => openPath.EndsWith("/*", StringComparison.Ordinal)
+            ? $"PathPrefix(`{openPath[..^1]}`)"
+            : $"Path(`{openPath}`)";
 
     private async Task WriteRoutesAsync(List<RouteTarget> routes, CancellationToken cancellationToken)
     {
@@ -209,6 +233,13 @@ public class BackendRouteConfigService
                 route.AppId, publishedAppsConfig.PublicBaseUrlHost);
             AppendRuntimeRouter(builder, route, key, host,
                 PublishedAppHostNames.BuildPrivateTargetPath(route.AppId, route.DeploymentTargetId, true), 50, true);
+
+            // Paths the app declares open (webhooks, callbacks) skip sign-in; they sit above the private router.
+            for (var index = 0; index < route.OpenPaths.Count; index++)
+            {
+                AppendRuntimeRouter(builder, route, $"{key}-open{index}", host, string.Empty, 60, false,
+                    BuildOpenPathRule(route.OpenPaths[index]), $"{key}-rewrite");
+            }
         }
 
         foreach (var route in routes.Where(route => !route.IsDefault))
@@ -275,7 +306,9 @@ public class BackendRouteConfigService
         string host,
         string pathPrefix,
         int priority,
-        bool authenticated)
+        bool authenticated,
+        string? pathRule = null,
+        string? rewriteKey = null)
     {
         builder.AppendLine($"    {key}-runtime:");
         builder.AppendLine("      entryPoints:");
@@ -283,12 +316,13 @@ public class BackendRouteConfigService
         builder.AppendLine(string.IsNullOrWhiteSpace(publishedAppsConfig.CertificateResolver)
             ? "      tls: {}"
             : $"      tls: {{ certResolver: {System.Text.Json.JsonSerializer.Serialize(publishedAppsConfig.CertificateResolver)} }}");
-        builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`{pathPrefix}`)\"");
+        builder.AppendLine($"      rule: \"Host(`{host}`) && {pathRule ?? $"PathPrefix(`{pathPrefix}`)"}\"");
         builder.AppendLine($"      priority: {priority}");
         builder.AppendLine($"      service: \"{route.RuntimeServiceName}\"");
+        var rewrite = rewriteKey ?? $"{key}-rewrite";
         var middlewares = authenticated
-            ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{key}-rewrite\"]"
-            : $"[\"{key}-rewrite\"]";
+            ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{rewrite}\"]"
+            : $"[\"{rewrite}\"]";
         builder.AppendLine($"      middlewares: {middlewares}");
     }
 

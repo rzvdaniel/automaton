@@ -25,6 +25,12 @@ public sealed class ApplicationContract
     /// <summary>Platform capabilities the app requests for administrator approval.</summary>
     public List<string> Permissions { get; set; } = [];
 
+    /// <summary>
+    /// Paths of the app's private address that answer without Automaton sign-in, for webhooks and callbacks:
+    /// <c>/callback</c> (exactly that path) or <c>/hooks/*</c> (that folder and everything below it).
+    /// </summary>
+    public List<string> OpenPaths { get; set; } = [];
+
     /// <summary>Plain (non-secret) values an installer chooses, delivered as environment variables like secrets.</summary>
     public List<ApplicationSettingDeclaration> Settings { get; set; } = [];
 
@@ -306,6 +312,7 @@ public static class ApplicationContractValidator
         ValidateCompose(contract, errors);
         ValidateSecrets(contract.Secrets, errors);
         ValidatePermissions(contract.Permissions, errors);
+        ValidateOpenPaths(contract.OpenPaths, errors);
         ValidateSettings(contract.Settings, contract.Secrets, errors);
         ValidateSchedules(contract.Schedules, errors);
 
@@ -317,6 +324,28 @@ public static class ApplicationContractValidator
 
     /// <summary>Every app permission an app can request.</summary>
     public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read"];
+
+    public const int MaxOpenPaths = 20;
+
+    /// <summary>True for <c>/exact/path</c> or <c>/folder/*</c>, using only URL path characters.</summary>
+    public static bool IsValidOpenPath(string? path)
+    {
+        if (string.IsNullOrEmpty(path) || path.Length > 200 || path[0] != '/' || path.Contains("..", StringComparison.Ordinal)) return false;
+        var body = path.EndsWith("/*", StringComparison.Ordinal) ? path[..^1] : path;
+        return body.All(c => c is '/' or '-' or '_' or '.' or '~' or '%' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'));
+    }
+
+    private static void ValidateOpenPaths(List<string>? paths, ICollection<string> errors)
+    {
+        if (paths is null) return;
+        if (paths.Count > MaxOpenPaths) errors.Add($"openPaths can contain at most {MaxOpenPaths} paths");
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            if (!IsValidOpenPath(path)) errors.Add($"openPaths entry '{path}' must start with / and be a plain path, optionally ending in /*");
+            else if (!seen.Add(path)) errors.Add($"openPaths declares '{path}' more than once");
+        }
+    }
 
     private static void ValidatePermissions(List<string>? permissions, ICollection<string> errors)
     {

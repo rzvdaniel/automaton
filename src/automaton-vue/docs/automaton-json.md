@@ -65,6 +65,7 @@ layout, build system, or application architecture.
 | `application.health.path` | Optional HTTP readiness path. |
 | `application.health.startupTimeoutSeconds` | Maximum startup duration. |
 | `application.storage.dataDirectory` | Durable app data directory. |
+| `application.openPaths` | Optional paths of the private address that answer without Automaton sign-in, for webhooks and callbacks. See below. |
 
 The Runner supplies the effective port in `AUTOMATON_PORT` and the durable data
 path in `AUTOMATON_APP_DATA_DIR`. A configured health path is ready only after a
@@ -79,6 +80,16 @@ Keep managed paths inside the project workspace.
 Run `automaton validate`, then `automaton deploy`. Deployment is asynchronous.
 Wait for `Succeeded` before treating the app as deployed. Publishing is a
 separate action and requires explicit approval.
+
+## Open paths: webhooks and callbacks
+
+An app's private address (`app-<id>.apps.<domain>`) asks every visitor to sign in to Automaton. An outside service that calls the app (a payment webhook, an OAuth callback) cannot sign in, so declare the paths it calls:
+
+```json
+"application": { "openPaths": ["/hooks/*", "/oauth/callback"] }
+```
+
+`/oauth/callback` opens exactly that path; `/hooks/*` opens `/hooks/` and everything below it. Use only letters, digits and `/ - _ . ~ %`, at most 20 paths. Those paths answer anyone who knows the address, so the app must check the caller itself (a signature or secret). Everything else stays behind sign-in, and publishing the app still makes the whole public address open. The routes update with the next deployment.
 
 ## App secrets
 
