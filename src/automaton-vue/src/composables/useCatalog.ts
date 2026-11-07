@@ -51,14 +51,14 @@ export function toCatalogEntries(file: { repo?: string; apps?: CatalogFileEntry[
 
 export function useCatalog() {
   const apps = ref<CatalogEntry[]>([])
-  const loading = ref(false)
+  const loading = ref(true)
   const error = ref(false)
 
   async function load() {
     loading.value = true
     error.value = false
     try {
-      const response = await fetch(CATALOG_URL, { cache: 'no-cache' })
+      const response = await fetch(CATALOG_URL, { cache: 'no-cache', signal: AbortSignal.timeout(10000) })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       apps.value = toCatalogEntries(await response.json())
     } catch {

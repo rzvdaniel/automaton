@@ -53,16 +53,17 @@ useSiteTheme()
   <h3 class="subh">In the official catalog <code>rzvdaniel/automaton-apps</code></h3>
   <p class="soft" style="margin-bottom:18px">Install any of these from <b>Apps → Catalog</b> in your Studio. Studio shows the source, the exact commit and the permissions before anything is created.</p>
   <div v-if="categories.length > 1" class="filters" role="group" aria-label="Category">
-    <button v-for="cat in ['all', ...categories]" :key="cat" class="tab" type="button" :aria-pressed="cat === category" :aria-selected="cat === category" @click="category = cat">{{ cat === 'all' ? 'All' : cat }}</button>
+    <button v-for="cat in ['all', ...categories]" :key="cat" class="tab" type="button" :aria-pressed="cat === category" @click="category = cat">{{ cat === 'all' ? 'All' : cat }}</button>
   </div>
   <p v-if="loading" class="soft">Reading the catalog from GitHub…</p>
   <p v-else-if="error" class="soft">The catalog could not be read right now. <a :href="publicAppConfig.exampleAppsUrl" target="_blank" rel="noopener">See it on GitHub</a>.</p>
+  <p v-else-if="apps.length === 0" class="soft">The catalog is empty right now.</p>
   <ul v-else class="clist">
     <li v-for="app in visibleApps" :key="app.id" class="citem">
       <span class="kic tool" aria-hidden="true">{{ app.initials }}</span>
       <div><h3>{{ app.name }} <code>{{ app.folder }}</code></h3><p>{{ app.summary }}</p>
         <div class="chips"><span>{{ app.category }}</span><span v-if="app.minServerVersion">server {{ app.minServerVersion }}+</span><span v-for="p in app.permissions" :key="p">asks for {{ p }}</span></div></div>
-      <div class="acts"><a class="btn" :href="app.sourceUrl" target="_blank" rel="noopener">Source</a><RouterLink class="btn primary" to="/get-started">Install</RouterLink></div>
+      <div class="acts"><a class="btn" :href="app.sourceUrl" target="_blank" rel="noopener">Source</a><RouterLink class="btn primary" to="/get-started">How to install</RouterLink></div>
     </li>
   </ul>
   <p class="soft" style="margin-top:14px;font-size:14px">Read live from the repository's <code>catalog.json</code>. Install from <b>Apps → Catalog</b> in your own Studio.</p>
