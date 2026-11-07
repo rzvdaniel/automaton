@@ -15,8 +15,8 @@ async function open(app: OrganizationAppSummary) {
   openingId.value = app.id
   error.value = ''
   try {
-    await appsService.createRuntimeLaunch(app.id)
-    window.location.assign(appsService.getRestrictedRuntimeLaunchUrl(app.id))
+    const { runtimeUrl } = await appsService.createRuntimeLaunch(app.id)
+    window.location.assign(runtimeUrl)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : 'The app could not be opened.'
   } finally {

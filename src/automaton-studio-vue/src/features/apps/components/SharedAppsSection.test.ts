@@ -4,11 +4,10 @@ import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
 import SharedAppsSection from './SharedAppsSection.vue'
 
-const createRuntimeLaunch = vi.fn().mockResolvedValue({ runtimeToken: 't' })
+const createRuntimeLaunch = vi.fn().mockResolvedValue({ runtimeToken: '', runtimeUrl: 'https://app-a1.apps.example.test/' })
 vi.mock('../services/apps.service', () => ({
   appsService: {
     createRuntimeLaunch: (id: string) => createRuntimeLaunch(id),
-    getRestrictedRuntimeLaunchUrl: (id: string) => `/api/apps/${id}/launch-runtime`,
   },
 }))
 
@@ -34,7 +33,7 @@ describe('SharedAppsSection', () => {
     await wrapper.find('button').trigger('click')
     await flushPromises()
     expect(createRuntimeLaunch).toHaveBeenCalledWith('a1')
-    expect(assign).toHaveBeenCalledWith('/api/apps/a1/launch-runtime')
+    expect(assign).toHaveBeenCalledWith('https://app-a1.apps.example.test/')
     vi.unstubAllGlobals()
   })
 })

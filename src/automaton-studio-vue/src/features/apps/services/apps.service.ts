@@ -388,14 +388,9 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/versions/${encodeURIComponent(version)}`)
   }
 
-  async createRuntimeLaunch(id: string): Promise<{ runtimeToken: string }> {
-    const { data } = await apiClient.post<{ runtimeToken: string }>(`/api/apps/${id}/runtime-launch`, {})
+  async createRuntimeLaunch(id: string): Promise<{ runtimeToken: string; runtimeUrl: string }> {
+    const { data } = await apiClient.post<{ runtimeToken: string; runtimeUrl: string }>(`/api/apps/${id}/runtime-launch`, {})
     return data
-  }
-
-  getRestrictedRuntimeLaunchUrl(id: string): string {
-    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
-    return `${apiBaseUrl}/api/apps/${encodeURIComponent(id)}/launch-runtime`
   }
 
   /**

@@ -302,7 +302,7 @@ internal static class AssignedRuntimeScenario
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    private static async Task<AssignedRuntimeFixture> SeedAssignedAppAsync(ApplicationDbContext dbContext)
+    internal static async Task<AssignedRuntimeFixture> SeedAssignedAppAsync(ApplicationDbContext dbContext)
     {
         var organizationId = Guid.NewGuid();
         var projectId = Guid.NewGuid();
@@ -355,5 +355,5 @@ internal static class AssignedRuntimeScenario
             request.HttpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
             CancellationToken.None);
 
-    private sealed record AssignedRuntimeFixture(Guid AppId, Guid UserId, OrganizationAppAssignment Assignment);
+    internal sealed record AssignedRuntimeFixture(Guid AppId, Guid UserId, OrganizationAppAssignment Assignment);
 }

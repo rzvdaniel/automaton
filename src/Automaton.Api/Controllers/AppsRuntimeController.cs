@@ -25,7 +25,8 @@ public sealed class AppsRuntimeController(
         if (await DenyAsync(id, cancellationToken) is { } denied) return denied;
 
         AppendRuntimeCookie(id);
-        return Ok(new { runtimeToken = string.Empty });
+        // runtimeUrl lets Studio navigate to the app directly: a plain page navigation to launch-runtime carries no bearer token.
+        return Ok(new { runtimeToken = string.Empty, runtimeUrl = BuildRestrictedRuntimeUrl(id) });
     }
 
     [HttpGet("{id}/launch-runtime")]
