@@ -65,7 +65,7 @@ async function copy(command: string) {
         The last successful backup is older than {{ staleHours }} hours. Check the server's automaton-backup timer.
       </Message>
       <template v-if="status.available">
-        <DataTable :value="status.backups" size="small" data-key="name">
+        <DataTable :value="status.backups" size="small" data-key="name" scrollable>
           <template #empty>No backups yet.</template>
           <Column header="Backup">
             <template #body="{ data }">{{ new Date(data.createdAt).toLocaleString() }}</template>

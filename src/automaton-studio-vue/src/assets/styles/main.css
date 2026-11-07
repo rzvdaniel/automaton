@@ -48,6 +48,11 @@ pre {
   font-family: var(--mono);
 }
 
+/* Long paths and commands wrap instead of widening the page on phones */
+code {
+  overflow-wrap: anywhere;
+}
+
 /* Cards are white (panel in dark mode) with a 1px line instead of a shadow */
 .p-card {
   border: 1px solid var(--line);

@@ -28,7 +28,7 @@ const MAIN: RailItem[] = [
 // Pages not yet moved into the six places stay reachable from here.
 const MORE: RailItem[] = [
   { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', match: startsWith('/apikeys'), hideForAppUser: true },
-  { label: 'CLI', icon: 'pi pi-terminal', to: '/downloads', match: startsWith('/downloads'), hideForAppUser: true },
+  { label: 'CLI', icon: 'pi pi-code', to: '/downloads', match: startsWith('/downloads'), hideForAppUser: true },
   { label: 'Admin', icon: 'pi pi-shield', to: '/admin', match: (p) => startsWith('/admin')(p) && !startsWith('/admin/installation')(p), adminOnly: true },
   { label: 'Documentation', icon: 'pi pi-book', to: 'https://automaton.monster/docs', external: true, match: () => false },
 ]

@@ -224,12 +224,12 @@ const handleRetry = async () => {
     <template v-if="activeTabIndex === 0">
 
     <!-- Apps List Header -->
-    <div class="apps-list-header flex align-items-center justify-content-between mb-4">
+    <div class="apps-list-header flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
       <div class="apps-list-title flex align-items-center gap-3">
         <span class="font-semibold">Your Apps</span>
         <Tag :value="`${visibleApps.length} apps`" severity="secondary" />
       </div>
-      <div class="apps-list-filters flex align-items-center gap-3">
+      <div class="apps-list-filters flex flex-wrap align-items-center gap-3">
         <IconField>
           <InputIcon class="pi pi-search" />
           <InputText v-model="searchQuery" placeholder="Search apps..." />
@@ -633,7 +633,7 @@ const handleRetry = async () => {
   .apps-list-filters :deep(.p-inputtext),
   .apps-list-filters :deep(.p-select),
   .apps-list-filters :deep(.p-multiselect) {
-    width: 100%;
+    width: 100% !important; /* beats the fixed w-10rem / w-12rem widths */
   }
 
   .apps-list-filters :deep(.p-iconfield) {

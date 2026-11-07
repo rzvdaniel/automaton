@@ -60,6 +60,16 @@ test.describe('as the system administrator', () => {
     await shot(page, 'admin-installation')
   })
 
+  test('phone width has no horizontal scroll on Apps and Installation', async () => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    for (const path of ['/apps', '/admin/installation']) {
+      await goTo(page, path)
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+      expect(overflow, path).toBeLessThanOrEqual(1)
+    }
+    await page.setViewportSize({ width: 1280, height: 800 })
+  })
+
   test('dark theme renders', async () => {
     // Sets the theme class directly: the toolbar switch also saves the choice to the user's settings on the server.
     await goTo(page, '/admin/users')
