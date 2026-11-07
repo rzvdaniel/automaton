@@ -13,14 +13,28 @@ const route = useRoute()
 const authStore = useAuthStore()
 const { isAppUserOnly, loadOrganizations, loading } = useOrganizationRole()
 
-// Reload on navigation so creating or joining an organization shows the right items at once.
-onMounted(loadOrganizations)
-watch(() => route.fullPath, loadOrganizations)
+// Reload on navigation so creating or joining an organization shows the right items at once. The rail keeps the
+// last known roles while a reload runs, so items do not flicker on every page change.
+const ready = ref(false)
+const appUserOnly = ref(false)
+watch(loading, (isLoading) => {
+  if (!isLoading) appUserOnly.value = isAppUserOnly.value
+})
+onMounted(async () => {
+  await loadOrganizations()
+  ready.value = true
+})
+watch(
+  () => route.path,
+  () => {
+    if (!loading.value) void loadOrganizations()
+  },
+)
 
 const roles = computed(() => authStore.user?.roles ?? [])
-const visible = computed(() => railItems({ roles: roles.value, appUserOnly: isAppUserOnly.value }))
+const visible = computed(() => railItems({ roles: roles.value, appUserOnly: appUserOnly.value }))
 const userName = computed(() => authStore.userName || authStore.userEmail || 'User')
-const userRole = computed(() => roleLabel(roles.value, isAppUserOnly.value))
+const userRole = computed(() => roleLabel(roles.value, appUserOnly.value))
 
 const isActive = (item: RailItem) => !item.external && item.match(route.path)
 
@@ -61,7 +75,7 @@ const userMenuItems = computed<MenuItem[]>(() => [
       </div>
 
       <nav class="rail-nav" aria-label="Main">
-        <template v-if="!loading">
+        <template v-if="ready">
           <a
             v-for="item in visible.main"
             :key="item.to"
