@@ -1,6 +1,10 @@
 # Automaton
 
-Automaton is a self-hosted platform where you or your AI agent build, deploy and share small web apps and automations on servers you control.
+**The home for every app your AI builds, on servers you own.** Automaton is an open-source platform for building, running and sharing web apps and automations. Your AI agent can set it up and deploy apps; you choose where they and their data live. [See the product](https://automaton.monster/product) and [what people build with it](https://automaton.monster/use-cases).
+
+An AI can put one app on a bare server. Automaton handles the work around many apps: an HTTPS address and access settings for each one, your own app store, secrets, health-checked deployments, nightly backups and server updates. [See how setup works](https://automaton.monster/how-setup-works).
+
+The [catalog](https://automaton.monster/catalog) lets you install apps from GitHub repositories, including a catalog your team maintains. An app declares how to build and run in `automaton.json`; your agent can follow the generated app guide to validate and deploy it. [Ask your AI to get started](https://automaton.monster/get-started), or follow the commands below.
 
 ## Who it is for
 
