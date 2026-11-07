@@ -11,6 +11,18 @@ public sealed class MachineStaticNginxConfigurationTests
     private static readonly Dictionary<Guid, Guid> Sites = new() { [SpaApp] = Guid.NewGuid(), [PlainApp] = Guid.NewGuid() };
 
     [Test]
+    public void StaticAssetsAreCompressedForTheRuntimeTunnel()
+    {
+        var config = MachineStaticSitePublisher.BuildNginxConfiguration(Sites, 8080);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(config, Does.Contain("gzip on;"));
+            Assert.That(config, Does.Contain("gzip_types application/javascript text/css;"));
+        });
+    }
+
+    [Test]
     public void StaticSiteAnswers404ForMissingFilesUnlessItIsASinglePageApp()
     {
         var config = MachineStaticSitePublisher.BuildNginxConfiguration(Sites, 8080, new HashSet<Guid> { SpaApp });
