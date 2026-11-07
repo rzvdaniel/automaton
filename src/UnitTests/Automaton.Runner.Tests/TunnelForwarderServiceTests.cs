@@ -63,6 +63,7 @@ public class TunnelForwarderServiceTests
     public void CreateRuntimeGatewayHandler_ReturnsRedirectsToTheVisitor()
     {
         var handler = (HttpClientHandler)TunnelForwarderService.CreateRuntimeGatewayHandler();
+        Assert.That(handler.UseCookies, Is.False);
 
         Assert.That(handler.AllowAutoRedirect, Is.False);
     }

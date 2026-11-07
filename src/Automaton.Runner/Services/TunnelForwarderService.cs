@@ -50,7 +50,7 @@ public class TunnelForwarderService
 
     // Redirects belong to the browser: following them here would request the app's redirect target on the Runner's
     // loopback gateway (404) instead of returning the 301/302 and its Location to the visitor.
-    internal static HttpMessageHandler CreateRuntimeGatewayHandler() => new HttpClientHandler { AllowAutoRedirect = false };
+    internal static HttpMessageHandler CreateRuntimeGatewayHandler() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
 
     public async Task<TunnelResponse> ForwardAsync(TunnelRequest request)
     {
