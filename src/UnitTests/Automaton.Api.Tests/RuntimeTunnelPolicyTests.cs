@@ -61,6 +61,27 @@ public class RuntimeTunnelPolicyTests
     }
 
     [Test]
+    public void CreateForwardedHeaders_GivesTheAppThePublicHostAndSchemeAndIgnoresClientValues()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString("app-1.apps.example.test");
+        context.Request.Headers["X-Forwarded-Host"] = "evil.example";
+        context.Request.Headers["X-Forwarded-Proto"] = "http";
+        context.Request.Headers["Origin"] = "https://app-1.apps.example.test";
+
+        var headers = RuntimeTunnelRequestSender.CreateForwardedHeaders(context.Request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(headers["X-Forwarded-Host"], Is.EqualTo(new[] { "app-1.apps.example.test" }));
+            Assert.That(headers["X-Forwarded-Proto"], Is.EqualTo(new[] { "https" }));
+            Assert.That(headers["Origin"], Is.EqualTo(new[] { "https://app-1.apps.example.test" }));
+            Assert.That(headers.ContainsKey("Host"), Is.False);
+        });
+    }
+
+    [Test]
     public async Task ReadBodyAsync_ReadsUnknownLengthBodyWithinLimit()
     {
         var context = new DefaultHttpContext();

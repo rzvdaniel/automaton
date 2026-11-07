@@ -118,17 +118,27 @@ public sealed class RuntimeTunnelRequestSender(
             RequestId = requestId,
             Method = request.Method,
             BodyBytes = body,
-            HeaderValues = request.Headers
-                .Where(header => !HopByHopHeaders.Contains(header.Key))
-                .ToDictionary(
-                    header => header.Key,
-                    header => header.Value.OfType<string>().ToArray(),
-                    StringComparer.OrdinalIgnoreCase),
+            HeaderValues = CreateForwardedHeaders(request),
             Destination = staticSite ? TunnelDestinations.StaticSite : TunnelDestinations.RuntimeGateway,
             RuntimeAppId = appId,
             RuntimeDeploymentTargetId = deploymentTargetId,
             RuntimePath = path.TrimStart('/') + request.QueryString
         };
+
+    // The Runner drops Host, so the app must learn the public host and scheme from X-Forwarded-*. Forwarded headers sent
+    // by the client are replaced: the API already resolved the address the request was really reached at.
+    internal static Dictionary<string, string[]> CreateForwardedHeaders(HttpRequest request)
+    {
+        var headers = request.Headers
+            .Where(header => !HopByHopHeaders.Contains(header.Key))
+            .ToDictionary(
+                header => header.Key,
+                header => header.Value.OfType<string>().ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        headers["X-Forwarded-Host"] = [request.Host.ToString()];
+        headers["X-Forwarded-Proto"] = [request.Scheme];
+        return headers;
+    }
 
     internal static async Task<(byte[]? Body, bool TooLarge)> ReadBodyAsync(
         HttpRequest request,
