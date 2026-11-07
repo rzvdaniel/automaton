@@ -43,6 +43,29 @@ public sealed class MachineStaticTunnelTests
         });
     }
 
+    [Test]
+    public async Task ForwardAsync_UsesStaticSiteDestinationOnUnpublishedPrivateHost()
+    {
+        await using var fixture = await StaticSiteFixture.CreateAsync();
+        await fixture.UnpublishAsync();
+
+        var response = await fixture.ForwardPrivateAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
+            Assert.That(fixture.LastRequest?.Destination, Is.EqualTo(TunnelDestinations.StaticSite));
+        });
+
+        var dispatchedRequest = fixture.LastRequest;
+        response = await fixture.ForwardAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
+            Assert.That(fixture.LastRequest, Is.SameAs(dispatchedRequest));
+        });
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task ForwardAsync_PreservesRuntimeGatewayForDynamicAndComposeApps(bool compose)
@@ -138,6 +161,21 @@ public sealed class MachineStaticTunnelTests
             var request = new DefaultHttpContext().Request;
             request.Host = new HostString(PublicHost);
             return service.ForwardAsync(appId, targetId, request, "assets/site.css", CancellationToken.None);
+        }
+
+        public Task<TunnelResponse> ForwardPrivateAsync()
+        {
+            var request = new DefaultHttpContext().Request;
+            request.Host = new HostString(PublishedAppHostNames.BuildPrivateAppHost(appId, "apps.automaton.monster"));
+            return service.ForwardAsync(appId, targetId, request, "assets/site.css", CancellationToken.None);
+        }
+
+        public async Task UnpublishAsync()
+        {
+            var app = db.WebApps.Local.Single(item => item.Id == appId);
+            app.IsPublished = false;
+            app.RuntimeVisibility = AppRuntimeVisibilities.Private;
+            await db.SaveChangesAsync();
         }
 
         public async Task RevokeAccessAsync()

@@ -25,7 +25,6 @@ public sealed class MachineStaticAppPublicationService(
         Guid ownerId,
         CancellationToken cancellationToken)
     {
-        if (runtimeVisibility != AppRuntimeVisibilities.Public) return false;
         var contract = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
         if (!contract.IsStaticSite) return false;
         var target = await FindMachineTargetAsync(app.Id, cancellationToken);

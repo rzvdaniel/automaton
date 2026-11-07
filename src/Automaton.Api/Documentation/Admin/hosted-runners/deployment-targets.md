@@ -120,7 +120,7 @@ Each Machine Management Runner can host several app deployment targets; each tar
 
 Static sites declare a build command and output directory with no runtime command;
 a Machine Management Runner publishes their output through one shared static
-serving container per machine. Successful static and supported Compose deployments
+serving container per machine. A deployed static site's private address works before publication for people allowed to open the app; publishing enables its public address. Unpublishing removes public access while keeping the private address available. Successful static and supported Compose deployments
 retain HTTP routing state even though they do not declare a runtime command.
 An app with only Actions shows in Studio as **Actions only, no web app** (healthy, with its last Action run) instead of Degraded or not deployed.
 

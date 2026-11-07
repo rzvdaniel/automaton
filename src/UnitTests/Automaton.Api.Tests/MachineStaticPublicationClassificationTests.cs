@@ -38,8 +38,9 @@ public sealed class MachineStaticPublicationClassificationTests
         });
     }
 
-    [Test]
-    public async Task PublishIfAssignedAsync_QueuesOnlyDeclaredStaticOutput()
+    [TestCase(AppRuntimeVisibilities.Public)]
+    [TestCase(AppRuntimeVisibilities.Private)]
+    public async Task PublishIfAssignedAsync_QueuesOnlyDeclaredStaticOutput(string visibility)
     {
         var contract = new ApplicationContract
         {
@@ -52,7 +53,7 @@ public sealed class MachineStaticPublicationClassificationTests
         await using var fixture = await PublicationFixture.CreateAsync(contract);
 
         var published = await fixture.Service.PublishIfAssignedAsync(
-            fixture.App, AppRuntimeVisibilities.Public, Guid.NewGuid(), CancellationToken.None);
+            fixture.App, visibility, Guid.NewGuid(), CancellationToken.None);
 
         Assert.Multiple(() =>
         {

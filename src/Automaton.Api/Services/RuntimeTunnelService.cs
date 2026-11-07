@@ -141,12 +141,15 @@ public sealed class RuntimeTunnelService(
 
     private bool UsesMachineStaticSite(AppDeploymentTarget target, Runner runner, string host)
         => target.IsDefault
-            && target.WebApp.IsPublished
-            && target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public
             && ApplicationContractSerialization.Deserialize(target.WebApp.ApplicationContractJson).IsStaticSite
-            && !string.IsNullOrWhiteSpace(target.WebApp.PublicUrl)
             && RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement
-            && string.Equals(host,
-                PublishedAppHostNames.BuildPublishedAppHost(target.WebApp.PublicUrl, publishedAppsConfig.PublicBaseUrlHost),
-                StringComparison.OrdinalIgnoreCase);
+            && (string.Equals(host,
+                    PublishedAppHostNames.BuildPrivateAppHost(target.WebAppId, publishedAppsConfig.PublicBaseUrlHost),
+                    StringComparison.OrdinalIgnoreCase)
+                || (target.WebApp.IsPublished
+                    && target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public
+                    && !string.IsNullOrWhiteSpace(target.WebApp.PublicUrl)
+                    && string.Equals(host,
+                        PublishedAppHostNames.BuildPublishedAppHost(target.WebApp.PublicUrl, publishedAppsConfig.PublicBaseUrlHost),
+                        StringComparison.OrdinalIgnoreCase)));
 }

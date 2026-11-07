@@ -101,8 +101,8 @@ public sealed class AppPublicationService(
         // Keep PublicUrl for re-publishing with the same slug.
         await dataContext.SaveChangesAsync(cancellationToken);
         await RecordUnpublishedAppAsync(entity, id, cancellationToken);
-        if (machineStaticPublication is not null)
-            await machineStaticPublication.QueueRemovalIfAssignedAsync(id, UserId, cancellationToken);
+        // The private address continues to serve the deployed static output after unpublishing.
+        // The public host is revoked by the publication state above.
     }
 
     private async Task EnsureAuthenticatedPublicationSupportedAsync(

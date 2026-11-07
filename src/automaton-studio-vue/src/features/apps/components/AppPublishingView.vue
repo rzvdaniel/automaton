@@ -119,7 +119,7 @@ async function copyPublishedUrl() {
             Publishing controls public access and discovery. It does not deploy or update the Live runtime.
           </p>
           <p v-else class="state-copy">
-            This app is unpublished. You can deploy and operate it in Studio without making it public.
+            This app is unpublished. Its private address is available to people allowed to open the app. Publish to give it a public address; you can require sign-in in the publishing settings.
           </p>
 
           <div v-if="publishedUrl" class="published-url">
