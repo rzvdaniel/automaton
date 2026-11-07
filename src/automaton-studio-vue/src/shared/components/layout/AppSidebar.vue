@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
@@ -8,14 +8,14 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { railItems, roleLabel, type RailItem } from './rail-items'
 
-const publicDocsUrl = 'https://automaton.monster/docs'
-
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const { isAppUserOnly, loadOrganizations, loading } = useOrganizationRole()
 
+// Reload on navigation so creating or joining an organization shows the right items at once.
 onMounted(loadOrganizations)
+watch(() => route.fullPath, loadOrganizations)
 
 const roles = computed(() => authStore.user?.roles ?? [])
 const visible = computed(() => railItems({ roles: roles.value, appUserOnly: isAppUserOnly.value }))
@@ -25,11 +25,12 @@ const userRole = computed(() => roleLabel(roles.value, isAppUserOnly.value))
 const isActive = (item: RailItem) => !item.external && item.match(route.path)
 
 function go(item: RailItem) {
-  if (item.external) window.open(publicDocsUrl, '_blank', 'noopener')
+  if (item.external) window.open(item.to, '_blank', 'noopener')
   else void router.push(item.to)
 }
 
 const userMenu = ref<InstanceType<typeof Menu> | null>(null)
+const userMenuOpen = ref(false)
 const userMenuItems = computed<MenuItem[]>(() => [
   {
     label: 'Public profile',
@@ -89,14 +90,20 @@ const userMenuItems = computed<MenuItem[]>(() => [
         </template>
       </nav>
 
-      <button type="button" class="rail-user" aria-haspopup="menu" @click="(event) => userMenu?.toggle(event)">
+      <button
+        type="button"
+        class="rail-user"
+        aria-haspopup="menu"
+        :aria-expanded="userMenuOpen"
+        @click="(event) => userMenu?.toggle(event)"
+      >
         <span class="rail-user-text">
           <span class="rail-user-name">{{ userName }}</span>
           <span class="rail-user-role">{{ userRole }}</span>
         </span>
         <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
       </button>
-      <Menu ref="userMenu" :model="userMenuItems" popup />
+      <Menu ref="userMenu" :model="userMenuItems" popup @show="userMenuOpen = true" @hide="userMenuOpen = false" />
     </div>
   </aside>
 </template>
