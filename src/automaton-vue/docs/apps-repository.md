@@ -80,6 +80,23 @@ The Catalog tab shows apps as cards, 24 to a page. Once the catalogs together li
 
 Each folder has an `automaton.json` ([reference](./automaton-json)). The catalog takes the app's `name`, its `summary` (one line) and `application.permissions` (what the app asks for) from it, so keep them accurate. Run `automaton validate` inside the app folder: the `applicationContract` check must pass (the link checks apply only once you deploy the app from that folder). Installing an app creates the installer's own copy; permissions are never granted by the catalog and need a system administrator's approval.
 
+## Package an open-source project
+
+An app folder can package a well-known open-source project without changing its source. Keep three things in the folder: `automaton.json`, a `README.md` that names the upstream project and link, its license, the packaged version and the configuration, and the upstream license file. Pin one upstream version in either of two ways. The [official catalog](https://github.com/rzvdaniel/automaton-apps) has examples of both.
+
+**B, from source or a release (the default).** `application.build.command` runs a script of the folder (for example `sh build.sh`) on the Runner. The script downloads one pinned release (a tag, never a branch), checks its SHA-256 against a value written in the script, and builds it, or unpacks the project's own ready-built release archive when compiling needs more memory than a 4 GB Runner has. Set `build.image` to an image with the build tools (pin its version), `build.outputDirectory` to the folder the script fills, and give the runtime the output folder as `workingDirectory`. Examples: `analytics/goatcounter` in the official catalog compiles its Go release in about 90 seconds; [`utilities/it-tools`](https://github.com/rzvdaniel/automaton-apps/tree/main/utilities/it-tools) is a static site that unpacks its release archive.
+
+**A, the project's own image.** `application.runtime.image` points at the image the project publishes, pinned to a version (never `latest`), and the app has no real build. Use it when a build is too heavy for a small Runner, and say so in the app's README. Example: `bookmarks/linkding` in the official catalog.
+
+What to know about the container, for both approaches:
+
+- Build and runtime containers run without Linux capabilities. An image that starts as root and then switches user or changes file owners (`uid =` in uWSGI, `chown` in an entrypoint) must be started with its own command instead of the image's entrypoint.
+- The runtime container's root filesystem is read-only. Only `AUTOMATON_APP_DATA_DIR` (and a small `/tmp`) is writable, so copy what must change there at start. The build container's `/tmp` is only 32 MB: build inside the app folder.
+- Set `application.runtime.user` to `1000:1000` when the app writes files into its data directory, so the Runner (also uid 1000) can delete them when the app is deleted.
+- Studio's install from a catalog or Git address does not accept an app that has a runtime command but no build command yet, so an image-only package carries a no-op build command (`sh -c true`) for now.
+- Requests reach the app with the Runner's address as `Host`, and a form post (`application/x-www-form-urlencoded`) loses its body. Apps that need the public host name, or HTML forms, do not work until the platform passes them; say so in the README.
+- Environment variables that start with `AUTOMATON_` are reserved. Names a project reserves for itself (GoatCounter's `GOATCOUNTER_`) need other names for your settings.
+
 ## catalog.json
 
 Generated, never edited by hand. Servers read `catalog.json` from the root of the repository's `main` branch (a source can name another branch).
