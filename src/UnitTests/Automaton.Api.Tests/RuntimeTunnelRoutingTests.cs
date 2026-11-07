@@ -24,6 +24,53 @@ public sealed class RuntimeTunnelRoutingTests
     }
 
     [Test]
+    public void RuntimeTunnelAction_HasNoParameters_SoMvcNeverReadsAFormBody()
+        => Assert.That(typeof(RuntimeTunnelController).GetMethod(nameof(RuntimeTunnelController.ProxyAsync))!.GetParameters(),
+            Is.Empty);
+
+    [TestCase("application/x-www-form-urlencoded", "a=1&b=two")]
+    [TestCase("application/json", "{\"a\":1}")]
+    [TestCase(null, "raw bytes")]
+    public async Task ParameterlessAction_LeavesTheRequestBodyUnread(string? contentType, string payload)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddControllers().AddApplicationPart(typeof(BodyProbeController).Assembly);
+        var app = builder.Build();
+        app.MapControllers();
+        await app.StartAsync();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/probe/x/deep/path")
+        {
+            Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(payload))
+        };
+        request.Content.Headers.Remove("Content-Type");
+        if (contentType is not null) request.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
+        var response = await app.GetTestClient().SendAsync(request);
+
+        Assert.That(await response.Content.ReadAsStringAsync(), Is.EqualTo(payload));
+        await app.DisposeAsync();
+    }
+
+    [Test]
+    public async Task ActionWithParameters_ConsumesAFormBody()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddControllers().AddApplicationPart(typeof(BodyProbeController).Assembly);
+        var app = builder.Build();
+        app.MapControllers();
+        await app.StartAsync();
+
+        var response = await app.GetTestClient().PostAsync("/probe-with-parameters/x",
+            new FormUrlEncodedContent([new KeyValuePair<string, string>("a", "1")]));
+
+        Assert.That(await response.Content.ReadAsStringAsync(), Is.Empty,
+            "documents why the tunnel action takes no parameters");
+        await app.DisposeAsync();
+    }
+
+    [Test]
     public async Task CorsMiddleware_ForwardsAppPreflight()
     {
         await using var app = await CreateHostAsync();
@@ -77,4 +124,18 @@ public sealed class RuntimeTunnelRoutingTests
         await app.StartAsync();
         return app;
     }
+}
+
+[Route("probe/{id}/{**path}")]
+public sealed class BodyProbeController : ControllerBase
+{
+    [HttpPost]
+    public async Task Echo() => await Request.Body.CopyToAsync(Response.Body);
+}
+
+[Route("probe-with-parameters/{id}")]
+public sealed class BodyProbeWithParametersController : ControllerBase
+{
+    [HttpPost]
+    public async Task Echo(string id) => await Request.Body.CopyToAsync(Response.Body);
 }

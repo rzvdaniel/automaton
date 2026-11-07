@@ -10,8 +10,14 @@ namespace Automaton.Api.Controllers;
 public sealed class RuntimeTunnelController(RuntimeTunnelService runtimeTunnelService) : ControllerBase
 {
     [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")]
-    public async Task ProxyAsync(Guid appId, Guid deploymentTargetId, string? path, CancellationToken cancellationToken)
+    // No action parameters on purpose: with any parameter MVC runs its value providers first, and the form provider
+    // reads and consumes an application/x-www-form-urlencoded body before it can be forwarded to the app.
+    public async Task ProxyAsync()
     {
+        var cancellationToken = HttpContext.RequestAborted;
+        var appId = Guid.Parse((string)RouteData.Values["appId"]!);
+        var deploymentTargetId = Guid.Parse((string)RouteData.Values["deploymentTargetId"]!);
+        var path = RouteData.Values["path"] as string;
         var tunnelResponse = await runtimeTunnelService.ForwardAsync(
             appId,
             deploymentTargetId,
