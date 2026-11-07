@@ -597,8 +597,3 @@ export interface AdminAppModerationRequest {
   marketplaceModerationReason?: string
 }
 
-export type StoreMode = 'public' | 'disabled'
-
-export interface StoreSettings {
-  mode: StoreMode
-}

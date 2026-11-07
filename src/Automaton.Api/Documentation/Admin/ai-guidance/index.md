@@ -5,4 +5,4 @@ order: 10
 
 # AI Guidance
 
-Administrative handbook for Automaton AI guidance, prompt composition, and exported AI project documents.
+Administrative handbook for Automaton AI guidance, prompt composition, and exported AI project documents. Studio no longer has an AI Guidance page; the guidance API is unchanged.
