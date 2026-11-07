@@ -89,7 +89,10 @@ function formatDate(value?: string) {
     <template v-if="!approved">
       <div class="cli-code" aria-label="Authorization code">
         <span v-if="!userCode" class="auth-note">Unavailable</span>
-        <span v-for="(char, index) in userCode.split('')" :key="index" class="cli-code-char">{{ char }}</span>
+        <template v-for="(char, index) in userCode.split('')" :key="index">
+          <span v-if="char === '-'" class="cli-code-sep">-</span>
+          <span v-else class="cli-code-char">{{ char }}</span>
+        </template>
       </div>
       <p class="auth-note" style="margin-bottom: 8px">Approving lets the agent, through the Automaton CLI:</p>
       <ul class="cli-list">

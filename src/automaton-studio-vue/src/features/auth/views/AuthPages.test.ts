@@ -71,7 +71,8 @@ describe('agent approval page', () => {
     mocks.cancel.mockResolvedValue(undefined)
     const { wrapper } = await mountAt(CliAuthorizeView, '/cli/authorize?requestId=r1&code=ABCD-1234')
     expect(wrapper.text()).toContain('Let your AI agent in?')
-    expect(wrapper.findAll('.cli-code-char').map((c) => c.text()).join('')).toBe('ABCD-1234')
+    expect(wrapper.findAll('.cli-code-char').map((c) => c.text()).join('')).toBe('ABCD1234')
+    expect(wrapper.find('.cli-code-sep').exists()).toBe(true)
     expect(wrapper.text()).toContain('API Keys')
 
     const buttons = wrapper.findAll('button')
