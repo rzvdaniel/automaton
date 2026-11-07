@@ -42,12 +42,6 @@ const navItems: AdminNavItem[] = [
     to: '/admin/installation',
     routePrefix: '/admin/installation',
   },
-  {  
-    label: 'Dashboard',
-    icon: 'pi pi-chart-bar',
-    to: '/admin/dashboard',
-    routePrefix: '/admin/dashboard',
-  },
   {
     label: 'Users',
     icon: 'pi pi-users',
@@ -60,30 +54,6 @@ const navItems: AdminNavItem[] = [
     to: '/admin/apps',
     badge: () => waitingForApproval.value,
     routePrefix: '/admin/apps',
-  },
-  {
-    label: 'AI Providers',
-    icon: 'pi pi-sparkles',
-    to: '/admin/ai-providers',
-    routePrefix: '/admin/ai-providers',
-  },
-  {
-    label: 'AI Guidance',
-    icon: 'pi pi-file-edit',
-    to: '/admin/ai-guidance',
-    routePrefix: '/admin/ai-guidance',
-  },
-  {
-    label: 'AI Settings',
-    icon: 'pi pi-sliders-h',
-    to: '/admin/ai-settings',
-    routePrefix: '/admin/ai-settings',
-  },
-  {
-    label: 'Marketplace Apps',
-    icon: 'pi pi-shop',
-    to: '/admin/marketplace-apps',
-    routePrefix: '/admin/marketplace-apps',
   },
   {
     label: 'App Activity',
@@ -102,12 +72,6 @@ const navItems: AdminNavItem[] = [
     icon: 'pi pi-list',
     to: '/admin/logs',
     routePrefix: '/admin/logs',
-  },
-  {
-    label: 'Subscription Plans',
-    icon: 'pi pi-credit-card',
-    to: '/admin/subscription-plans',
-    routePrefix: '/admin/subscription-plans',
   },
 ]
 

@@ -3,12 +3,8 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 // Import feature routes
 import { authRoutes } from '@/features/auth/routes'
-import { dashboardRoutes } from '@/features/dashboard/routes'
-import { flowsRoutes } from '@/features/flows/routes'
 import { appsRoutes } from '@/features/apps/routes'
-import { stepsRoutes } from '@/features/steps/routes'
 import { runnersRoutes } from '@/features/runners/routes'
-import { projectsRoutes } from '@/features/projects/routes'
 import { organizationsRoutes } from '@/features/organizations/routes'
 import { settingsRoutes } from '@/features/settings/routes'
 import { downloadsRoutes } from '@/features/downloads/routes'
@@ -31,8 +27,8 @@ const router = createRouter({
       meta: { requiresAuth: false, layout: 'none' },
     },
 
-    // Dashboard (home)
-    ...dashboardRoutes,
+    // Apps is the start page
+    { path: '/', redirect: { name: 'apps' } },
 
     // Auth
     ...authRoutes,
@@ -41,20 +37,18 @@ const router = createRouter({
     ...installRoutes,
 
     // Features
-    ...flowsRoutes,
     ...appsRoutes,
-    ...stepsRoutes,
     ...runnersRoutes,
-    ...projectsRoutes,
     ...organizationsRoutes,
     ...settingsRoutes,
     ...downloadsRoutes,
     ...adminRoutes,
 
-    // Catch-all redirect to dashboard
+    // Unknown paths, including removed pages, show the not-found page
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/',
+      name: 'not-found',
+      component: () => import('@/shared/views/NotFoundView.vue'),
     },
   ],
 })
@@ -100,7 +94,7 @@ router.beforeEach(async (to, _from, next) => {
 
   // If user is authenticated and tries to access auth pages (login/register)
   if (authStore.isAuthenticated && to.meta.layout === 'auth' && to.name !== 'change-password') {
-    // Redirect to dashboard
+    // Redirect to the start page
     next({ path: '/' })
     return
   }

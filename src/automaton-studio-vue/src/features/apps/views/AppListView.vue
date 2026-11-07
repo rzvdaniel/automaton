@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
@@ -18,7 +18,6 @@ import CopyCommand from '../components/CopyCommand.vue'
 import CatalogPanel from '../components/CatalogPanel.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
-import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import type { AppListItem } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
@@ -30,7 +29,6 @@ const route = useRoute()
 const toast = useToast()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
-const projectsStore = useProjectsStore()
 
 const getDeploymentSummary = (app: AppListItem) => {
   return app.runtime.genericRuntimeDeployed ? 'Generic runtime deployed' : 'Not deployed yet'
@@ -145,25 +143,17 @@ const showEmptySearch = computed(() => {
   return visibleApps.value.length === 0 && appsStore.hasApps && hasActiveFilter
 })
 
-// React to active project changes (including initial load)
-watch(
-  () => projectsStore.activeProjectId,
-  async (projectId) => {
-    selectedRunner.value = null
-    selectedTags.value = []
-    selectedTagGroup.value = null
-    try {
-      const [, suggestions] = await Promise.all([
-        appsStore.fetchApps(projectId ?? undefined),
-        appsService.getTagSuggestions(projectId ?? undefined),
-      ])
-      tagSuggestions.value = suggestions
-    } catch {
-      tagSuggestions.value = []
-    }
-  },
-  { immediate: true },
-)
+onMounted(async () => {
+  try {
+    const [, suggestions] = await Promise.all([
+      appsStore.fetchApps(),
+      appsService.getTagSuggestions(),
+    ])
+    tagSuggestions.value = suggestions
+  } catch {
+    tagSuggestions.value = []
+  }
+})
 
 onUnmounted(() => {
   appsStore.clearFilters()

@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
-import ProjectSwitcher from '@/features/projects/components/ProjectSwitcher.vue'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
@@ -55,11 +54,6 @@ const userMenuItems = computed<MenuItem[]>(() => {
       command: () => router.push('/settings'),
     },
     {
-      label: 'Billing',
-      icon: 'pi pi-credit-card',
-      command: () => router.push('/billing'),
-    },
-    {
       separator: true,
     },
     {
@@ -103,7 +97,6 @@ function goToSettings() {
           @click="toggleMobile"
         />
         <div class="border-right" style="height: 1.5rem"></div>
-        <ProjectSwitcher />
         <span
           v-tooltip.bottom="'Developer Preview\nAPIs and features may change as the platform evolves.'"
           class="preview-badge"

@@ -134,18 +134,6 @@ class OrganizationsService {
   }
 
   // =====================================================
-  // Projects
-  // =====================================================
-
-  /**
-   * Get all projects in the organization
-   */
-  async getOrganizationProjects(organizationId: string): Promise<any[]> {
-    const response = await apiClient.get(`/api/organizations/${organizationId}/projects`);
-    return response.data;
-  }
-
-  // =====================================================
   // App Assignment
   // =====================================================
 
@@ -189,20 +177,6 @@ class OrganizationsService {
   async getAppAssignedUsers(organizationId: string, appId: string): Promise<any[]> {
     const response = await apiClient.get(`/api/organizations/${organizationId}/apps/${appId}/users`);
     return response.data;
-  }
-  
-  /**
-   * Link an existing project to the organization
-   */
-  async linkProject(organizationId: string, projectId: string): Promise<void> {
-    await apiClient.put(`/api/organizations/${organizationId}/projects/${projectId}`);
-  }
-  
-  /**
-   * Unlink a project from the organization
-   */
-  async unlinkProject(organizationId: string, projectId: string): Promise<void> {
-    await apiClient.delete(`/api/organizations/${organizationId}/projects/${projectId}`);
   }
 }
 

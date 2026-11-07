@@ -104,10 +104,6 @@ function navigateToMembers() {
   router.push({ name: 'organization-members', params: { id: organizationId.value } })
 }
 
-function navigateToProjects() {
-  router.push({ name: 'organization-projects', params: { id: organizationId.value } })
-}
-
 function navigateToApps() {
   router.push({ name: 'organization-apps', params: { id: organizationId.value } })
 }
@@ -218,28 +214,6 @@ const formatDate = (date: string) => {
               icon="pi pi-arrow-right"
               text
               @click="navigateToMembers"
-            />
-          </template>
-        </Card>
-
-        <!-- Projects Card - Hidden for AppUser -->
-        <Card v-if="!isAppUser">
-          <template #title>
-            <div class="flex align-items-center gap-2">
-              <i class="pi pi-folder" style="color: var(--p-primary-color)"></i>
-              <span>Projects</span>
-            </div>
-          </template>
-          <template #content>
-            <div class="stat-value">{{ organization.projectCount }}</div>
-            <p class="text-muted">Organization projects</p>
-          </template>
-          <template #footer>
-            <Button
-              label="View Projects"
-              icon="pi pi-arrow-right"
-              text
-              @click="navigateToProjects"
             />
           </template>
         </Card>

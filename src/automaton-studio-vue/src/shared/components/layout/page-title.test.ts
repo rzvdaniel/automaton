@@ -9,14 +9,14 @@ describe('pageTitleForRoute', () => {
 
   it('turns unmapped route names into title-case words', () => {
     expect(pageTitleForRoute('organization-members')).toBe('Organization Members')
-    expect(pageTitleForRoute('billing')).toBe('Billing')
+    expect(pageTitleForRoute('organization-settings')).toBe('Organization Settings')
   })
 
   it('prefers the title declared in route meta', () => {
-    expect(pageTitleForRoute('admin-ai-settings', 'AI Settings')).toBe('AI Settings')
+    expect(pageTitleForRoute('admin-logs', 'Audit Events')).toBe('Audit Events')
   })
 
-  it('falls back to Dashboard without a route name', () => {
-    expect(pageTitleForRoute(undefined)).toBe('Dashboard')
+  it('falls back to Apps without a route name', () => {
+    expect(pageTitleForRoute(undefined)).toBe('Apps')
   })
 })

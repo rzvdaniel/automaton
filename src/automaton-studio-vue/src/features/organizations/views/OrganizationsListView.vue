@@ -234,13 +234,6 @@ function resetCreateForm() {
         </template>
       </Column>
 
-      <Column field="projectCount" header="Projects" sortable>
-        <template #body="{ data }">
-          <i class="pi pi-folder mr-1"></i>
-          {{ data.projectCount }}
-        </template>
-      </Column>
-
       <Column field="updatedAt" header="Last Updated" sortable>
         <template #body="{ data }">
           {{ formatDate(data.updatedAt) }}

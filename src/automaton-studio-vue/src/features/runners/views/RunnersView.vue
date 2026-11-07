@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -16,7 +16,6 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { runnersService } from '../services/runners.service'
-import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import {
   RunnerStatus,
   getStatusDisplayName,
@@ -29,7 +28,6 @@ import { classifyRunner, isVisibleApplicationRunner } from '../utils/runner-clas
 
 const toast = useToast()
 const confirm = useConfirm()
-const projectsStore = useProjectsStore()
 const authStore = useAuthStore()
 
 // State
@@ -147,25 +145,13 @@ function getRunnerSourceSeverity(runner: Runner): 'contrast' | 'warn' | 'info' {
 }
 
 async function handleSelfHostedInstallationCreated() {
-  if (projectsStore.activeProjectId) {
-    projectsStore.setActiveProject(null)
-    toast.add({
-      severity: 'info',
-      summary: 'Switched to Personal Runners',
-      detail: 'Your new self-hosted Runner is personal and will appear here after it connects.',
-      life: 5000,
-    })
-    return
-  }
-
   await refreshRunners()
 }
 
-// Load runners with optional project filter
-async function loadRunners(projectId?: string | null) {
+async function loadRunners() {
   loading.value = true
   try {
-    runners.value = await runnersService.list(projectId ?? undefined)
+    runners.value = await runnersService.list()
   } catch (err: unknown) {
     console.error('Failed to load runners:', err)
     toast.add({
@@ -179,9 +165,9 @@ async function loadRunners(projectId?: string | null) {
   }
 }
 
-async function refreshRunners(projectId?: string | null) {
+async function refreshRunners() {
   try {
-    runners.value = await runnersService.list(projectId ?? undefined)
+    runners.value = await runnersService.list()
   } catch (err: unknown) {
     console.error('Failed to refresh runners:', err)
   }
@@ -190,7 +176,7 @@ async function refreshRunners(projectId?: string | null) {
 function startAutoRefresh() {
   stopAutoRefresh()
   autoRefreshTimer = window.setInterval(() => {
-    void refreshRunners(projectsStore.activeProjectId)
+    void refreshRunners()
   }, autoRefreshIntervalMs)
 }
 
@@ -242,14 +228,7 @@ function confirmDelete(runner: Runner) {
   })
 }
 
-// React to active project changes (including initial load)
-watch(
-  () => projectsStore.activeProjectId,
-  async (projectId) => {
-    await loadRunners(projectId)
-  },
-  { immediate: true },
-)
+void loadRunners()
 
 startAutoRefresh()
 

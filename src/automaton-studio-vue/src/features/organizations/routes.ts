@@ -20,12 +20,6 @@ export const organizationsRoutes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
-    path: '/organizations/:id/projects',
-    name: 'organization-projects',
-    component: () => import('./views/OrganizationProjectsView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/organizations/:id/apps',
     name: 'organization-apps',
     component: () => import('./views/OrganizationAppsView.vue'),
@@ -41,18 +35,6 @@ export const organizationsRoutes: RouteRecordRaw[] = [
     path: '/organizations/invitations/accept',
     name: 'accept-organization-invitation',
     component: () => import('./views/AcceptInvitationView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/my-apps',
-    name: 'assigned-apps',
-    component: () => import('./views/AssignedAppsView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/my-apps/:appId',
-    name: 'assigned-app-use',
-    component: () => import('./views/AssignedAppUseView.vue'),
     meta: { requiresAuth: true },
   },
 ]

@@ -5,9 +5,7 @@ import { watch } from 'vue'
 import Button from 'primevue/button'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
-import billingService, { type BillingStatusResponse } from '@/features/settings/services/billingService'
 import { apiKeysService } from '@/features/settings/services/apikeys.service'
-import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
@@ -15,7 +13,6 @@ const publicDocsUrl = 'https://automaton.monster/docs'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const { hasPaidPlans, ensureLoaded: ensurePaidPlansLoaded } = usePaidPlansAvailable()
 const { isExpanded, isPinned, isMobile, isMobileOpen, setHovered, togglePinned, closeMobile } = useSidebarState()
 
 // Load organization roles for access control
@@ -42,16 +39,10 @@ interface NavSection {
 }
 
 const mainNavItems: NavItem[] = [
-  { label: 'Dashboard', icon: 'pi pi-home', to: '/' },
-  { label: 'Apps', icon: 'pi pi-globe', to: '/apps', hideForAppUser: true },
+  { label: 'Apps', icon: 'pi pi-globe', to: '/apps' },
   { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true, accent: 'green' },
   { label: 'Runners', icon: 'pi pi-desktop', to: '/runners', hideForAppUser: true },
-  { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
   { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
-]
-
-const collaborationNavItems: NavItem[] = [
-  { label: 'My Apps', icon: 'pi pi-th-large', to: '/my-apps', hideForAppUser: false },
 ]
 
 const adminNavItems: NavItem[] = [
@@ -60,22 +51,12 @@ const adminNavItems: NavItem[] = [
 
 const utilityNavItems: NavItem[] = [
   { label: 'CLI', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
-  { label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
   { label: 'Documentation', icon: 'pi pi-book', to: publicDocsUrl, external: true },
 ]
 
-// Billing usage widget
-const billingStatus = ref<BillingStatusResponse | null>(null)
+// API keys count for the sidebar badge
 const apiKeysCount = ref(0)
-
-async function loadBillingStatus() {
-  try {
-    billingStatus.value = await billingService.getBillingStatus()
-  } catch {
-    // silently ignore — widget just won't show
-  }
-}
 
 async function loadApiKeysCount() {
   try {
@@ -90,13 +71,10 @@ onMounted(async () => {
   // Load organizations to determine user's roles
   await loadOrganizations()
   await Promise.all([
-    loadBillingStatus(),
     loadApiKeysCount(),
-    ensurePaidPlansLoaded(),
   ])
 })
 
-const sidebarPlansLabel = computed(() => hasPaidPlans.value ? 'Upgrade' : 'Plans soon')
 const isAdmin = computed(() => {
   const roles = authStore.user?.roles
   if (!roles) return false
@@ -109,18 +87,16 @@ const apiKeysBadge = computed(() => {
 })
 
 const apiKeysNavItem = computed<NavItem>(() => ({
-  ...mainNavItems[2]!,
+  ...mainNavItems[1]!,
   accent: 'green',
   badge: apiKeysBadge.value,
 }))
 
 const primaryNavItems = computed<NavItem[]>(() => [
   mainNavItems[0]!,
-  mainNavItems[1]!,
   apiKeysNavItem.value,
+  mainNavItems[2]!,
   mainNavItems[3]!,
-  mainNavItems[4]!,
-  mainNavItems[5]!,
 ])
 
 function filterItems(items: NavItem[]) {
@@ -128,8 +104,6 @@ function filterItems(items: NavItem[]) {
 
   if (isAppUserOnly.value) {
     filtered = filtered.filter((item) => !item.hideForAppUser)
-  } else {
-    filtered = filtered.filter((item) => item.to !== '/my-apps')
   }
 
   if (!isAdmin.value) {
@@ -142,7 +116,6 @@ function filterItems(items: NavItem[]) {
 const visibleSections = computed<NavSection[]>(() => {
   const sections: NavSection[] = [
     { key: 'main', items: filterItems(primaryNavItems.value) },
-    { key: 'collaboration', items: filterItems(collaborationNavItems) },
   ]
 
   return sections.filter((section) => section.items.length > 0)
@@ -188,9 +161,6 @@ const navigate = (item: NavItem) => {
 const isActive = (to: string) => {
   if (to.startsWith('http')) {
     return false
-  }
-  if (to === '/') {
-    return route.path === '/'
   }
   return route.path.startsWith(to)
 }
@@ -267,17 +237,6 @@ const isActive = (to: string) => {
       </nav>
 
       <div class="sidebar-spacer"></div>
-
-      <div v-if="isExpanded && billingStatus" class="billing-widget" @click="navigate({ label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' })">
-        <div class="billing-widget-header">
-          <span class="billing-plan">{{ billingStatus.planName }}</span>
-          <span v-if="billingStatus.hasActiveSubscription" class="billing-status">Active</span>
-        </div>
-        <div class="billing-widget-footer">
-          <span class="text-color-secondary">Apps run on your assigned machine</span>
-          <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate({ label: 'Pricing', icon: 'pi pi-credit-card', to: '/pricing' })">{{ sidebarPlansLabel }}</span>
-        </div>
-      </div>
 
       <nav class="sidebar-nav sidebar-nav-bottom">
         <div class="nav-divider"></div>
@@ -575,58 +534,6 @@ const isActive = (to: string) => {
 
 .sidebar-nav-bottom {
   margin-top: auto;
-}
-
-/* Billing usage widget */
-.billing-widget {
-  margin: 0 0 0.5rem;
-  padding: 0.5rem 0.65rem;
-  border-radius: 0.5rem;
-  background: var(--p-surface-100);
-  cursor: pointer;
-  transition: background 0.15s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.billing-widget:hover {
-  background: var(--p-surface-200);
-}
-
-.billing-widget-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.billing-plan {
-  font-size: 0.72rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.billing-status {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--p-green-500);
-}
-
-.billing-widget-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.66rem;
-}
-
-.billing-upgrade {
-  color: var(--p-primary-500);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.billing-upgrade:hover {
-  text-decoration: underline;
 }
 
 :global(.app-dark) .nav-item-accent-green {

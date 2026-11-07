@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
-import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
@@ -16,35 +14,16 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
-import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
-import type { AiProvider } from '@/shared/types/ai.types'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
-import {
-  AppExecutionPolicy,
-  AppVerificationStrategy,
-  type AppExecutionPolicyType,
-  type AppVerificationStrategyType,
-} from '../types/settings.types'
 const {
   theme: themePreference,
   fontSize,
-  defaultAiModel,
-  defaultPlanningModel,
-  showAiDebugDetails,
-  appVerificationStrategy,
-  appExecutionPolicy,
   isLoading: settingsLoading,
   isSaving: settingsSaving,
   setTheme,
   setFontSize,
-  setDefaultAiModel,
-  setDefaultPlanningModel,
-  setShowAiDebugDetails,
-  setAppVerificationStrategy,
-  setAppExecutionPolicy,
 } = useUserSettings()
 const authStore = useAuthStore()
-const router = useRouter()
 const toast = useToast()
 
 const activeSection = ref('account')
@@ -65,43 +44,6 @@ const accountSuccess = ref(false)
 // Local editor font size for input binding (synced from cached settings)
 const editorFontSize = ref(14)
 
-// AI preferences
-const aiProviders = ref<AiProvider[]>([])
-const aiModelsLoading = ref(false)
-
-const aiModelOptions = computed(() =>
-  aiProviders.value.map((provider) => ({
-    label: provider.displayName || provider.providerName,
-    providerName: provider.providerName,
-    items: provider.supportedModels.map((model) => ({ label: model, value: model })),
-  })),
-)
-
-const aiModelFlatOptions = computed(() =>
-  aiProviders.value.flatMap((provider) =>
-    provider.supportedModels.map((model) => ({
-      label: model,
-      value: model,
-      provider: provider.providerName,
-    })),
-  ),
-)
-
-const selectedDefaultAiModel = ref<string | undefined>(undefined)
-const selectedDefaultPlanningModel = ref<string | undefined>(undefined)
-const aiDebugDetailsEnabled = ref(false)
-const selectedAppVerificationStrategy = ref<string | undefined>(undefined)
-const selectedAppExecutionPolicy = ref<string | undefined>(undefined)
-const appVerificationStrategyOptions = [
-  { label: 'Balanced', value: AppVerificationStrategy.Balanced },
-  { label: 'Continuous', value: AppVerificationStrategy.Continuous },
-  { label: 'Final Gate', value: AppVerificationStrategy.FinalGate },
-]
-const appExecutionPolicyOptions = [
-  { label: 'Default', value: AppExecutionPolicy.Default },
-  { label: 'Lean Tools', value: AppExecutionPolicy.LeanTools },
-]
-
 onMounted(async () => {
   // Load user data from store
   if (authStore.user) {
@@ -114,36 +56,12 @@ onMounted(async () => {
   }
   // Sync local value from cached settings
   editorFontSize.value = fontSize.value
-  selectedDefaultAiModel.value = defaultAiModel.value
-  selectedDefaultPlanningModel.value = defaultPlanningModel.value
-  aiDebugDetailsEnabled.value = showAiDebugDetails.value
-  selectedAppVerificationStrategy.value = appVerificationStrategy.value
-  selectedAppExecutionPolicy.value = appExecutionPolicy.value
-
-  // Load AI providers for model dropdowns
-  aiModelsLoading.value = true
-  try {
-    const providers = await getAvailableProviders(true)
-    aiProviders.value = providers.filter(
-      (p) => (p.hasStoredKeys || p.hasEnvironmentKey) && p.supportedModels.length > 0,
-    )
-  } catch {
-    // Non-critical — dropdowns will be empty
-  } finally {
-    aiModelsLoading.value = false
-  }
 })
 
 // Keep local value in sync with cached settings
 watch(fontSize, (newSize) => {
   editorFontSize.value = newSize
 })
-
-watch(defaultAiModel, (v) => { selectedDefaultAiModel.value = v })
-watch(defaultPlanningModel, (v) => { selectedDefaultPlanningModel.value = v })
-watch(showAiDebugDetails, (v) => { aiDebugDetailsEnabled.value = v })
-watch(appVerificationStrategy, (v) => { selectedAppVerificationStrategy.value = v })
-watch(appExecutionPolicy, (v) => { selectedAppExecutionPolicy.value = v })
 
 // Check username availability
 async function checkUsernameAvailability() {
@@ -252,42 +170,6 @@ const themeOptions = ref([
   { label: 'Dark', value: 'dark', icon: 'pi pi-moon' },
   { label: 'System', value: 'system', icon: 'pi pi-desktop' },
 ])
-
-async function saveAiPreferences() {
-  try {
-    const aiModel = selectedDefaultAiModel.value
-    const aiProv = aiModel
-      ? (aiModelFlatOptions.value.find((o) => o.value === aiModel)?.provider ?? '')
-      : undefined
-
-    const planModel = selectedDefaultPlanningModel.value
-    const planProv = planModel
-      ? (aiModelFlatOptions.value.find((o) => o.value === planModel)?.provider ?? '')
-      : undefined
-
-    // Save sequentially: settings composable uses a shared isSaving gate.
-    // Parallel calls can skip updates and leave some values unsaved.
-    await setDefaultAiModel(aiModel, aiProv)
-    await setDefaultPlanningModel(planModel, planProv)
-    await setShowAiDebugDetails(aiDebugDetailsEnabled.value)
-    await setAppVerificationStrategy(selectedAppVerificationStrategy.value as AppVerificationStrategyType | undefined)
-    await setAppExecutionPolicy(selectedAppExecutionPolicy.value as AppExecutionPolicyType | undefined)
-
-    toast.add({
-      severity: 'success',
-      summary: 'Settings Saved',
-      detail: 'AI preferences have been updated.',
-      life: 3000,
-    })
-  } catch {
-    toast.add({
-      severity: 'error',
-      summary: 'Save Failed',
-      detail: 'Could not save AI preferences.',
-      life: 5000,
-    })
-  }
-}
 
 async function saveEditorSettings() {
   try {
@@ -432,14 +314,6 @@ const passwordLoading = computed(() => passwordSaving.value)
                 :class="{ 'surface-hover': activeSection === 'appearance' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'appearance'"
-              />
-              <Button
-                label="AI Providers"
-                icon="pi pi-sparkles"
-                text
-                :class="{ 'surface-hover': activeSection === 'ai' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'ai'"
               />
               <Button
                 label="Notifications"
@@ -619,145 +493,6 @@ const passwordLoading = computed(() => passwordSaving.value)
                   :loading="settingsSaving"
                   :disabled="settingsSaving || settingsLoading"
                   @click="saveEditorSettings"
-                />
-              </div>
-            </div>
-          </template>
-        </Card>
-
-        <!-- AI Preferences Section -->
-        <Card v-if="activeSection === 'ai'">
-          <template #title>AI Providers</template>
-          <template #content>
-            <div class="flex flex-column gap-5">
-              <p class="text-color-secondary m-0">
-                Bring your own AI provider keys and set preferred models. These override the admin
-                defaults and apply across assistants and AI-enabled app workflows.
-              </p>
-
-              <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
-                <div class="pr-3">
-                  <div class="font-medium">Manage Provider Keys</div>
-                  <div class="text-color-secondary text-sm">
-                    Add or update OpenAI, Anthropic, Gemini, and other provider credentials.
-                  </div>
-                </div>
-                <Button
-                  label="Open AI Providers"
-                  icon="pi pi-external-link"
-                  outlined
-                  @click="router.push('/ai-keys')"
-                />
-              </div>
-
-              <!-- Default AI Model -->
-              <div class="flex flex-column gap-2">
-                <label for="defaultAiModel" class="font-medium">Default AI Model</label>
-                <Select
-                  id="defaultAiModel"
-                  v-model="selectedDefaultAiModel"
-                  :options="aiModelOptions"
-                  option-label="label"
-                  option-value="value"
-                  option-group-label="label"
-                  option-group-children="items"
-                  placeholder="Use admin default"
-                  show-clear
-                  :loading="aiModelsLoading"
-                  :disabled="settingsSaving || aiModelsLoading"
-                  class="w-full"
-                />
-                <small class="text-color-secondary">
-                  Used for chat, code generation, and general AI tasks.
-                </small>
-              </div>
-
-              <!-- Default Planning Model -->
-              <div class="flex flex-column gap-2">
-                <label for="defaultPlanningModel" class="font-medium">Default Planning Model</label>
-                <Select
-                  id="defaultPlanningModel"
-                  v-model="selectedDefaultPlanningModel"
-                  :options="aiModelOptions"
-                  option-label="label"
-                  option-value="value"
-                  option-group-label="label"
-                  option-group-children="items"
-                  placeholder="Use admin default"
-                  show-clear
-                  :loading="aiModelsLoading"
-                  :disabled="settingsSaving || aiModelsLoading"
-                  class="w-full"
-                />
-                <small class="text-color-secondary">
-                  Used for multi-step planning and flow generation tasks.
-                </small>
-              </div>
-
-              <!-- AI Chat Debug Rendering -->
-              <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
-                <div class="pr-3">
-                  <div class="font-medium">Show AI Debug Details</div>
-                  <div class="text-color-secondary text-sm">
-                    Display verbose tool instructions/results and UI check messages in AI chat. This only changes what is shown, not what is sent to AI.
-                  </div>
-                </div>
-                <SelectButton
-                  :model-value="aiDebugDetailsEnabled"
-                  :options="[
-                    { label: 'Off', value: false },
-                    { label: 'On', value: true },
-                  ]"
-                  option-label="label"
-                  option-value="value"
-                  :disabled="settingsSaving || aiModelsLoading"
-                  @update:model-value="(v) => aiDebugDetailsEnabled = Boolean(v)"
-                />
-              </div>
-
-              <div class="flex flex-column gap-2">
-                <label for="appVerificationStrategy" class="font-medium">App Verification Strategy</label>
-                <Select
-                  id="appVerificationStrategy"
-                  v-model="selectedAppVerificationStrategy"
-                  :options="appVerificationStrategyOptions"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="Use organization/admin default"
-                  show-clear
-                  :disabled="settingsSaving"
-                  class="w-full"
-                />
-                <small class="text-color-secondary">
-                  Personal override for how aggressively the app builder verifies each step.
-                </small>
-              </div>
-
-              <div class="flex flex-column gap-2">
-                <label for="appExecutionPolicy" class="font-medium">App Execution Policy</label>
-                <Select
-                  id="appExecutionPolicy"
-                  v-model="selectedAppExecutionPolicy"
-                  :options="appExecutionPolicyOptions"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="Use organization/admin default"
-                  show-clear
-                  :disabled="settingsSaving"
-                  class="w-full"
-                />
-                <small class="text-color-secondary">
-                  Personal override for tool-call efficiency behavior during app generation.
-                </small>
-              </div>
-
-              <div class="flex justify-content-end pt-3 border-top-1 surface-border">
-                <Button
-                  label="Save Changes"
-                  icon="pi pi-check"
-                  :loading="settingsSaving"
-                  :disabled="settingsSaving || aiModelsLoading"
-                  @click="saveAiPreferences"
                 />
               </div>
             </div>
