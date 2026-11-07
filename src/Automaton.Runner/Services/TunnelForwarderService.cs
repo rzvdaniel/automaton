@@ -36,7 +36,7 @@ public class TunnelForwarderService
     {
         _maxBodyBytes = config.Value.MaxBodyBytes;
         this.staticSitePublisher = staticSitePublisher;
-        _fastApiClient = new HttpClient(fastApiHandler ?? new HttpClientHandler())
+        _fastApiClient = new HttpClient(fastApiHandler ?? new HttpClientHandler { UseCookies = false })
         {
             BaseAddress = new Uri("http://localhost:8001"),
             Timeout = TimeSpan.FromSeconds(config.Value.TimeoutSeconds)
