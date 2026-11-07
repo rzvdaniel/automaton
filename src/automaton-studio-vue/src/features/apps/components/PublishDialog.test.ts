@@ -6,6 +6,34 @@ import PublishDialog from './PublishDialog.vue'
 vi.mock('../services/apps.service', () => ({ appsService: { generateSlug: (name: string) => name.toLowerCase().replace(/\s+/g, '-') } }))
 
 describe('PublishDialog', () => {
+  it('lets an owner require sign-in from publishing settings', async () => {
+    const wrapper = mount(PublishDialog, {
+      props: { visible: true, appName: 'Static Tool' },
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /><slot name="footer" /></div>' },
+          InputText: true,
+          InputSwitch: true,
+          Message: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('Require sign-in')
+    const switches = wrapper.findAllComponents({ name: 'InputSwitch' })
+    expect(switches).toHaveLength(3)
+    switches[1]!.vm.$emit('update:modelValue', true)
+    await wrapper.vm.$nextTick()
+
+    const publish = wrapper.findAll('button').find((button) => button.text().includes('Publish app'))
+    if (!publish) throw new Error('Publish button not found')
+    await publish.trigger('click')
+    expect(wrapper.emitted('publish')?.[0]?.[0]).toMatchObject({
+      requiresAuthentication: true,
+      runtimeVisibility: 'private',
+    })
+  })
+
   it('makes Live publishing context explicit while a canary is being viewed', () => {
     const wrapper = mount(PublishDialog, {
       props: {
@@ -62,7 +90,7 @@ describe('PublishDialog', () => {
     })
 
     expect(wrapper.text()).toContain('This app requires sign-in, so its runtime must remain private.')
-    expect(wrapper.text()).toContain('Sign-in is currently required. This dialog preserves that setting and keeps the runtime private.')
+    expect(wrapper.text()).toContain('Require sign-in')
     expect(wrapper.text()).toContain('Private runtime')
     expect(wrapper.text()).not.toContain('Remixing')
     expect(wrapper.text()).not.toContain('remix')
