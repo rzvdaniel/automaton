@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   listDeploymentTargets: vi.fn(),
   createRuntimeLaunch: vi.fn(),
-  getRestrictedRuntimeLaunchUrl: vi.fn(() => '/api/apps/app-id/launch-runtime'),
 }))
 
 vi.mock('../services/apps.service', () => ({ appsService: mocks }))
