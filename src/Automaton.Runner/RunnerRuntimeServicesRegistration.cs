@@ -21,6 +21,8 @@ internal static class RunnerRuntimeServicesRegistration
         services.AddSingleton<IRuntimeTunnelReconnectRequester>(provider => provider.GetRequiredService<HubService>());
         services.AddSingleton<RunnerStorageTelemetryApiClient>();
         services.AddHostedService<StorageTelemetryBackgroundService>();
+        services.AddSingleton<HostHealthCollector>();
+        services.AddHostedService<HostHealthBackgroundService>();
         services.AddHostedService(provider => provider.GetRequiredService<RunnerRuntimeGatewayService>());
     }
 }

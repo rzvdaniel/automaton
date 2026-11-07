@@ -185,13 +185,12 @@ public sealed class AppSecretService(
             values[secret.Name] = protector.Unprotect(secret.ProtectedValue);
             delivered.Add(new(secret.Name, AppSecretScopes.App, secret.Version));
         }
-        var permissionKey = await db.AppPermissionApprovals
-            .Where(approval => approval.AppId == appId && approval.Permission == AppPermissionApproval.BackupsRead && approval.ProtectedKey != null)
-            .Select(approval => approval.ProtectedKey).FirstOrDefaultAsync(token);
-        if (permissionKey is not null)
+        var credential = await AppPermissionService.DeliveredCredential(db.AppPermissionApprovals, appId)
+            .Select(approval => new { approval.ProtectedKey, approval.Permission }).FirstOrDefaultAsync(token);
+        if (credential is { ProtectedKey: not null })
         {
-            values[AppPermissionApproval.CredentialVariable] = protector.Unprotect(permissionKey);
-            delivered.Add(new(AppPermissionApproval.CredentialVariable, "permission", null, AppPermissionApproval.BackupsRead));
+            values[AppPermissionApproval.CredentialVariable] = protector.Unprotect(credential.ProtectedKey);
+            delivered.Add(new(AppPermissionApproval.CredentialVariable, "permission", null, credential.Permission));
         }
         var contract = await ContractAsync(appId, token);
         // Settings are saved like app secrets; a declared default applies until the installer sets a value.

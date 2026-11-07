@@ -13,6 +13,11 @@ public sealed class RunnerStorageTelemetryApiClient(
         CancellationToken cancellationToken)
         => PostAsync("api/runner-storage/machine", report, cancellationToken);
 
+    public Task ReportHostHealthAsync(
+        MachineHostHealth report,
+        CancellationToken cancellationToken)
+        => PostAsync("api/runner-health/machine", report, cancellationToken);
+
     private async Task PostAsync<TReport>(
         string path,
         TReport report,

@@ -37,6 +37,10 @@ public class Runner
     [MaxLength(32)] public string? MachineStorageMeasurementStatus { get; set; }
     [MaxLength(2000)] public string? MachineStorageMeasurementError { get; set; }
 
+    /// <summary>Latest host figures reported by a Machine Management Runner (JSON of <c>MachineHostHealth</c>).</summary>
+    public string? MachineHostHealthJson { get; set; }
+    public DateTime? MachineHostHealthMeasuredAtUtc { get; set; }
+
     /// <summary>
     /// Installation purpose. This does not grant privileges; the installation
     /// profile does that. Infrastructure runners are administrator-owned.

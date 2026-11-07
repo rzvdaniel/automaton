@@ -23,7 +23,7 @@ public sealed class AppPermissionServiceTests
         var statuses = await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, true, default);
         var token = await IssuedTokenAsync(db, protector);
         Assert.That(statuses.Single().Approved, Is.True);
-        Assert.That((await service.ValidateCredentialAsync(token, default))?.Permission, Is.EqualTo(AppPermissionApproval.BackupsRead));
+        Assert.That((await service.ValidateCredentialAsync(token, default))?.Permissions, Is.EqualTo(new[] { AppPermissionApproval.BackupsRead }));
 
         await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, false, default);
         Assert.That(await service.ValidateCredentialAsync(token, default), Is.Null);
@@ -125,6 +125,38 @@ public sealed class AppPermissionServiceTests
         {
             new AppRuntimeRestarter.RunningTarget(running.Id, runnerId), new AppRuntimeRestarter.RunningTarget(deploying.Id, runnerId)
         }));
+    }
+
+    [Test]
+    public async Task ServerReadIsApprovableAndOneKeyServesEveryApprovedPermission()
+    {
+        var (db, appId, _, protector) = await CreateAsync();
+        var app = await db.WebApps.FindAsync(appId);
+        app!.ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract
+        {
+            Permissions = [AppPermissionApproval.BackupsRead, AppPermissionApproval.ServerRead]
+        });
+        await db.SaveChangesAsync();
+        var restarter = new RecordingRestarter();
+        var service = new AppPermissionService(db, protector, runtimes: restarter);
+        var secrets = new AppSecretService(db, new SecretStore(db, protector), protector, null!);
+
+        await service.SetApprovalAsync(appId, AppPermissionApproval.ServerRead, true, default);
+        var delivered = (await secrets.ResolveForExecutionAsync(appId, default))[AppPermissionApproval.CredentialVariable];
+        Assert.That((await service.ValidateCredentialAsync(delivered, default))?.Permissions, Is.EqualTo(new[] { AppPermissionApproval.ServerRead }));
+
+        await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, true, default);
+        var withBoth = (await secrets.ResolveForExecutionAsync(appId, default))[AppPermissionApproval.CredentialVariable];
+        Assert.That(withBoth, Is.Not.EqualTo(delivered), "the delivered key belongs to the first approved permission (backups:read)");
+        var both = new[] { AppPermissionApproval.BackupsRead, AppPermissionApproval.ServerRead };
+        Assert.That((await service.ValidateCredentialAsync(withBoth, default))?.Permissions, Is.EquivalentTo(both));
+        Assert.That((await service.ValidateCredentialAsync(delivered, default))?.Permissions, Is.EquivalentTo(both));
+
+        await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, false, default);
+        Assert.That(await service.ValidateCredentialAsync(withBoth, default), Is.Null);
+        Assert.That((await service.ValidateCredentialAsync(delivered, default))?.Permissions, Is.EqualTo(new[] { AppPermissionApproval.ServerRead }));
+        Assert.That((await secrets.ResolveForExecutionAsync(appId, default))[AppPermissionApproval.CredentialVariable], Is.EqualTo(delivered));
+        Assert.That(restarter.Apps, Has.Count.EqualTo(3), "restart on first approval, when the key switches to backups, and when it switches back");
     }
 
     private sealed class RecordingRestarter : IAppRuntimeRestarter

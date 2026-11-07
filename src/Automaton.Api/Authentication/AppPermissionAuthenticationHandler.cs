@@ -9,6 +9,15 @@ public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOpt
 {
     public const string Scheme = "AppPermission";
     public const string BackupsReadPolicy = "AppPermission:backups:read";
+    public const string ServerReadPolicy = "AppPermission:server:read";
+
+    /// <summary>Allows system administrators and apps whose approved credential carries the permission.</summary>
+    public static void AddPermissionPolicy(Microsoft.AspNetCore.Authorization.AuthorizationOptions options, string policyName, string permission)
+        => options.AddPolicy(policyName, policy => policy
+            .AddAuthenticationSchemes(Scheme, Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context => context.User.IsInRole(Automaton.Api.Enums.UserRole.SystemAdministrator)
+                || context.User.HasClaim("app_permission", permission)));
 }
 
 public sealed class AppPermissionAuthenticationHandler(
@@ -25,11 +34,8 @@ public sealed class AppPermissionAuthenticationHandler(
             return AuthenticateResult.NoResult();
         var credential = await permissions.ValidateCredentialAsync(authorization[7..].Trim(), Context.RequestAborted);
         if (credential is null) return AuthenticateResult.Fail("Invalid or revoked app permission key.");
-        var claims = new[]
-        {
-            new Claim("app_id", credential.Value.AppId.ToString()),
-            new Claim("app_permission", credential.Value.Permission)
-        };
+        var claims = new List<Claim> { new("app_id", credential.Value.AppId.ToString()) };
+        claims.AddRange(credential.Value.Permissions.Select(permission => new Claim("app_permission", permission)));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme.Name));
         return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name));
     }

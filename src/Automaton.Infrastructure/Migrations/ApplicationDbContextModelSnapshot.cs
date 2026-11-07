@@ -3156,6 +3156,12 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<DateTime?>("LastHeartbeatAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("MachineHostHealthJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("MachineHostHealthMeasuredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("MachineName")
                         .HasMaxLength(120)
                         .HasColumnType("citext");

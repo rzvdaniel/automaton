@@ -276,11 +276,10 @@ internal static class ApiAuthorizationRegistration
             options.AddPolicy("Administrators", policy =>
                 policy.RequireRole(UserRole.Administrator, UserRole.SystemAdministrator));
 
-            options.AddPolicy(AppPermissionAuthenticationOptions.BackupsReadPolicy, policy => policy
-                .AddAuthenticationSchemes(AppPermissionAuthenticationOptions.Scheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
-                .RequireAuthenticatedUser()
-                .RequireAssertion(context => context.User.IsInRole(UserRole.SystemAdministrator)
-                    || context.User.HasClaim("app_permission", AppPermissionApproval.BackupsRead)));
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.BackupsReadPolicy, AppPermissionApproval.BackupsRead);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.ServerReadPolicy, AppPermissionApproval.ServerRead);
 
             // Project-based authorization policies
             options.AddPolicy("ProjectAdmin", policy =>
@@ -604,6 +603,11 @@ internal static class ApiRunnerRegistration
             provider.GetRequiredService<RunnerExecutionCommandPublisher>());
         services.AddScoped<RunnerStorageTelemetryService>();
         services.AddScoped<RunnerStorageTelemetrySubmissionService>();
+        services.AddMemoryCache();
+        services.AddScoped<Automaton.Api.ServerHealth.HostHealthReportService>();
+        services.AddScoped<Automaton.Api.ServerHealth.ServerHealthService>();
+        services.AddSingleton<Automaton.Api.ServerHealth.LatestReleaseClient>();
+        services.AddSingleton<Automaton.Api.ServerHealth.CertificateExpiryProbe>();
         services.Configure<MachineContainerResourceOptions>(applicationBuilder.Configuration.GetSection(MachineContainerResourceOptions.SectionName));
         services.AddScoped<SelfHostedRunnerInstallationService>();
         services.AddScoped<SelfHostedRunnerEnrollmentExchangeService>();

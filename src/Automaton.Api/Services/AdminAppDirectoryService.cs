@@ -94,7 +94,7 @@ public sealed class AdminAppDirectoryService(ApplicationDbContext db, AdminAutho
     {
         // Only apps whose stored contract mentions a supported permission can request one.
         var candidates = await db.WebApps.AsNoTracking()
-            .Where(app => app.ApplicationContractJson.Contains(ApplicationContractValidator.SupportedPermission))
+            .Where(app => app.ApplicationContractJson.Contains("backups:read") || app.ApplicationContractJson.Contains("server:read"))
             .Select(app => new { app.Id, app.ApplicationContractJson })
             .ToListAsync(token);
         if (candidates.Count == 0) return [];

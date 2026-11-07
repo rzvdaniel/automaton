@@ -35,7 +35,7 @@ public sealed class AppPermissionService(
     public async Task<IReadOnlyList<AppPermissionStatus>> SetApprovalAsync(Guid appId, string permission, bool approved,
         CancellationToken token)
     {
-        if (permission != AppPermissionApproval.BackupsRead) throw new ArgumentException("Unsupported app permission.", nameof(permission));
+        if (!ApplicationContractValidator.SupportedPermissions.Contains(permission)) throw new ArgumentException("Unsupported app permission.", nameof(permission));
         var requested = await RequestedAsync(appId, token);
         if (approved && !requested.Contains(permission, StringComparer.Ordinal))
             throw new InvalidOperationException("The app has not requested this permission.");
@@ -47,8 +47,9 @@ public sealed class AppPermissionService(
             db.AppPermissionApprovals.Add(row);
         }
 
-        // Approving issues a new credential and revoking withdraws one; either way running copies restart to pick it up.
-        var credentialChanged = approved == (row.ProtectedKey is null);
+        // An app holds one APP_AUTOMATON_API_KEY, the credential of its first approved permission; every approved
+        // permission is valid for it. Running copies restart only when that delivered key changes.
+        var deliveredBefore = await DeliveredTokenHashAsync(appId, token);
         if (!approved)
         {
             row.Status = row.ProtectedKey is null ? AppPermissionStatuses.Rejected : AppPermissionStatuses.Revoked;
@@ -66,6 +67,7 @@ public sealed class AppPermissionService(
         row.UpdatedAtUtc = DateTime.UtcNow;
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException) { throw new AppPermissionConflictException(); }
+        var credentialChanged = deliveredBefore != await DeliveredTokenHashAsync(appId, token);
         if (audit is not null)
         {
             var (action, eventType) = row.Status switch
@@ -85,7 +87,14 @@ public sealed class AppPermissionService(
         return await GetStatusAsync(appId, token);
     }
 
-    public async Task<(Guid AppId, string Permission)?> ValidateCredentialAsync(string tokenValue, CancellationToken token)
+    /// <summary>The credential delivered to the app as APP_AUTOMATON_API_KEY, identified by its hash.</summary>
+    internal static IQueryable<AppPermissionApproval> DeliveredCredential(IQueryable<AppPermissionApproval> approvals, Guid appId)
+        => approvals.Where(x => x.AppId == appId && x.ProtectedKey != null).OrderBy(x => x.Permission);
+
+    private async Task<string?> DeliveredTokenHashAsync(Guid appId, CancellationToken token)
+        => (await DeliveredCredential(db.AppPermissionApprovals.AsNoTracking(), appId).FirstOrDefaultAsync(token))?.TokenHash;
+
+    public async Task<(Guid AppId, IReadOnlyList<string> Permissions)?> ValidateCredentialAsync(string tokenValue, CancellationToken token)
     {
         byte[] bytes;
         try { bytes = Convert.FromBase64String(tokenValue); }
@@ -95,9 +104,12 @@ public sealed class AppPermissionService(
         if (row is null) return null;
         var app = await db.WebApps.Where(item => item.Id == row.AppId)
             .Select(item => new { item.AccessStatus, item.ApplicationContractJson }).SingleOrDefaultAsync(token);
-        if (app is null || app.AccessStatus != AppAccessStatuses.Active
-            || !RequestedPermissions(app.ApplicationContractJson).Contains(row.Permission, StringComparer.Ordinal)) return null;
-        return (row.AppId, row.Permission);
+        if (app is null || app.AccessStatus != AppAccessStatuses.Active) return null;
+        var requested = RequestedPermissions(app.ApplicationContractJson);
+        if (!requested.Contains(row.Permission, StringComparer.Ordinal)) return null;
+        var approved = await db.AppPermissionApprovals.Where(x => x.AppId == row.AppId && x.ProtectedKey != null)
+            .Select(x => x.Permission).ToListAsync(token);
+        return (row.AppId, approved.Where(permission => requested.Contains(permission, StringComparer.Ordinal)).ToArray());
     }
 
     private async Task<string[]> RequestedAsync(Guid appId, CancellationToken token)

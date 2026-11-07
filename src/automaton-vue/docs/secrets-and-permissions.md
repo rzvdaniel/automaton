@@ -30,7 +30,7 @@ An app folder linked to an app on your server ([Create your first app](./getting
 
 ## Request a platform permission
 
-Declare `application.permissions` (today only `backups:read`), deploy, then show the state:
+Declare `application.permissions` (`backups:read` and `server:read`), deploy, then show the state:
 
 ```bash
 automaton permissions status

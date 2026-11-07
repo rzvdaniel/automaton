@@ -132,7 +132,7 @@ public static partial class InstallationUpdate
     private static bool IsActive(InstallationUpdateRun? run) => run?.State is "starting" or "running";
 
     // Installation:Version holds the plain form (0.2.4); requests use the tag form (server-v0.2.4).
-    private static Version? Parse(string? tag)
+    internal static Version? Parse(string? tag)
     {
         if (tag is null) return null;
         var plain = tag.StartsWith("server-v", StringComparison.Ordinal) ? tag["server-v".Length..] : tag;

@@ -312,8 +312,11 @@ public static class ApplicationContractValidator
         return errors;
     }
 
-    /// <summary>The only app permission currently supported.</summary>
+    /// <summary>The first supported app permission, read access to the server's backups.</summary>
     public const string SupportedPermission = "backups:read";
+
+    /// <summary>Every app permission an app can request.</summary>
+    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read"];
 
     private static void ValidatePermissions(List<string>? permissions, ICollection<string> errors)
     {
@@ -322,7 +325,7 @@ public static class ApplicationContractValidator
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var permission in permissions)
         {
-            if (permission != SupportedPermission) errors.Add($"permissions contains unsupported permission '{permission}'");
+            if (!SupportedPermissions.Contains(permission)) errors.Add($"permissions contains unsupported permission '{permission}'");
             if (!seen.Add(permission)) errors.Add($"permissions declares '{permission}' more than once");
         }
     }
