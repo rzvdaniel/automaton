@@ -223,18 +223,24 @@ fi
 "${compose[@]}" up -d --wait --wait-timeout 600
 # Validate actual public HTTPS/API routing as well as container health.
 echo 'Waiting for HTTPS certificates…'
+explain_https_failure() {
+    printf 'The HTTPS check failed at %s. The services may be healthy, but HTTPS is not ready.\n' "$1" >&2
+    "${compose[@]}" logs --no-color --tail 300 traefik 2>/dev/null \
+        | python3 "$bundle_dir/explain_certificate_failure.py" "$domain" || true
+    exit 1
+}
 # Older bundles use /healthz and predate the public /health check.
 if grep -Fq 'http://127.0.0.1:8080/health]' "$install_dir/compose.yaml"; then
     api_health=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health" 2>/dev/null) \
-        || { echo "The API HTTPS health check failed at https://api.$domain/health." >&2; exit 1; }
+        || explain_https_failure "https://api.$domain/health"
     printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' 2>/dev/null || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
 fi
 studio_status=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" 2>/dev/null) \
-    || { echo "The Studio installation status check failed at https://studio.$domain/api/install/status." >&2; exit 1; }
+    || explain_https_failure "https://studio.$domain/api/install/status"
 python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response' <<< "$studio_status" 2>/dev/null \
     || { echo 'The Studio installation status response was invalid.' >&2; exit 1; }
 curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null \
-    || { echo "The Studio HTTPS check failed at https://studio.$domain/." >&2; exit 1; }
+    || explain_https_failure "https://studio.$domain/"
 curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
     || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
 python3 - "$domain" <<'PYBROKER'
