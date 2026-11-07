@@ -14,7 +14,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
 
 ## Steps
 
-1. Validate and deploy. The deployment is asynchronous; wait for `Succeeded` in `automaton status` (the `Deploy complete` line `deploy` prints means the package was applied, not that the app is running).
+1. Validate and deploy. The deployment is asynchronous; the `Deploy complete` line means the package was applied, not that the app is running. Wait for `Running` in `automaton apps`.
 
    ```bash
    automaton validate
@@ -23,7 +23,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
 
    With one online Runner it is assigned automatically. With several, add `--runner NAME`. `automaton deploy <target-slug>` selects a remote deployment target; `--env NAME` selects a local project profile, not a remote target.
 
-2. Check the result.
+2. Check the result. `automaton status` shows the linked app and publish settings, but does not show the deployment state; `automaton apps` shows it in the Status column.
 
    ```bash
    automaton status

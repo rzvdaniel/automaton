@@ -27,7 +27,7 @@ SMTP is not needed to start: the first administrator's email is confirmed by thi
 
 ## Without a browser (SSH or an AI agent)
 
-Studio's setup page calls two endpoints, and you can call them yourself. Needs `jq` and bash (process substitution): `sudo apt-get install -y jq`. Run this on the server, in a shell where the password is typed at a hidden prompt, never given as an argument and never echoed:
+Studio's setup page calls two endpoints, and you can call them yourself. The snippet below needs Bash (for process substitution) and `jq`, which a fresh Ubuntu 24.04 installation does not include; install it first with `sudo apt-get install -y jq`. Run this on the server, in a shell where the password is typed at a hidden prompt, never given as an argument and never echoed:
 
 ```bash
 API=https://api.example.com

@@ -30,6 +30,8 @@ automaton runners install --name main --ssh user@host
 automaton runners install --name main --print-command
 ```
 
+For `--ssh`, the CLI runs the `ssh` executable found on your PATH. On Windows, use Windows OpenSSH (`C:\Windows\System32\OpenSSH\ssh.exe`) on PATH; a Git Bash SSH wrapper can fail with this command.
+
 The CLI asks you to confirm the Docker access. Add `--yes` for automation (required when not interactive). Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds for the Runner to connect (`--timeout` changes this) and prints its Runner ID. `--print-command` also asks for confirmation, so give it `--yes` when there is no terminal, and it then waits for the Runner to enroll: run the printed command on the host within `--timeout` seconds (default 300), or the CLI times out. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
 
 You can also use Studio: **Runners → Install Machine Management Runner**.
