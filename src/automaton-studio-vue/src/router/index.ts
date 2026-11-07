@@ -106,7 +106,7 @@ router.beforeEach(async (to, _from, next) => {
     const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role))
 
     if (!hasRequiredRole) {
-      // User doesn't have required role - redirect to dashboard
+      // User doesn't have required role - redirect to the start page
       next({ path: '/' })
       return
     }

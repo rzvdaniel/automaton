@@ -9,6 +9,19 @@ describe('studio router', () => {
     expect(router.resolve({ name: 'apps' }).path).toBe('/apps')
   })
 
+  it('never navigates to a route name that does not exist', () => {
+    const sources = import.meta.glob('../**/*.{vue,ts}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+    const known = new Set(router.getRoutes().map((route) => route.name).filter(Boolean))
+    const missing: string[] = []
+    for (const [file, text] of Object.entries(sources)) {
+      if (file.endsWith('.test.ts')) continue
+      for (const match of text.matchAll(/(?:router|\$router)\.(?:push|replace)\(\{\s*name:\s*'([^']+)'/g)) {
+        if (!known.has(match[1])) missing.push(`${file}: ${match[1]}`)
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
   it.each([
     '/flows',
     '/flows/generate',

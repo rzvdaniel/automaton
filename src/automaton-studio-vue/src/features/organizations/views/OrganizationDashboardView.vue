@@ -223,7 +223,7 @@ const formatDate = (date: string) => {
           <template #title>
             <div class="flex align-items-center gap-2">
               <i class="pi pi-th-large" style="color: var(--p-primary-color)"></i>
-              <span>{{ isAppUser ? 'My Apps' : 'Apps' }}</span>
+              <span>{{ isAppUser ? 'Assigned apps' : 'Apps' }}</span>
             </div>
           </template>
           <template #content>
@@ -232,10 +232,10 @@ const formatDate = (date: string) => {
           </template>
           <template #footer>
             <Button
-              :label="isAppUser ? 'View My Apps' : 'Manage Apps'"
+              :label="isAppUser ? 'View Apps' : 'Manage Apps'"
               icon="pi pi-arrow-right"
               text
-              @click="isAppUser ? router.push({ name: 'assigned-apps' }) : navigateToApps()"
+              @click="isAppUser ? router.push({ name: 'apps' }) : navigateToApps()"
             />
           </template>
         </Card>

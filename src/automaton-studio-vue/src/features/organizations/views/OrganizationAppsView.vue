@@ -32,15 +32,15 @@ onMounted(async () => {
     const org = await organizationsService.getOrganization(organizationId.value)
     currentUserRole.value = org.currentUserRole || null
     
-    // Redirect AppUsers - they should use My Apps instead
+    // Redirect AppUsers - they cannot manage assignments
     if (isAppUser.value) {
       toast.add({
         severity: 'warn',
         summary: 'Access Restricted',
-        detail: 'AppUsers cannot manage app assignments. Use "My Apps" to view your assigned apps.',
+        detail: 'AppUsers cannot manage app assignments. Open Apps to see the apps available to you.',
         life: 4000,
       })
-      router.push({ name: 'assigned-apps' })
+      router.push({ name: 'apps' })
       return
     }
   } catch (error) {
