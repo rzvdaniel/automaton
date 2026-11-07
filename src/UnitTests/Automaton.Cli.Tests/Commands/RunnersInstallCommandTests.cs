@@ -24,6 +24,21 @@ public class RunnersInstallCommandTests
     }
 
     [Test]
+    public void ToShellInput_UsesOnlyLineFeedsSoWindowsCannotBreakTheHereDocument()
+    {
+        var script = "/bin/sh <<'AUTOMATON_RUNNER_INSTALL'\r\necho ok\r\nAUTOMATON_RUNNER_INSTALL\r\n";
+
+        var input = RunnersInstallCommand.ToShellInput(script);
+
+        Assert.That(input, Is.EqualTo("/bin/sh <<'AUTOMATON_RUNNER_INSTALL'\necho ok\nAUTOMATON_RUNNER_INSTALL\n"));
+        Assert.That(input, Does.Not.Contain("\r"));
+    }
+
+    [Test]
+    public void ToShellInput_EndsWithSingleLineFeed()
+        => Assert.That(RunnersInstallCommand.ToShellInput("echo a\n\n"), Is.EqualTo("echo a\n"));
+
+    [Test]
     public void SshInstallerReceivesSecretOnlyOnStdinAndRedactsFailure()
     {
         if (OperatingSystem.IsWindows()) Assert.Ignore("Requires a POSIX shell script as a fake ssh.");

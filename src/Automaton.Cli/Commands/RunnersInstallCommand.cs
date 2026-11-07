@@ -118,6 +118,9 @@ public static class RunnersInstallCommand
         if (!Prompt()) throw new InvalidOperationException("Installation cancelled.");
     }
 
+    // The script runs in a POSIX shell: any CR (Windows Environment.NewLine, CRLF from the server) would break the here-document.
+    internal static string ToShellInput(string command) => command.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n') + "\n";
+
     internal static async Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct)
     {
         var start = new ProcessStartInfo(ssh is null ? "sudo" : "ssh")
@@ -136,7 +139,7 @@ public static class RunnersInstallCommand
             var stderr = process.StandardError.ReadToEndAsync(limit.Token);
             try
             {
-                await process.StandardInput.WriteLineAsync(command.AsMemory(), limit.Token);
+                await process.StandardInput.WriteAsync(ToShellInput(command).AsMemory(), limit.Token);
                 process.StandardInput.Close();
             }
             catch (IOException) { /* installer exited early; its output is reported below */ }
