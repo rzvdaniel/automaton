@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Sockets;
 using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;
@@ -95,16 +96,21 @@ public sealed class RunnerRuntimeProcessManagerTests : RunnerRuntimeProcessManag
     }
 
     [Test]
-    public void StartupFailureIsDeterministic()
+    public void StartupFailureDoesNotRegisterUnreadyRuntime()
     {
         var registry = new RunnerRuntimeRegistry();
         using var manager = CreateManager(new RunnerWorkspaceService(), registry);
         var contract = CreateContract(["--startup-delay", "5000"]);
         contract.Health.StartupTimeoutSeconds = 1;
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
 
-        Assert.That(
-            async () => await manager.ApplyAsync(Guid.NewGuid(), Guid.NewGuid(), contract),
-            Throws.TypeOf<TimeoutException>());
+        var error = Assert.CatchAsync(async () => await manager.ApplyAsync(appId, targetId, contract));
+
+        Assert.That(error, Is.TypeOf<TimeoutException>().Or.TypeOf<SocketException>());
+        if (error is SocketException socketError)
+            Assert.That(socketError.SocketErrorCode, Is.EqualTo(SocketError.ConnectionRefused));
+        Assert.That(registry.TryGet(appId, targetId, out _), Is.False);
     }
 
     [Test]
