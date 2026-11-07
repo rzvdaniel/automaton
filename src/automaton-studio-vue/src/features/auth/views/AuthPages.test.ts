@@ -69,7 +69,7 @@ describe('agent approval page', () => {
     })
     mocks.approve.mockResolvedValue(undefined)
     mocks.cancel.mockResolvedValue(undefined)
-    const { wrapper, router } = await mountAt(CliAuthorizeView, '/cli/authorize?requestId=r1&code=ABCD-1234')
+    const { wrapper } = await mountAt(CliAuthorizeView, '/cli/authorize?requestId=r1&code=ABCD-1234')
     expect(wrapper.text()).toContain('Let your AI agent in?')
     expect(wrapper.findAll('.cli-code-char').map((c) => c.text()).join('')).toBe('ABCD-1234')
     expect(wrapper.text()).toContain('API Keys')
@@ -86,7 +86,6 @@ describe('agent approval page', () => {
     await deny.trigger('click')
     await flushPromises()
     expect(mocks.cancel).toHaveBeenCalledWith('r1', 'ABCD-1234')
-    expect(router).toBeTruthy()
   })
 
   it('says so when the link has no code', async () => {

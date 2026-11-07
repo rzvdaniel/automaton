@@ -163,7 +163,7 @@ function continueWithGitHub() {
               <router-link to="/forgot-password" class="auth-link">Forgot password?</router-link>
             </div>
             <Password
-              id="password"
+              input-id="password"
               v-model="password"
               autocomplete="current-password"
               :feedback="false"

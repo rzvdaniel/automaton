@@ -34,7 +34,7 @@ export async function signIn(browser: Browser, role: Role, viewport = { width: 1
   const page = await (await browser.newContext({ viewport })).newPage()
   await page.goto('/login')
   await page.locator('input[type=email], #email').fill(email)
-  await page.locator("input[placeholder='Enter your password']").fill(password)
+  await page.locator("#password").fill(password)
   await page.locator('button[type=submit]').click()
   await expect(page).not.toHaveURL(/\/login|\/change-password/, { timeout: 20_000 })
   return page

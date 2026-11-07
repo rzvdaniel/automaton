@@ -151,7 +151,7 @@ function clearError() {
         <div class="auth-field">
           <label for="password">New Password</label>
           <Password
-            id="password"
+            input-id="password"
             v-model="password"
             placeholder="Enter new password"
             toggle-mask
@@ -168,7 +168,7 @@ function clearError() {
         <div class="auth-field">
           <label for="confirmPassword">Confirm Password</label>
           <Password
-            id="confirmPassword"
+            input-id="confirmPassword"
             v-model="confirmPassword"
             placeholder="Confirm new password"
             :feedback="false"

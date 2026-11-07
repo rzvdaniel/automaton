@@ -320,7 +320,7 @@ function handleTurnstileError() {
           <div class="auth-field">
             <label for="password">Password</label>
             <Password
-              id="password"
+              input-id="password"
               v-model="password"
               placeholder="Create a password"
               toggle-mask
@@ -341,7 +341,7 @@ function handleTurnstileError() {
           <div class="auth-field">
             <label for="confirmPassword">Confirm Password</label>
             <Password
-              id="confirmPassword"
+              input-id="confirmPassword"
               v-model="confirmPassword"
               placeholder="Confirm your password"
               :feedback="false"

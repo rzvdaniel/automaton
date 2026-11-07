@@ -320,3 +320,9 @@
   gap: 10px;
   margin-bottom: 16px;
 }
+
+.auth-link--inline {
+  display: inline;
+  min-height: 0;
+  font-size: inherit;
+}
