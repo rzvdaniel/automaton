@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import Card from 'primevue/card'
+import AuthCard from '../components/AuthCard.vue'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -103,101 +103,62 @@ function handleTurnstileError() {
 </script>
 
 <template>
-  <div class="forgot-password-view flex align-items-center justify-content-center min-h-screen">
-    <Card class="forgot-password-card w-full" style="max-width: 400px">
-      <template #header>
-        <div class="text-center pt-4">
-          <i class="pi pi-lock text-4xl mb-3" style="color: var(--p-primary-500)"></i>
-          <h1 class="text-2xl font-bold m-0">Forgot Password</h1>
-          <p class="text-color-secondary mt-2">
-            {{ success ? 'Check your email' : 'Enter your email to reset your password' }}
-          </p>
+  <AuthCard
+    title="Forgot password"
+    :lead="success ? 'Check your email' : 'Enter your email to reset your password'"
+  >
+    <template v-if="success">
+      <Message severity="success" :closable="false" class="mb-4">
+        If an account with that email exists, we've sent password reset instructions.
+      </Message>
+      <p class="auth-note mb-4">
+        Please check your email inbox and spam folder. The link will expire in 24 hours.
+      </p>
+      <router-link to="/login">
+        <Button label="Back to Sign In" class="auth-outline" />
+      </router-link>
+    </template>
+
+    <template v-else>
+      <Message v-if="error" severity="error" :closable="false" class="mb-4">
+        {{ error }}
+      </Message>
+
+      <form class="auth-form" @submit.prevent="handleSubmit">
+        <div class="auth-field">
+          <label for="email">Email Address</label>
+          <InputText
+            id="email"
+            v-model="email"
+            type="email"
+            placeholder="you@example.com"
+            :invalid="hasError('email')"
+            :disabled="isLoading"
+            @input="clearError"
+          />
+          <small v-if="hasError('email')" class="text-red-500">{{ formErrors.email }}</small>
         </div>
-      </template>
 
-      <template #content>
-        <!-- Success message -->
-        <template v-if="success">
-          <Message severity="success" :closable="false" class="mb-4">
-            If an account with that email exists, we've sent password reset instructions.
-          </Message>
-          <p class="text-color-secondary text-sm mb-4">
-            Please check your email inbox and spam folder. The link will expire in 24 hours.
-          </p>
-          <router-link to="/login" class="w-full">
-            <Button label="Back to Sign In" class="w-full" outlined />
+        <div v-if="turnstileEnabled" class="auth-field">
+          <CloudflareTurnstile
+            ref="turnstileRef"
+            :site-key="turnstileSiteKey"
+            @verified="handleTurnstileVerified"
+            @expired="handleTurnstileExpired"
+            @error="handleTurnstileError"
+          />
+          <small v-if="turnstileError" class="text-red-500">{{ turnstileError }}</small>
+        </div>
+
+        <Button type="submit" label="Send Reset Link" class="auth-primary" :loading="isLoading" :disabled="isLoading" />
+
+        <div class="auth-center">
+          <router-link to="/login" class="auth-link">
+            <i class="pi pi-arrow-left mr-1"></i>
+            Back to Sign In
           </router-link>
-        </template>
-
-        <!-- Form -->
-        <template v-else>
-          <!-- Error message -->
-          <Message v-if="error" severity="error" :closable="false" class="mb-4">
-            {{ error }}
-          </Message>
-
-          <form class="flex flex-column gap-4" @submit.prevent="handleSubmit">
-            <div class="flex flex-column gap-2">
-              <label for="email" class="font-medium">Email Address</label>
-              <InputText
-                id="email"
-                v-model="email"
-                type="email"
-                placeholder="Enter your email"
-                class="w-full"
-                :invalid="hasError('email')"
-                :disabled="isLoading"
-                @input="clearError"
-              />
-              <small v-if="hasError('email')" class="text-red-500">
-                {{ formErrors.email }}
-              </small>
-            </div>
-
-            <div v-if="turnstileEnabled" class="flex flex-column gap-2">
-              <CloudflareTurnstile
-                ref="turnstileRef"
-                :site-key="turnstileSiteKey"
-                @verified="handleTurnstileVerified"
-                @expired="handleTurnstileExpired"
-                @error="handleTurnstileError"
-              />
-              <small v-if="turnstileError" class="text-red-500">
-                {{ turnstileError }}
-              </small>
-            </div>
-
-            <Button
-              type="submit"
-              label="Send Reset Link"
-              class="w-full"
-              :loading="isLoading"
-              :disabled="isLoading"
-            />
-
-            <div class="text-center">
-              <router-link to="/login" class="text-primary no-underline hover:underline text-sm">
-                <i class="pi pi-arrow-left mr-1"></i>
-                Back to Sign In
-              </router-link>
-            </div>
-          </form>
-        </template>
-      </template>
-    </Card>
-  </div>
+        </div>
+      </form>
+    </template>
+  </AuthCard>
 </template>
-
-<style scoped>
-.forgot-password-view {
-  background-color: var(--p-surface-50);
-}
-
-:global(.app-dark) .forgot-password-view {
-  background-color: var(--p-surface-950);
-}
-
-.forgot-password-card {
-  margin: 1rem;
-}
-</style>

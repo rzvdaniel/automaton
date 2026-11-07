@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { installService } from '@/features/install/services/install.service'
-import Card from 'primevue/card'
+import '../auth.css'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
@@ -16,6 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const gitHubEnabled = ref(false)
 const userSignUp = ref(false)
+const serverHost = window.location.host
 
 // Form state
 const email = ref('')
@@ -113,18 +114,21 @@ function continueWithGitHub() {
 </script>
 
 <template>
-  <div class="login-view flex align-items-center justify-content-center min-h-screen">
-    <Card class="login-card w-full" style="max-width: 400px">
-      <template #header>
-        <div class="auth-card-header text-center pt-4">
-          <img src="/logo.svg" alt="Automaton logo" class="auth-logo mb-3" />
-          <h1 class="text-2xl font-bold m-0">Automaton Studio</h1>
-          <p class="text-color-secondary mt-2">Sign in to your account</p>
-        </div>
-      </template>
+  <div class="signin auth-page">
+    <section class="signin-side">
+      <div class="auth-brand auth-brand--left"><span class="auth-mark" aria-hidden="true">&gt;_</span>Automaton</div>
+      <div>
+        <h1 class="signin-headline">All your AI-built apps, <span>on your server.</span></h1>
+        <p class="signin-sub">Sign in to manage your apps, who can open them, backups and updates.</p>
+      </div>
+      <p class="signin-host">{{ serverHost }}</p>
+    </section>
 
-      <template #content>
-        <!-- Success message -->
+    <main class="signin-main">
+      <div class="signin-form">
+        <h2>Sign in</h2>
+        <p class="auth-lead">New here? Ask your server's admin for an invite.</p>
+
         <Message v-if="successMessage" severity="success" :closable="false" class="mb-4">
           {{ successMessage }}
         </Message>
@@ -133,120 +137,73 @@ function continueWithGitHub() {
           {{ confirmationErrorMessage }}
         </Message>
 
-        <!-- Error message -->
         <Message v-if="error" severity="error" :closable="false" class="mb-4">
           {{ error }}
         </Message>
 
-        <form class="flex flex-column gap-4" @submit.prevent="handleSubmit">
-          <div class="flex flex-column gap-2">
-            <label for="email" class="font-medium">Email</label>
+        <form class="auth-form" @submit.prevent="handleSubmit">
+          <div class="auth-field">
+            <label for="email">Email</label>
             <InputText
               id="email"
               v-model="email"
               type="email"
-              placeholder="Enter your email"
-              class="w-full"
+              autocomplete="username"
+              placeholder="you@example.com"
               :invalid="hasError('email')"
               :disabled="isLoading"
               @input="clearError"
             />
-            <small v-if="hasError('email')" class="text-red-500">
-              {{ formErrors.email }}
-            </small>
+            <small v-if="hasError('email')" class="text-red-500">{{ formErrors.email }}</small>
           </div>
 
-          <div class="flex flex-column gap-2">
-            <label for="password" class="font-medium">Password</label>
+          <div class="auth-field">
+            <div class="auth-label-row">
+              <label for="password">Password</label>
+              <router-link to="/forgot-password" class="auth-link">Forgot password?</router-link>
+            </div>
             <Password
               id="password"
               v-model="password"
-              placeholder="Enter your password"
+              autocomplete="current-password"
               :feedback="false"
               toggle-mask
-              class="w-full"
               input-class="w-full"
               :invalid="hasError('password')"
               :disabled="isLoading"
               @input="clearError"
             />
-            <small v-if="hasError('password')" class="text-red-500">
-              {{ formErrors.password }}
-            </small>
-          </div>
-
-          <div class="flex align-items-center justify-content-end">
-            <router-link to="/forgot-password" class="text-sm text-primary no-underline hover:underline">
-              Forgot password?
-            </router-link>
+            <small v-if="hasError('password')" class="text-red-500">{{ formErrors.password }}</small>
           </div>
 
           <Button
             type="submit"
-            label="Sign In"
-            class="w-full"
+            label="Sign in"
+            class="auth-primary"
             :loading="isLoading"
             :disabled="isLoading"
           />
 
           <Button
-            type="button"
             v-if="gitHubEnabled"
+            type="button"
             label="Continue with GitHub"
             icon="pi pi-github"
-            severity="secondary"
-            outlined
-            class="w-full"
+            class="auth-outline"
             :disabled="isLoading"
             @click="continueWithGitHub"
           />
 
-          <div v-if="userSignUp" class="text-center">
-            <span class="text-color-secondary text-sm">Don't have an account? </span>
-            <router-link to="/register" class="text-primary no-underline hover:underline text-sm">
-              Sign up
-            </router-link>
+          <div v-if="userSignUp" class="auth-center">
+            <span class="auth-note">Don't have an account?&nbsp;</span>
+            <router-link to="/register" class="auth-link">Sign up</router-link>
           </div>
 
-          <p class="login-preview-note text-center">
-            Automaton is an experimental developer preview platform. Features and infrastructure
-            may change without notice.
+          <p class="auth-note">
+            Signing in from your AI agent? Approve the code it shows you after signing in.
           </p>
         </form>
-      </template>
-    </Card>
+      </div>
+    </main>
   </div>
 </template>
-
-<style scoped>
-.login-view {
-  background-color: var(--p-surface-50);
-}
-
-:global(.app-dark) .login-view {
-  background-color: var(--p-surface-950);
-}
-
-.login-card {
-  margin: 1rem;
-}
-
-.auth-card-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.auth-logo {
-  width: 4rem;
-  height: 4rem;
-  display: block;
-}
-
-.login-preview-note {
-  margin: 0;
-  color: var(--p-text-muted-color);
-  font-size: 0.8rem;
-  line-height: 1.55;
-}
-</style>

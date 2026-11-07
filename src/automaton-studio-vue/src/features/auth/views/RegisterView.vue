@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import Card from 'primevue/card'
+import AuthCard from '../components/AuthCard.vue'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
@@ -230,31 +230,21 @@ function handleTurnstileError() {
 </script>
 
 <template>
-  <div class="register-view flex align-items-center justify-content-center min-h-screen">
-    <Card class="register-card w-full" style="max-width: 400px">
-      <template #header>
-        <div class="auth-card-header text-center pt-4">
-          <img src="/logo.svg" alt="Automaton logo" class="auth-logo mb-3" />
-          <h1 class="text-2xl font-bold m-0">Create Account</h1>
-          <p class="text-color-secondary mt-2">Get started with Automaton Studio</p>
-        </div>
-      </template>
-
-      <template #content>
+  <AuthCard title="Create account" lead="Get started with Automaton Studio">
         <Message v-if="!registrationEnabled" severity="info" :closable="false" class="mb-4">
           {{ registrationStatusMessage }}
         </Message>
         <div v-if="!registrationEnabled" class="text-center">
-          <router-link to="/login" class="text-primary no-underline hover:underline">Sign in</router-link>
+          <router-link to="/login" class="auth-link">Sign in</router-link>
         </div>
         <!-- Error message -->
         <Message v-if="error" severity="error" :closable="false" class="mb-4">
           {{ error }}
         </Message>
 
-        <form v-if="registrationEnabled" class="flex flex-column gap-4" @submit.prevent="handleSubmit">
-          <div class="flex flex-column gap-2">
-            <label for="name" class="font-medium">Full Name</label>
+        <form v-if="registrationEnabled" class="auth-form" @submit.prevent="handleSubmit">
+          <div class="auth-field">
+            <label for="name">Full Name</label>
             <InputText
               id="name"
               v-model="name"
@@ -270,8 +260,8 @@ function handleTurnstileError() {
             </small>
           </div>
 
-          <div class="flex flex-column gap-2">
-            <label for="email" class="font-medium">Email</label>
+          <div class="auth-field">
+            <label for="email">Email</label>
             <InputText
               id="email"
               v-model="email"
@@ -287,9 +277,9 @@ function handleTurnstileError() {
             </small>
           </div>
 
-          <div class="flex flex-column gap-2">
+          <div class="auth-field">
             <div class="flex align-items-center justify-content-between">
-              <label for="publicUsername" class="font-medium">Public Username</label>
+              <label for="publicUsername">Public Username</label>
               <Tag 
                 v-if="usernameStatus === 'available'" 
                 severity="success" 
@@ -327,8 +317,8 @@ function handleTurnstileError() {
             </small>
           </div>
 
-          <div class="flex flex-column gap-2">
-            <label for="password" class="font-medium">Password</label>
+          <div class="auth-field">
+            <label for="password">Password</label>
             <Password
               id="password"
               v-model="password"
@@ -348,8 +338,8 @@ function handleTurnstileError() {
             </small>
           </div>
 
-          <div class="flex flex-column gap-2">
-            <label for="confirmPassword" class="font-medium">Confirm Password</label>
+          <div class="auth-field">
+            <label for="confirmPassword">Confirm Password</label>
             <Password
               id="confirmPassword"
               v-model="confirmPassword"
@@ -367,7 +357,7 @@ function handleTurnstileError() {
             </small>
           </div>
 
-          <div class="flex flex-column gap-2">
+          <div class="auth-field">
             <div class="flex align-items-center gap-2">
               <Checkbox
                 v-model="agreeTerms"
@@ -378,9 +368,9 @@ function handleTurnstileError() {
               />
               <label for="terms" class="text-sm">
                 I agree to the
-                <a href="/terms" target="_blank" rel="noopener noreferrer" class="text-primary no-underline hover:underline">Terms of Service</a>
+                <a href="/terms" target="_blank" rel="noopener noreferrer" class="auth-link">Terms of Service</a>
                 and
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" class="text-primary no-underline hover:underline">Privacy Policy</a>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" class="auth-link">Privacy Policy</a>
                 and understand that Automaton is an experimental preview platform that may experience instability, service interruptions, or data loss.
               </label>
             </div>
@@ -405,7 +395,7 @@ function handleTurnstileError() {
           <Button
             type="submit"
             label="Create Account"
-            class="w-full"
+            class="auth-primary"
             :loading="isLoading"
             :disabled="isLoading"
           />
@@ -414,47 +404,23 @@ function handleTurnstileError() {
             type="button"
             label="Continue with GitHub"
             icon="pi pi-github"
-            severity="secondary"
-            outlined
-            class="w-full"
+            class="auth-outline"
             :disabled="isLoading"
             @click="continueWithGitHub"
           />
 
           <div class="text-center">
             <span class="text-color-secondary text-sm">Already have an account? </span>
-            <router-link to="/login" class="text-primary no-underline hover:underline text-sm">
+            <router-link to="/login" class="auth-link">
               Sign in
             </router-link>
           </div>
         </form>
-      </template>
-    </Card>
-  </div>
+  </AuthCard>
 </template>
 
 <style scoped>
-.register-view {
-  background-color: var(--p-surface-50);
-}
-
-:global(.app-dark) .register-view {
-  background-color: var(--p-surface-950);
-}
-
-.register-card {
-  margin: 1rem;
-}
-
-.auth-card-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.auth-logo {
-  width: 4rem;
-  height: 4rem;
-  display: block;
+.text-red-500 {
+  color: var(--p-red-500);
 }
 </style>

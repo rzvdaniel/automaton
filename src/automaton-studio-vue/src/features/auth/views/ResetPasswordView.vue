@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Card from 'primevue/card'
+import AuthCard from '../components/AuthCard.vue'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -121,125 +121,82 @@ function clearError() {
 </script>
 
 <template>
-  <div class="reset-password-view flex align-items-center justify-content-center min-h-screen">
-    <Card class="reset-password-card w-full" style="max-width: 400px">
-      <template #header>
-        <div class="text-center pt-4">
-          <i
-            :class="success ? 'pi pi-check-circle' : 'pi pi-lock'"
-            class="text-4xl mb-3"
-            :style="{ color: success ? 'var(--p-green-500)' : 'var(--p-primary-500)' }"
-          ></i>
-          <h1 class="text-2xl font-bold m-0">
-            {{ success ? 'Password Set Successfully' : isCreatingPassword ? 'Create Your Password' : 'Set New Password' }}
-          </h1>
-          <p class="text-color-secondary mt-2">
-            {{ success ? 'Your password has been updated' : isCreatingPassword ? 'Set up a password for your account' : 'Create a new password for your account' }}
-          </p>
+  <AuthCard
+    :title="success ? 'Password set successfully' : isCreatingPassword ? 'Create your password' : 'Set new password'"
+    :lead="success ? 'Your password has been updated' : isCreatingPassword ? 'Set up a password for your account' : 'Create a new password for your account'"
+  >
+    <template v-if="invalidLink">
+      <Message severity="error" :closable="false" class="mb-4">
+        Invalid password reset link. The link may be expired or malformed.
+      </Message>
+      <div class="auth-form">
+        <router-link to="/forgot-password"><Button label="Request New Link" class="auth-primary" /></router-link>
+        <router-link to="/login"><Button label="Back to Sign In" class="auth-outline" /></router-link>
+      </div>
+    </template>
+
+    <template v-else-if="success">
+      <Message severity="success" :closable="false" class="mb-4">
+        {{ isCreatingPassword ? 'Your password has been successfully created.' : 'Your password has been successfully reset.' }}
+      </Message>
+      <Button label="Sign In" class="auth-primary" @click="goToLogin" />
+    </template>
+
+    <template v-else>
+      <Message v-if="error" severity="error" :closable="false" class="mb-4">
+        {{ error }}
+      </Message>
+
+      <form class="auth-form" @submit.prevent="handleSubmit">
+        <div class="auth-field">
+          <label for="password">New Password</label>
+          <Password
+            id="password"
+            v-model="password"
+            placeholder="Enter new password"
+            toggle-mask
+            autocomplete="new-password"
+            input-class="w-full"
+            :invalid="hasError('password')"
+            :disabled="isLoading"
+            @input="clearError"
+          />
+          <small v-if="hasError('password')" class="text-red-500">{{ formErrors.password }}</small>
+          <small v-else class="auth-note">Must contain uppercase, lowercase, and number</small>
         </div>
-      </template>
 
-      <template #content>
-        <!-- Invalid link -->
-        <template v-if="invalidLink">
-          <Message severity="error" :closable="false" class="mb-4">
-            Invalid password reset link. The link may be expired or malformed.
-          </Message>
-          <router-link to="/forgot-password" class="w-full block mb-3">
-            <Button label="Request New Link" class="w-full" />
+        <div class="auth-field">
+          <label for="confirmPassword">Confirm Password</label>
+          <Password
+            id="confirmPassword"
+            v-model="confirmPassword"
+            placeholder="Confirm new password"
+            :feedback="false"
+            toggle-mask
+            autocomplete="new-password"
+            input-class="w-full"
+            :invalid="hasError('confirmPassword')"
+            :disabled="isLoading"
+            @input="clearError"
+          />
+          <small v-if="hasError('confirmPassword')" class="text-red-500">{{ formErrors.confirmPassword }}</small>
+        </div>
+
+        <Button
+          type="submit"
+          :label="isCreatingPassword ? 'Create Password' : 'Reset Password'"
+          class="auth-primary"
+          :loading="isLoading"
+          :disabled="isLoading"
+        />
+
+        <div class="auth-center">
+          <router-link to="/login" class="auth-link">
+            <i class="pi pi-arrow-left mr-1"></i>
+            Back to Sign In
           </router-link>
-          <router-link to="/login" class="w-full block">
-            <Button label="Back to Sign In" class="w-full" outlined />
-          </router-link>
-        </template>
-
-        <!-- Success message -->
-        <template v-else-if="success">
-          <Message severity="success" :closable="false" class="mb-4">
-            {{ isCreatingPassword ? 'Your password has been successfully created.' : 'Your password has been successfully reset.' }}
-          </Message>
-          <Button label="Sign In" class="w-full" @click="goToLogin" />
-        </template>
-
-        <!-- Form -->
-        <template v-else>
-          <!-- Error message -->
-          <Message v-if="error" severity="error" :closable="false" class="mb-4">
-            {{ error }}
-          </Message>
-
-          <form class="flex flex-column gap-4" @submit.prevent="handleSubmit">
-            <div class="flex flex-column gap-2">
-              <label for="password" class="font-medium">New Password</label>
-              <Password
-                id="password"
-                v-model="password"
-                placeholder="Enter new password"
-                toggle-mask
-                class="w-full"
-                input-class="w-full"
-                :invalid="hasError('password')"
-                :disabled="isLoading"
-                @input="clearError"
-              />
-              <small v-if="hasError('password')" class="text-red-500">
-                {{ formErrors.password }}
-              </small>
-              <small v-else class="text-color-secondary">
-                Must contain uppercase, lowercase, and number
-              </small>
-            </div>
-
-            <div class="flex flex-column gap-2">
-              <label for="confirmPassword" class="font-medium">Confirm Password</label>
-              <Password
-                id="confirmPassword"
-                v-model="confirmPassword"
-                placeholder="Confirm new password"
-                :feedback="false"
-                toggle-mask
-                class="w-full"
-                input-class="w-full"
-                :invalid="hasError('confirmPassword')"
-                :disabled="isLoading"
-                @input="clearError"
-              />
-              <small v-if="hasError('confirmPassword')" class="text-red-500">
-                {{ formErrors.confirmPassword }}
-              </small>
-            </div>
-
-            <Button
-              type="submit"
-              :label="isCreatingPassword ? 'Create Password' : 'Reset Password'"
-              class="w-full"
-              :loading="isLoading"
-              :disabled="isLoading"
-            />
-
-            <div class="text-center">
-              <router-link to="/login" class="text-primary no-underline hover:underline text-sm">
-                <i class="pi pi-arrow-left mr-1"></i>
-                Back to Sign In
-              </router-link>
-            </div>
-          </form>
-        </template>
-      </template>
-    </Card>
-  </div>
+        </div>
+      </form>
+    </template>
+  </AuthCard>
 </template>
-
-<style scoped>
-.reset-password-view {
-  background-color: var(--p-surface-50);
-}
-
-:global(.app-dark) .reset-password-view {
-  background-color: var(--p-surface-950);
-}
-
-.reset-password-card {
-  margin: 1rem;
-}
-</style>

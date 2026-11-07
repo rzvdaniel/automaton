@@ -35,6 +35,6 @@ export const organizationsRoutes: RouteRecordRaw[] = [
     path: '/organizations/invitations/accept',
     name: 'accept-organization-invitation',
     component: () => import('./views/AcceptInvitationView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, layout: 'auth' },
   },
 ]
