@@ -107,6 +107,7 @@ export interface ApplicationBuildSpec {
   image?: string | null
   command: ApplicationCommandSpec | null
   outputDirectory?: string | null
+  singlePageApp?: boolean
   timeoutSeconds: number
 }
 

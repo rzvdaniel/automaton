@@ -31,6 +31,42 @@ public sealed class MachineStaticSitePublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_ServesTheIndexFallbackOnlyForDeclaredSinglePageApps()
+    {
+        var app = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var publisher = new MachineStaticSitePublisher(
+            new RunnerWorkspaceService(), new MachineStaticServingOptions(),
+            (_, _) => Task.FromResult<MachineStaticServerEndpoint?>(new("127.0.0.1", 32123)),
+            (_, _) => Task.FromResult(true));
+        var workspace = new RunnerWorkspaceService();
+        var versions = workspace.GetPublishedStaticSiteVersionsRoot(app);
+        var configPath = Path.Combine(workspace.GetPublishedStaticMetadataRoot(), "nginx", "default.conf");
+        WriteOutput(app, target, "dist", "site");
+
+        await publisher.PublishAsync(first, app, target, "dist", CancellationToken.None);
+        var plain = await File.ReadAllTextAsync(configPath);
+        await publisher.PublishAsync(first, app, target, "dist", CancellationToken.None, singlePageApp: true);
+        var retriedAsSpa = await File.ReadAllTextAsync(configPath);
+        WriteOutput(app, target, "dist", "site v2");
+        await publisher.PublishAsync(second, app, target, "dist", CancellationToken.None, singlePageApp: true);
+        var replacedAsSpa = await File.ReadAllTextAsync(configPath);
+        var markersWhilePublished = Directory.GetFiles(versions, "*.spa").Select(Path.GetFileName).ToArray();
+        await publisher.UnpublishAsync(app, target, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(plain, Does.Contain("=404;").And.Not.Contain($"/{first:D}/index.html;"));
+            Assert.That(retriedAsSpa, Does.Contain($"/{first:D}/index.html;"));
+            Assert.That(replacedAsSpa, Does.Contain($"/{second:D}/index.html;"));
+            Assert.That(markersWhilePublished, Is.EquivalentTo(new[] { $"{first:D}.spa", $"{second:D}.spa" }));
+            Assert.That(Directory.Exists(versions), Is.False);
+        });
+    }
+
+    [Test]
     public async Task PublishAsync_SeparatesSitesAndRetainsWorkingVersionWhenReplacementFails()
     {
         var firstApp = Guid.NewGuid();

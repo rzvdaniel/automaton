@@ -56,7 +56,7 @@ layout, build system, or application architecture.
 | `application.build.command` | Optional executable, arguments, working directory, environment, and shell setting. |
 | `application.build.image` | Optional OCI image used to execute the build command; defaults to `runtime.image`. |
 | `application.build.outputDirectory` | Optional directory containing the build artifact. |
-| `application.build.singlePageApp` | Static sites only, default `false`. A missing path answers 404. Set `true` for a single-page app whose router needs unknown paths to get `index.html` (200). |
+| `application.build.singlePageApp` | Static sites only, default `false`. A missing path answers 404. Set `true` for a single-page app whose router needs unknown paths to get `index.html` (200). Sites published by an older release lose the fallback when the Runner next rewrites its configuration: declare the field and redeploy them. |
 | `application.build.timeoutSeconds` | Maximum build duration. |
 | `application.runtime.command` | Executable and arguments for the long-running app process. |
 | `application.runtime.image` | OCI image that executes the runtime command; required for new container deployments when `runtime.command` is present. Historical stored contracts remain readable until redeployed with an image. |

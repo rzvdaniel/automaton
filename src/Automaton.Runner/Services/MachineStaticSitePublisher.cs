@@ -70,7 +70,7 @@ public sealed class MachineStaticSitePublisher
 
         var index = ReadIndex();
         if (IsSamePublication(index, appId, operationId))
-            return await EnsureExistingPublicationAsync(index, scope, cancellationToken);
+            return await EnsureExistingPublicationAsync(index, scope, singlePageApp, cancellationToken);
 
         diskAdmission.EnsureAvailable(workspace, minimumFreeDiskMb);
 
@@ -84,8 +84,10 @@ public sealed class MachineStaticSitePublisher
     private async Task<MachineStaticServerEndpoint?> EnsureExistingPublicationAsync(
         IReadOnlyDictionary<Guid, Guid> index,
         HostContainerScope scope,
+        bool singlePageApp,
         CancellationToken cancellationToken)
     {
+        SetSinglePageMarker(Path.Combine(workspace.GetPublishedStaticSiteVersionsRoot(scope.AppId), index[scope.AppId].ToString("D")), singlePageApp);
         await WriteConfigurationAsync(index, cancellationToken);
         var endpoint = await ensureContainer(scope, cancellationToken);
         return endpoint is not null && await reloadContainer(scope, cancellationToken)
@@ -116,7 +118,7 @@ public sealed class MachineStaticSitePublisher
             Directory.CreateDirectory(Path.GetDirectoryName(releaseRoot)!);
             if (Directory.Exists(releaseRoot)) DeleteTreeWithoutFollowingLinks(releaseRoot);
             Directory.Move(stageRoot, releaseRoot);
-            if (singlePageApp) File.WriteAllText(SinglePageMarker(releaseRoot), string.Empty);
+            SetSinglePageMarker(releaseRoot, singlePageApp);
 
             var updated = new Dictionary<Guid, Guid>(index) { [appId] = operationId };
             configurationUpdateStarted = true;
@@ -430,6 +432,12 @@ public sealed class MachineStaticSitePublisher
 
     // A release served as a single-page app has a sibling marker file; it is outside the served release directory.
     private static string SinglePageMarker(string releaseRoot) => releaseRoot + ".spa";
+
+    private static void SetSinglePageMarker(string releaseRoot, bool singlePageApp)
+    {
+        if (singlePageApp) File.WriteAllText(SinglePageMarker(releaseRoot), string.Empty);
+        else File.Delete(SinglePageMarker(releaseRoot));
+    }
 
     private static void DeleteRelease(string releaseRoot)
     {
