@@ -12,6 +12,7 @@ import 'primeflex/primeflex.css'
 // Application styles - AFTER PrimeVue imports
 import './assets/styles/tokens.css'
 import './assets/styles/main.css'
+import './assets/styles/page-family.css'
 import { StudioPreset } from './assets/styles/studio-preset'
 
 import App from './App.vue'

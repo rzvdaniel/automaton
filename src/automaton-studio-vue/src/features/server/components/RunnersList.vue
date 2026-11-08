@@ -109,9 +109,11 @@ async function prepareRemoval(runner: Runner) {
 .runner-rows {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--p-content-border-color);
-  border-radius: 8px;
-  background: var(--p-content-background);
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper);
 }
 
 .runner-row {
@@ -119,11 +121,9 @@ async function prepareRemoval(runner: Runner) {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem 1.5rem;
-  padding: 0.85rem 1rem;
-}
-
-.runner-row + .runner-row {
-  border-top: 1px solid var(--p-content-border-color);
+  padding: 12px 14px;
+  border: 1px solid var(--row-line);
+  border-radius: 12px;
 }
 
 .runner-row__name {
@@ -142,8 +142,8 @@ async function prepareRemoval(runner: Runner) {
   flex-shrink: 0;
 }
 
-.is-online { background: var(--p-green-500); }
-.is-offline { background: var(--p-red-500); }
+.is-online { background: var(--ok); }
+.is-offline { background: var(--signal); }
 
 .runner-row__facts {
   display: flex;
@@ -153,7 +153,7 @@ async function prepareRemoval(runner: Runner) {
 }
 
 .runner-row__facts dt {
-  color: var(--p-text-muted-color);
+  color: var(--ink-soft);
   font-size: 0.8rem;
 }
 

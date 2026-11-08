@@ -171,7 +171,7 @@ async function installFromUrl() {
           @update:search="onSearch"
           @select="show({ category: $event || undefined, page: 1 })"
         />
-        <AppFilterBar label="Catalog" :pills="sourcePills" :active="sourceActive" @select="pickSource" />
+        <AppFilterBar :label="sourcePills.length > 1 ? 'Catalog' : 'Show'" :pills="sourcePills" :active="sourceActive" @select="pickSource" />
       </template>
       <p v-if="(catalog.totalApps ?? catalog.apps.length) === 0" class="catalog-note">The catalog has no apps yet.</p>
       <div v-else-if="catalog.apps.length === 0" class="apps-card apps-empty" role="status">

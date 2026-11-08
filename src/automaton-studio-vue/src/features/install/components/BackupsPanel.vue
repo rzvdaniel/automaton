@@ -2,8 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import { RouterLink } from 'vue-router'
 import { installService } from '../services/install.service'
 import { appsService } from '@/features/apps/services/apps.service'
@@ -111,12 +109,12 @@ async function copy(command: string) {
 </script>
 
 <template>
-  <div class="flex flex-column gap-4">
+  <div class="flex flex-column gap-3 studio-page">
     <Message v-if="loadError" severity="error" :closable="false">{{ loadError }}</Message>
     <template v-else-if="!loading && status">
       <Message v-if="!status.available" severity="warn" :closable="false">
-        Nightly backups are not set up on this server yet. Run the latest server update
-        (<code>sudo bash /opt/automaton-server/update.sh</code>) to enable them.
+        Nightly backups are not set up on this server yet. Update the server to turn them on
+        (<code>sudo bash /opt/automaton-server/update.sh</code>).
       </Message>
       <Message v-else-if="status.lastError" severity="error" :closable="false">{{ status.lastError }}</Message>
       <Message v-else-if="stale" severity="warn" :closable="false">
@@ -127,19 +125,19 @@ async function copy(command: string) {
 
       <div class="grid">
         <div class="col-12 md:col-4">
-          <div class="surface-card border-1 surface-border border-round p-3 h-full" data-test="tile-last">
-            <div class="text-color-secondary text-sm">Last backup</div>
+          <div class="studio-card h-full" data-test="tile-last">
+            <div class="studio-muted">Last backup</div>
             <div class="text-xl font-bold mt-1">{{ ago(status.lastSuccessAt) }}</div>
-            <div class="text-sm text-color-secondary mt-1">
+            <div class="studio-muted mt-1">
               {{ status.lastSuccessAt ? new Date(status.lastSuccessAt).toLocaleString() : 'No backup yet' }}
             </div>
           </div>
         </div>
         <div class="col-12 md:col-4">
-          <div class="surface-card border-1 surface-border border-round p-3 h-full" data-test="tile-next">
-            <div class="text-color-secondary text-sm">Next backup</div>
+          <div class="studio-card h-full" data-test="tile-next">
+            <div class="studio-muted">Next backup</div>
             <div class="text-xl font-bold mt-1">{{ status.available ? (nextBackup && !nextBackup.estimated ? nextBackup.at : 'Tonight') : 'Not scheduled' }}</div>
-            <div class="text-sm text-color-secondary mt-1">
+            <div class="studio-muted mt-1">
               <template v-if="status.available && nextBackup?.estimated">About {{ nextBackup.at }}, then every night</template>
               <template v-else-if="status.available && nextBackup">Then every night</template>
               <template v-else-if="status.available">Every night</template>
@@ -148,8 +146,8 @@ async function copy(command: string) {
           </div>
         </div>
         <div class="col-12 md:col-4">
-          <div class="surface-card border-1 surface-border border-round p-3 h-full" data-test="tile-offsite">
-            <div class="text-color-secondary text-sm">Offsite copy</div>
+          <div class="studio-card h-full" data-test="tile-offsite">
+            <div class="studio-muted">Offsite copy</div>
             <template v-if="offsiteApp">
               <div class="text-xl font-bold mt-1">{{ offsiteApp.name }}</div>
               <RouterLink :to="`/apps/${offsiteApp.id}`" class="text-sm">Open the app to see its runs</RouterLink>
@@ -158,7 +156,7 @@ async function copy(command: string) {
               <div class="text-xl font-bold mt-1">Not set up</div>
               <RouterLink to="/apps/catalog" class="text-sm">Install the Offsite Backup app from the Catalog</RouterLink>
             </template>
-            <div v-else class="text-sm text-color-secondary mt-1">Checking...</div>
+            <div v-else class="studio-muted mt-1">Checking...</div>
           </div>
         </div>
       </div>
@@ -166,7 +164,7 @@ async function copy(command: string) {
       <template v-if="status.available">
         <div class="flex align-items-center gap-2 flex-wrap">
           <Button
-            v-if="status.triggerAvailable" label="Back up now" icon="pi pi-database" size="small"
+            v-if="status.triggerAvailable" label="Back up now" class="btn-main"
             :loading="requesting" :disabled="requesting || (status.requestPending && !status.hint)" data-test="back-up-now" @click="backUpNow"
           />
           <span v-if="requesting || (status.requestPending && !status.hint)" class="text-color-secondary" data-test="backup-requested">
@@ -184,61 +182,58 @@ async function copy(command: string) {
         </div>
 
         <div>
-          <h2 class="text-lg font-bold mt-0 mb-2">History</h2>
-          <DataTable :value="status.backups" size="small" data-key="name" scrollable>
-            <template #empty>No backups yet.</template>
-            <Column header="Backup">
-              <template #body="{ data }">{{ new Date(data.createdAt).toLocaleString() }}</template>
-            </Column>
-            <Column header="Size">
-              <template #body="{ data }">{{ formatSize(data.sizeBytes) }}</template>
-            </Column>
-            <Column header="Encrypted archive">
-              <template #body="{ data }">
-                <span v-if="data.archiveSizeBytes !== null">{{ formatSize(data.archiveSizeBytes) }}</span>
-                <span v-else class="text-color-secondary">Not available</span>
-              </template>
-            </Column>
-            <Column header="Restore the whole server">
-              <template #body="{ data }">
-                <div class="flex align-items-center gap-2">
+          <h2 class="studio-section">History <span class="studio-section__count">{{ status.backups.length }}</span></h2>
+          <div class="studio-card">
+            <p v-if="!status.backups.length" class="studio-muted m-0">No backups yet.</p>
+            <div v-for="data in status.backups" :key="data.name" class="studio-row backup-row">
+              <span class="studio-row__text">
+                <span class="studio-row__name">{{ new Date(data.createdAt).toLocaleString() }}</span>
+                <span class="studio-row__line">{{ formatSize(data.sizeBytes) }}<template v-if="data.archiveSizeBytes !== null"> · encrypted copy {{ formatSize(data.archiveSizeBytes) }}</template></span>
+              </span>
+              <span class="studio-pill" :class="data.archiveSizeBytes !== null ? 'studio-pill--ok' : 'studio-pill--off'">{{ data.archiveSizeBytes !== null ? 'Encrypted' : 'No archive' }}</span>
+              <details class="backup-restore">
+                <summary class="p-button btn-small">Restore the whole server</summary>
+                <div class="flex align-items-center gap-2 mt-2">
                   <code class="text-sm">{{ data.restoreCommand }}</code>
                   <Button
                     :icon="copied === data.restoreCommand ? 'pi pi-check' : 'pi pi-copy'"
                     text rounded size="small" aria-label="Copy restore command" @click="copy(data.restoreCommand)"
                   />
                 </div>
-              </template>
-            </Column>
-          </DataTable>
-          <Message class="mt-3" severity="warn" :closable="false">
-            Restoring replaces the whole database and its keys with the backup; everything written after it is lost. The
-            command asks you to type the server domain and saves the current state as a new backup first.
+              </details>
+            </div>
+          </div>
+          <Message severity="warn" :closable="false">
+            Restoring replaces the whole database and its keys; everything written after the backup is lost.
           </Message>
         </div>
       </template>
 
       <div v-if="apps.length" data-test="app-restore">
-        <h2 class="text-lg font-bold mt-0 mb-2">Restore one app</h2>
-        <p class="mt-0 text-color-secondary">Open an app's Settings page, under Advanced, to go back to an earlier version of that app.</p>
-        <div class="flex flex-wrap gap-3">
-          <RouterLink v-for="app in apps" :key="app.id" :to="{ path: `/apps/${app.id}`, query: { view: 'settings' } }">
+        <h2 class="studio-section">Restore one app</h2>
+        <p class="studio-muted mt-0">Open an app, then Settings, then Advanced.</p>
+        <div class="flex flex-wrap gap-2">
+          <RouterLink v-for="app in apps" :key="app.id" :to="{ path: `/apps/${app.id}`, query: { view: 'settings' } }" class="p-button btn-small">
             {{ app.name }}
           </RouterLink>
         </div>
       </div>
 
       <Message v-if="status.backupRecipient" severity="warn" :closable="false">
-        Encrypted archives cannot be restored without the backup key. Save the recipient in your backup configuration
-        and store the private key in a password manager now. The key remains on this server:
+        Encrypted archives need the backup key. Store the private key in a password manager. It stays on this server:
         <code>{{ status.backupKeyCommand }}</code>
         <div class="mt-2"><code>{{ status.backupRecipient }}</code></div>
       </Message>
       <Message severity="info" :closable="false">
-        These backups live on the same server. Copy the encrypted archive and private key to separate off-site storage,
-        and keep a protected copy of /etc/automaton for the other server credentials. Also turn on your hosting provider's
-        server backups (snapshots).
+        These backups live on this server. Copy them, the private key and /etc/automaton to separate storage, and turn on your host's snapshots.
       </Message>
     </template>
   </div>
 </template>
+
+<style scoped>
+.backup-restore summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; padding: 4px 14px; }
+.backup-restore summary::-webkit-details-marker { display: none; }
+.backup-restore[open] { flex-basis: 100%; }
+.backup-row { flex-wrap: wrap; }
+</style>

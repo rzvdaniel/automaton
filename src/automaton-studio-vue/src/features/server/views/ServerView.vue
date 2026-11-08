@@ -8,6 +8,7 @@ import SelfHostedRunnerInstallDialog from '@/features/runners/components/SelfHos
 import { runnersService } from '@/features/runners/services/runners.service'
 import { isVisibleApplicationRunner } from '@/features/runners/utils/runner-classification'
 import type { Runner } from '@/features/runners/types/runners.types'
+import PageHead from '@/shared/components/PageHead.vue'
 import HealthTiles from '../components/HealthTiles.vue'
 import RunnersList from '../components/RunnersList.vue'
 import ServerUpdateBanner from '../components/ServerUpdateBanner.vue'
@@ -70,25 +71,17 @@ onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
-  <div class="server-view">
-    <div class="flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-      <div>
-        <h1 class="text-3xl font-bold m-0">Server</h1>
-        <p class="text-color-secondary mt-1 mb-0">
-          <template v-if="health?.server.version">Automaton {{ health.server.version }}</template>
-          <template v-else>Health, updates and Runners</template>
-        </p>
-      </div>
-    </div>
+  <div class="server-view studio-page">
+    <PageHead title="Server" :line="health?.server.version ? `Automaton ${health.server.version}` : 'Health, updates and Runners.'" />
 
     <ServerUpdateBanner
       v-if="updateAvailable" class="mb-4" :current="health!.server.version" :latest="health!.server.latestVersion"
       @updated="refresh"
     />
 
-    <section v-if="health" class="mb-5">
+    <section v-if="health" class="mb-4">
       <HealthTiles :health="health" />
-      <p v-if="health.host" class="text-color-secondary text-sm mt-2 mb-0" data-testid="host-os">
+      <p v-if="health.host" class="studio-muted mt-2 mb-0" data-testid="host-os">
         {{ [health.host.osName, health.host.osVersion].filter(Boolean).join(' ') }}
       </p>
     </section>
@@ -98,29 +91,26 @@ onBeforeUnmount(() => clearInterval(timer))
     <Message v-else-if="healthError" severity="warn" :closable="false" class="mb-4">{{ healthError }}</Message>
 
     <section>
-      <div class="flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <h2 class="text-xl font-semibold m-0">Runners</h2>
-        <Button label="Add a Runner" icon="pi pi-plus" size="small" data-testid="add-runner" @click="showInstall = true" />
+      <div class="flex align-items-center justify-content-between flex-wrap gap-2">
+        <h2 class="studio-section">Runners</h2>
+        <Button label="Add a Runner" outlined class="btn-small" data-testid="add-runner" @click="showInstall = true" />
       </div>
       <Message v-if="runnersError" severity="error" :closable="false">{{ runnersError }}</Message>
-      <div v-else-if="loading" class="text-color-secondary">Loading Runners...</div>
+      <div v-else-if="loading" class="studio-muted">Loading Runners...</div>
       <div
-        v-else-if="visibleRunners.length === 0" class="empty border-round p-4 text-center text-color-secondary"
+        v-else-if="visibleRunners.length === 0" class="studio-card text-center studio-muted"
         data-testid="runners-empty"
       >
-        No Runners yet. A Runner is the machine that runs your apps; add one to deploy.
+        No Runners yet. Add one to deploy apps.
       </div>
       <RunnersList v-else :runners="visibleRunners" @changed="loadRunners" />
     </section>
 
-    <section v-if="isAdmin" class="mt-5" data-testid="admin-links">
-      <h2 class="text-xl font-semibold m-0 mb-2">Administration</h2>
-      <p class="text-sm m-0">
-        <template v-for="(link, i) in adminLinks" :key="link.to">
-          <span v-if="i" class="text-color-secondary"> · </span>
-          <RouterLink :to="link.to">{{ link.label }}</RouterLink>
-        </template>
-      </p>
+    <section v-if="isAdmin" data-testid="admin-links">
+      <h2 class="studio-section">Administration</h2>
+      <div class="admin-chips">
+        <RouterLink v-for="link in adminLinks" :key="link.to" :to="link.to" class="chip">{{ link.label }}</RouterLink>
+      </div>
     </section>
 
     <SelfHostedRunnerInstallDialog v-model:visible="showInstall" @created="loadRunners" />
@@ -128,12 +118,5 @@ onBeforeUnmount(() => clearInterval(timer))
 </template>
 
 <style scoped>
-.server-view {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-.empty {
-  border: 1px dashed var(--p-content-border-color);
-}
+.server-view { max-width: 1400px; margin: 0 auto; }
 </style>

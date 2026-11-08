@@ -4,13 +4,14 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
-import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { adminUsersService } from '@/features/admin/services/adminUsersService'
 import type { AdminUser } from '@/features/admin/types/admin.types'
 import { organizationsService } from '@/features/organizations/services/organizationsService'
 import type { OrganizationListItem } from '@/features/organizations/types'
+import PageHead from '@/shared/components/PageHead.vue'
+import AppFilterBar from '@/features/apps/components/AppFilterBar.vue'
 import AdminAddUserDialog from '@/features/admin/components/AdminAddUserDialog.vue'
 import InvitePeopleDialog from '../components/InvitePeopleDialog.vue'
 import NewTeamDialog from '../components/NewTeamDialog.vue'
@@ -94,90 +95,74 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="people">
-    <header class="head">
-      <div>
-        <h1>People</h1>
-        <p class="sub">Who can use this server, and the teams they share apps in.</p>
-      </div>
-      <div class="actions">
-        <Button label="New team" icon="pi pi-plus" severity="secondary" outlined @click="showNewTeam = true" />
-        <Button v-if="isAdmin" label="Create with password" icon="pi pi-key" severity="secondary" text @click="showCreate = true" />
-        <Button v-if="canInvite" label="Invite people" icon="pi pi-user-plus" @click="showInvite = true" />
-      </div>
-    </header>
+  <div class="people studio-page">
+    <PageHead title="People" line="Who can use this server, and the teams they share apps in.">
+      <Button label="New team" outlined class="btn-small" @click="showNewTeam = true" />
+      <Button v-if="isAdmin" label="Create with password" outlined class="btn-small" @click="showCreate = true" />
+      <Button v-if="canInvite" label="Invite people" class="btn-main" @click="showInvite = true" />
+    </PageHead>
 
     <Message v-if="failed" severity="error" :closable="false">
       People could not be loaded.
       <Button label="Try again" link @click="load" />
     </Message>
-    <Skeleton v-else-if="loading" height="12rem" />
+    <div v-else-if="loading" class="studio-card" aria-busy="true"><Skeleton v-for="i in 3" :key="i" height="56px" border-radius="12px" /></div>
 
     <template v-else>
-      <section aria-labelledby="members-title">
-        <h2 id="members-title">Members <span class="count">{{ members.length }}</span></h2>
-        <input v-if="isAdmin" v-model="search" class="search" type="search" placeholder="Search by name or email" aria-label="Search people" @keyup.enter="load" />
-        <p v-if="!members.length" class="empty">No one yet. Invite the first person.</p>
-        <table v-else class="rows">
-          <thead>
-            <tr><th>Name</th><th>Role</th><th>Teams</th><th v-if="isAdmin" class="num">Apps</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="person in members" :key="person.id" :class="{ clickable: isAdmin }" @click="openPerson(person.id)">
-              <td>
-                <div class="name">{{ person.name }}</div>
-                <div v-if="person.name !== person.email" class="muted">{{ person.email }}</div>
-              </td>
-              <td>{{ person.role }}</td>
-              <td>{{ person.teams.join(', ') || '—' }}</td>
-              <td v-if="isAdmin" class="num">{{ person.appCount ?? '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-if="isAdmin && totalUsers > 100" class="muted">Showing the first 100 of {{ totalUsers }} accounts. Search to narrow the list.</p>
-      </section>
+      <h2 id="members-title" class="studio-section">Members <span class="studio-section__count">{{ members.length }}</span></h2>
+      <AppFilterBar
+        v-if="isAdmin"
+        v-model:search="search"
+        label="Search people"
+        placeholder="Search by name or email"
+        :pills="[]"
+        :active="() => false"
+        @keyup.enter="load"
+      />
+      <div class="studio-card">
+        <p v-if="!members.length" class="studio-muted">No one yet. Invite the first person.</p>
+        <component
+          :is="isAdmin ? 'button' : 'div'" v-for="person in members" :key="person.id" class="studio-row"
+          :type="isAdmin ? 'button' : undefined" @click="openPerson(person.id)"
+        >
+          <span class="studio-row__text">
+            <span class="studio-row__name">{{ person.name }}</span>
+            <span class="studio-row__line">{{ person.name !== person.email ? person.email + ' · ' : '' }}{{ person.teams.join(', ') || 'No team' }}</span>
+          </span>
+          <span v-if="isAdmin" class="studio-muted">{{ person.appCount ?? 0 }} apps</span>
+          <span class="studio-pill">{{ person.role }}</span>
+        </component>
+        <p v-if="isAdmin && totalUsers > 100" class="studio-muted">Showing the first 100 of {{ totalUsers }} accounts. Search to narrow the list.</p>
+      </div>
 
-      <section v-if="isAdmin" aria-labelledby="pending-title">
-        <h2 id="pending-title">Pending invites <span class="count">{{ pending.length }}</span></h2>
-        <p v-if="!pending.length" class="empty">No pending invites.</p>
-        <table v-else class="rows">
-          <thead>
-            <tr><th>Email</th><th>Invited</th><th></th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in pending" :key="user.id">
-              <td>
-                <div class="name">{{ user.email }}</div>
-                <Tag value="Waiting to join" severity="warn" />
-              </td>
-              <td>{{ user.registeredAtUtc ? new Date(user.registeredAtUtc).toLocaleDateString() : '—' }}</td>
-              <td class="num">
-                <Button label="Resend" icon="pi pi-send" size="small" text :loading="resending === user.id" @click="resend(user)" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      <template v-if="isAdmin && pending.length">
+        <h2 id="pending-title" class="studio-section">Pending invites <span class="studio-section__count">{{ pending.length }}</span></h2>
+        <div class="studio-card">
+          <div v-for="user in pending" :key="user.id" class="studio-row">
+            <span class="studio-row__text">
+              <span class="studio-row__name">{{ user.email }}</span>
+              <span class="studio-row__line">Invited {{ user.registeredAtUtc ? new Date(user.registeredAtUtc).toLocaleDateString() : '' }}</span>
+            </span>
+            <span class="studio-pill studio-pill--warn">Waiting to join</span>
+            <Button label="Resend" outlined class="btn-small" :loading="resending === user.id" @click="resend(user)" />
+          </div>
+        </div>
+      </template>
 
-      <section aria-labelledby="teams-title">
-        <h2 id="teams-title">Teams <span class="count">{{ teams.length }}</span></h2>
-        <p v-if="!teams.length" class="empty">No teams yet. A team shares apps with its members.</p>
-        <table v-else class="rows">
-          <thead>
-            <tr><th>Team</th><th class="num">Members</th><th class="num">Shared apps</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="team in teams" :key="team.id" class="clickable" @click="router.push({ name: 'organization-dashboard', params: { id: team.id } })">
-              <td>
-                <div class="name">{{ team.name }}</div>
-                <div class="muted">You are {{ team.role === 'OrgAdmin' ? 'a team admin' : team.role === 'Developer' ? 'a developer' : 'an app user' }}</div>
-              </td>
-              <td class="num">{{ team.memberCount }}</td>
-              <td class="num">{{ sharedApps[team.id] ?? '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      <h2 id="teams-title" class="studio-section">Teams <span class="studio-section__count">{{ teams.length }}</span></h2>
+      <div class="studio-card">
+        <p v-if="!teams.length" class="studio-muted">No teams yet. A team shares apps with its members.</p>
+        <button
+          v-for="team in teams" :key="team.id" type="button" class="studio-row"
+          @click="router.push({ name: 'organization-dashboard', params: { id: team.id } })"
+        >
+          <span class="studio-row__text">
+            <span class="studio-row__name">{{ team.name }}</span>
+            <span class="studio-row__line">{{ team.memberCount }} members · {{ sharedApps[team.id] ?? 0 }} shared apps</span>
+          </span>
+          <span class="studio-pill">{{ team.role === 'OrgAdmin' ? 'Team admin' : team.role === 'Developer' ? 'Developer' : 'App user' }}</span>
+        </button>
+      </div>
     </template>
 
     <InvitePeopleDialog v-model:visible="showInvite" :teams="adminTeams" :can-invite-accounts="isAdmin" @done="load" />
@@ -187,21 +172,5 @@ onMounted(load)
 </template>
 
 <style scoped>
-.people { padding: 1.5rem; max-width: 64rem; display: flex; flex-direction: column; gap: 1.75rem; }
-.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
-h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
-h2 { margin: 0 0 0.6rem; font-size: 1.1rem; font-weight: 600; }
-.sub { margin: 0.25rem 0 0; color: var(--p-text-muted-color); }
-.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.count { margin-left: 0.4rem; font-weight: 400; color: var(--p-text-muted-color); }
-.empty, .muted { color: var(--p-text-muted-color); font-size: 0.9rem; margin: 0; }
-.rows { width: 100%; border-collapse: collapse; }
-.rows th { text-align: left; font-weight: 500; font-size: 0.85rem; color: var(--p-text-muted-color); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--p-content-border-color); }
-.rows td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--p-content-border-color); vertical-align: middle; }
-.rows .num { text-align: right; white-space: nowrap; }
-.name { font-weight: 500; }
-.search { width: 100%; max-width: 20rem; margin-bottom: 0.6rem; padding: 0.45rem 0.6rem; border: 1px solid var(--p-content-border-color); border-radius: 6px; background: var(--p-content-background); color: inherit; }
-.clickable { cursor: pointer; }
-.clickable:hover { background: var(--p-content-hover-background); }
-@media (max-width: 640px) { .people { padding: 1rem; } }
+.people { max-width: 1400px; margin: 0 auto; }
 </style>
