@@ -39,11 +39,7 @@ public sealed class EssentialCatalogBootstrapService(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         if (await db.Settings.AnyAsync(s => s.Key == CompletionKey, cancellationToken)) return true;
-        if (!await db.Runners.AnyAsync(r => r.LastConnectedAtUtc != null, cancellationToken)) return false;
-        var adminId = await db.UserRoles
-            .Where(membership => db.Roles.Any(role => role.Id == membership.RoleId && role.Name == UserRole.SystemAdministrator))
-            .Select(membership => membership.UserId)
-            .FirstOrDefaultAsync(cancellationToken);
+        var adminId = await FirstAdministratorWithRunnerAsync(db, cancellationToken);
         if (adminId == Guid.Empty) return false;
 
         // A session lock serializes API replicas; a crash releases it and the next pass resumes missing apps.
@@ -77,23 +73,47 @@ public sealed class EssentialCatalogBootstrapService(
         }
     }
 
+    internal static async Task<Guid> FirstAdministratorWithRunnerAsync(ApplicationDbContext db, CancellationToken cancellationToken)
+    {
+        if (!await db.Runners.AnyAsync(r => r.LastConnectedAtUtc != null, cancellationToken)) return Guid.Empty;
+        return await db.UserRoles
+            .Where(membership => db.Roles.Any(role => role.Id == membership.RoleId && role.Name == UserRole.SystemAdministrator))
+            .Select(membership => membership.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    internal static IReadOnlyList<CatalogEntryDto>? MissingEssentials(
+        CatalogResponse response, IReadOnlySet<(string Repo, string Folder)> installed)
+    {
+        if (response.Unavailable || response.Stale) return null;
+        var missing = new List<CatalogEntryDto>();
+        foreach (var id in AppIds)
+        {
+            var entry = response.Apps.SingleOrDefault(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId);
+            if (entry is null || entry.RequiresNewerServer) return null;
+            if (!installed.Contains((entry.Repo, entry.Folder))) missing.Add(entry);
+        }
+        return missing;
+    }
+
     private async Task<bool> InstallMissingAsync(IServiceProvider services, ApplicationDbContext db, Guid adminId, CancellationToken cancellationToken)
     {
         var catalog = services.GetRequiredService<AppCatalogService>();
         var response = await catalog.GetAsync(adminId, false, cancellationToken,
             new CatalogQuery { Source = CatalogSourceStore.OfficialId, PageSize = CatalogQuery.MaximumPageSize });
-        if (response.Unavailable || response.Stale) return false;
+        var installed = await db.WebApps
+            .Where(app => app.InstalledFromRepo != null && app.WebAppUsers.Any(user => user.UserId == adminId))
+            .Select(app => new { Repo = app.InstalledFromRepo!, Folder = app.InstalledFromFolder ?? "" })
+            .ToListAsync(cancellationToken);
+        var missing = MissingEssentials(response, installed.Select(app => (app.Repo, app.Folder)).ToHashSet());
+        if (missing is null) return false;
         var installer = services.GetRequiredService<AppCatalogInstallService>();
         var userContext = services.GetRequiredService<UserContextService>();
         userContext.ImpersonateUser(adminId);
         try
         {
-            foreach (var id in AppIds)
+            foreach (var entry in missing)
             {
-                var entry = response.Apps.SingleOrDefault(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId);
-                if (entry is null || entry.RequiresNewerServer) return false;
-                if (await db.WebApps.AnyAsync(app => app.InstalledFromRepo == entry.Repo
-                    && app.InstalledFromFolder == entry.Folder && app.WebAppUsers.Any(user => user.UserId == adminId), cancellationToken)) continue;
                 await installer.InstallAsync(new CatalogInstallRequest
                 {
                     Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit
