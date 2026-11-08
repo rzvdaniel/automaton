@@ -33,7 +33,7 @@ describe('app list display', () => {
 
   it('shows the next scheduled run of an Actions-only app in its description', () => {
     const now = new Date()
-    const soon = new Date(now.getTime() + 60_000).toISOString()
+    const soon = new Date(new Date(now).setHours(12, 0, 0, 0)).toISOString()
     const time = new Date(soon).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     expect(appDescription(app({ actionsOnly: true, summary: 'Backs up', nextActionRunAtUtc: soon }))).toContain(`Backs up · next run ${time}`)
     expect(appDescription(app({ actionsOnly: true, nextActionRunAtUtc: null }))).toBe('Action')
