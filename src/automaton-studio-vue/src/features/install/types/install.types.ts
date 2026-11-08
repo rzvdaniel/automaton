@@ -111,4 +111,6 @@ export interface InstallationBackupStatus {
   /** The host can start a backup requested from Studio. */
   triggerAvailable?: boolean
   requestPending?: boolean
+  /** Set when the host has not picked up a backup request. */
+  hint?: string | null
 }

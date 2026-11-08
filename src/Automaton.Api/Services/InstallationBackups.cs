@@ -19,7 +19,8 @@ public sealed record InstallationBackupStatus(
     IReadOnlyList<InstallationBackup> Backups,
     DateTimeOffset? NextRunAt = null,
     bool TriggerAvailable = false,
-    bool RequestPending = false);
+    bool RequestPending = false,
+    string? Hint = null);
 
 public enum InstallationBackupRequestResult { Accepted, InProgress, TriggerMissing, TriggerBlocked }
 
@@ -39,10 +40,14 @@ public static partial class InstallationBackups
     {
         var status = await ReadStatusFileAsync(configuration, token);
         var requests = RequestsDirectory(configuration);
+        var request = Path.Combine(requests, "request.json");
+        var pending = File.Exists(request);
+        var stalled = pending && DateTime.UtcNow - File.GetLastWriteTimeUtc(request) > InstallationUpdate.PickupTimeout;
         return status with
         {
             TriggerAvailable = Directory.Exists(requests),
-            RequestPending = File.Exists(Path.Combine(requests, "request.json"))
+            RequestPending = pending,
+            Hint = stalled ? "The server has not picked up the backup request. On the server, run: sudo bash /opt/automaton-server/backup.sh --install-timer" : null
         };
     }
 

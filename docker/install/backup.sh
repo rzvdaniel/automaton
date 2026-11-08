@@ -58,7 +58,12 @@ write_status() {
     install -d -m 0755 "$status_dir"
     # When the timer fires next (empty if it is not installed); systemd prints it in the server's time zone.
     local next_run
-    next_run=$(date -u -d "$(systemctl show automaton-backup.timer -p NextElapseUSecRealtime --value 2>/dev/null)" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)
+    local next_raw
+    next_raw=$(systemctl show automaton-backup.timer -p NextElapseUSecRealtime --value 2>/dev/null || true)
+    next_run=''
+    if [[ -n "$next_raw" && "$next_raw" != n/a ]]; then
+        next_run=$(date -u -d "$next_raw" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)
+    fi
     python3 - "$backup_root" "$status_dir/backup.json" "$ok" "$error" "$keep" "$recipient_file" "$next_run" <<'PY'
 import json, os, shlex, sys, tempfile
 from datetime import datetime, timezone

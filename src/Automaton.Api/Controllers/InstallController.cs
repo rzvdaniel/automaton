@@ -95,7 +95,7 @@ public class InstallController(InstallService installService, IConfiguration con
             }),
             _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
-                message = "This server cannot start a backup from Studio yet. Run sudo bash /opt/automaton-server/update.sh once on the server to enable it."
+                message = "This server cannot start a backup from Studio yet. Run sudo bash /opt/automaton-server/backup.sh --install-timer once on the server to enable it."
             })
         };
     }

@@ -109,7 +109,12 @@ public sealed class InstallationBackupsTests
         Assert.That(idle.RequestPending, Is.False);
 
         await InstallationBackups.RequestAsync(config, "admin@example.com", Now, CancellationToken.None);
-        Assert.That((await InstallationBackups.ReadAsync(config, CancellationToken.None)).RequestPending, Is.True);
+        var pending = await InstallationBackups.ReadAsync(config, CancellationToken.None);
+        Assert.That(pending.RequestPending, Is.True);
+        Assert.That(pending.Hint, Is.Null);
+
+        File.SetLastWriteTimeUtc(Path.Combine(requests.Path, "request.json"), DateTime.UtcNow.AddMinutes(-5));
+        Assert.That((await InstallationBackups.ReadAsync(config, CancellationToken.None)).Hint, Does.Contain("backup.sh --install-timer"));
     }
 
     [Test]

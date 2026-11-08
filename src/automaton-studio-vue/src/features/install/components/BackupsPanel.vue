@@ -123,6 +123,8 @@ async function copy(command: string) {
         The last successful backup is older than {{ staleHours }} hours. Check the server's automaton-backup timer.
       </Message>
 
+      <Message v-if="status.hint" severity="warn" :closable="false">{{ status.hint }}</Message>
+
       <div class="grid">
         <div class="col-12 md:col-4">
           <div class="surface-card border-1 surface-border border-round p-3 h-full" data-test="tile-last">
@@ -165,9 +167,9 @@ async function copy(command: string) {
         <div class="flex align-items-center gap-2 flex-wrap">
           <Button
             v-if="status.triggerAvailable" label="Back up now" icon="pi pi-database" size="small"
-            :loading="requesting" :disabled="requesting || status.requestPending" data-test="back-up-now" @click="backUpNow"
+            :loading="requesting" :disabled="requesting || (status.requestPending && !status.hint)" data-test="back-up-now" @click="backUpNow"
           />
-          <span v-if="requesting || status.requestPending" class="text-color-secondary" data-test="backup-requested">
+          <span v-if="requesting || (status.requestPending && !status.hint)" class="text-color-secondary" data-test="backup-requested">
             Backup requested. It starts within moments.
           </span>
           <template v-if="!status.triggerAvailable">
