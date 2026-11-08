@@ -3,7 +3,8 @@
 # Data Protection keys that decrypt it. Runs nightly from automaton-backup.timer.
 #
 #   backup.sh                  take a backup now and rotate old ones
-#   backup.sh --install-timer  install and start the nightly systemd timer
+#   backup.sh --install-timer  install and start the nightly systemd timer, and the unit that starts a backup
+#                              requested from Studio or the CLI (automaton-backup-request.path)
 #   backup.sh --list           list backups
 set -euo pipefail
 umask 077
@@ -17,7 +18,7 @@ while (($#)); do
         --keep) keep="${2:?Missing number of backups to keep}"; shift 2 ;;
         --install-timer) mode=timer; shift ;;
         --list) mode=list; shift ;;
-        --help) sed -n '2,8p' "$0"; exit 0 ;;
+        --help) sed -n '2,9p' "$0"; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -37,6 +38,7 @@ fi
 recipient_file="$config_dir/backup-recipient"
 identity_file="$config_dir/secrets/backup-key"
 status_dir="$config_dir/status"
+request_dir=${AUTOMATON_BACKUP_REQUEST_DIR:-/var/lib/automaton/backup/requests}
 name_pattern='^automaton-[0-9]{8}T[0-9]{6}Z$'
 
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
@@ -54,10 +56,13 @@ list_backups() {
 write_status() {
     local ok="$1" error="$2"
     install -d -m 0755 "$status_dir"
-    python3 - "$backup_root" "$status_dir/backup.json" "$ok" "$error" "$keep" "$recipient_file" <<'PY'
+    # When the timer fires next (empty if it is not installed); systemd prints it in the server's time zone.
+    local next_run
+    next_run=$(date -u -d "$(systemctl show automaton-backup.timer -p NextElapseUSecRealtime --value 2>/dev/null)" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)
+    python3 - "$backup_root" "$status_dir/backup.json" "$ok" "$error" "$keep" "$recipient_file" "$next_run" <<'PY'
 import json, os, shlex, sys, tempfile
 from datetime import datetime, timezone
-root, target, ok, error, keep, recipient_file = sys.argv[1:]
+root, target, ok, error, keep, recipient_file, next_run = sys.argv[1:]
 previous = {}
 try:
     previous = json.load(open(target))
@@ -96,6 +101,7 @@ status = {
     'lastAttemptAt': now,
     'lastSuccessAt': now if ok == 'true' else previous.get('lastSuccessAt'),
     'lastError': None if ok == 'true' else error,
+    'nextRunAt': next_run or None,
     'keep': int(keep),
     'directory': root,
     'backupRecipient': open(recipient_file).read().strip() if os.path.isfile(recipient_file) else None,
@@ -133,9 +139,37 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
-    chmod 0644 /etc/systemd/system/automaton-backup.service /etc/systemd/system/automaton-backup.timer
+    # The API container never gets root: it only drops request.json here, and this path unit starts the same service.
+    install -d -m 0755 "$(dirname "$request_dir")"
+    install -d -m 0700 "$request_dir"
+    cat > /etc/systemd/system/automaton-backup-request.service <<UNIT
+[Unit]
+Description=Start an Automaton backup requested from Studio or the CLI
+After=docker.service
+Wants=docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/rm -rf -- $request_dir/request.json
+ExecStart=/usr/bin/systemctl start automaton-backup.service
+UNIT
+    cat > /etc/systemd/system/automaton-backup-request.path <<UNIT
+[Unit]
+Description=Watch for Automaton backup requests
+
+[Path]
+PathExists=$request_dir/request.json
+Unit=automaton-backup-request.service
+TriggerLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    chmod 0644 /etc/systemd/system/automaton-backup.service /etc/systemd/system/automaton-backup.timer \
+        /etc/systemd/system/automaton-backup-request.service /etc/systemd/system/automaton-backup-request.path
     systemctl daemon-reload
-    systemctl enable --now automaton-backup.timer >/dev/null
+    systemctl enable --now automaton-backup.timer automaton-backup-request.path >/dev/null
     echo "Nightly backups enabled (automaton-backup.timer); keeping the newest $keep in $backup_root."
 }
 

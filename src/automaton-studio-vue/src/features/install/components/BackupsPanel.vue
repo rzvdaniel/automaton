@@ -17,8 +17,11 @@ const copied = ref<string | null>(null)
 const apps = ref<AppListItem[]>([])
 const appsLoaded = ref(false)
 
-// The Offsite Backup maintenance app, when it is installed on this server.
-const offsiteApp = computed(() => apps.value.find((app) => /off-?site\s*backup/i.test(app.name)) ?? null)
+// The Offsite Backup maintenance app, when it is installed on this server: matched by its catalog id, not its name.
+const OFFSITE_CATALOG_ID = 'offsite-backup'
+const offsiteAppId = ref<string | null>(null)
+const offsiteApp = computed(() => apps.value.find((app) => app.id === offsiteAppId.value) ?? null)
+const requesting = ref(false)
 
 const staleHours = 36
 const stale = computed(() => {
@@ -30,7 +33,12 @@ onMounted(() => { load(); loadApps() })
 
 async function loadApps() {
   try {
-    apps.value = (await appsService.getApps()).sort((a, b) => a.name.localeCompare(b.name))
+    const [list, catalog] = await Promise.all([
+      appsService.getApps(),
+      appsService.getCatalog(false, { installed: true, pageSize: 100 }),
+    ])
+    apps.value = list.sort((a, b) => a.name.localeCompare(b.name))
+    offsiteAppId.value = catalog.apps.find((entry) => entry.id === OFFSITE_CATALOG_ID)?.installedAppId ?? null
   } catch {
     apps.value = [] // the offsite tile and the restore list are hints; the history stays usable
   } finally {
@@ -45,15 +53,37 @@ function ago(iso: string | null) {
   return hours < 48 ? `${hours} hour${hours === 1 ? '' : 's'} ago` : `${Math.floor(hours / 24)} days ago`
 }
 
-// The host timer is nightly; Studio is not told its exact time, so the next run is estimated from the last one.
+// The host reports when its timer fires next; older servers do not, so the next run is estimated from the last one.
 const nextBackup = computed(() => {
+  const reported = status.value?.nextRunAt
+  if (reported) return { at: new Date(reported).toLocaleString(), estimated: false }
   const last = status.value?.lastAttemptAt ?? status.value?.lastSuccessAt
   const next = last ? new Date(last).getTime() + 24 * 3600_000 : 0
-  return next > Date.now() ? new Date(next).toLocaleString() : null
+  return next > Date.now() ? { at: new Date(next).toLocaleString(), estimated: true } : null
 })
 
-async function load() {
-  loading.value = true
+async function backUpNow() {
+  requesting.value = true
+  loadError.value = null
+  const before = status.value?.lastAttemptAt ?? null
+  try {
+    await installService.startBackup()
+    // The host runs the backup within moments; refresh until it reports a newer attempt.
+    for (let attempt = 0; attempt < 24; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 5000))
+      await load(false)
+      if (status.value?.lastAttemptAt !== before) break
+    }
+  } catch (error) {
+    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message
+    loadError.value = message ?? 'The backup could not be started.'
+  } finally {
+    requesting.value = false
+  }
+}
+
+async function load(showLoading = true) {
+  loading.value = showLoading
   loadError.value = null
   try {
     status.value = await installService.getBackups()
@@ -106,9 +136,10 @@ async function copy(command: string) {
         <div class="col-12 md:col-4">
           <div class="surface-card border-1 surface-border border-round p-3 h-full" data-test="tile-next">
             <div class="text-color-secondary text-sm">Next backup</div>
-            <div class="text-xl font-bold mt-1">{{ status.available ? 'Tonight' : 'Not scheduled' }}</div>
+            <div class="text-xl font-bold mt-1">{{ status.available ? (nextBackup && !nextBackup.estimated ? nextBackup.at : 'Tonight') : 'Not scheduled' }}</div>
             <div class="text-sm text-color-secondary mt-1">
-              <template v-if="status.available && nextBackup">About {{ nextBackup }}, then every night</template>
+              <template v-if="status.available && nextBackup?.estimated">About {{ nextBackup.at }}, then every night</template>
+              <template v-else-if="status.available && nextBackup">Then every night</template>
               <template v-else-if="status.available">Every night</template>
               <template v-else>Nightly backups are off</template>
             </div>
@@ -132,13 +163,22 @@ async function copy(command: string) {
 
       <template v-if="status.available">
         <div class="flex align-items-center gap-2 flex-wrap">
-          <strong>Back up now</strong>
-          <span class="text-color-secondary">Run on the server:</span>
-          <code class="text-sm">{{ status.backupNowCommand }}</code>
           <Button
-            :icon="copied === status.backupNowCommand ? 'pi pi-check' : 'pi pi-copy'"
-            text rounded size="small" aria-label="Copy backup command" @click="copy(status.backupNowCommand)"
+            v-if="status.triggerAvailable" label="Back up now" icon="pi pi-database" size="small"
+            :loading="requesting" :disabled="requesting || status.requestPending" data-test="back-up-now" @click="backUpNow"
           />
+          <span v-if="requesting || status.requestPending" class="text-color-secondary" data-test="backup-requested">
+            Backup requested. It starts within moments.
+          </span>
+          <template v-if="!status.triggerAvailable">
+            <strong>Back up now</strong>
+            <span class="text-color-secondary">Run on the server:</span>
+            <code class="text-sm">{{ status.backupNowCommand }}</code>
+            <Button
+              :icon="copied === status.backupNowCommand ? 'pi pi-check' : 'pi pi-copy'"
+              text rounded size="small" aria-label="Copy backup command" @click="copy(status.backupNowCommand)"
+            />
+          </template>
         </div>
 
         <div>

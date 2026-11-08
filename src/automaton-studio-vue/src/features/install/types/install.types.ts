@@ -106,4 +106,9 @@ export interface InstallationBackupStatus {
   backupRecipient: string | null
   backupKeyCommand: string
   backups: InstallationBackup[]
+  /** When the host timer next starts a backup, if the host reports it. */
+  nextRunAt?: string | null
+  /** The host can start a backup requested from Studio. */
+  triggerAvailable?: boolean
+  requestPending?: boolean
 }

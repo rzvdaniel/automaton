@@ -14,6 +14,8 @@ internal static class ServerCommand
         command.AddCommand(BuildUpdate(config));
         command.AddCommand(BuildUpdateStatus(config));
         command.AddCommand(BuildStatus(config));
+        command.AddCommand(BuildBackup(config));
+        command.AddCommand(BuildBackupStatus(config));
         return command;
     }
 
@@ -85,6 +87,42 @@ internal static class ServerCommand
             if (asJson) CliJson.Write(new { success = status == "ok", status, version });
             else Console.WriteLine($"Status: {status}{Environment.NewLine}Version: {version ?? "not reported by this server"}");
             return status == "ok";
+        }, json));
+        return command;
+    }
+
+    private static Command BuildBackup(ConfigService config)
+    {
+        var json = new Option<bool>("--json", "Print the result as JSON");
+        var command = new Command("backup", "Ask the server to take a backup now (system administrators)") { json };
+        command.SetHandler(context => RunAsync(context, config, async (client, asJson, ct) =>
+        {
+            await client.StartServerBackupAsync(ct);
+            const string message = "Backup requested. Check progress with: automaton server backup-status";
+            if (asJson) CliJson.Write(new { success = true, message });
+            else Console.WriteLine(message);
+            return true;
+        }, json));
+        return command;
+    }
+
+    private static Command BuildBackupStatus(ConfigService config)
+    {
+        var json = new Option<bool>("--json", "Print the result as JSON");
+        var command = new Command("backup-status", "Show the last backup and when the next scheduled backup runs") { json };
+        command.SetHandler(context => RunAsync(context, config, async (client, asJson, ct) =>
+        {
+            var status = await client.GetServerBackupsAsync(ct);
+            if (asJson) CliJson.Write(new { success = true, status.Available, status.LastAttemptAt, status.LastSuccessAt, status.LastError, status.NextRunAt, status.RequestPending, status.TriggerAvailable });
+            else
+            {
+                Console.WriteLine($"Backups: {(status.Available ? "set up" : "not set up on this server")}");
+                Console.WriteLine($"Last successful backup: {status.LastSuccessAt?.ToString("O") ?? "never"}");
+                Console.WriteLine($"Next scheduled backup: {status.NextRunAt?.ToString("O") ?? "unknown"}");
+                if (status.RequestPending) Console.WriteLine("A backup has been requested and is waiting for the server.");
+                if (status.LastError is not null) Console.WriteLine($"Last error: {status.LastError}");
+            }
+            return true;
         }, json));
         return command;
     }

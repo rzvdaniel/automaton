@@ -16,3 +16,8 @@ internal sealed record ServerUpdateRun(
 internal sealed record ServerUpdateStatus(
     string? CurrentVersion, bool TriggerAvailable, ServerUpdateRun? Run, string? Log,
     bool Stale = false, bool RequestPending = false, int? RequestAgeSeconds = null, string? Hint = null);
+
+/// <summary>Backup state reported by the host (<c>GET /api/install/backups</c>).</summary>
+internal sealed record ServerBackupStatus(
+    bool Available, DateTimeOffset? LastAttemptAt, DateTimeOffset? LastSuccessAt, string? LastError, int Keep,
+    DateTimeOffset? NextRunAt = null, bool TriggerAvailable = false, bool RequestPending = false);

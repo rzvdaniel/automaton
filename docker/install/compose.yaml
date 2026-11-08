@@ -57,6 +57,7 @@ services:
       - ${CONFIG_DIR:?}/status:/app/installation-status:ro
       - ${BACKUP_DIR:?}/nightly:/app/installation-backups:ro
       - /var/lib/automaton/update/requests:/app/update-requests
+      - /var/lib/automaton/backup/requests:/app/backup-requests
       - /var/lib/automaton/update/status:/app/update-status:ro
     healthcheck:
       test: [CMD, curl, -fsS, http://127.0.0.1:8080/health]

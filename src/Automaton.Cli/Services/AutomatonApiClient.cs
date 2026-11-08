@@ -210,6 +210,20 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(response);
     }
 
+    internal async Task<ServerBackupStatus> GetServerBackupsAsync(CancellationToken ct = default)
+    {
+        using var response = await _http.GetAsync("api/install/backups", ct);
+        await EnsureSuccessAsync(response);
+        return (await ReadJsonAsync(response, ct)).Deserialize<ServerBackupStatus>(JsonOptions)
+            ?? throw new InvalidOperationException("Server backup response was empty.");
+    }
+
+    internal async Task StartServerBackupAsync(CancellationToken ct = default)
+    {
+        using var response = await PostJsonAsync("api/install/backups", "{}", ct);
+        await EnsureSuccessAsync(response);
+    }
+
     /// <summary>The API's /health status ("ok") and, on servers that report it, the release (server-vX.Y.Z).</summary>
     internal async Task<(string Status, string? Version)> GetHealthReportAsync(CancellationToken ct = default)
     {

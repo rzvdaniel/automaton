@@ -161,7 +161,7 @@ internal static class InstallationTestFixture
     internal static IConfiguration Configuration(string? token) => new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?> { ["Bootstrap:Token"] = token }).Build();
 
-    internal static InstallController Controller(ApplicationDbContext db) => new(Service(db), Configuration("server-token"), new SetupEnvironment(), db, null!)
+    internal static InstallController Controller(ApplicationDbContext db) => new(Service(db), Configuration("server-token"), new SetupEnvironment(), db, null!, null!)
     {
         ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
     };

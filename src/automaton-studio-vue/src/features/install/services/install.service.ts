@@ -14,6 +14,11 @@ class InstallService {
     return data
   }
 
+  /** Asks the host to take a backup now (system administrators). */
+  async startBackup(): Promise<void> {
+    await apiClient.post('/api/install/backups')
+  }
+
   async getBackups(): Promise<InstallationBackupStatus> {
     const { data } = await apiClient.get<InstallationBackupStatus>('/api/install/backups')
     return data

@@ -16,11 +16,16 @@ public sealed record InstallationBackupStatus(
     string BackupNowCommand,
     string? BackupRecipient,
     string BackupKeyCommand,
-    IReadOnlyList<InstallationBackup> Backups);
+    IReadOnlyList<InstallationBackup> Backups,
+    DateTimeOffset? NextRunAt = null,
+    bool TriggerAvailable = false,
+    bool RequestPending = false);
+
+public enum InstallationBackupRequestResult { Accepted, InProgress, TriggerMissing, TriggerBlocked }
 
 /// <summary>
 /// Reads the backup status that the host's backup.sh writes into the read-only installation status mount.
-/// The API never runs backups or restores; it shows the commands an operator runs on the server.
+/// The API never runs backups or restores itself; restores are commands an operator runs on the server.
 /// </summary>
 public static partial class InstallationBackups
 {
@@ -28,8 +33,56 @@ public static partial class InstallationBackups
     public static readonly TimeSpan StaleAfter = TimeSpan.FromHours(36);
     private const string InstallDirectory = "/opt/automaton-server";
     public const string DefaultBackupDirectory = "/app/installation-backups";
+    public const string DefaultRequestsDirectory = "/app/backup-requests";
 
     public static async Task<InstallationBackupStatus> ReadAsync(IConfiguration configuration, CancellationToken token)
+    {
+        var status = await ReadStatusFileAsync(configuration, token);
+        var requests = RequestsDirectory(configuration);
+        return status with
+        {
+            TriggerAvailable = Directory.Exists(requests),
+            RequestPending = File.Exists(Path.Combine(requests, "request.json"))
+        };
+    }
+
+    /// <summary>
+    /// Asks the host to take a backup now. Like server updates, the API never runs it: it drops a request file that a
+    /// root systemd path unit (automaton-backup-request.path, installed by backup.sh) turns into the normal backup.
+    /// </summary>
+    public static async Task<InstallationBackupRequestResult> RequestAsync(
+        IConfiguration configuration, string requestedBy, DateTimeOffset now, CancellationToken token)
+    {
+        var requests = RequestsDirectory(configuration);
+        if (!Directory.Exists(requests)) return InstallationBackupRequestResult.TriggerMissing;
+        var target = Path.Combine(requests, "request.json");
+        if (Directory.Exists(target)) return InstallationBackupRequestResult.TriggerBlocked;
+        if (File.Exists(target)) return InstallationBackupRequestResult.InProgress;
+        var temporary = Path.Combine(requests, $".request-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(new
+            {
+                requestedBy = InstallationUpdate.SafeLabel(requestedBy), requestedAtUtc = now
+            }), token);
+            File.Move(temporary, target);
+            return InstallationBackupRequestResult.Accepted;
+        }
+        catch (IOException) when (File.Exists(target)) { return InstallationBackupRequestResult.InProgress; }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return InstallationBackupRequestResult.TriggerBlocked;
+        }
+        finally
+        {
+            try { File.Delete(temporary); } catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+        }
+    }
+
+    private static string RequestsDirectory(IConfiguration configuration)
+        => configuration["Installation:BackupRequestsDirectory"] ?? DefaultRequestsDirectory;
+
+    private static async Task<InstallationBackupStatus> ReadStatusFileAsync(IConfiguration configuration, CancellationToken token)
     {
         var path = Path.Combine(configuration["Installation:StatusDirectory"] ?? DefaultStatusDirectory, "backup.json");
         var backupNow = $"sudo bash {InstallDirectory}/backup.sh";
@@ -46,7 +99,7 @@ public static partial class InstallationBackups
                 .Select(backup => new InstallationBackup(backup.Name!, backup.CreatedAt, backup.SizeBytes,
                     $"sudo bash {InstallDirectory}/restore.sh {backup.Name}", backup.ArchiveSizeBytes, backup.ArchiveSha256))
                 .ToList();
-            return new(true, file.LastAttemptAt, file.LastSuccessAt, file.LastError, file.Keep, file.Directory, backupNow, file.BackupRecipient, file.BackupKeyCommand ?? backupKeyCommand, backups);
+            return new(true, file.LastAttemptAt, file.LastSuccessAt, file.LastError, file.Keep, file.Directory, backupNow, file.BackupRecipient, file.BackupKeyCommand ?? backupKeyCommand, backups, file.NextRunAt);
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -85,6 +138,7 @@ public static partial class InstallationBackups
     {
         public DateTimeOffset? LastAttemptAt { get; init; }
         public DateTimeOffset? LastSuccessAt { get; init; }
+        public DateTimeOffset? NextRunAt { get; init; }
         public string? LastError { get; init; }
         public int Keep { get; init; }
         public string? Directory { get; init; }
