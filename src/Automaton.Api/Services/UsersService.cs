@@ -439,6 +439,9 @@ public class UsersService
 
         if (!result.Succeeded)
         {
+            if (result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.InvalidToken)))
+                throw new InvalidResetLinkException("invalid");
+
             throw new InvalidOperationException($"Error in resetting password");
         }
 
