@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appKindOf, describeSchedule, formatWhen, getAppHealth, statusSentence, type StatusInput } from './app-overview'
+import { accessLabel, appKindOf, describeSchedule, formatWhen, getAppHealth, statusSentence, type StatusInput } from './app-overview'
 import type { AppOperationalSummary } from './app-operational-summary'
 
 const now = new Date('2026-11-08T12:00:00Z')
@@ -73,5 +73,12 @@ describe('status sentence', () => {
   it('says a web app is not live or that its deploy failed', () => {
     expect(text({ kind: 'web' })).toBe('Not live yet. Deploy it from your AI or with the CLI.')
     expect(text({ kind: 'web', failed: true, deployError: 'build broke' })).toBe('The last deploy failed: build broke')
+  })
+})
+
+describe('access label', () => {
+  it('names who can open the app', () => {
+    expect(['internet', 'people', 'server', 'me'].map((audience) => accessLabel(audience as never)))
+      .toEqual(['Public', 'People I choose', 'Everyone on this server', 'Only you'])
   })
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { isAxiosError } from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
@@ -38,10 +38,21 @@ async function load() {
   }
 }
 
-function edit(secretName: string) {
+/** Opens the form in place and focuses the first empty field. */
+async function openForm(secretName = '') {
   name.value = secretName
   value.value = ''
-  document.getElementById('secret-value')?.focus()
+  error.value = null
+  adding.value = true
+  await nextTick()
+  document.getElementById(secretName ? 'secret-value' : 'secret-name')?.focus()
+}
+
+function cancel() {
+  adding.value = false
+  name.value = ''
+  value.value = ''
+  error.value = null
 }
 
 async function save() {
@@ -58,8 +69,7 @@ async function save() {
   saving.value = true
   try {
     await appsService.setSecret(props.appId, secretName, value.value)
-    name.value = ''
-    value.value = ''
+    cancel()
     await load()
   } catch (failure) {
     error.value = message(failure, 'The secret could not be saved.')
@@ -92,49 +102,46 @@ function message(failure: unknown, fallback: string) {
 </script>
 
 <template>
-  <section v-if="error || adding || (loaded && (secrets.length > 0 || (declared?.length ?? 0) > 0))" class="card" aria-labelledby="secrets-title">
+  <section class="card" aria-labelledby="secrets-title" data-testid="secrets-card">
     <div class="card-head">
       <h2 id="secrets-title">Secrets</h2>
-      <span class="hint">Encrypted and never shown again. Used from the next start.</span>
+      <Button v-if="!adding" label="Add a secret" icon="pi pi-plus" size="small" severity="secondary" outlined data-testid="add-secret" @click="openForm()" />
     </div>
-    <p v-if="secrets.length === 0 && missing.length === 0" class="hint">No secrets yet.</p>
+    <p v-if="loaded && secrets.length === 0 && missing.length === 0" class="hint">No secrets yet. They are encrypted, never shown again and used from the next start.</p>
     <div v-for="secret in secrets" :key="secret.name" class="row">
       <code>{{ secret.name }}</code>
       <span class="hint">
         set {{ formatWhen(secret.updatedAtUtc) }} ·
-        <button type="button" class="link" :aria-label="`Replace ${secret.name}`" @click="edit(secret.name)">replace</button> ·
+        <button type="button" class="link" :aria-label="`Replace ${secret.name}`" @click="openForm(secret.name)">replace</button> ·
         <button type="button" class="link" :aria-label="`Remove ${secret.name}`" @click="remove(secret.name)">remove</button>
       </span>
     </div>
     <div v-if="missing.length > 0" data-testid="missing-secrets">
       <div v-for="item in missing" :key="item.name" class="row">
         <span><code>{{ item.name }}</code> <span class="hint">needed, not set<template v-if="item.description"> · {{ item.description }}</template></span></span>
-        <button type="button" class="link" @click="edit(item.name)">set</button>
+        <button type="button" class="link" @click="openForm(item.name)">set</button>
       </div>
     </div>
-    <div class="add">
+    <form v-if="adding" class="add" data-testid="secret-form" @submit.prevent="save">
       <label for="secret-name">Name
-        <InputText id="secret-name" v-model="name" name="secret-name" placeholder="S3_SECRET_KEY" autocomplete="off" v-bind="noAutofill" @keyup.enter="save" />
+        <InputText id="secret-name" v-model="name" name="secret-name" placeholder="S3_SECRET_KEY" autocomplete="off" v-bind="noAutofill" />
       </label>
       <label for="secret-value">Value
-        <InputText id="secret-value" v-model="value" name="secret-value" type="password" autocomplete="new-password" v-bind="noAutofill" @keyup.enter="save" />
+        <InputText id="secret-value" v-model="value" name="secret-value" type="password" autocomplete="new-password" v-bind="noAutofill" />
       </label>
-      <Button label="Save secret" icon="pi pi-lock" :loading="saving" @click="save" />
-    </div>
-    <small class="hint">Saving an existing name replaces its value.</small>
+      <Button type="submit" label="Save secret" icon="pi pi-lock" :loading="saving" />
+      <Button type="button" label="Cancel" severity="secondary" text @click="cancel" />
+    </form>
+    <small v-if="adding" class="hint">Saving an existing name replaces its value.</small>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
   </section>
-  <div v-else-if="loaded" class="empty" data-testid="no-secrets">
-    No secrets · <button type="button" class="link" @click="adding = true">Add a secret</button>
-  </div>
 </template>
 
 <style scoped>
 .card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
-.card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .hint { color: var(--ink-soft); font-size: 13px; }
-.empty { padding: 4px 4px; color: var(--ink-soft); font-size: 13px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
 code { font-family: var(--mono); font-size: 13px; }
 .link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }

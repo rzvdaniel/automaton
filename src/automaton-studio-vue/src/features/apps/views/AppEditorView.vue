@@ -21,10 +21,10 @@ import { actionSchedulesService, type ActionModule, type ActionSchedule } from '
 import { appsService, type AppActionExecution } from '../services/apps.service'
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { AppDeploymentTarget } from '../types/apps.types'
+import type { AppDeploymentTarget, AppSharing } from '../types/apps.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
-import { appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
+import { accessLabel, appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const route = useRoute()
@@ -39,6 +39,7 @@ const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const executions = ref<AppActionExecution[]>([])
 const schedules = ref<ActionSchedule[]>([])
 const actions = ref<ActionModule[]>([])
+const sharing = ref<AppSharing | null>(null)
 const showShareDialog = ref(false)
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const starting = ref(false)
@@ -52,20 +53,15 @@ const liveTarget = computed(() => getLiveTarget(deploymentTargets.value))
 const lastRun = computed(() => [...executions.value].sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0] ?? null)
 const health = computed(() => getAppHealth(editorStore.applicationState, lastRun.value))
 
-const publicAppUrl = computed(() => {
-  const current = app.value
-  return current?.isPublished && current.canLaunchPublicly && current.publicUrl ? getPublishedAppUrl(current.publicUrl) : ''
-})
-const openAppUrl = computed(() => {
-  if (!app.value || kind.value === 'tool') return ''
-  if (publicAppUrl.value) return publicAppUrl.value
-  return liveTarget.value?.genericRuntimeDeployed ? getStudioApplicationUrl(app.value.id) : ''
-})
+/** The public address, once the app is published. */
+const publicAppUrl = computed(() => kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed && app.value?.isPublished && app.value.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : '')
+/** The sign-in address: opens for the owner and the people it is shared with. */
+const privateAppUrl = computed(() =>
+  app.value && kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed ? getDeployedAppUrl(app.value.id) : '')
 /** The address of the app itself (an API's base URL); empty until it is live. */
-const address = computed(() => {
-  if (!app.value || kind.value === 'tool') return ''
-  return publicAppUrl.value || (liveTarget.value?.genericRuntimeDeployed ? getDeployedAppUrl(app.value.id) : '')
-})
+const address = computed(() => (kind.value === 'tool' ? '' : publicAppUrl.value || privateAppUrl.value))
+const openAppUrl = computed(() => publicAppUrl.value || (privateAppUrl.value ? getStudioApplicationUrl(app.value!.id) : ''))
+const access = computed(() => kind.value === 'tool' || !sharing.value ? '' : accessLabel(sharing.value.audience))
 const apiReferenceUrl = computed(() => {
   const path = app.value?.application?.openapi
   return address.value && path ? new URL(path, address.value).toString() : ''
@@ -108,6 +104,7 @@ onMounted(async () => {
     await editorStore.loadApp(appId.value)
     await handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
     void loadWhatItDoes()
+    void loadSharing()
     if (wantsShare) showShareDialog.value = true
   } catch (error: unknown) {
     toast.add({
@@ -254,7 +251,16 @@ async function handleTargetsChanged(targets: AppDeploymentTarget[]) {
   }
 }
 
+async function loadSharing() {
+  try {
+    sharing.value = await appsService.getSharing(appId.value)
+  } catch {
+    sharing.value = null
+  }
+}
+
 async function handleSharingChanged() {
+  void loadSharing()
   // The address people open the app at follows who can open the app.
   await editorStore.refreshApp(appId.value)
 }
@@ -276,11 +282,13 @@ async function handleSharingChanged() {
             <div class="title-line">
               <h1>{{ app.name }}</h1>
               <span class="pill" :class="`pill--${health}`" data-testid="app-health">{{ health }}</span>
+              <button v-if="access && app.canUpdate !== false" type="button" class="pill pill--access" title="Change who can open it" data-testid="app-access" @click="showShareDialog = true">{{ access }}</button>
+              <span v-else-if="access" class="pill pill--access" data-testid="app-access">{{ access }}</span>
             </div>
             <p v-if="app.summary" class="summary">{{ app.summary }}</p>
           </div>
           <div class="head-actions">
-            <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
+            <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" icon="pi pi-share-alt" outlined data-testid="share-app" @click="showShareDialog = true" />
             <template v-if="kind === 'tool'">
               <Button
                 label="Run now"
@@ -323,6 +331,9 @@ async function handleSharingChanged() {
           :schedules="schedules"
           :actions="actions"
           :address="address"
+          :public-address="publicAppUrl"
+          :private-address="privateAppUrl"
+          :sharing="sharing"
           @navigate="handleNavigation"
           @share="showShareDialog = true"
         />
@@ -426,6 +437,9 @@ h1 {
 
 .pill--healthy { border: 1px solid var(--ok); color: var(--ok); }
 .pill--failing { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
+.pill--access { border: 1px solid var(--line); background: none; color: var(--ink); }
+button.pill--access { cursor: pointer; }
+button.pill--access:hover { background: var(--row-line); }
 .pill--stopped { background: var(--row-line); color: var(--ink-soft); }
 
 .tabs {

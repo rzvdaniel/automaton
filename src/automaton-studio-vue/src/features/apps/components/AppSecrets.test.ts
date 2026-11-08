@@ -15,8 +15,7 @@ const mountSecrets = () => mount(AppSecrets, {
   global: { plugins: [PrimeVue, ConfirmationService] },
 })
 
-const saveButton = (wrapper: ReturnType<typeof mountSecrets>) =>
-  wrapper.findAll('button').find((button) => button.text().includes('Save secret'))!
+const openForm = (wrapper: ReturnType<typeof mountSecrets>) => wrapper.find('[data-testid="add-secret"]').trigger('click')
 
 describe('AppSecrets', () => {
   it('lists secret names without values and saves a new value', async () => {
@@ -27,10 +26,11 @@ describe('AppSecrets', () => {
     const wrapper = mountSecrets()
     await flushPromises()
     expect(wrapper.text()).toContain('S3_BUCKET')
+    await openForm(wrapper)
 
     await wrapper.find('#secret-name').setValue('S3_SECRET_KEY')
     await wrapper.find('#secret-value').setValue('very-secret')
-    await saveButton(wrapper).trigger('click')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(appsService.setSecret).toHaveBeenCalledWith('app-1', 'S3_SECRET_KEY', 'very-secret')
@@ -42,10 +42,11 @@ describe('AppSecrets', () => {
     vi.mocked(appsService.setSecret).mockClear()
     const wrapper = mountSecrets()
     await flushPromises()
+    await openForm(wrapper)
 
     await wrapper.find('#secret-name').setValue('AUTOMATON_APP_ID')
     await wrapper.find('#secret-value').setValue('x')
-    await saveButton(wrapper).trigger('click')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(appsService.setSecret).not.toHaveBeenCalled()
@@ -55,6 +56,7 @@ describe('AppSecrets', () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
     const wrapper = mountSecrets()
     await flushPromises()
+    await openForm(wrapper)
 
     const nameInput = wrapper.find('input#secret-name').element as HTMLInputElement
     const valueInput = wrapper.find('input#secret-value').element as HTMLInputElement
@@ -80,14 +82,23 @@ describe('AppSecrets', () => {
     expect((wrapper.find('input#secret-name').element as HTMLInputElement).value).toBe('S3_BUCKET')
   })
 
-  it('shows one small row with no secrets, and Add a secret opens the form', async () => {
+  it('always shows the card; Add a secret opens the form in place, focuses Name, and Cancel closes it', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    const wrapper = mount(AppSecrets, { props: { appId: 'app-1' }, global: { plugins: [PrimeVue, ConfirmationService] } })
+    const wrapper = mount(AppSecrets, {
+      props: { appId: 'app-1' },
+      attachTo: document.body,
+      global: { plugins: [PrimeVue, ConfirmationService] },
+    })
     await flushPromises()
-    expect(wrapper.find('[data-testid="no-secrets"]').text()).toContain('No secrets')
+    expect(wrapper.find('[data-testid="secrets-card"]').text()).toContain('No secrets yet')
     expect(wrapper.find('input#secret-name').exists()).toBe(false)
-    await wrapper.find('[data-testid="no-secrets"] button').trigger('click')
-    expect(wrapper.find('input#secret-name').exists()).toBe(true)
+    await openForm(wrapper)
+    await flushPromises()
+    expect(wrapper.find('input#secret-name').element).toBe(document.activeElement)
+    expect(wrapper.find('[data-testid="secrets-card"]').text()).toContain('No secrets yet')
+    await wrapper.findAll('button').find((button) => button.text() === 'Cancel')!.trigger('click')
+    expect(wrapper.find('input#secret-name').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it('lists the secrets the app needs and are not set yet', async () => {
