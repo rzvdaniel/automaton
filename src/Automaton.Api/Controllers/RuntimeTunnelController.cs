@@ -42,11 +42,24 @@ public sealed class RuntimeTunnelController(
                 cancellationToken);
         }
 
-        Response.StatusCode = tunnelResponse.StatusCode;
-        foreach (var (name, values) in tunnelResponse.HeaderValues)
+        try
         {
-            if (!IsHopByHopResponseHeader(name))
-                Response.Headers[name] = values;
+            Response.StatusCode = tunnelResponse.StatusCode;
+            foreach (var (name, values) in tunnelResponse.HeaderValues)
+            {
+                if (!IsHopByHopResponseHeader(name))
+                    Response.Headers[name] = values;
+            }
+        }
+        catch
+        {
+            // Nobody will read the body: release the stream and the app's slot.
+            if (tunnelResponse.BodyStream is { } unread)
+            {
+                await unread.CancelAsync();
+                unread.Dispose();
+            }
+            throw;
         }
 
         if (tunnelResponse.BodyStream is { } bodyStream)

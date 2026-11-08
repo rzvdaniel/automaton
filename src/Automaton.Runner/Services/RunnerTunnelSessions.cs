@@ -17,6 +17,7 @@ internal sealed class RunnerTunnelSessions(TunnelForwarderConfig config, ILogger
     // API acknowledges every 8 chunks; the Runner never has more than this many unacknowledged.
     internal const int SendWindowChunks = 32;
     internal const int AckEveryChunks = 8;
+    private static readonly TimeSpan AckTimeout = TimeSpan.FromMinutes(6);
 
     private readonly ConcurrentDictionary<string, StreamState> streams = new();
     private readonly ConcurrentDictionary<string, SocketSession> sockets = new();
@@ -47,10 +48,14 @@ internal sealed class RunnerTunnelSessions(TunnelForwarderConfig config, ILogger
         if (sockets.TryGetValue(requestId, out var socket)) socket.Cancellation.Cancel();
     }
 
+    /// <summary>Registers a stream before its head is sent, so a cancel sent right after the head is not lost.</summary>
+    public void PrepareStream(string requestId) => streams[requestId] = new StreamState();
+
     public async Task SendBodyAsync(HubConnection connection, string requestId, TunnelForwardResult result)
     {
-        using var state = new StreamState();
-        streams[requestId] = state;
+        if (!streams.TryGetValue(requestId, out var state))
+            streams[requestId] = state = new StreamState();
+        using var owned = state;
         var failed = false;
         try
         {
@@ -59,7 +64,9 @@ internal sealed class RunnerTunnelSessions(TunnelForwarderConfig config, ILogger
             int read;
             while ((read = await body.ReadAsync(buffer, state.Cancellation.Token)) > 0)
             {
-                await state.Window.WaitAsync(state.Cancellation.Token);
+                // No acknowledgement for this long means the API stopped reading: give the slot back.
+                if (!await state.Window.WaitAsync(AckTimeout, state.Cancellation.Token))
+                    throw new TimeoutException("The API stopped acknowledging the stream.");
                 await connection.SendAsync(
                     "TunnelResponseChunk", requestId, buffer.AsSpan(0, read).ToArray(), false, false,
                     state.Cancellation.Token);
@@ -84,6 +91,7 @@ internal sealed class RunnerTunnelSessions(TunnelForwarderConfig config, ILogger
         using var state = new SocketSession();
         sockets[request.RequestId] = state;
         using var socket = new ClientWebSocket();
+        socket.Options.CollectHttpResponseDetails = true;
         try
         {
             var opened = await OpenAsync(socket, request, state.Cancellation.Token);

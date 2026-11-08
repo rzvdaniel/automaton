@@ -122,6 +122,8 @@ internal sealed class HubExecutionHandlerRegistrar
                     response.StatusCode, request.RequestId, response.Error);
                 WriteLine($"⚠️ Controller error ({response.StatusCode}): {response.Error ?? "(no details)"}  [{request.Path}]");
             }
+            if (result.IsStreaming)
+                sessions.PrepareStream(request.RequestId);
             await connection.SendAsync(TunnelResponseMethod, response);
             if (result.IsStreaming)
                 await sessions.SendBodyAsync(connection, request.RequestId, result);

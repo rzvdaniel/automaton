@@ -44,6 +44,7 @@ internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeReg
     private static async Task ProxyWebSocketAsync(HttpContext context, int port, string? path)
     {
         using var upstream = new ClientWebSocket();
+        upstream.Options.CollectHttpResponseDetails = true;
         var connectionTokens = GetConnectionTokens(context.Request.Headers["Connection"]);
         foreach (var header in context.Request.Headers)
         {
