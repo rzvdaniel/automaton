@@ -135,6 +135,7 @@ const source = computed(() => {
           <span>{{ item.permission }}</span>
           <span class="pill" :class="item.approved ? 'pill--ok' : 'pill--bad'">{{ item.approved ? 'approved' : 'waiting for approval' }}</span>
         </div>
+        <p v-if="kind === 'tool' && secretCount === 0 && permissions.length === 0" class="hint">Nothing to set up.</p>
         <div v-if="kind !== 'tool'" class="row">
           <span>{{ whoLabel }}</span>
           <span class="hint">{{ whoValue }} · <a href="#share" @click.prevent="emit('share')">share</a></span>

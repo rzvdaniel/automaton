@@ -5,9 +5,9 @@ import { applicationEventsService } from '@/shared/services/api/application-even
 import type { ApplicationEvent } from '@/shared/types/ai.types'
 import { actionSchedulesService } from '../services/action-schedules.service'
 import { appsService, type AppActionExecution } from '../services/apps.service'
-import type { SecretAuditEntry } from '../types/apps.types'
+import type { AppDeploymentTarget, SecretAuditEntry } from '../types/apps.types'
 import type { ConsoleEntry } from '../types/console.types'
-import { buildActivity, filterActivity, formatActivityTime, type ActivityFilter } from '../utils/app-activity'
+import { buildActivity, deployActivity, filterActivity, formatActivityTime, type ActivityFilter } from '../utils/app-activity'
 import { composeExecutionOutput } from '../utils/execution-output'
 
 const props = defineProps<{
@@ -17,6 +17,7 @@ const props = defineProps<{
   liveOutputAvailable: boolean
   liveLogs: ReadonlyArray<ConsoleEntry>
   refreshKey?: number
+  deployTarget?: AppDeploymentTarget | null
 }>()
 
 const events = ref<ApplicationEvent[]>([])
@@ -44,7 +45,7 @@ async function load() {
 
 watch(() => [props.appId, props.refreshKey], load, { immediate: true })
 
-const all = computed(() => buildActivity(props.executions, events.value, secretHistory.value))
+const all = computed(() => buildActivity(props.executions, events.value, secretHistory.value, deployActivity(props.deployTarget ?? null)))
 const visible = computed(() => filterActivity(all.value, filter.value))
 const problemCount = computed(() => filterActivity(all.value, 'problems').length)
 const hasRuns = computed(() => props.executions.length > 0)

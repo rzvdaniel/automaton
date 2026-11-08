@@ -332,6 +332,7 @@ async function handleSharingChanged() {
           :live-output-available="liveOutputAvailable"
           :live-logs="runtimeLogs"
           :refresh-key="activityRefresh"
+          :deploy-target="kind === 'tool' ? null : liveTarget"
         />
         <AppSettingsPage
           v-else

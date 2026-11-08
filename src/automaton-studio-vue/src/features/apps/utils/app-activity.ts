@@ -32,6 +32,7 @@ export function buildActivity(
   runs: ReadonlyArray<ActivityRun>,
   events: ReadonlyArray<ApplicationEvent>,
   secrets: ReadonlyArray<SecretAuditEntry>,
+  deploys: ReadonlyArray<ActivityItem> = [],
 ): ActivityItem[] {
   const items: ActivityItem[] = []
   for (const run of runs) {
@@ -58,11 +59,34 @@ export function buildActivity(
       kind: 'change',
       tone: 'none',
       subject: '',
-      text: entry.userName ? `${entry.message} by ${entry.userName}` : entry.message,
+      text: describeSecretChange(entry),
       at: entry.createdAtUtc,
     })
   })
-  return items.sort((a, b) => b.at.localeCompare(a.at))
+  const recorded = events.some((event) => event.eventType.includes('Deploy'))
+  return [...items, ...(recorded ? [] : deploys)].sort((a, b) => b.at.localeCompare(a.at))
+}
+
+function describeSecretChange(entry: SecretAuditEntry): string {
+  const by = entry.userName ? ` by ${entry.userName}` : ''
+  if (!entry.name) return `${entry.message}${by}`
+  if (entry.eventType === 'SecretDeleted') return `Secret ${entry.name} removed${by}`
+  return `Secret ${entry.name} ${(entry.version ?? 1) > 1 ? 'replaced' : 'set'}${by}`
+}
+
+/** Deploys the event log did not record: the target remembers its last attempt and last success. */
+export function deployActivity(
+  target: { lastDeploymentAt?: string | null; lastSuccessfulDeploymentAt?: string | null; lastDeploymentError?: string | null } | null,
+): ActivityItem[] {
+  if (!target) return []
+  const items: ActivityItem[] = []
+  if (target.lastSuccessfulDeploymentAt) {
+    items.push({ id: 'deploy-ok', kind: 'change', tone: 'none', subject: '', text: 'Deployed', at: target.lastSuccessfulDeploymentAt })
+  }
+  if (target.lastDeploymentError && target.lastDeploymentAt && target.lastDeploymentAt !== target.lastSuccessfulDeploymentAt) {
+    items.push({ id: 'deploy-failed', kind: 'change', tone: 'failed', subject: '', text: `Deploy failed: ${target.lastDeploymentError}`, at: target.lastDeploymentAt })
+  }
+  return items
 }
 
 export function filterActivity(items: ReadonlyArray<ActivityItem>, filter: ActivityFilter): ActivityItem[] {

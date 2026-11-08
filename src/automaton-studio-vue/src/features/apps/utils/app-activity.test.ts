@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildActivity, filterActivity, formatActivityTime } from './app-activity'
+import { buildActivity, deployActivity, filterActivity, formatActivityTime } from './app-activity'
 import type { ApplicationEvent } from '@/shared/types/ai.types'
 import type { SecretAuditEntry } from '../types/apps.types'
 
@@ -34,6 +34,14 @@ describe('app activity', () => {
     expect(filterActivity(items, 'runs').map((item) => item.id)).toEqual(['run-r1', 'run-r2'])
     expect(filterActivity(items, 'changes')).toHaveLength(3)
     expect(filterActivity(items, 'problems').map((item) => item.id)).toEqual(['run-r2', 'event-e3'])
+  })
+
+  it('words secret changes briefly and adds the last deploys the event log lacks', () => {
+    const merged = buildActivity([], [], [secret({ name: 'S3_KEY', version: 2, userName: 'Ann' })], deployActivity({
+      lastSuccessfulDeploymentAt: '2026-11-08T10:00:00Z', lastDeploymentAt: '2026-11-08T11:00:00Z', lastDeploymentError: 'build broke',
+    }))
+    expect(merged.map((item) => item.text)).toEqual(['Deploy failed: build broke', 'Deployed', 'Secret S3_KEY replaced by Ann'])
+    expect(buildActivity([], [event({})], [], deployActivity({ lastSuccessfulDeploymentAt: '2026-11-08T10:00:00Z' })).map((item) => item.text)).toEqual(['Deployed'])
   })
 
   it('words the time as today, yesterday or a date', () => {
