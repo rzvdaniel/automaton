@@ -10,9 +10,9 @@ describe('railItems', () => {
     expect(labels(more)).toContain('Admin')
   })
 
-  it('hides Backups and Admin from members', () => {
+  it('hides Server, Backups and Admin from members', () => {
     const { main, more } = railItems({ roles: ['User'], appUserOnly: false })
-    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Settings'])
+    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Settings'])
     expect(labels(more)).not.toContain('Admin')
   })
 
@@ -28,7 +28,7 @@ describe('railItems', () => {
       Apps: '/apps',
       Catalog: '/apps/catalog',
       People: '/people',
-      Server: '/runners',
+      Server: '/server',
       Backups: '/admin/installation',
       Settings: '/settings',
     })

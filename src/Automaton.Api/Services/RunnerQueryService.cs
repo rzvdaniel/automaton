@@ -54,8 +54,17 @@ public sealed class RunnerQueryService(
             .Where(x => x.RunnerId != null && runnerIds.Contains(x.RunnerId.Value))
             .ToDictionaryAsync(x => x.RunnerId!.Value, cancellationToken);
 
+        var appCounts = (await dbContext.AppDeploymentTargets.AsNoTracking()
+                .Where(x => x.ExecutionRunnerId != null && runnerIds.Contains(x.ExecutionRunnerId.Value))
+                .Select(x => new { RunnerId = x.ExecutionRunnerId!.Value, x.WebAppId })
+                .Distinct()
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.RunnerId)
+            .ToDictionary(group => group.Key, group => group.Count());
+
         foreach (var result in results)
         {
+            result.AppCount = appCounts.GetValueOrDefault(result.Id);
             if (!hostedStorage.TryGetValue(result.Id, out var hosted))
                 continue;
 

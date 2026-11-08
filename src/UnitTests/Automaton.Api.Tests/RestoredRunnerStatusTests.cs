@@ -26,6 +26,29 @@ public sealed class RestoredRunnerStatusTests
         Assert.That(runners[live].ConnectionId, Is.EqualTo("current-connection"));
     }
 
+    [Test]
+    public async Task RunnerListCountsEachAppOnTheRunnerOnce()
+    {
+        var db = AppAuthorizationTestData.CreateDbContext();
+        var owner = Guid.NewGuid();
+        var busy = AddRunner(db, owner, "busy", "c1", DateTime.UtcNow);
+        var idle = AddRunner(db, owner, "idle", "c2", DateTime.UtcNow);
+        var shared = Guid.NewGuid();
+        db.AppDeploymentTargets.Add(AppDeploymentTarget.CreateLive(shared, busy));
+        db.AppDeploymentTargets.Add(new AppDeploymentTarget { Id = Guid.NewGuid(), WebAppId = shared, Name = "Staging",
+            Slug = "staging", ExecutionRunnerId = busy });
+        db.AppDeploymentTargets.Add(AppDeploymentTarget.CreateLive(Guid.NewGuid(), busy));
+        await db.SaveChangesAsync();
+        var user = AppAuthorizationTestData.CreateUserContextService(owner);
+        var service = new RunnerQueryService(db, new ResourceAuthorizationService(db, user), user,
+            new RunnerConnectionSessionService(db, null!, user));
+
+        var runners = (await service.List(default)).ToDictionary(runner => runner.Id);
+
+        Assert.That(runners[busy].AppCount, Is.EqualTo(2));
+        Assert.That(runners[idle].AppCount, Is.EqualTo(0));
+    }
+
     private static Guid AddRunner(Automaton.Api.Data.ApplicationDbContext db, Guid owner, string name, string connection, DateTime heartbeat)
     {
         var id = Guid.NewGuid();

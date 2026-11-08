@@ -89,7 +89,7 @@ function stateLabel(state: string) {
       <div>Current version: <strong>{{ status.currentVersion ?? 'Unknown' }}</strong></div>
       <Message v-if="runnersToUpgrade > 0" severity="warn" :closable="false" data-testid="runners-need-upgrade">
         {{ runnersToUpgrade }} {{ runnersToUpgrade === 1 ? 'Runner needs' : 'Runners need' }} an upgrade.
-        <a href="/runners">Open Runners</a> and click Upgrade, or run <code>automaton runners upgrade &lt;runner&gt; --wait</code>.
+        <a href="/server">Open Server</a> and click Upgrade, or run <code>automaton runners upgrade &lt;runner&gt; --wait</code>.
       </Message>
       <Message v-if="!status.triggerAvailable" severity="warn" :closable="false">
         This server cannot update itself from Studio yet. Run <code>sudo bash /opt/automaton-server/update.sh</code> on the

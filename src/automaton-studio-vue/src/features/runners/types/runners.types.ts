@@ -56,6 +56,8 @@ export interface Runner {
   hostedRunnerId?: string | null
   isHostedRunner: boolean
   upgradeAvailable?: boolean
+  operatingSystem?: string | null
+  appCount?: number
   storageAllowanceBytes?: number | null
   storageTotalBytes?: number | null
   storageUsagePercent?: number | null
