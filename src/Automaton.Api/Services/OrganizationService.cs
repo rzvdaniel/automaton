@@ -963,15 +963,22 @@ public class OrganizationService : IOrganizationService
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var apps = await GetAssignedAppsQuery(userId, null)
+        var assigned = await GetAssignedAppsQuery(userId, null)
             .Select(assignment => assignment.App!)
             .ToListAsync(cancellationToken);
         // Apps an owner shared with this person, or with everyone on the server, belong in the same list.
-        apps.AddRange(await dbContext.WebApps
+        assigned.AddRange(await dbContext.WebApps
             .Where(app => app.DeletionClaimId == null &&
                           (app.SharedWithServer || dbContext.AppShares.Any(share => share.WebAppId == app.Id && share.UserId == userId)))
             .ToListAsync(cancellationToken));
-        return apps
+        // Apps in a project (team) the user is an active member of: the user can already open them, so list them too.
+        assigned.AddRange(await dbContext.ProjectApps
+            .Where(projectApp => projectApp.Project!.IsActive &&
+                projectApp.Project.Members.Any(member => member.UserId == userId && member.IsActive))
+            .Select(projectApp => projectApp.WebApp!)
+            .Where(app => app.DeletionClaimId == null)
+            .ToListAsync(cancellationToken));
+        return assigned
             .DistinctBy(app => app.Id)
             .ToArray();
     }
