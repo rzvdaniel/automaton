@@ -969,7 +969,9 @@ public class OrganizationService : IOrganizationService
         // Apps an owner shared with this person, or with everyone on the server, belong in the same list.
         assigned.AddRange(await dbContext.WebApps
             .Where(app => app.DeletionClaimId == null &&
-                          (app.SharedWithServer || dbContext.AppShares.Any(share => share.WebAppId == app.Id && share.UserId == userId)))
+                          (app.SharedWithServer || dbContext.AppShares.Any(share => share.WebAppId == app.Id && share.UserId == userId) ||
+                           (app.SharedWithProjectId != null && dbContext.ProjectMembers.Any(member =>
+                               member.ProjectId == app.SharedWithProjectId && member.UserId == userId && member.IsActive && member.Project!.IsActive))))
             .ToListAsync(cancellationToken));
         // Apps in a project (team) the user is an active member of: the user can already open them, so list them too.
         assigned.AddRange(await dbContext.ProjectApps

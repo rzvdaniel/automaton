@@ -4244,6 +4244,9 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<int>("Scope")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("SharedWithProjectId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("SharedWithServer")
                         .HasColumnType("boolean");
 
@@ -4285,6 +4288,8 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.HasIndex("PublicUrl")
                         .IsUnique();
+
+                    b.HasIndex("SharedWithProjectId");
 
                     b.HasIndex("IsProfileFeatured", "IsPublished");
 
@@ -5285,6 +5290,14 @@ namespace Automaton.Infrastructure.Migrations
                         .HasForeignKey("SensitiveVariableId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.WebApp", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.Project", null)
+                        .WithMany()
+                        .HasForeignKey("SharedWithProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.WebAppScreenshot", b =>

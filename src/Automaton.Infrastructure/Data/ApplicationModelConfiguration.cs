@@ -55,6 +55,8 @@ internal static class ApplicationModelConfiguration
 
     private static void ConfigureAppShare(ModelBuilder modelBuilder)
     {
+        // A team share ends when the team is deleted.
+        modelBuilder.Entity<WebApp>().HasOne<Project>().WithMany().HasForeignKey(e => e.SharedWithProjectId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<AppShare>(entity =>
         {
             entity.HasKey(e => new { e.WebAppId, e.UserId });

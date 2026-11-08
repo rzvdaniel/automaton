@@ -72,10 +72,14 @@ public class ResourceAuthorizationService
            await IsSharedWithAsync(appId, userId, cancellationToken) ||
            await IsAdministratorAsync(userId, cancellationToken);
 
-    /// <summary>True when the owner shared the app with this person, or with everyone on the server.</summary>
+    /// <summary>True when the owner shared the app with this person, with a team they belong to, or with everyone on the server.</summary>
     public async Task<bool> IsSharedWithAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
         => await dbContext.AppShares.AnyAsync(share => share.WebAppId == appId && share.UserId == userId, cancellationToken) ||
-           await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.SharedWithServer && app.DeletionClaimId == null, cancellationToken);
+           await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.DeletionClaimId == null &&
+               (app.SharedWithServer ||
+                (app.SharedWithProjectId != null && dbContext.ProjectMembers.Any(member =>
+                    member.ProjectId == app.SharedWithProjectId && member.UserId == userId && member.IsActive &&
+                    member.Project!.IsActive))), cancellationToken);
 
     public async Task<bool> AppExistsAsync(Guid appId, CancellationToken cancellationToken = default)
         => await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.DeletionClaimId == null, cancellationToken);

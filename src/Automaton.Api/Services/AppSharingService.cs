@@ -12,19 +12,26 @@ public static class AppSharingAudiences
 {
     public const string OnlyMe = "me";
     public const string People = "people";
+    public const string Team = "team";
     public const string Server = "server";
     public const string Internet = "internet";
 
-    public static bool IsValid(string? audience) => audience is OnlyMe or People or Server or Internet;
+    public static bool IsValid(string? audience) => audience is OnlyMe or People or Team or Server or Internet;
 }
 
 public sealed record AppSharingPerson(Guid UserId, string Email, string DisplayName);
 
-public sealed record AppSharingState(string Audience, IReadOnlyList<AppSharingPerson> People, string? PublicUrlSlug);
+public sealed record AppSharingTeam(Guid Id, string Name);
+
+/// <param name="Team">The team whose members open the app (audience "team").</param>
+/// <param name="Listed">For "internet": whether the app is listed in the marketplace.</param>
+public sealed record AppSharingState(
+    string Audience, IReadOnlyList<AppSharingPerson> People, string? PublicUrlSlug,
+    AppSharingTeam? Team = null, bool Listed = false);
 
 /// <summary>
-/// One answer to "who can open this app?": only the owner, chosen people, everyone signed in on this server,
-/// or anyone on the internet. Studio, the API and the CLI all go through this service.
+/// One answer to "who can open this app?": only the owner, chosen people, a team, everyone signed in on this server,
+/// or anyone on the internet (optionally listed in the marketplace). Studio, the API and the CLI all go through this service.
 /// </summary>
 public sealed class AppSharingService(
     ApplicationDbContext dbContext,
@@ -42,11 +49,12 @@ public sealed class AppSharingService(
     }
 
     public async Task<AppSharingState> SetAudienceAsync(
-        Guid appId, string audience, string? publicUrlSlug, CancellationToken cancellationToken)
+        Guid appId, string audience, string? publicUrlSlug, Guid? teamId, bool? listed, CancellationToken cancellationToken)
     {
         if (!AppSharingAudiences.IsValid(audience))
-            throw new InvalidOperationException("Choose one of: me, people, server, internet.");
+            throw new InvalidOperationException("Choose one of: me, people, team, server, internet.");
         var app = await LoadManagedAppAsync(appId, cancellationToken);
+        var team = audience == AppSharingAudiences.Team ? await LoadOwnTeamAsync(teamId, cancellationToken) : null;
 
         if (audience == AppSharingAudiences.Internet)
         {
@@ -56,17 +64,26 @@ public sealed class AppSharingService(
             await publicationService.Publish(
                 appId, slug, requiresAuthentication: false, executionRunnerId: null, category: app.Category,
                 tags: app.Tags, isForkable: app.IsForkable,
-                catalogVisibility: app.CatalogVisibility, cancellationToken: cancellationToken);
+                catalogVisibility: listed switch
+                {
+                    true => AppCatalogVisibilities.Listed,
+                    false => AppCatalogVisibilities.Unlisted,
+                    null => app.CatalogVisibility
+                },
+                cancellationToken: cancellationToken);
             app.SharedWithServer = false;
         }
         else
         {
             if (app.IsPublished) await publicationService.Unpublish(appId, cancellationToken);
             app.SharedWithServer = audience == AppSharingAudiences.Server;
+            if (listed == true)
+                throw new InvalidOperationException("Only an app open to anyone on the internet can be listed in the store.");
             if (audience == AppSharingAudiences.OnlyMe)
                 dbContext.AppShares.RemoveRange(await dbContext.AppShares.Where(share => share.WebAppId == appId).ToListAsync(cancellationToken));
         }
 
+        app.SharedWithProjectId = team?.Id;
         await dbContext.SaveChangesAsync(cancellationToken);
         await AuditAsync(appId, $"Sharing set to '{audience}'", cancellationToken);
         return await BuildStateAsync(app, cancellationToken);
@@ -105,6 +122,16 @@ public sealed class AppSharingService(
         return await BuildStateAsync(app, cancellationToken);
     }
 
+    // A team can be chosen only by one of its own members.
+    private async Task<Project> LoadOwnTeamAsync(Guid? teamId, CancellationToken cancellationToken)
+    {
+        if (teamId is null)
+            throw new InvalidOperationException("Choose a team (teamId).");
+        var team = await dbContext.Projects.FirstOrDefaultAsync(project => project.Id == teamId && project.IsActive &&
+            project.Members.Any(member => member.UserId == UserId && member.IsActive), cancellationToken);
+        return team ?? throw new KeyNotFoundException("You are not a member of that team.");
+    }
+
     private async Task<WebApp> LoadManagedAppAsync(Guid appId, CancellationToken cancellationToken)
     {
         var app = await dbContext.WebApps.FirstOrDefaultAsync(a => a.Id == appId && a.DeletionClaimId == null, cancellationToken);
@@ -123,11 +150,17 @@ public sealed class AppSharingService(
                             orderby user.Email
                             select new AppSharingPerson(user.Id, user.Email ?? string.Empty, user.DisplayName ?? string.Empty))
             .ToListAsync(cancellationToken);
-        var audience = IsOpenToInternet(app) ? AppSharingAudiences.Internet
+        var team = app.SharedWithProjectId is null ? null
+            : await dbContext.Projects.Where(project => project.Id == app.SharedWithProjectId)
+                .Select(project => new AppSharingTeam(project.Id, project.DisplayName)).FirstOrDefaultAsync(cancellationToken);
+        var internet = IsOpenToInternet(app);
+        var audience = internet ? AppSharingAudiences.Internet
+            : team is not null ? AppSharingAudiences.Team
             : app.SharedWithServer ? AppSharingAudiences.Server
             : people.Count > 0 ? AppSharingAudiences.People
             : AppSharingAudiences.OnlyMe;
-        return new AppSharingState(audience, people, string.IsNullOrWhiteSpace(app.PublicUrl) ? null : app.PublicUrl);
+        return new AppSharingState(audience, people, string.IsNullOrWhiteSpace(app.PublicUrl) ? null : app.PublicUrl,
+            team, internet && app.CatalogVisibility == AppCatalogVisibilities.Listed);
     }
 
     public static bool IsOpenToInternet(WebApp app) =>

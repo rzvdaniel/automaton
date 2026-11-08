@@ -323,7 +323,7 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    /// <summary>Who can open the app: audience (me, people, server, internet) and the chosen people.</summary>
+    /// <summary>Who can open the app: audience (me, people, team, server, internet) and the chosen people.</summary>
     public async Task<JsonElement> GetSharingAsync(string appId, CancellationToken ct = default)
     {
         using var resp = await _http.GetAsync($"api/apps/{appId}/sharing", ct);
@@ -331,9 +331,10 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    public async Task<JsonElement> SetSharingAsync(string appId, string audience, string? publicUrl, CancellationToken ct = default)
+    public async Task<JsonElement> SetSharingAsync(
+        string appId, string audience, string? publicUrl, string? teamId = null, bool? listed = null, CancellationToken ct = default)
     {
-        var content = new StringContent(JsonSerializer.Serialize(new { audience, publicUrl }, JsonOptions), Encoding.UTF8, "application/json");
+        var content = new StringContent(JsonSerializer.Serialize(new { audience, publicUrl, teamId, listed }, JsonOptions), Encoding.UTF8, "application/json");
         using var resp = await _http.PutAsync($"api/apps/{appId}/sharing", content, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);

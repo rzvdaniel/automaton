@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text.Json;
 using Automaton.Cli.Services;
 using Spectre.Console;
@@ -11,7 +12,7 @@ namespace Automaton.Cli.Commands;
 /// </summary>
 public static class ShareCommand
 {
-    private static readonly string[] Audiences = ["me", "people", "server", "internet"];
+    private static readonly string[] Audiences = ["me", "people", "team", "server", "internet"];
 
     public static Command Build(ConfigService config)
     {
@@ -39,17 +40,38 @@ public static class ShareCommand
 
     private static Command BuildSet(ConfigService config)
     {
-        var audience = new Argument<string>("audience", "me (only you), people (the people you added), server (everyone on this server) or internet (anyone, with a public address)");
+        var audience = new Argument<string>("audience", "me (only you), people (the people you added), team (members of --team), server (everyone on this server) or internet (anyone, with a public address)");
         var slug = new Option<string?>(["--slug", "-s"], "Public address name for 'internet' (kept from before when omitted)");
+        var team = new Option<string?>("--team", "Project (team) name or id for 'team'; its members open the app after signing in. See: automaton project list");
+        var list = new Option<bool>("--list", "With 'internet': list the app in the store (text and images: automaton listing)");
+        var noList = new Option<bool>("--no-list", "With 'internet': keep the app out of the store");
         var json = JsonOption();
-        var command = new Command("set", "Choose who can open the app") { audience, slug, json };
-        command.SetHandler((string choice, string? publicUrl, bool asJson) => RunAsync(asJson, async () =>
+        var command = new Command("set", "Choose who can open the app") { audience, slug, team, list, noList, json };
+        command.SetHandler((InvocationContext context) =>
         {
-            if (!Audiences.Contains(choice, StringComparer.Ordinal))
-                throw new InvalidOperationException($"Choose one of: {string.Join(", ", Audiences)}.");
-            var (client, appId) = Connect(config);
-            using (client) Write(await client.SetSharingAsync(appId, choice, publicUrl), asJson);
-        }), audience, slug, json);
+            var parse = context.ParseResult;
+            var asJson = parse.GetValueForOption(json);
+            return RunAsync(asJson, async () =>
+            {
+                var choice = parse.GetValueForArgument(audience);
+                if (!Audiences.Contains(choice, StringComparer.Ordinal))
+                    throw new InvalidOperationException($"Choose one of: {string.Join(", ", Audiences)}.");
+                if (parse.GetValueForOption(list) && parse.GetValueForOption(noList))
+                    throw new InvalidOperationException("Use either --list or --no-list, not both.");
+                bool? listed = parse.GetValueForOption(list) ? true : parse.GetValueForOption(noList) ? false : null;
+                var (client, appId) = Connect(config);
+                using (client)
+                {
+                    string? teamId = null;
+                    if (choice == "team")
+                    {
+                        var reference = parse.GetValueForOption(team) ?? throw new InvalidOperationException("Name the team: --team NAME.");
+                        teamId = ProjectCommand.PickProject(await client.ListProjectsAsync(), reference).Id;
+                    }
+                    Write(await client.SetSharingAsync(appId, choice, parse.GetValueForOption(slug), teamId, listed), asJson);
+                }
+            });
+        });
         return command;
     }
 
@@ -99,9 +121,14 @@ public static class ShareCommand
         {
             "internet" => "[bold]Anyone on the internet[/] can open this app.",
             "server" => "[bold]Everyone on this server[/] can open this app.",
+            "team" => $"[bold]Members of {Markup.Escape(state.GetProperty("team").GetProperty("name").GetString() ?? "the team")}[/] can open this app.",
             "people" => "[bold]People you choose[/] can open this app.",
             _ => "[bold]Only you[/] can open this app."
         });
+        if (audience == "internet")
+            AnsiConsole.MarkupLine(state.TryGetProperty("listed", out var listed) && listed.ValueKind == JsonValueKind.True
+                ? "Listed in the store."
+                : "Not listed in the store (--list to list it).");
         if (state.TryGetProperty("publicUrlSlug", out var slug) && slug.ValueKind == JsonValueKind.String)
             AnsiConsole.MarkupLine($"Public address name: {Markup.Escape(slug.GetString()!)}");
         foreach (var person in state.GetProperty("people").EnumerateArray())

@@ -21,6 +21,7 @@ import type {
   AppScreenshot,
   PublishAppRequest,
   AppSharing,
+  MyTeam,
   SharingAudience,
   ExportAppResponse,
   LinkedStepInfo,
@@ -215,8 +216,24 @@ class AppsService {
     return (await apiClient.get<AppSharing>(`/api/apps/${id}/sharing`)).data
   }
 
-  async setSharing(id: string, audience: SharingAudience, publicUrl?: string): Promise<AppSharing> {
-    return (await apiClient.put<AppSharing>(`/api/apps/${id}/sharing`, { audience, publicUrl })).data
+  async setSharing(
+    id: string,
+    audience: SharingAudience,
+    publicUrl?: string,
+    teamId?: string,
+    listed?: boolean,
+  ): Promise<AppSharing> {
+    return (await apiClient.put<AppSharing>(`/api/apps/${id}/sharing`, { audience, publicUrl, teamId, listed })).data
+  }
+
+  /** The teams the signed-in person can share an app with. GET /api/projects */
+  async listMyTeams(): Promise<MyTeam[]> {
+    return (await apiClient.get<MyTeam[]>('/api/projects')).data ?? []
+  }
+
+  /** How the app appears in the store. PUT /api/apps/{id}/listing; an empty category clears it. */
+  async updateListing(id: string, listing: { summary: string, category: string, tags: string[] }): Promise<void> {
+    await apiClient.put(`/api/apps/${id}/listing`, listing)
   }
 
   async addSharedPerson(id: string, email: string): Promise<AppSharing> {

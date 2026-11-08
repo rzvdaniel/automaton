@@ -597,7 +597,7 @@ export interface InstallManifest {
 }
 
 /** Who can open an app: only the owner, chosen people, everyone signed in on the server, or anyone on the internet. */
-export type SharingAudience = 'me' | 'people' | 'server' | 'internet'
+export type SharingAudience = 'me' | 'people' | 'team' | 'server' | 'internet'
 
 export interface SharedPerson {
   userId: string
@@ -609,4 +609,14 @@ export interface AppSharing {
   audience: SharingAudience
   people: SharedPerson[]
   publicUrlSlug?: string | null
+  /** The team whose members open the app (audience 'team'). */
+  team?: { id: string, name: string } | null
+  /** For 'internet': whether the app is listed in the store. */
+  listed?: boolean
+}
+
+/** A team (project) the signed-in person belongs to. */
+export interface MyTeam {
+  id: string
+  displayName: string
 }
