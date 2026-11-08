@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHead from '@/shared/components/PageHead.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
@@ -235,30 +236,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="admin-user-detail-view">
-    <div class="page-header">
-      <div>
-        <div class="breadcrumb-row">
-          <Button
-            label="People"
-            link
-            class="breadcrumb-link"
-            @click="goBack"
-          />
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current">{{ user?.name || 'User details' }}</span>
-        </div>
-        <h2 class="page-title">{{ user?.name || 'User Details' }}</h2>
-        <p class="page-subtitle">Profile, security, usage, and activity for this account.</p>
-      </div>
-
-      <Button
-        icon="pi pi-arrow-left"
-        label="Back to People"
-        outlined
-        @click="goBack"
-      />
-    </div>
+  <div class="admin-user-detail-view studio-page">
+    <PageHead :title="user?.name || 'User details'" line="Profile, security, usage and activity for this account.">
+      <Button icon="pi pi-arrow-left" label="People" outlined class="btn-small" @click="goBack" />
+    </PageHead>
 
     <div v-if="isLoading && !user" class="loading-state">
       <ProgressSpinner style="width: 40px; height: 40px" />

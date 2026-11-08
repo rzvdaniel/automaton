@@ -28,23 +28,22 @@ const tiles = computed(() => healthTiles(props.health))
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--p-content-border-color);
-  border-left-width: 4px;
-  border-radius: 8px;
-  background: var(--p-content-background);
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper);
   min-width: 0;
 }
 
-.health-tile--ok { border-left-color: var(--p-green-500); }
-.health-tile--warn { border-left-color: var(--p-orange-500); }
-.health-tile--danger { border-left-color: var(--p-red-500); }
-.health-tile--unknown { border-left-color: var(--p-surface-400); }
+.health-tile__label::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ink-soft); }
+.health-tile--ok .health-tile__label::before { background: var(--ok); }
+.health-tile--warn .health-tile__label::before,
+.health-tile--danger .health-tile__label::before { background: var(--signal); }
 
 .health-tile__label,
 .health-tile__detail {
-  color: var(--p-text-muted-color);
-  font-size: 0.85rem;
+  color: var(--ink-soft);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 

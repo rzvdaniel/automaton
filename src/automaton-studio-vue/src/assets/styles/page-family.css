@@ -1,0 +1,30 @@
+/* The Studio page family: shared by Apps, Catalog, People, Server, Backups, Settings and the detail pages. */
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.page-head__title { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); }
+.page-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; }
+.page-head__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.p-button.btn-small { min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; text-decoration: none; }
+.p-button.btn-small:hover { border-color: var(--signal); background: transparent; color: var(--ink); }
+.p-button.btn-main { min-height: 36px; background: var(--signal); border-color: var(--signal); color: var(--on-signal); border-radius: 999px; font-weight: 600; font-size: 13px; }
+.studio-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; margin-bottom: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; }
+.studio-section { margin: 24px 0 8px; font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--ink); }
+.studio-section__count { margin-left: 6px; font-weight: 400; color: var(--ink-soft); }
+.studio-pill { display: inline-block; flex: none; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; font-family: var(--mono); font-size: 11.5px; line-height: 1.3; color: var(--ink-soft); }
+.studio-pill--ok { border-color: var(--ok); color: var(--ok); }
+.studio-pill--warn { background: color-mix(in srgb, var(--signal) 18%, transparent); border-color: transparent; color: var(--signal-ink); }
+.studio-pill--off { background: var(--row-line); border-color: transparent; }
+.studio-muted { color: var(--ink-soft); font-size: 13px; }
+.studio-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 12px 14px; box-sizing: border-box; border: 1px solid var(--row-line); border-radius: 12px; background: transparent; color: var(--ink); font: inherit; text-align: left; text-decoration: none; }
+a.studio-row, button.studio-row, .studio-row--click { cursor: pointer; }
+.studio-row--click:hover, a.studio-row:hover { border-color: var(--signal); }
+.studio-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.studio-row__name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-row__line { color: var(--ink-soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-page .p-card { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; box-shadow: none; color: var(--ink); }
+.studio-page .p-card-title { font-family: var(--display); font-size: 18px; font-weight: 600; }
+.studio-page a:not(.p-button) { color: var(--p-primary-color); }
+@media (max-width: 640px) { .studio-row { flex-wrap: wrap; } }
+.chip { min-height: 36px; display: inline-flex; align-items: center; padding: 6px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; text-decoration: none; }
+.studio-page a.chip { color: var(--ink); }
+.chip:hover { border-color: var(--signal); }
+.section-links, .admin-chips { display: flex; flex-wrap: wrap; gap: 8px; }
