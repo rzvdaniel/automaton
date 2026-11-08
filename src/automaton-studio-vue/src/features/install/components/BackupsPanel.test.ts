@@ -29,7 +29,7 @@ describe('BackupsPanel', () => {
     expect(wrapper.get('[data-test=tile-next]').text()).toContain('every night')
     expect(wrapper.get('[data-test=tile-offsite]').text()).toContain('Offsite Backup')
     expect(wrapper.get('[data-test=app-restore]').html()).toContain('/apps/a2')
-    expect(wrapper.get('[data-test=app-restore]').html()).toContain('more')
+    expect(wrapper.get('[data-test=app-restore]').html()).toContain('settings')
   })
 
   it('offers the catalog when the Offsite Backup app is not installed', async () => {
