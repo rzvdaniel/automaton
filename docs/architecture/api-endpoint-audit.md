@@ -7,7 +7,7 @@ the install scripts and the docs. Studio pages were removed in #831; this lists 
 
 | Controller | Endpoints |
 |---|---|
-| `CustomStepsController`, `AppsStepsController` | `api/customsteps`, `api/apps/{id}/steps` (link, create, list) |
+| `AppsStepsController` | `api/apps/{id}/steps` (link, create, list) |
 | `AiStepConversationController`, `AiConversationController`, `AiUtilityController` | `api/ai/step/conversation`, AI conversation and name generation |
 | `AiApiKeysController` | `api/AiApiKeys` |
 | `AdminAiProvidersController`, `AdminAiModelsController`, `AdminAiProviderKeysController`, `AdminAiSettingsController`, `AdminAiGuidanceController` | `api/admin/ai-providers`, `api/admin/ai-guidance` |
@@ -22,6 +22,7 @@ Also removed: the Studio client methods for those calls (`apps.service.ts`) and 
 | Endpoint | Client that needs it |
 |---|---|
 | `api/projects`, `api/projects/{id}/members`, `apps`, `runners` | CLI (`project`, `runners install`, `share`) and the Studio share dialog (`listMyTeams`) |
+| `api/customsteps` | Install migration check (`docker/install/migration_app_check.py`); kept because its API tests still cover it |
 | `api/flows/{id}`, `api/flowexecutions` | Runner (`FlowExecutionService`, `AppConfig.FlowsUrl`) |
 | `api/ai-guidance` (`AiGuidanceController`) | CLI (`AiGuidancePackService`) |
 | `api/web-apps/...` flow and step execution (`AppsFlowExecutionController`, `AppsStepExecutionController`) | Published apps: the generated config sets `backendApiPath` to `/api/web-apps/{slug}` |
