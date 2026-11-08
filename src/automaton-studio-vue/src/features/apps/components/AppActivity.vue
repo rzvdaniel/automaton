@@ -135,7 +135,7 @@ async function copyOutput(executionId: string) {
             <i v-else-if="item.tone === 'running'" class="pi pi-clock status--wait"></i>
           </span>
           <span class="what" :class="{ muted: item.kind === 'change' }">
-            <strong v-if="item.subject">{{ item.subject }} </strong>{{ item.text }}
+            <strong v-if="item.subject">{{ item.subject }}</strong>{{ item.subject ? " " : "" }}{{ item.text }}
             <span v-if="item.tone === 'failed' && item.kind === 'run'" class="sr-only"> (failed)</span>
           </span>
           <span class="mono hint">{{ formatActivityTime(item.at) }}</span>
