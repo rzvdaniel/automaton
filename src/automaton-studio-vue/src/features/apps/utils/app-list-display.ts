@@ -86,3 +86,9 @@ export function matchesSearch(app: AppListItem, query: string): boolean {
   if (!needle) return true
   return [app.name, app.summary, app.description, ...app.tags].some((text) => text?.toLowerCase().includes(needle))
 }
+
+/** Official apps are named "Automaton Flow Check"; the list already says it is Automaton's, so drop the prefix. */
+export function catalogName(name: string): string {
+  const short = name.replace(/^Automaton\s+/i, '').trim()
+  return short || name
+}

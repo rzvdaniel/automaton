@@ -32,17 +32,25 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Off-site Backup')
     expect(wrapper.text()).toContain('Asks for backups:read')
-    expect(wrapper.find('a[aria-label="Source of Off-site Backup"]').attributes('href')).toBe('https://github.com/o/apps/tree/0123456789abcdef0123456789abcdef01234567/m/backup')
     expect(wrapper.find('.link').attributes('data-to')).toContain('"commit":"0123456789abcdef0123456789abcdef01234567"')
+    await wrapper.find('button[aria-label="Details of Off-site Backup"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector('a[aria-label="Source of Off-site Backup"]')!.getAttribute('href')).toBe('https://github.com/o/apps/tree/0123456789abcdef0123456789abcdef01234567/m/backup')
+    expect(document.body.textContent).toContain('Commit 0123456')
+    wrapper.unmount()
   })
 
   it('shows Installed with a Manage link for an installed entry', async () => {
     getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-1' }], fetchedAt: null, stale: false, unavailable: false, message: null })
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.text()).toContain('Installed')
-    expect(wrapper.text()).toContain('Manage')
-    expect(wrapper.find('.link').attributes('data-to')).toContain('app-1')
+    expect(wrapper.find('.catalog-installed').text()).toBe('Installed')
+    expect(wrapper.find('.link').exists()).toBe(false)
+    await wrapper.find('button[aria-label="Details of Off-site Backup"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('Manage')
+    expect(document.body.querySelector('.link')!.getAttribute('data-to')).toContain('app-1')
+    wrapper.unmount()
   })
 
   it('warns when the list is the saved copy', async () => {
@@ -91,7 +99,7 @@ describe('CatalogPanel', () => {
   })
 
   it('styles panels and links with the Studio theme tokens, not undefined legacy ones', () => {
-    expect(source).toContain('var(--p-content-background)')
+    expect(source).toContain('var(--line)')
     expect(source).toContain('var(--p-primary-color)')
     expect(source).not.toMatch(/var\(--surface-/)
   })
@@ -145,12 +153,19 @@ describe('CatalogPanel', () => {
   const facets = { categories: [{ value: 'Maintenance', label: 'Maintenance', count: 10 }, { value: 'Tools', label: 'Tools', count: 20 }], sources: [{ value: 'official', label: 'Official', count: 20 }, { value: 'acme', label: 'Acme', count: 10 }] }
   const big = (extra: object = {}) => ({ apps: many(24), fetchedAt: null, stale: false, unavailable: false, message: null, total: 30, totalApps: 30, page: 1, pageSize: 24, ...facets, ...extra })
 
-  it('hides the filters and the pager while the catalog has 12 apps or fewer', async () => {
+  it('drops the Automaton prefix from official names and shows no access line when an app asks for none', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, name: 'Automaton Flow Check', permissions: [] }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('.app-row__name').text()).toBe('Flow Check')
+    expect(wrapper.text()).not.toContain('Asks for')
+  })
+
+  it('shows the search and chips for a small catalog too but no pager', async () => {
     getCatalog.mockResolvedValue({ ...big({ apps: many(3), total: 3, totalApps: 3 }) })
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Installed')
+    expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
     expect(wrapper.find('.p-paginator').exists()).toBe(false)
   })
 
@@ -159,9 +174,9 @@ describe('CatalogPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
     expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Maintenance (10)')
+    expect(wrapper.text()).toContain('Maintenance · 10')
     expect(wrapper.text()).toContain('Installed')
-    expect(wrapper.find('[aria-label="Catalog"]').text()).toContain('Acme (10)')
+    expect(wrapper.find('[aria-label="Catalog"]').text()).toContain('Acme · 10')
     expect(wrapper.find('.p-paginator').exists()).toBe(true)
   })
 
@@ -172,7 +187,7 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(getCatalog).toHaveBeenCalledWith(false, { q: 'back', category: 'Tools', source: 'official', installed: true, page: 2, pageSize: 24 })
     expect((wrapper.find('input[aria-label="Search apps"]').element as HTMLInputElement).value).toBe('back')
-    await wrapper.findAll('button').find((b) => b.text() === 'Maintenance (10)')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Maintenance · 10')!.trigger('click')
     expect(replace).toHaveBeenCalledWith({ query: { q: 'back', category: 'Maintenance', source: 'official', installed: '1' } })
   })
 
