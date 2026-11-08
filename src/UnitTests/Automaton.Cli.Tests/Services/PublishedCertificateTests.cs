@@ -10,7 +10,7 @@ public class PublishedCertificateTests
     private static readonly Uri AppUrl = new("https://example.invalid/");
 
     [Test]
-    public async Task WaitAsync_RetriesTlsErrorAndAcceptsAuthenticatedRoute()
+    public async Task CheckAsync_RetriesTlsErrorAndAcceptsAuthenticatedRoute()
     {
         var attempts = 0;
         using var client = new HttpClient(new ProbeHandler(_ => ++attempts == 1
@@ -25,7 +25,7 @@ public class PublishedCertificateTests
     }
 
     [Test]
-    public async Task WaitAsync_ReturnsPendingWhenDeadlineExpires()
+    public async Task CheckAsync_ReturnsPendingWhenDeadlineExpires()
     {
         using var client = new HttpClient(new ProbeHandler(
             _ => throw new HttpRequestException(HttpRequestError.SecureConnectionError, "Certificate is not ready")));
@@ -49,7 +49,7 @@ public class PublishedCertificateTests
     }
 
     [Test]
-    public void WaitAsync_PropagatesCallerCancellation()
+    public void CheckAsync_PropagatesCallerCancellation()
     {
         using var client = new HttpClient(new ProbeHandler(token => throw new OperationCanceledException(token)));
         using var caller = new CancellationTokenSource();
