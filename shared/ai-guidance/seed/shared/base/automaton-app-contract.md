@@ -83,6 +83,10 @@ configured request timeout.
 supplies its path in `AUTOMATON_APP_DATA_DIR`. Data there survives runtime
 replacement. Build and runtime artifacts are disposable.
 
+`AUTOMATON_API_URL` is the server's public API base URL (no trailing slash), set
+in every runtime and Action. Use it to call the Automaton API with an approved
+permission key; do not ask the user for it or guess it from your own host.
+
 Use structured commands by default. Set `useShell` only when shell semantics
 are required. Keep every managed path inside the application workspace.
 

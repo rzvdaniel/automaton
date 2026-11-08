@@ -69,7 +69,9 @@ Automaton does not require a language, framework, package manager, source
 layout, or application architecture. The remote Runner performs the configured
 build. The app must listen on the effective port supplied through
 `AUTOMATON_PORT`. Put durable data under `AUTOMATON_APP_DATA_DIR`; build and
-runtime outputs are disposable. Prefer structured commands and use shell mode
+runtime outputs are disposable. `AUTOMATON_API_URL` holds the server's public API
+base URL in every runtime and Action; use it instead of asking for or guessing
+the address. Prefer structured commands and use shell mode
 only when required.
 
 Use the smallest contract that describes the app. Do not invent a directory

@@ -4,7 +4,9 @@ using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Automaton.Api.Enums;
+using Automaton.Api.Config;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
@@ -31,8 +33,11 @@ public sealed class AppSecretService(
     ISecretStore store,
     ISecretProtector protector,
     ResourceAuthorizationService authorization,
-    SecretAuditLog? auditLog = null)
+    SecretAuditLog? auditLog = null,
+    IOptions<PublishedAppsConfig>? publishedApps = null)
 {
+    public const string ApiUrlVariable = "AUTOMATON_API_URL";
+
     public const int MaxSecretsPerApp = 50;
     public const int MaxSecretsPerVault = 200;
     public const int MaxValueLength = 16 * 1024;
@@ -200,6 +205,12 @@ public sealed class AppSecretService(
         // Lets an app keep per-install data apart (for example a storage prefix); AUTOMATON_ names cannot be declared.
         values["AUTOMATON_APP_ID"] = appId.ToString();
         var plain = (contract.Settings ?? []).Select(setting => setting.Name).Append("AUTOMATON_APP_ID").ToList();
+        // The server's public API base URL, so apps that call the API need not guess it.
+        if (publishedApps?.Value.ApiBaseUrl is { Length: > 0 } apiUrl)
+        {
+            values[ApiUrlVariable] = apiUrl.TrimEnd('/');
+            plain.Add(ApiUrlVariable);
+        }
         var wanted = (contract.Secrets ?? []).Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
         if (wanted.Count > 0) await AddVaultSecretsAsync(vaults, wanted, values, delivered, token);
         return (values, delivered, plain);
