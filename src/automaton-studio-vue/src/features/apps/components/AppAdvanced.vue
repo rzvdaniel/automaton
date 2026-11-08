@@ -187,6 +187,10 @@ function askDelete() {
 
   <Dialog v-model:visible="runnerDialog" modal header="Change Runner" :style="{ width: 'min(28rem, 92vw)' }">
     <Select v-model="runnerId" :options="runnerOptions" option-label="label" option-value="value" option-disabled="disabled" placeholder="Choose a Runner" class="w-full" aria-label="Runner" />
+    <p v-if="props.app.projectId" class="text-color-secondary" data-testid="project-runner-hint">
+      Only Runners shared with this project are listed. Your personal Runner is not shared automatically, because sharing lets every project member deploy to it.
+      The Runner's owner can share it with <code>automaton project runners add &lt;runner&gt; --project {{ props.app.projectId }}</code>.
+    </p>
     <template #footer>
       <Button label="Cancel" text @click="runnerDialog = false" />
       <Button label="Save" :loading="savingRunner" :disabled="!runnerId" @click="saveRunner" />
