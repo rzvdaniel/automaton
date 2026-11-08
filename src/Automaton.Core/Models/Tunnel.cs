@@ -32,6 +32,11 @@ public class TunnelRequest
     /// the complete gateway path from the trusted App and target identifiers.
     /// </summary>
     public string? RuntimePath { get; set; }
+
+    /// <summary>Marks a WebSocket upgrade: the Runner opens a socket to the app instead of an HTTP request.</summary>
+    public bool WebSocket { get; set; }
+
+    public string[] WebSocketSubProtocols { get; set; } = [];
 }
 
 public class TunnelResponse
@@ -43,6 +48,54 @@ public class TunnelResponse
     public Dictionary<string, string[]> HeaderValues { get; set; } = [];
     public byte[]? BodyBytes { get; set; }
     public string? Error { get; set; }
+
+    /// <summary>
+    /// True when this response only carries status and headers: the body follows as chunks
+    /// (<c>TunnelResponseChunk</c>) so Server-Sent Events and large downloads are not buffered.
+    /// </summary>
+    public bool Streaming { get; set; }
+
+    /// <summary>Milliseconds the Runner spent waiting for the app's response headers. Lets the API log tunnel overhead.</summary>
+    public long UpstreamMs { get; set; }
+
+    /// <summary>API side only (never serialized): the body chunks of a streaming response.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
+    public TunnelBodyStream? BodyStream { get; set; }
+}
+
+/// <summary>API side reader for the chunks of one streaming tunnel response, with flow control back to the Runner.</summary>
+public sealed class TunnelBodyStream(
+    System.Threading.Channels.ChannelReader<byte[]> reader,
+    Func<Task> acknowledgeAsync,
+    Func<Task> cancelAsync,
+    IDisposable? lease = null) : IDisposable
+{
+    public void Dispose() => lease?.Dispose();
+
+    public System.Threading.Channels.ChannelReader<byte[]> Reader { get; } = reader;
+    public Func<Task> AcknowledgeAsync { get; } = acknowledgeAsync;
+    public Func<Task> CancelAsync { get; } = cancelAsync;
+}
+
+/// <summary>One WebSocket message fragment relayed between the browser, the API and the Runner.</summary>
+public class TunnelWebSocketFrame
+{
+    public string RequestId { get; set; } = string.Empty;
+
+    /// <summary>One of <see cref="TunnelWebSocketFrameKinds"/>.</summary>
+    public string Kind { get; set; } = TunnelWebSocketFrameKinds.Text;
+    public byte[] Data { get; set; } = [];
+    public bool EndOfMessage { get; set; } = true;
+    public int? CloseStatus { get; set; }
+    public string? CloseDescription { get; set; }
+}
+
+public static class TunnelWebSocketFrameKinds
+{
+    public const string Text = "text";
+    public const string Binary = "binary";
+    public const string Close = "close";
 }
 
 public static class TunnelDestinations

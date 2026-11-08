@@ -14,7 +14,7 @@ Automaton is early. These are the specific things to know before you rely on it.
 - **A Runner is the agent you install on a server to run apps.** With one Runner, `automaton deploy` uses it automatically; with several you pick one per app. There is no automatic balancing.
 - **No high availability.** The API, database and each Runner run on single machines. A machine that goes down takes its apps with it until you restore it.
 - **No autoscaling or cross-region failover.** Each app runs where it is assigned.
-- **No WebSockets or streamed responses.** Requests and responses are complete; apps poll for live updates.
+- **Open streams and WebSockets are capped per app.** Server-Sent Events and WebSockets work, but one app holds at most 20 at a time and an idle one closes after five minutes.
 - **Routing at large scale is unvalidated.** The proxy configuration holds per-app rules and is regenerated on change; behavior with thousands of apps has not been measured (see the [self-hosted core notes](https://github.com/rzvdaniel/automaton/blob/main/docs/roadmap/self-hosted-core.md)).
 
 ## Operations

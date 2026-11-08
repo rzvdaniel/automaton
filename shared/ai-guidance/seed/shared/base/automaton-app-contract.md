@@ -67,11 +67,14 @@ Binding only to container loopback (`127.0.0.1`) is not reachable through
 Docker bridge publication. Runtime command fields use the same execution rules
 as the build command.
 
-Automaton forwards each HTTP request to the runtime and returns the complete
-response once the app has finished it. WebSocket upgrades and streamed
-responses, such as Server-Sent Events, are not supported. For live updates,
-poll a JSON endpoint and keep each request within the server's configured
-request timeout.
+Automaton forwards each HTTP request to the runtime. Small responses arrive
+complete; responses that stream (Server-Sent Events, or a body with no known
+length or larger than one message) are relayed to the browser chunk by chunk as
+the app writes them. WebSocket upgrades are relayed too. Request bodies are
+still sent whole and are limited in size. One app may hold a limited number of
+open streams and WebSockets at once, and one with no traffic for five minutes
+is closed, so send a heartbeat. Keep ordinary requests within the server's
+configured request timeout.
 
 `health.path` is optional. When configured, readiness requires a successful
 2xx HTTP response on that path. `health.startupTimeoutSeconds` limits startup.

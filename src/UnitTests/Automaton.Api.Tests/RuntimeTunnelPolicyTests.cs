@@ -264,6 +264,7 @@ public class RuntimeTunnelPolicyTests
         var requestSender = new RuntimeTunnelRequestSender(
             new CompletingHubContext(registry),
             registry,
+            new TunnelLongLivedLimiter(),
             Options.Create(new RuntimeTunnelConfig()),
             NullLogger<RuntimeTunnelRequestSender>.Instance);
         return new RuntimeTunnelService(

@@ -56,11 +56,14 @@ port, health path, and data directory explicit whenever the app has a runtime.
 Keep generated output and dependencies out of durable source unless the user
 specifically asks for them.
 
-Automaton forwards each HTTP request to the runtime and returns the complete
-response once the app has finished it. WebSocket upgrades and streamed
-responses, such as Server-Sent Events, are not supported. For live updates,
-poll a JSON endpoint and keep each request within the server's configured
-request timeout.
+Automaton forwards each HTTP request to the runtime. Small responses arrive
+complete; responses that stream (Server-Sent Events, or a body with no known
+length or larger than one message) are relayed to the browser chunk by chunk as
+the app writes them. WebSocket upgrades are relayed too. Request bodies are
+still sent whole and are limited in size. One app may hold a limited number of
+open streams and WebSockets at once, and one with no traffic for five minutes
+is closed, so send a heartbeat. Keep ordinary requests within the server's
+configured request timeout.
 
 Automaton does not require a language, framework, package manager, source
 layout, or application architecture. The remote Runner performs the configured

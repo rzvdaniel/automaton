@@ -80,7 +80,7 @@ useSiteTheme()
   <div class="head"><p class="eyebrow">Good to know</p><h2>What Automaton does not do (yet)</h2><p>We would rather you know before you install.</p></div>
   <div class="grid">
     <div class="cap"><h3>No autoscaling</h3><p>Each app runs on one Runner. Add machines yourself; there is no automatic failover.</p></div>
-    <div class="cap"><h3>No live connections</h3><p>WebSockets and streamed responses are not supported. Apps poll a small JSON endpoint instead.</p></div>
+    <div class="cap"><h3>Bounded live connections</h3><p>Server-Sent Events and WebSockets work, with a cap on how many one app keeps open and a request body limit.</p></div>
     <div class="cap"><h3>You run the server</h3><p>Updates are one request, but the machine, DNS and off-site copies of backups are yours.</p></div>
   </div>
 </div></section>

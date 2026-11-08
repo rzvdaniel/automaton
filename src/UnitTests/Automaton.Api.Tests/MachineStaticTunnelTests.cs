@@ -233,7 +233,7 @@ public sealed class MachineStaticTunnelTests
     {
         var registry = new TunnelRequestRegistry();
         var hub = new CapturingHubContext(registry);
-        var sender = new RuntimeTunnelRequestSender(hub, registry,
+        var sender = new RuntimeTunnelRequestSender(hub, registry, new TunnelLongLivedLimiter(),
             Options.Create(new RuntimeTunnelConfig()), NullLogger<RuntimeTunnelRequestSender>.Instance);
         var service = new RuntimeTunnelService(db, sender,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),

@@ -65,8 +65,9 @@ public sealed class AiGuidanceSeedExportTests
             Assert.That(exportedText, Does.Contain("no HTTP endpoint"));
             Assert.That(exportedText, Does.Contain("automaton create"));
             Assert.That(exportedText, Does.Contain("not linked in the current environment"));
-            Assert.That(normalizedExportedText, Does.Contain("WebSocket upgrades and streamed responses, such as Server-Sent Events, are not supported."));
-            Assert.That(normalizedExportedText, Does.Contain("poll a JSON endpoint"));
+            Assert.That(normalizedExportedText, Does.Contain("WebSocket upgrades are relayed too."));
+            Assert.That(normalizedExportedText, Does.Contain("Server-Sent Events"));
+            Assert.That(normalizedExportedText, Does.Not.Contain("are not supported. For live updates"));
             Assert.That(exportedText, Does.Not.Contain("automaton target approve"));
             Assert.That(exportedText, Does.Not.Contain("When the app has no server-side process"));
 

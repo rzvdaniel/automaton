@@ -34,7 +34,7 @@ Publishing allows only public file types (such as `.html`, `.css`, `.js`, `.txt`
 
 For APIs, server-rendered sites and anything with logic. Declare `application.runtime.command`; the process must listen on `AUTOMATON_PORT` and answer `application.health.path`. Store durable files under `AUTOMATON_APP_DATA_DIR`. `--template node|python|dotnet` creates a working example.
 
-Requests and responses are complete: WebSockets and streamed responses (Server-Sent Events) are not supported. For live views, poll a small JSON endpoint.
+Server-Sent Events and WebSockets work: responses stream to the browser as the app writes them, and WebSocket upgrades are relayed. Each app can hold a limited number of open streams and sockets at once (20 by default), and an idle one is closed after five minutes, so send a heartbeat.
 
 ## Deploy and verify
 

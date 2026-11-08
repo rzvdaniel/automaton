@@ -28,21 +28,13 @@ bounded.
 
 ## Support real-time connections for hosted apps
 
-**Problem.** Private and published app traffic passes through the API runtime
-tunnel, which drops the `Upgrade` header and buffers each response
-(`RuntimeTunnelController`, `RunnerRuntimeGatewayProxy`,
-`RuntimeTunnelRequestSender`). WebSockets and Server-Sent Events cannot work, so
-live apps must poll. The app contract documents this limitation.
-
-**Direction.** First stream response bodies end to end (API, Runner tunnel,
-container), which enables Server-Sent Events. Then evaluate forwarding WebSocket
-upgrades. Preserve per-app routing, authentication, request limits, and tunnel
-backpressure, and bound concurrent long-lived connections per app.
-
-**Acceptance.** A deployed sample app streams Server-Sent Events and holds a
-WebSocket session through both its private and published URLs. Tunnel memory
-stays bounded with slow clients, and existing request/response apps behave as
-before.
+**Done** (#873). App traffic keeps one path, the API runtime tunnel, so the single access gate and the Runner's
+removal of `automaton_runtime_*` cookies stay as they are. Response bodies that stream (event streams, bodies with no
+known length or larger than one message) are relayed chunk by chunk with an acknowledgement window, so memory stays
+bounded with slow clients. WebSocket upgrades are relayed through the same tunnel. The Runner handles each tunnel
+request on its own task and refuses more than 64 in flight per app; the API allows 20 open streams and WebSockets per
+app and closes one that is idle for 300 seconds. The API logs `Tunnel latency` for every tunnel request (round trip,
+time the app took, and the difference). Direct Traefik routing was dropped; revisit it only if those numbers demand it.
 
 ## Repair tests that fail on main
 

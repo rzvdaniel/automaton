@@ -30,6 +30,7 @@ internal static class ApiApplicationPipelineExtensions
         ApiStaticFileMiddleware.Configure(app);
         ApiCorsMiddleware.Configure(app, corsOrigins);
 
+        app.UseWebSockets();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseMiddleware<PasswordChangeRequirement>();
