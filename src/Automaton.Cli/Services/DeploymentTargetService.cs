@@ -148,7 +148,7 @@ public sealed class DeploymentTargetService(ConfigService config)
         {
             var runner = string.IsNullOrWhiteSpace(runnerReference)
                 ? null
-                : await ResolveRunnerAsync(client, runnerReference, null, cancellationToken);
+                : await ResolveRunnerForAppAsync(client, appId, runnerReference, cancellationToken);
             var normalizedSlug = slug.Trim().ToLowerInvariant();
             return await client.CreateDeploymentTargetAsync(
                 appId,
@@ -314,14 +314,12 @@ public sealed class DeploymentTargetService(ConfigService config)
             ? project.GetString()
             : null;
         if (projectId == null) return await ResolveRunnerAsync(client, runnerReference, null, cancellationToken);
-        var personalChecked = false;
         try
         {
             return await ResolveRunnerAsync(client, runnerReference, projectId, cancellationToken);
         }
-        catch (InvalidOperationException) when (!personalChecked)
+        catch (InvalidOperationException notFound) when (notFound.Message.Contains("was not found", StringComparison.Ordinal))
         {
-            personalChecked = true;
             if (!await IsPersonalRunnerAsync(client, runnerReference, cancellationToken)) throw;
             throw new InvalidOperationException(
                 $"Runner '{runnerReference}' is your personal Runner and is not shared with this app's project. " +
