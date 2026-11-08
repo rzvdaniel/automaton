@@ -258,6 +258,7 @@ else
     printf '\nHTTPS certificates are ready. Open the first-administrator setup link:\nhttps://studio.%s/install#token=%s\n' "$domain" "$setup_token"
     printf 'For an older release that cannot open the link, visit https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
 fi
+printf 'After the first administrator and Runner connect, Server Console, Website Monitor and Heartbeat will appear in Apps from the official catalog. They remain unpublished and need separate permission approval. To opt out before connecting a Runner, set Catalog.InstallEssentialsOnFirstRunner to false in %s/appsettings.Production.json and restart the API. Remove an unwanted app from its Settings > Danger Zone.\n' "$config_dir"
 # Nightly database and key backups are on by default; take the first one now.
 if [[ -f "$install_dir/backup.sh" ]]; then
     bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && bash "$install_dir/backup.sh" --install-dir "$install_dir" \

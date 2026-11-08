@@ -39,11 +39,17 @@ class InstallationConfigurationTests(unittest.TestCase):
         path = self.root / 'appsettings.Production.json'
         config = json.loads(path.read_text())
         config['EmailConfig']['EmailHost'] = 'mail.example.com'
+        config['Catalog']['InstallEssentialsOnFirstRunner'] = False
         path.write_text(json.dumps(config))
         before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         self.configure()
         after = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         self.assertEqual(before, after)
+
+    def test_fresh_install_enables_essential_catalog_apps(self):
+        self.configure()
+        settings = json.loads((self.root / 'appsettings.Production.json').read_text())
+        self.assertTrue(settings['Catalog']['InstallEssentialsOnFirstRunner'])
 
     def test_generated_credentials_are_private_unique_and_connected(self):
         self.configure()
