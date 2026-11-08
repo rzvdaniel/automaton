@@ -21,7 +21,7 @@ No, but Automaton is designed around one. The CLI generates an `AGENTS.md` and c
 Static sites, APIs and long-running servers in containers, and finite jobs called Actions. See [Build an Automaton app](./build-an-automaton-app).
 
 ## What can I not run?
-Apps that need WebSockets or streamed responses; see [Current limitations](./limitations).
+Apps that need autoscaling or multi-region failover; see [Current limitations](./limitations).
 
 ## Can strangers sign up on my server?
 No. Self sign-up is disabled. An administrator creates or invites each user.

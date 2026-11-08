@@ -17,7 +17,6 @@ Automaton is a self-hosted platform for deploying web apps, APIs and scheduled j
 ## Automaton does not fit you if
 
 - You need automatic scaling, multi-region failover or a global edge network. Each app runs on one Runner machine (a Runner is the agent you install on a server to run apps); there is no autoscaling, no automatic balancing and no cross-region failover.
-- You need live streaming connections. WebSockets and Server-Sent Events are not supported; apps poll a JSON endpoint instead.
 - You want a hosted service to sign up for. Automaton is software you install; there is no Automaton cloud and self sign-up is disabled on your server (an administrator adds users).
 - You cannot give the server public DNS and HTTPS, or you need ARM or a fully offline or private-only installation. Those are not the supported setup.
 - You need to host strangers' code. Automaton is for you and people you trust, not public multi-tenant hosting.

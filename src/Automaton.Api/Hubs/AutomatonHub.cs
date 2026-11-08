@@ -106,6 +106,20 @@ public class AutomatonHub : Hub
         return Task.CompletedTask;
     }
 
+    /// <summary>Runner → API: one body chunk of a streaming tunnel response. Tells the Runner to stop when nobody reads it.</summary>
+    public async Task TunnelResponseChunk(string requestId, byte[] data, bool final, bool failed)
+    {
+        if (!tunnelRegistry.TryWriteChunk(requestId, data, final, failed) && !final)
+            await Clients.Caller.SendAsync(AutomatonHubMethods.TunnelCancel, requestId);
+    }
+
+    /// <summary>Runner → API: one frame of an open tunnel WebSocket.</summary>
+    public async Task TunnelWebSocketFrame(TunnelWebSocketFrame frame)
+    {
+        if (!tunnelRegistry.TryWriteWebSocketFrame(frame) && frame.Kind != TunnelWebSocketFrameKinds.Close)
+            await Clients.Caller.SendAsync(AutomatonHubMethods.TunnelCancel, frame.RequestId);
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         var runner = GetRunnerOrNull();

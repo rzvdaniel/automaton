@@ -11,6 +11,7 @@ namespace Automaton.Api.Services;
 public sealed class RuntimeTunnelRequestSender(
     IHubContext<AutomatonHub> hub,
     TunnelRequestRegistry registry,
+    TunnelLongLivedLimiter limiter,
     IOptions<RuntimeTunnelConfig> options,
     ILogger<RuntimeTunnelRequestSender> logger)
 {
@@ -19,6 +20,8 @@ public sealed class RuntimeTunnelRequestSender(
         "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization",
         "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Host", "Content-Length"
     };
+
+    private const int AckEveryChunks = 8;
 
     private readonly RuntimeTunnelConfig config = options.Value;
 
@@ -62,9 +65,13 @@ public sealed class RuntimeTunnelRequestSender(
     {
         try
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             await hub.Clients.Client(runner.ConnectionId!)
                 .SendAsync(AutomatonHubMethods.TunnelRequest, tunnelRequest, cancellationToken);
             var response = await responseTask;
+            LogLatency(appId, deploymentTargetId, runner.Id, path, response, stopwatch.ElapsedMilliseconds);
+            if (response.Streaming)
+                response = await AttachStreamAsync(response, runner, appId, cancellationToken);
             if (response.StatusCode >= StatusCodes.Status400BadRequest)
             {
                 logger.LogWarning(
@@ -105,6 +112,47 @@ public sealed class RuntimeTunnelRequestSender(
         }
     }
 
+    // The Runner reports how long the app took to answer; the rest of the round trip is what the tunnel added.
+    private void LogLatency(Guid appId, Guid targetId, Guid runnerId, string path, TunnelResponse response, long roundTripMs)
+        => logger.LogInformation(
+            "Tunnel latency: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} RuntimePath={RuntimePath} StatusCode={StatusCode} Streaming={Streaming} RoundTripMs={RoundTripMs} UpstreamMs={UpstreamMs} TunnelOverheadMs={TunnelOverheadMs}",
+            appId, targetId, runnerId, path, response.StatusCode, response.Streaming,
+            roundTripMs, response.UpstreamMs, Math.Max(0, roundTripMs - response.UpstreamMs));
+
+    // A streaming response holds one of the app's long-lived slots until the browser reads it to the end or goes away.
+    private async Task<TunnelResponse> AttachStreamAsync(
+        TunnelResponse response, Runner runner, Guid appId, CancellationToken cancellationToken)
+    {
+        var connection = hub.Clients.Client(runner.ConnectionId!);
+        var cancel = new Func<Task>(async () =>
+        {
+            registry.EndStream(response.RequestId, new OperationCanceledException());
+            try { await connection.SendAsync(AutomatonHubMethods.TunnelCancel, response.RequestId, CancellationToken.None); }
+            catch (Exception exception) { logger.LogDebug(exception, "Could not cancel tunnel stream {RequestId}", response.RequestId); }
+        });
+
+        var lease = limiter.TryAcquire(appId, config.MaxLongLivedPerApp);
+        if (lease is null)
+        {
+            await cancel();
+            logger.LogWarning("Tunnel stream rejected: AppId={AppId} RunnerId={RunnerId} too many long-lived connections", appId, runner.Id);
+            return Failure(StatusCodes.Status503ServiceUnavailable, "This app has too many open streaming connections.");
+        }
+
+        var unacknowledged = 0;
+        response.BodyStream = new TunnelBodyStream(
+            response.BodyStream!.Reader,
+            async () =>
+            {
+                if (++unacknowledged < AckEveryChunks) return;
+                unacknowledged = 0;
+                await connection.SendAsync(AutomatonHubMethods.TunnelAck, response.RequestId, cancellationToken);
+            },
+            cancel,
+            lease);
+        return response;
+    }
+
     private static TunnelRequest CreateTunnelRequest(
         string requestId,
         Guid appId,
@@ -124,6 +172,27 @@ public sealed class RuntimeTunnelRequestSender(
             RuntimeDeploymentTargetId = deploymentTargetId,
             RuntimePath = path.TrimStart('/') + request.QueryString
         };
+
+    internal static TunnelRequest CreateWebSocketRequest(
+        string requestId, Guid appId, Guid deploymentTargetId, HttpRequest request, string path)
+    {
+        var headers = CreateForwardedHeaders(request);
+        var subProtocols = headers.TryGetValue("Sec-WebSocket-Protocol", out var offered)
+            ? offered.SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).ToArray()
+            : [];
+        return new()
+        {
+            RequestId = requestId,
+            Method = HttpMethods.Get,
+            HeaderValues = headers,
+            Destination = TunnelDestinations.RuntimeGateway,
+            RuntimeAppId = appId,
+            RuntimeDeploymentTargetId = deploymentTargetId,
+            RuntimePath = path.TrimStart('/') + request.QueryString,
+            WebSocket = true,
+            WebSocketSubProtocols = subProtocols
+        };
+    }
 
     // The Runner drops Host, so the app must learn the public host and scheme from X-Forwarded-*. Forwarded headers sent
     // by the client are replaced: the API already resolved the address the request was really reached at.

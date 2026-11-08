@@ -10,4 +10,8 @@ public class TunnelForwarderConfig
     // CPU-intensive controllers (e.g. audio/video conversion, ML inference).
     // Default: 300 seconds (5 minutes).
     public int TimeoutSeconds { get; set; } = 300;
+
+    // Requests, streams and WebSockets one app may have in flight on this Runner at once. More get a 503 so one
+    // busy app cannot take the whole Runner.
+    public int MaxConcurrentRequestsPerApp { get; set; } = 64;
 }

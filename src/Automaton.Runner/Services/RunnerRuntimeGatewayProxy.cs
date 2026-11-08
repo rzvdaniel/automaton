@@ -1,5 +1,7 @@
+using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using System.Net.WebSockets;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -18,6 +20,12 @@ internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeReg
             return;
         }
 
+        if (context.WebSockets.IsWebSocketRequest)
+        {
+            await ProxyWebSocketAsync(context, runtime.Port, path);
+            return;
+        }
+
         using var request = CreateRequest(context, runtime.Port, path);
         try
         {
@@ -28,6 +36,69 @@ internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeReg
         catch (HttpRequestException)
         {
             await WriteUnavailableResponseAsync(context);
+        }
+    }
+
+    // Connects to the app first so a refused upgrade is reported with a real status; only then is the visitor's
+    // socket accepted and both directions are relayed. The same header and cookie rules as plain requests apply.
+    private static async Task ProxyWebSocketAsync(HttpContext context, int port, string? path)
+    {
+        using var upstream = new ClientWebSocket();
+        var connectionTokens = GetConnectionTokens(context.Request.Headers["Connection"]);
+        foreach (var header in context.Request.Headers)
+        {
+            if (IsHopByHopHeader(header.Key, connectionTokens)
+                || header.Key.StartsWith("Sec-WebSocket-", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase)
+                || header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var value = header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase)
+                ? FilterRuntimeCookies(header.Value!)
+                : string.Join(", ", header.Value.ToArray());
+            if (value is null) continue;
+            try { upstream.Options.SetRequestHeader(header.Key, value); }
+            catch (ArgumentException) { }
+        }
+        foreach (var subProtocol in context.WebSockets.WebSocketRequestedProtocols)
+            upstream.Options.AddSubProtocol(subProtocol);
+
+        var target = new UriBuilder("ws", RunnerRuntimeEndpointConfiguration.HostAddress, port)
+        {
+            Path = NormalizePath(path),
+            Query = context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty
+        }.Uri;
+        try
+        {
+            await upstream.ConnectAsync(target, context.RequestAborted);
+        }
+        catch (WebSocketException)
+        {
+            context.Response.StatusCode = (int?)upstream.HttpStatusCode is >= 400 and var status
+                ? status
+                : StatusCodes.Status502BadGateway;
+            return;
+        }
+
+        using var downstream = await context.WebSockets.AcceptWebSocketAsync(upstream.SubProtocol);
+        using var relay = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+        var toApp = RelayAsync(downstream, upstream, relay.Token);
+        var toVisitor = RelayAsync(upstream, downstream, relay.Token);
+        await Task.WhenAny(toApp, toVisitor);
+        relay.CancelAfter(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(toApp, toVisitor);
+    }
+
+    private static async Task RelayAsync(WebSocket from, WebSocket to, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await TunnelWebSocketPump.ReadAsync(from, string.Empty,
+                frame => TunnelWebSocketPump.WriteAsync(to, frame, cancellationToken), cancellationToken);
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or WebSocketException)
+        {
+            if (to.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                to.Abort();
         }
     }
 

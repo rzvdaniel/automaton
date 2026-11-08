@@ -54,22 +54,68 @@ public class TunnelForwarderService
 
     public async Task<TunnelResponse> ForwardAsync(TunnelRequest request)
     {
+        using var result = await ForwardAsync(request, allowStreaming: false);
+        return result.Response;
+    }
+
+    /// <summary>
+    /// Forwards the request. With <paramref name="allowStreaming"/>, a runtime response that is an event stream, has no
+    /// known length or is larger than one message comes back as status and headers only; the caller then reads
+    /// <see cref="TunnelForwardResult.OpenBodyAsync"/> chunk by chunk instead of the Runner buffering it.
+    /// </summary>
+    public async Task<TunnelForwardResult> ForwardAsync(TunnelRequest request, bool allowStreaming)
+    {
         try
         {
             var route = await ResolveRouteAsync(request, CancellationToken.None);
             if (route is null)
-                return InvalidRuntimeDestination(request.RequestId);
+                return new TunnelForwardResult(InvalidRuntimeDestination(request.RequestId), null);
 
             using var httpRequest = CreateHttpRequest(request, route.Value.Path);
             LogForwarding(route.Value.IsRuntimeGateway, request, route.Value.Path);
-            using var httpResponse = await route.Value.Client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
-            return await CreateTunnelResponseAsync(request, httpResponse, route.Value.IsRuntimeGateway);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var httpResponse = await route.Value.Client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
+            var upstreamMs = stopwatch.ElapsedMilliseconds;
+            if (allowStreaming && route.Value.IsRuntimeGateway && ShouldStream(request, httpResponse))
+                return new TunnelForwardResult(CreateStreamingHead(request, httpResponse, upstreamMs), httpResponse);
+
+            using (httpResponse)
+            {
+                var response = await CreateTunnelResponseAsync(request, httpResponse, route.Value.IsRuntimeGateway);
+                response.UpstreamMs = upstreamMs;
+                return new TunnelForwardResult(response, null);
+            }
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Tunnel call failed: {Method} {Path}", request.Method, request.Path);
-            return new TunnelResponse { RequestId = request.RequestId, StatusCode = 502, Error = ex.Message };
+            return new TunnelForwardResult(
+                new TunnelResponse { RequestId = request.RequestId, StatusCode = 502, Error = ex.Message }, null);
         }
+    }
+
+    internal bool ShouldStream(TunnelRequest request, HttpResponseMessage response)
+    {
+        if (string.Equals(request.Method, "HEAD", StringComparison.OrdinalIgnoreCase)
+            || response.StatusCode is System.Net.HttpStatusCode.NoContent or System.Net.HttpStatusCode.NotModified)
+            return false;
+        var length = response.Content.Headers.ContentLength;
+        return response.Content.Headers.ContentType?.MediaType == "text/event-stream"
+            || length is null
+            || length > _maxBodyBytes;
+    }
+
+    private static TunnelResponse CreateStreamingHead(TunnelRequest request, HttpResponseMessage httpResponse, long upstreamMs)
+    {
+        var head = new TunnelResponse
+        {
+            RequestId = request.RequestId,
+            StatusCode = (int)httpResponse.StatusCode,
+            Streaming = true,
+            UpstreamMs = upstreamMs
+        };
+        CopyResponseHeaders(httpResponse, head);
+        return head;
     }
 
     private async Task<(HttpClient Client, string Path, bool IsRuntimeGateway)?> ResolveRouteAsync(
@@ -241,4 +287,16 @@ public class TunnelForwarderService
         if (!request.Headers.TryAddWithoutValidation(name, values) && request.Content != null)
             request.Content.Headers.TryAddWithoutValidation(name, values);
     }
+}
+
+/// <summary>A forwarded response; when it streams, the app's response stays open until this is disposed.</summary>
+public sealed class TunnelForwardResult(TunnelResponse response, HttpResponseMessage? streamingSource) : IDisposable
+{
+    public TunnelResponse Response { get; } = response;
+    public bool IsStreaming => streamingSource is not null;
+
+    public Task<Stream> OpenBodyAsync(CancellationToken cancellationToken)
+        => streamingSource!.Content.ReadAsStreamAsync(cancellationToken);
+
+    public void Dispose() => streamingSource?.Dispose();
 }

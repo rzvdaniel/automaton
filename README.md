@@ -15,7 +15,6 @@ The [catalog](https://automaton.monster/catalog) lets you install apps from GitH
 
 **Does not fit** if you need:
 - autoscaling or multi-region failover;
-- WebSockets or streamed responses (apps cannot use them);
 - a hosted service to sign up for, or hosting for untrusted users.
 
 > **Early access.** The app lifecycle runs on our own production server. A restore from an off-site archive onto a clean second server has been proven. Nightly backups stay on the server by default; copy them and the backup key to encrypted off-site storage for recovery. Fresh-server installs took 118 seconds on Ubuntu 22.04 and about 90 seconds on Debian 12 (Hetzner CX23; [measurements](https://github.com/rzvdaniel/automaton/issues/561)). See [limitations](https://automaton.monster/docs/limitations), [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you) and the [FAQ](https://automaton.monster/docs/faq).

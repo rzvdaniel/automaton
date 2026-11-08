@@ -29,6 +29,7 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         builder.Logging.ClearProviders();
 
         var app = builder.Build();
+        app.UseWebSockets();
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
         app.MapGet("/ready", () => Results.Ok(new { status = "ready" }));
         app.Map("/apps", branch => branch.Run(ProxyRuntimePathAsync));

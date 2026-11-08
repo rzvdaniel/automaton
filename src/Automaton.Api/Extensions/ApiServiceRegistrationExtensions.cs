@@ -545,6 +545,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppStepsService>();
         services.AddScoped<AppsStepExecutionService>();
         services.AddSingleton<TunnelRequestRegistry>();
+        services.AddSingleton<TunnelLongLivedLimiter>();
         return services;
     }
 }
@@ -565,6 +566,7 @@ internal static class ApiAppExecutionRegistration
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
+        services.AddScoped<RuntimeTunnelWebSocketService>();
         services.AddScoped<RuntimeFileProxyService>();
         services.AddScoped<ApplicationDeploymentService>();
         services.AddScoped<DeploymentPackageFinalizationService>();

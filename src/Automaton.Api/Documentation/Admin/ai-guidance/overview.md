@@ -66,6 +66,6 @@ and whose output path is set. The built-in export is exactly `AGENTS.md` and
 guidance remain available to their own consumers without leaking into local
 project files.
 
-The exported app skill includes the HTTP forwarding limitation: WebSocket upgrades
-and streaming responses, including Server-Sent Events, are unsupported. After a
+The exported app skill describes HTTP forwarding: Server-Sent Events, streamed responses and WebSocket upgrades
+work, with a cap on open streams per app and an idle timeout. After a
 server update, run `automaton sync-ai` in existing projects to refresh this guidance.
