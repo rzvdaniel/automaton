@@ -84,23 +84,43 @@ with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
         if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
 PYBROKER
 }
-# Delegated mode (#891): the DNS responder runs in a Compose profile; DOMAIN, the profile and the port 53 address live in .env.
+# Delegated mode (#891): the DNS responder runs in a Compose profile; DOMAIN, the profile, the port 53 address and the
+# control-port secret live in .env. The secret is kept across reruns so Traefik and the responder always agree.
+delegated_bind() { python3 "$bundle_dir/check_dns.py" --bind-address ${public_ips[@]+"${public_ips[@]}"} 2>/dev/null || true; }
 set_delegated_env() {
-    local env_file="$install_dir/.env" bind=''
-    local lines; lines=$(grep -Ev '^(DOMAIN|COMPOSE_PROFILES|DNS_BIND)=' "$env_file" || true)
+    local env_file="$install_dir/.env" bind='' secret=''
+    secret=$(sed -n 's/^ACME_RESPONDER_SECRET=//p' "$env_file" | tail -n1)
+    local lines; lines=$(grep -Ev '^(DOMAIN|COMPOSE_PROFILES|DNS_BIND|ACME_RESPONDER_SECRET)=' "$env_file" || true)
     { [[ -z "$lines" ]] || printf '%s\n' "$lines"
       if [[ "$tls_mode" == delegated ]]; then
-          bind=$(python3 "$bundle_dir/check_dns.py" --bind-address ${public_ips[@]+"${public_ips[@]}"}) || bind=''
-          printf 'DOMAIN=%s\nCOMPOSE_PROFILES=delegated\n' "$domain"
+          bind=$(delegated_bind)
+          [[ -n "$secret" ]] || secret=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+          printf 'DOMAIN=%s\nCOMPOSE_PROFILES=delegated\nACME_RESPONDER_SECRET=%s\n' "$domain" "$secret"
           [[ -z "$bind" ]] || printf 'DNS_BIND=%s\n' "$bind"
       fi; } > "$env_file.new"
     chmod 0600 "$env_file.new"; mv "$env_file.new" "$env_file"
 }
+# Port 53 must be bindable (UDP and TCP) on the address the responder will use; skipped when our own responder holds it.
 check_port_53() {
-    if ss -lunH | awk '{print $4}' | grep -Ev '^(127\.|\[::1\])' | grep -Eq ':53$' && ! "${compose[@]}" ps --services --status running 2>/dev/null | grep -qx acme-responder; then
-        echo 'Port 53 is already used on this server (often systemd-resolved listening on all addresses). Free it; nothing was changed.' >&2
-        exit 1
-    fi
+    "${compose[@]}" ps --services --status running 2>/dev/null | grep -qx acme-responder && return 0
+    python3 "$bundle_dir/check_dns.py" --port-free "$(delegated_bind)" || {
+        echo 'UDP or TCP port 53 is already used on this server (often systemd-resolved listening on all addresses). Free it; nothing was changed.' >&2
+        exit 1; }
+}
+# A switch that fails before the restart puts every file it may have touched back and stops the responder.
+switch_backup=''
+files_touched=(traefik.yml installation.json appsettings.Production.json dynamic secrets/cloudflare-token)
+backup_switch() {
+    switch_backup=$(mktemp -d); chmod 0700 "$switch_backup"
+    (cd "$config_dir" && cp -a --parents "${files_touched[@]}" "$switch_backup/") && cp -a "$install_dir/.env" "$switch_backup/dotenv"
+}
+rollback_switch() {
+    echo 'The switch failed; restoring the previous TLS configuration.' >&2
+    [[ -n "$switch_backup" ]] || exit 1
+    cp -a "$switch_backup"/. "$config_dir"/ 2>/dev/null; mv "$config_dir/dotenv" "$install_dir/.env" 2>/dev/null
+    "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true
+    "${compose[@]}" restart traefik api >/dev/null 2>&1 || true
+    rm -rf "$switch_backup"; exit 1
 }
 if $switch_tls; then
     [[ -f "$install_dir/release.env" && -f "$install_dir/.env" ]] || { echo 'No installation was found to switch. Run the installer without --switch-tls first.' >&2; exit 1; }
@@ -113,19 +133,20 @@ if $switch_tls; then
     [[ -z "$token_file" ]] || token_args=(--cloudflare-token-file "$token_file")
     domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "$config_dir/installation.json")
     export CONFIG_DIR="$config_dir"
+    backup_switch || { echo 'Could not back up the current configuration. Nothing was changed.' >&2; exit 1; }
     if [[ "$tls_mode" == delegated ]]; then
         # The public DNS check follows the NS record to this server's port 53, so the responder must be running first.
         check_port_53
         set_delegated_env
-        "${compose[@]}" up -d acme-responder || exit 1
+        "${compose[@]}" up -d acme-responder || rollback_switch
         sleep 3
-        python3 "$bundle_dir/check_dns.py" --delegation "$domain" || { "${compose[@]}" stop acme-responder >/dev/null 2>&1; exit 1; }
+        python3 "$bundle_dir/check_dns.py" --delegation "$domain" || rollback_switch
     fi
-    python3 "$install_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" ${token_args[@]+"${token_args[@]}"} || exit 1
+    python3 "$install_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" ${token_args[@]+"${token_args[@]}"} || rollback_switch
     [[ "$tls_mode" == delegated ]] || "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true
     set_delegated_env
-    "${compose[@]}" config --quiet
-    if [[ "$tls_mode" == delegated ]]; then "${compose[@]}" up -d acme-responder || exit 1; else "${compose[@]}" --profile delegated rm -f acme-responder >/dev/null 2>&1 || true; fi
+    "${compose[@]}" config --quiet || rollback_switch
+    if [[ "$tls_mode" == delegated ]]; then "${compose[@]}" up -d acme-responder || rollback_switch; else "${compose[@]}" --profile delegated rm -f acme-responder >/dev/null 2>&1 || true; fi
     certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     # Always restart and check, so a switch that failed its HTTPS check can be retried with the same command.
     # Traefik reads its certificate resolver at start; the API rewrites published app routes with the new resolver at start.
@@ -306,6 +327,7 @@ printf 'CONFIG_DIR=%s\nBACKUP_DIR=%s/backups\n' "$config_dir" "$install_dir" > "
 set_delegated_env
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 "${compose[@]}" config --quiet
+if [[ "$tls_mode" == delegated ]]; then check_port_53; fi
 if [[ "$tls_mode" == delegated ]]; then printf 'Delegated TLS: add this one DNS record before the certificate can be issued, and open UDP/TCP port 53: %s\n' "$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import check_dns; print(check_dns.delegation_record(sys.argv[2]))' "$bundle_dir" "$domain")"; fi
 printf 'DNS must resolve api.%s, studio.%s, store.%s, apps.%s and *.apps.%s to this server. Allow inbound TCP 80, 443 and 5671.\n' "$domain" "$domain" "$domain" "$domain" "$domain"
 if $configure_only; then

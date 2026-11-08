@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'docker/install'))
-from check_dns import check_dns, public_addresses
+from check_dns import check_dns, locally_assigned, public_addresses
 
 
 class InstallDnsTests(unittest.TestCase):
@@ -46,6 +46,19 @@ class InstallDnsTests(unittest.TestCase):
     def test_stale_aaaa_fails_even_when_a_record_matches(self):
         with self.assertRaisesRegex(ValueError, 'api.example.com:.*wrong A/AAAA'):
             self.check(lambda _: ['203.0.113.20', '2001:db8::2'])
+
+
+    def test_only_addresses_assigned_here_can_be_bound(self):
+        self.assertTrue(locally_assigned(ipaddress.ip_address('127.0.0.1')))
+        self.assertFalse(locally_assigned(ipaddress.ip_address('203.0.113.9')))  # NAT: public IP is not on an interface
+
+
+class InstallDirLayoutTests(unittest.TestCase):
+    def test_switch_tools_are_copied_into_the_install_dir(self):
+        root = Path(__file__).resolve().parents[2]
+        for script in ('scripts/install-automaton.sh', 'scripts/update-automaton.sh'):
+            text = (root / script).read_text()
+            self.assertIn('acme_responder.py check_dns.py', text, script)
 
 
 if __name__ == '__main__':

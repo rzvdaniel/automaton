@@ -97,6 +97,8 @@ services:
       CF_DNS_API_TOKEN_FILE: /run/secrets/cloudflare_token
       # Used only by the delegated TLS mode (#891): Traefik hands DNS challenges to the responder below.
       HTTPREQ_ENDPOINT: http://acme-responder:8053
+      HTTPREQ_USERNAME: acme
+      HTTPREQ_PASSWORD: ${ACME_RESPONDER_SECRET:-}
     secrets: [cloudflare_token]
     volumes:
       - ${CONFIG_DIR:?}/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -115,6 +117,8 @@ services:
     image: ${RESPONDER_IMAGE:-python:3-alpine}
     restart: unless-stopped
     logging: *logging
+    environment:
+      ACME_RESPONDER_SECRET: ${ACME_RESPONDER_SECRET:-}
     command: [python, -u, /responder.py, --zone, '_acme-challenge.apps.${DOMAIN:-}', --ns-name, 'api.${DOMAIN:-}']
     ports: ['${DNS_BIND:-0.0.0.0}:53:53/udp', '${DNS_BIND:-0.0.0.0}:53:53/tcp']
     read_only: true

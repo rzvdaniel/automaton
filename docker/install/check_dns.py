@@ -108,8 +108,58 @@ def delegation_record(domain):
     return f'_acme-challenge.apps.{domain}  NS  api.{domain}'
 
 
+def locally_assigned(address):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.bind((str(address), 0))
+        return True
+    except OSError:
+        return False
+
+
+def port_53_free(address=''):
+    """True when UDP and TCP port 53 can be bound on address (all addresses when empty)."""
+    for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+        with socket.socket(socket.AF_INET, kind) as sock:
+            try:
+                sock.bind((address or '0.0.0.0', 53))
+            except OSError:
+                return False
+    return True
+
+
+def probe_responder(domain):
+    """Ask the responder over UDP and TCP at the address api.<domain> resolves to (the real path Let's Encrypt takes)."""
+    zone = f'_acme-challenge.apps.{domain}'
+    name = b''.join(bytes([len(label)]) + label.encode() for label in zone.split('.')) + b'\x00'
+    query = struct.pack('!HHHHHH', 0x4153, 0, 1, 0, 0, 0) + name + struct.pack('!HH', 6, 1)
+    host = f'api.{domain}'
+    try:
+        addresses = sorted({e[4][0] for e in socket.getaddrinfo(host, 53, socket.AF_INET, socket.SOCK_STREAM)})
+    except socket.gaierror as error:
+        raise ValueError(f'{host} does not resolve: {error}') from error
+    for address in addresses:
+        for protocol in ('UDP', 'TCP'):
+            try:
+                if protocol == 'UDP':
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                        sock.settimeout(5)
+                        sock.sendto(query, (address, 53))
+                        data = sock.recv(512)
+                else:
+                    with socket.create_connection((address, 53), timeout=5) as sock:
+                        sock.sendall(struct.pack('!H', len(query)) + query)
+                        data = sock.recv(512)[2:]
+                ok = len(data) >= 12 and struct.unpack('!H', data[:2])[0] == 0x4153 and data[2] & 0x04 and data[7] >= 1
+            except OSError:
+                ok = False
+            if not ok:
+                raise ValueError(f'the DNS responder did not answer on {protocol} port 53 at {address}. Open UDP and TCP port 53 in the firewall and any cloud security group.')
+
+
 def check_delegation(domain):
     zone = f'_acme-challenge.apps.{domain}'
+    probe_responder(domain)
     try:
         names = ns_query(zone)
     except (OSError, struct.error, IndexError, ValueError) as error:
@@ -137,6 +187,9 @@ if __name__ == '__main__':
             raise SystemExit(f'Delegated TLS preflight failed: {error}') from error
         print('The delegation record was found.')
     elif sys.argv[1] == '--bind-address':  # the IPv4 address the DNS responder listens on (empty when none)
-        print(next(iter(sorted(str(a) for a in public_addresses(sys.argv[2:]) if a.version == 4)), ''))
+        # Only an address assigned to this server can be bound; behind NAT the responder listens on all addresses.
+        print(next(iter(sorted(str(a) for a in public_addresses(sys.argv[2:]) if a.version == 4 and locally_assigned(a))), ''))
+    elif sys.argv[1] == '--port-free':  # exit 1 when port 53 (UDP or TCP) is taken on the given address
+        raise SystemExit(0 if port_53_free(sys.argv[2] if len(sys.argv) > 2 else '') else 1)
     else:
         main(sys.argv[1], sys.argv[2:])

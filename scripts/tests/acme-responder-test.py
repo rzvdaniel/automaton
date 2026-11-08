@@ -65,6 +65,15 @@ class ResponderTests(unittest.TestCase):
         flags = header(self.responder.handle(query(ZONE, 16), '1.1.1.1', limit=512))[1]
         self.assertTrue(flags & 0x0200)
 
+    def test_control_port_requires_the_shared_secret(self):
+        import base64
+        good = 'Basic ' + base64.b64encode(b'acme:s3cret').decode()
+        self.assertTrue(module.authorized(good, 's3cret'))
+        self.assertFalse(module.authorized('Basic ' + base64.b64encode(b'acme:wrong').decode(), 's3cret'))
+        self.assertFalse(module.authorized(None, 's3cret'))
+        self.assertFalse(module.authorized('Basic !!!', 's3cret'))
+        self.assertFalse(module.authorized(good, ''))  # no secret configured: nothing is authorized
+
 
 if __name__ == '__main__':
     unittest.main()

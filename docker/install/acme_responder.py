@@ -6,7 +6,10 @@ an open resolver. Traefik's httpreq DNS provider sets and clears the TXT values 
 Standard library only.
 """
 import argparse
+import base64
+import hmac
 import json
+import os
 import socket
 import struct
 import threading
@@ -136,10 +139,25 @@ def serve_tcp(responder, host, port):
     ThreadingTCPServer((host, port), Handler).serve_forever()
 
 
-def serve_control(responder, host, port):
-    """Traefik's httpreq provider: POST /present and /cleanup with {"fqdn": ..., "value": ...}."""
+def authorized(header, secret):
+    """HTTP Basic check of the control port: any username, the shared secret as the password."""
+    if not secret or not header or not header.startswith('Basic '):
+        return False
+    try:
+        password = base64.b64decode(header[6:], validate=True).decode().partition(':')[2]
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return hmac.compare_digest(password.encode(), secret.encode())
+
+
+def serve_control(responder, host, port, secret):
+    """Traefik's httpreq provider: POST /present and /cleanup with {"fqdn": ..., "value": ...}, authenticated."""
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
+            if not authorized(self.headers.get('Authorization'), secret):
+                self.send_response(401)
+                self.end_headers()
+                return
             try:
                 body = json.loads(self.rfile.read(min(int(self.headers.get('Content-Length', 0)), 4096)))
                 ok = self.path in ('/present', '/cleanup') and responder.set_value(
@@ -161,9 +179,13 @@ def main():
     parser.add_argument('--dns-port', type=int, default=53)
     parser.add_argument('--control-port', type=int, default=8053)
     args = parser.parse_args()
+    secret = os.environ.get('ACME_RESPONDER_SECRET', '')
+    if not secret:
+        raise SystemExit('ACME_RESPONDER_SECRET is not set; the control port would be open to the whole Compose network.')
     responder = Responder(args.zone, args.ns_name)
-    for target, port in ((serve_udp, args.dns_port), (serve_tcp, args.dns_port), (serve_control, args.control_port)):
-        threading.Thread(target=target, args=(responder, '0.0.0.0', port), daemon=True).start()
+    threads = [(serve_udp, args.dns_port, ()), (serve_tcp, args.dns_port, ()), (serve_control, args.control_port, (secret,))]
+    for target, port, extra in threads:
+        threading.Thread(target=target, args=(responder, '0.0.0.0', port, *extra), daemon=True).start()
     threading.Event().wait()
 
 
