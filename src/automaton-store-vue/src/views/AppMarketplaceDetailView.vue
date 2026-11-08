@@ -236,7 +236,7 @@ onBeforeUnmount(() => {
       </section>
 
       <template v-if="app && !loading">
-                <section class="band" aria-labelledby="about-title">
+        <section class="band" aria-labelledby="about-title">
           <div class="wrap about">
             <div class="section-head">
               <h2 id="about-title">About</h2>
@@ -362,6 +362,7 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 40rem);
 }
 .title {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -391,6 +392,8 @@ onBeforeUnmount(() => {
   color: var(--on-signal);
 }
 .hero h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: clamp(1.8rem, 4vw, 2.4rem);
   font-weight: 800;
 }

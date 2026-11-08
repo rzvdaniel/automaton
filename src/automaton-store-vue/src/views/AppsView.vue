@@ -153,9 +153,9 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section class="band" aria-labelledby="publish-title">
+      <section class="band" aria-label="List your app">
         <div class="wrap publish">
-          <p id="publish-title">
+          <p>
             Want your app here? Publish it from
             <a v-if="publicAppConfig.studioUrl" :href="publicAppConfig.studioUrl">Studio</a><template v-else>Studio</template>
             (<a :href="publishDocsUrl" target="_blank" rel="noopener">how publishing works</a>).

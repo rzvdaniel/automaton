@@ -20,4 +20,9 @@ describe('AppMark', () => {
     const container = render({ id: 'abc', name: 'notes', imageUrl: 'https://x.test/a.png' })
     expect(container.querySelector('img')?.getAttribute('src')).toBe('https://x.test/a.png')
   })
+
+  it('gives different ids different colours', () => {
+    const colours = new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) => render({ id, name: 'x' }).innerHTML))
+    expect(colours.size).toBeGreaterThan(1)
+  })
 })
