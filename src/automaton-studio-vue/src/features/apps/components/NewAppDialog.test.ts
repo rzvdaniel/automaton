@@ -18,6 +18,12 @@ describe('NewAppDialog', () => {
     expect(text).toContain('Pick from the catalog')
   })
 
+  it('points the prompt at the current server, not automaton.monster', () => {
+    const text = mountDialog().text()
+    expect(text).toContain(`${window.location.origin}/llms.txt`)
+    expect(text).not.toContain('automaton.monster/llms.txt')
+  })
+
   it('closes and asks for the catalog', async () => {
     const wrapper = mountDialog()
     const button = wrapper.findAll('button').find((b) => b.text().includes('Open the catalog'))!

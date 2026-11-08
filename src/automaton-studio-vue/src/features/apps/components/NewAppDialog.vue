@@ -6,8 +6,10 @@ import CopyCommand from './CopyCommand.vue'
 const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{ catalog: [] }>()
 
+const serverUrl = window.location.origin
+
 const prompt =
-  'Create a new app on my Automaton server with the Automaton CLI. Read https://automaton.monster/llms.txt first, ' +
+  `Create a new app on my Automaton server (${serverUrl}) with the Automaton CLI. Read ${serverUrl}/llms.txt first, ` +
   'then run: automaton new "My App", automaton validate, automaton deploy. Ask me what the app should do.'
 
 function openCatalog() {
