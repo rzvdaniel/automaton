@@ -44,6 +44,7 @@ public class ApplicationContractDescriptorTests
         Assert.That(Check(c => c.Pages = [new() { Path = "//evil.example", Label = "x" }]), Is.Not.Empty);
         Assert.That(Check(c => c.Pages = [new() { Path = "/a?b#c", Label = "x" }]), Is.Not.Empty);
         Assert.That(Check(c => c.Description = "a\tb"), Is.Not.Empty);
+        Assert.That(Check(c => c.Description = "   "), Is.Not.Empty);
     }
 
     [Test]
@@ -58,9 +59,10 @@ public class ApplicationContractDescriptorTests
     public void RoundTripsThroughJson()
     {
         var c = ApplicationContractDefaults.Create();
-        c.Kind = "api"; c.OpenApi = "/openapi.json"; c.Pages = [new() { Path = "/", Label = "Home" }];
+        c.Kind = "api"; c.Description = "Summary"; c.OpenApi = "/openapi.json"; c.Pages = [new() { Path = "/", Label = "Home" }];
         var back = ApplicationContractSerialization.Deserialize(ApplicationContractSerialization.Serialize(c));
         Assert.That(back.Kind, Is.EqualTo("api"));
+        Assert.That(back.Description, Is.EqualTo("Summary"));
         Assert.That(back.OpenApi, Is.EqualTo("/openapi.json"));
         Assert.That(back.Pages, Has.Count.EqualTo(1));
     }

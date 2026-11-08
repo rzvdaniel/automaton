@@ -357,6 +357,7 @@ public static class ApplicationContractValidator
     public static string? DescriptionError(string? text, string name)
     {
         if (string.IsNullOrEmpty(text)) return null;
+        if (string.IsNullOrWhiteSpace(text)) return $"{name} cannot be empty";
         if (text.Any(char.IsControl)) return $"{name} must be one line of plain text";
         if (text.Length > MaxDescriptionLength) return $"{name} can be at most {MaxDescriptionLength} characters";
         if (text.Contains('\n') || text.Contains('\r')) return $"{name} must be one line";
@@ -381,12 +382,14 @@ public static class ApplicationContractValidator
     private static void ValidatePages(List<ApplicationPageDeclaration> pages, ICollection<string> errors)
     {
         if (pages.Count > MaxPages) errors.Add($"pages can contain at most {MaxPages} entries");
+        var index = 0;
         foreach (var page in pages)
         {
+            index++;
             if (page is null || !(page.Path == "/" || IsPlainPath(page.Path)))
-                errors.Add($"pages entry '{page?.Label}' needs a path that starts with / and has no spaces or ..");
+                errors.Add($"pages entry {index} ('{page?.Path}') needs a path that starts with / and has no spaces or ..");
             if (page is null || string.IsNullOrWhiteSpace(page.Label) || page.Label.Length > MaxPageLabelLength)
-                errors.Add($"pages entry '{page?.Path}' needs a label of 1-{MaxPageLabelLength} characters");
+                errors.Add($"pages entry {index} needs a label of 1-{MaxPageLabelLength} characters");
         }
     }
 
