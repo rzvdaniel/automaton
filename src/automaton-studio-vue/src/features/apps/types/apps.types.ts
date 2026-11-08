@@ -184,6 +184,8 @@ export interface AppListItem {
   /** No web runtime or static site: the app only has Actions. */
   actionsOnly?: boolean
   lastActionRun?: { moduleKey: string; status: string; createdAtUtc: string } | null
+  /** Soonest run of an enabled schedule of an Actions-only app. */
+  nextActionRunAtUtc?: string | null
 }
 
 export const DeploymentTargetStatus = {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AppListItem } from '../types/apps.types'
-import { appDescription, appKind, appState, formatShortTime, markColors, markInitial, markPalette, matchesFilter, matchesSearch } from './app-list-display'
+import { appDescription, appKind, appState, formatShortTime, nextRunLabel, markColors, markInitial, markPalette, matchesFilter, matchesSearch } from './app-list-display'
 
 const app = (over: Partial<AppListItem> = {}): AppListItem => ({
   id: 'a1', name: 'Notes', summary: '', description: '', tags: [], isPublished: false, updatedAtUtc: '2026-01-01T00:00:00Z',
@@ -29,6 +29,17 @@ describe('app list display', () => {
     expect(appKind(app({ actionsOnly: true }))).toBe('Action')
     expect(appDescription(app({ summary: 'Short links' }))).toBe('Web app · Short links')
     expect(appDescription(app())).toBe('Web app')
+  })
+
+  it('shows the next scheduled run of an Actions-only app in its description', () => {
+    const now = new Date()
+    const soon = new Date(now.getTime() + 60_000).toISOString()
+    const time = new Date(soon).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    expect(appDescription(app({ actionsOnly: true, summary: 'Backs up', nextActionRunAtUtc: soon }))).toContain(`Backs up · next run ${time}`)
+    expect(appDescription(app({ actionsOnly: true, nextActionRunAtUtc: null }))).toBe('Action')
+    expect(appDescription(app({ nextActionRunAtUtc: soon }))).toBe('Web app')
+    const later = new Date(now.getTime() + 3 * 86400_000).toISOString()
+    expect(nextRunLabel(app({ actionsOnly: true, nextActionRunAtUtc: later }), now)).toMatch(/^next run .+, /)
   })
 
   it('derives state: live, stopped, and the last run for actions', () => {
