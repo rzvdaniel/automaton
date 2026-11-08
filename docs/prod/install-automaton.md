@@ -198,6 +198,8 @@ sudo systemctl list-timers automaton-backup.timer    # next scheduled run
 sudo journalctl -u automaton-backup.service          # backup logs
 ```
 
+A system administrator can also start a backup from **Backups** in Studio (**Back up now**) or with `automaton server backup`; `automaton server backup-status` shows the last backup and the next scheduled run, which Studio shows too. The API never runs it as root: like server updates, it writes `request.json` into `/var/lib/automaton/backup/requests/` (mounted into the API), and the systemd path unit `automaton-backup-request.path` (installed by `backup.sh --install-timer`) starts the normal `automaton-backup.service`. Every request is audited. A server that has not run the latest updater yet shows the `backup.sh` command instead of the button.
+
 These backups live on the same server, so they protect against mistakes and failed updates, not against losing the server. Also:
 
 1. **Turn on your hosting provider's server backups** (for example Hetzner Backups or DigitalOcean Backups). Their disk images include `/etc/automaton`, the Docker volumes and the nightly dumps above, which makes them restorable. A snapshot taken while PostgreSQL is writing is only crash-consistent; the nightly dump inside it is consistent.

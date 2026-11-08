@@ -94,6 +94,73 @@ public sealed class InstallationBackupsTests
         Assert.That(InstallationBackups.ToCheck(never, Now).Status, Is.EqualTo("error"));
     }
 
+    [Test]
+    public async Task ReportsTheNextScheduledRunAndWhetherARequestIsPending()
+    {
+        using var directory = new AppAuthorizationTestData.TemporaryDirectory();
+        using var requests = new AppAuthorizationTestData.TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "backup.json"),
+            """{"lastSuccessAt":"2026-11-01T03:10:00Z","nextRunAt":"2026-11-02T03:25:00Z","keep":7,"backups":[]}""");
+        var config = RequestConfiguration(directory.Path, requests.Path);
+
+        var idle = await InstallationBackups.ReadAsync(config, CancellationToken.None);
+        Assert.That(idle.NextRunAt, Is.EqualTo(new DateTimeOffset(2026, 11, 2, 3, 25, 0, TimeSpan.Zero)));
+        Assert.That(idle.TriggerAvailable, Is.True);
+        Assert.That(idle.RequestPending, Is.False);
+
+        await InstallationBackups.RequestAsync(config, "admin@example.com", Now, CancellationToken.None);
+        var pending = await InstallationBackups.ReadAsync(config, CancellationToken.None);
+        Assert.That(pending.RequestPending, Is.True);
+        Assert.That(pending.Hint, Is.Null);
+
+        File.SetLastWriteTimeUtc(Path.Combine(requests.Path, "request.json"), DateTime.UtcNow.AddMinutes(-5));
+        Assert.That((await InstallationBackups.ReadAsync(config, CancellationToken.None)).Hint, Does.Contain("backup.sh --install-timer"));
+    }
+
+    [Test]
+    public async Task RequestWritesOneFileAndRefusesASecondUntilTheHostTakesIt()
+    {
+        using var directory = new AppAuthorizationTestData.TemporaryDirectory();
+        using var requests = new AppAuthorizationTestData.TemporaryDirectory();
+        var config = RequestConfiguration(directory.Path, requests.Path);
+
+        Assert.That(await InstallationBackups.RequestAsync(config, "admin@example.com", Now, CancellationToken.None), Is.EqualTo(InstallationBackupRequestResult.Accepted));
+        Assert.That(await InstallationBackups.RequestAsync(config, "x", Now, CancellationToken.None), Is.EqualTo(InstallationBackupRequestResult.InProgress));
+        Assert.That(await File.ReadAllTextAsync(Path.Combine(requests.Path, "request.json")), Does.Contain("admin@example.com"));
+        Assert.That(Directory.GetFiles(requests.Path), Has.Length.EqualTo(1));
+
+        File.Delete(Path.Combine(requests.Path, "request.json"));
+        Directory.CreateDirectory(Path.Combine(requests.Path, "request.json"));
+        Assert.That(await InstallationBackups.RequestAsync(config, "x", Now, CancellationToken.None), Is.EqualTo(InstallationBackupRequestResult.TriggerBlocked));
+    }
+
+    [Test]
+    public async Task RequestWithoutTheHostTriggerIsReported()
+    {
+        using var directory = new AppAuthorizationTestData.TemporaryDirectory();
+        var config = RequestConfiguration(directory.Path, Path.Combine(directory.Path, "missing"));
+
+        Assert.That(await InstallationBackups.RequestAsync(config, "x", Now, CancellationToken.None), Is.EqualTo(InstallationBackupRequestResult.TriggerMissing));
+        Assert.That((await InstallationBackups.ReadAsync(config, CancellationToken.None)).TriggerAvailable, Is.False);
+    }
+
+    [Test]
+    public void StartingABackupIsOnlyForSystemAdministrators()
+    {
+        var authorize = typeof(InstallController).GetMethod(nameof(InstallController.StartBackup))!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();
+
+        Assert.That(authorize.Roles, Is.EqualTo(Automaton.Api.Enums.UserRole.SystemAdministrator));
+        Assert.That(authorize.Policy, Is.EqualTo("DeveloperApiAccess"));
+    }
+
+    private static IConfiguration RequestConfiguration(string statusDirectory, string requestsDirectory)
+        => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Installation:StatusDirectory"] = statusDirectory,
+            ["Installation:BackupRequestsDirectory"] = requestsDirectory
+        }).Build();
+
     private static IConfiguration Configuration(string statusDirectory)
         => new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Installation:StatusDirectory"] = statusDirectory })

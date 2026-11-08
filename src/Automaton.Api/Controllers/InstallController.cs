@@ -1,7 +1,11 @@
+using System.Security.Claims;
 using Automaton.Api.Application.Commands;
+using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
@@ -11,7 +15,8 @@ namespace Automaton.Api.Controllers;
 
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class InstallController(InstallService installService, IConfiguration configuration,
-    IWebHostEnvironment environment, ApplicationDbContext db, SmtpSettingsService smtpSettings) : BaseController
+    IWebHostEnvironment environment, ApplicationDbContext db, SmtpSettingsService smtpSettings,
+    IAuditEventService auditEventService) : BaseController
 {
     [HttpGet("status")]
     [AllowAnonymous]
@@ -54,6 +59,46 @@ public class InstallController(InstallService installService, IConfiguration con
     [Authorize(Policy = Automaton.Api.Authentication.AppPermissionAuthenticationOptions.BackupsReadPolicy)]
     public async Task<IActionResult> GetBackups(CancellationToken token)
         => Ok(await InstallationBackups.ReadAsync(configuration, token));
+
+    [HttpPost("backups")]
+    [Authorize(Policy = "DeveloperApiAccess", Roles = UserRole.SystemAdministrator)]
+    public async Task<IActionResult> StartBackup(CancellationToken token)
+    {
+        _ = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId);
+        var email = User.FindFirstValue(ClaimTypes.Email);
+        var requestedBy = string.IsNullOrWhiteSpace(email) ? userId.ToString() : $"{email} {userId}";
+
+        // Audit first and fail closed, as for server updates: a root-triggering request that cannot be recorded is not sent.
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.ServerBackupRequested,
+            Action = AuditActions.Requested,
+            EntityType = AuditEntityTypes.ServerInstallation,
+            ActorUserId = userId == Guid.Empty ? null : userId,
+            Message = "A server backup was requested",
+            Metadata = new
+            {
+                AuthenticationType = User.Identity?.AuthenticationType,
+                ApiKeyScope = User.FindFirstValue("api_key_scope"),
+                ApiKeyId = User.FindFirstValue("api_key_id")
+            },
+            FailOnError = true
+        }, token);
+
+        return await InstallationBackups.RequestAsync(configuration, requestedBy, DateTimeOffset.UtcNow, token) switch
+        {
+            InstallationBackupRequestResult.Accepted => Accepted(new { requested = true }),
+            InstallationBackupRequestResult.InProgress => Conflict(new { message = "A backup is already requested." }),
+            InstallationBackupRequestResult.TriggerBlocked => StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "The backup request directory on the server cannot be used. Check /var/lib/automaton/backup/requests: it must be writable and must not contain a request.json that is not a regular file."
+            }),
+            _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "This server cannot start a backup from Studio yet. Run sudo bash /opt/automaton-server/backup.sh --install-timer once on the server to enable it."
+            })
+        };
+    }
 
     [HttpGet("backups/{name}/archive")]
     [Authorize(Policy = Automaton.Api.Authentication.AppPermissionAuthenticationOptions.BackupsReadPolicy)]
