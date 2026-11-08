@@ -164,6 +164,7 @@ const handleRetry = async () => {
 </template>
 
 <style scoped>
+.apps-view { max-width: 1400px; margin: 0 auto; }
 .apps-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .apps-head__title { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); }
 .apps-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; max-width: 52ch; }
