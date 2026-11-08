@@ -11,6 +11,14 @@ vi.mock('../services/apps.service', () => ({
     setSharing: vi.fn(),
     addSharedPerson: vi.fn(),
     removeSharedPerson: vi.fn(),
+    get: vi.fn(),
+    getMarketplaceCategories: vi.fn(),
+    listMyTeams: vi.fn(),
+    updateListing: vi.fn(),
+    uploadThumbnail: vi.fn(),
+    uploadScreenshot: vi.fn(),
+    deleteScreenshot: vi.fn(),
+    removeThumbnail: vi.fn(),
   },
 }))
 
@@ -32,6 +40,9 @@ describe('ShareDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(appsService.getSharing).mockResolvedValue({ audience: 'me', people: [] })
+    vi.mocked(appsService.get).mockResolvedValue({ summary: 'Old summary', category: null, tags: 'a,b', thumbnailUrl: null, screenshots: [] } as never)
+    vi.mocked(appsService.getMarketplaceCategories).mockResolvedValue(['Games', 'Tools'])
+    vi.mocked(appsService.listMyTeams).mockResolvedValue([{ id: 't-1', displayName: 'Design' }])
   })
 
   it('offers the four choices and starts on the current one', async () => {
@@ -39,7 +50,7 @@ describe('ShareDialog', () => {
     await flushPromises()
 
     const text = wrapper.text()
-    for (const title of ['Only me', 'People I choose', 'Everyone on this server', 'Anyone on the internet']) {
+    for (const title of ['Only me', 'People I choose', 'A team', 'Everyone on this server', 'Anyone on the internet']) {
       expect(text).toContain(title)
     }
     expect((wrapper.find('[data-testid="share-choice-me"] input').element as HTMLInputElement).checked).toBe(true)
@@ -55,7 +66,7 @@ describe('ShareDialog', () => {
     await wrapper.find('[data-testid="share-save"]').trigger('click')
     await flushPromises()
 
-    expect(appsService.setSharing).toHaveBeenCalledWith('app-1', 'server', undefined)
+    expect(appsService.setSharing).toHaveBeenCalledWith('app-1', 'server', undefined, undefined, undefined)
     expect(wrapper.emitted('changed')).toHaveLength(1)
   })
 
@@ -73,7 +84,7 @@ describe('ShareDialog', () => {
     await wrapper.find('[data-testid="share-save"]').trigger('click')
     await flushPromises()
 
-    expect(appsService.setSharing).toHaveBeenCalledWith('app-1', 'internet', 'static-tool')
+    expect(appsService.setSharing).toHaveBeenCalledWith('app-1', 'internet', 'static-tool', undefined, false)
   })
 
   it('adds and removes people and shows the server message when a person is unknown', async () => {
@@ -100,5 +111,67 @@ describe('ShareDialog', () => {
     await flushPromises()
     expect(appsService.removeSharedPerson).toHaveBeenCalledWith('app-1', 'u-1')
     expect(wrapper.find('[data-testid="share-people"]').text()).not.toContain('ana@example.test')
+  })
+
+  it('shares with a team the person picks', async () => {
+    vi.mocked(appsService.setSharing).mockResolvedValue({ audience: 'team', people: [], team: { id: 't-1', name: 'Design' } })
+    const wrapper = open()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="share-choice-team"] input').setValue(true)
+    expect(wrapper.find('[data-testid="share-save"]').attributes('disabled')).toBeDefined()
+    await wrapper.find('#share-team').setValue('t-1')
+    await wrapper.find('[data-testid="share-save"]').trigger('click')
+    await flushPromises()
+
+    expect(appsService.setSharing).toHaveBeenCalledWith('app-1', 'team', undefined, 't-1', undefined)
+    expect(wrapper.emitted('changed')).toHaveLength(1)
+  })
+
+  it('shows an error with Retry when the teams cannot be loaded, not "not in a team"', async () => {
+    vi.mocked(appsService.listMyTeams).mockRejectedValueOnce(new Error('down'))
+    const wrapper = open()
+    await flushPromises()
+    await wrapper.find('[data-testid="share-choice-team"] input').setValue(true)
+
+    expect(wrapper.find('[data-testid="share-teams-error"]').text()).toContain('could not be loaded')
+    expect(wrapper.text()).not.toContain('not in a team yet')
+
+    await wrapper.find('[data-testid="share-teams-retry"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="share-teams-error"]').exists()).toBe(false)
+    expect(wrapper.find('#share-team').text()).toContain('Design')
+  })
+
+  it('keeps the dialog as it was and shows the error when the listing cannot be saved', async () => {
+    vi.mocked(appsService.updateListing).mockRejectedValueOnce({ response: { data: { message: 'Unknown category' } } })
+    const wrapper = open()
+    await flushPromises()
+    await wrapper.find('[data-testid="share-choice-internet"] input').setValue(true)
+    await wrapper.find('[data-testid="share-list"] input').setValue(true)
+    await wrapper.find('[data-testid="share-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="share-error"]').text()).toContain('Unknown category')
+    expect(appsService.setSharing).not.toHaveBeenCalled()
+    expect(wrapper.emitted('changed')).toBeUndefined()
+  })
+
+  it('lists the app in the store with its summary, category and tags', async () => {
+    vi.mocked(appsService.setSharing).mockResolvedValue({ audience: 'internet', people: [], publicUrlSlug: 'static-tool', listed: true })
+    const wrapper = open()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="share-choice-internet"] input').setValue(true)
+    expect(wrapper.find('[data-testid="share-listing"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="share-list"] input').setValue(true)
+    await wrapper.find('#share-summary').setValue('A handy tool')
+    await wrapper.find('#share-category').setValue('Tools')
+    await wrapper.find('#share-tags').setValue('x, y')
+    await wrapper.find('[data-testid="share-save"]').trigger('click')
+    await flushPromises()
+
+    expect(appsService.setSharing).toHaveBeenCalledWith('app-1', 'internet', 'static-tool', undefined, true)
+    expect(appsService.updateListing).toHaveBeenCalledWith('app-1', { summary: 'A handy tool', category: 'Tools', tags: ['x', 'y'] })
   })
 })

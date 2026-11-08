@@ -26,6 +26,9 @@ public class WebApp
 
     /// <summary>Any signed-in person on this server may open the app (not the public internet).</summary>
     public bool SharedWithServer { get; set; }
+
+    /// <summary>Members of this team (project) may open the app after signing in; they cannot manage it.</summary>
+    public Guid? SharedWithProjectId { get; set; }
     public bool IsForkable { get; set; } = false;
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
