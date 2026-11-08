@@ -96,27 +96,33 @@ set_delegated_env() {
       fi; } > "$env_file.new"
     chmod 0600 "$env_file.new"; mv "$env_file.new" "$env_file"
 }
-check_delegated_ready() {
-    python3 "$bundle_dir/check_dns.py" --delegation "$domain" || exit 1
+check_port_53() {
     if ss -lunH | awk '{print $4}' | grep -Ev '^(127\.|\[::1\])' | grep -Eq ':53$' && ! "${compose[@]}" ps --services --status running 2>/dev/null | grep -qx acme-responder; then
-        echo 'Port 53 is already used on this server (often systemd-resolved listening on all addresses). Free it or pass --public-ip ADDRESS so the responder binds only that address; nothing was changed.' >&2
+        echo 'Port 53 is already used on this server (often systemd-resolved listening on all addresses). Free it; nothing was changed.' >&2
         exit 1
     fi
 }
 if $switch_tls; then
     [[ -f "$install_dir/release.env" && -f "$install_dir/.env" ]] || { echo 'No installation was found to switch. Run the installer without --switch-tls first.' >&2; exit 1; }
-    [[ -f "$install_dir/configure.py" && -f "$install_dir/explain_certificate_failure.py" ]] || { echo "This server's installed tools predate the TLS switch. Update to a release that includes it first: sudo bash $install_dir/update.sh" >&2; exit 1; }
+    [[ -f "$install_dir/configure.py" && -f "$install_dir/explain_certificate_failure.py" && ( "$tls_mode" != delegated || -f "$install_dir/acme_responder.py" ) ]] || { echo "This server's installed tools predate the TLS switch. Update to a release that includes it first: sudo bash $install_dir/update.sh" >&2; exit 1; }
     bundle_dir="$install_dir"
-    $tls_mode_given || { echo 'Say which mode to switch to: --switch-tls --tls-mode cloudflare (or http).' >&2; exit 1; }
+    $tls_mode_given || { echo 'Say which mode to switch to: --switch-tls --tls-mode cloudflare (delegated or http).' >&2; exit 1; }
     [[ -z "$domain$email" ]] || { echo '--switch-tls changes only the TLS mode; the domain and email cannot be changed.' >&2; exit 1; }
     command -v python3 >/dev/null && docker info >/dev/null || { echo 'Docker and python3 are required.' >&2; exit 1; }
     token_args=()
     [[ -z "$token_file" ]] || token_args=(--cloudflare-token-file "$token_file")
     domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "$config_dir/installation.json")
     export CONFIG_DIR="$config_dir"
-    [[ "$tls_mode" != delegated ]] || check_delegated_ready
+    if [[ "$tls_mode" == delegated ]]; then
+        # The public DNS check follows the NS record to this server's port 53, so the responder must be running first.
+        check_port_53
+        set_delegated_env
+        "${compose[@]}" up -d acme-responder || exit 1
+        sleep 3
+        python3 "$bundle_dir/check_dns.py" --delegation "$domain" || { "${compose[@]}" stop acme-responder >/dev/null 2>&1; exit 1; }
+    fi
     python3 "$install_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" ${token_args[@]+"${token_args[@]}"} || exit 1
-    "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true
+    [[ "$tls_mode" == delegated ]] || "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true
     set_delegated_env
     "${compose[@]}" config --quiet
     if [[ "$tls_mode" == delegated ]]; then "${compose[@]}" up -d acme-responder || exit 1; else "${compose[@]}" --profile delegated rm -f acme-responder >/dev/null 2>&1 || true; fi
@@ -265,7 +271,6 @@ fi
 [[ -n "$email" ]] || read -r -p 'Certificate notification email: ' email
 if ! $configure_only && [[ -f "$bundle_dir/check_dns.py" ]]; then
     python3 "$bundle_dir/check_dns.py" "$domain" "${public_ips[@]}"
-    if [[ "$tls_mode" == delegated ]]; then python3 "$bundle_dir/check_dns.py" --delegation "$domain" || exit 1; fi
 fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
@@ -287,7 +292,7 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py acme_responder.py; do
+for script in backup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py acme_responder.py check_dns.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
@@ -301,6 +306,7 @@ printf 'CONFIG_DIR=%s\nBACKUP_DIR=%s/backups\n' "$config_dir" "$install_dir" > "
 set_delegated_env
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 "${compose[@]}" config --quiet
+if [[ "$tls_mode" == delegated ]]; then printf 'Delegated TLS: add this one DNS record before the certificate can be issued, and open UDP/TCP port 53: %s\n' "$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import check_dns; print(check_dns.delegation_record(sys.argv[2]))' "$bundle_dir" "$domain")"; fi
 printf 'DNS must resolve api.%s, studio.%s, store.%s, apps.%s and *.apps.%s to this server. Allow inbound TCP 80, 443 and 5671.\n' "$domain" "$domain" "$domain" "$domain" "$domain"
 if $configure_only; then
     echo 'Configuration prepared. No services were started.'
