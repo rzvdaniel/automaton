@@ -11,7 +11,7 @@ vi.mock('../services/apps.service', () => ({
 }))
 
 const mountSecrets = () => mount(AppSecrets, {
-  props: { appId: 'app-1' },
+  props: { appId: 'app-1', declared: [{ name: 'S3_BUCKET' }] },
   global: { plugins: [PrimeVue, ConfirmationService] },
 })
 
@@ -51,21 +51,52 @@ describe('AppSecrets', () => {
     expect(appsService.setSecret).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('not starting with a digit or AUTOMATON_')
   })
-  it('shows the audit history of changes and deliveries on demand', async () => {
+  it('marks the name and value inputs so password managers do not fill in saved logins (#894)', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    vi.mocked(appsService.listSecretHistory).mockResolvedValue([
-      {
-        createdAtUtc: '2026-11-01T03:00:00Z', eventType: 'SecretsDelivered', message: '1 secret(s) delivered to a runtime start',
-        runnerId: 'runner-1', delivered: [{ name: 'PAYMENTS_KEY', scope: 'project', version: 2, from: 'STRIPE_KEY' }],
-      },
-    ])
     const wrapper = mountSecrets()
     await flushPromises()
-    await wrapper.findAll('button').find((button) => button.text().includes('Show history'))!.trigger('click')
+
+    const nameInput = wrapper.find('input#secret-name').element as HTMLInputElement
+    const valueInput = wrapper.find('input#secret-value').element as HTMLInputElement
+    expect(nameInput.getAttribute('autocomplete')).toBe('off')
+    expect(valueInput.getAttribute('autocomplete')).toBe('new-password')
+    expect(valueInput.type).toBe('password')
+    for (const input of [nameInput, valueInput]) {
+      expect(input.getAttribute('name')).toMatch(/^secret-/)
+      expect(input.getAttribute('data-1p-ignore')).not.toBeNull()
+      expect(input.getAttribute('data-lpignore')).toBe('true')
+    }
+  })
+
+  it('fills the form from a row to replace its value', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([
+      { name: 'S3_BUCKET', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' },
+    ])
+    vi.mocked(appsService.setSecret).mockClear()
+    const wrapper = mountSecrets()
     await flushPromises()
 
-    expect(appsService.listSecretHistory).toHaveBeenCalledWith('app-1')
-    expect(wrapper.text()).toContain('PAYMENTS_KEY v2 (project:STRIPE_KEY)')
-    expect(wrapper.text()).toContain('Runner')
+    await wrapper.findAll('button').find((button) => button.text() === 'replace')!.trigger('click')
+    expect((wrapper.find('input#secret-name').element as HTMLInputElement).value).toBe('S3_BUCKET')
+  })
+
+  it('shows one small row with no secrets, and Add a secret opens the form', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([])
+    const wrapper = mount(AppSecrets, { props: { appId: 'app-1' }, global: { plugins: [PrimeVue, ConfirmationService] } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="no-secrets"]').text()).toContain('No secrets')
+    expect(wrapper.find('input#secret-name').exists()).toBe(false)
+    await wrapper.find('[data-testid="no-secrets"] button').trigger('click')
+    expect(wrapper.find('input#secret-name').exists()).toBe(true)
+  })
+
+  it('lists the secrets the app needs and are not set yet', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([])
+    const wrapper = mount(AppSecrets, {
+      props: { appId: 'app-1', declared: [{ name: 'API_KEY', description: 'For the vendor' }] },
+      global: { plugins: [PrimeVue, ConfirmationService] },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="missing-secrets"]').text()).toContain('API_KEY')
   })
 })

@@ -49,15 +49,16 @@ describe('AppListView', () => {
     item({ id: 'c', name: 'Idle', liveEnvironment: null, runner: null }),
   ]
 
-  it('lists each app as a link to its page with kind, access and state', async () => {
+  it('lists each app as a link to its page with kind once and only the state', async () => {
     const wrapper = await mountView(apps)
     expect(wrapper.find('h1').text()).toBe('Apps')
     const links = wrapper.findAll('.apps-card a')
     expect(links.map((link) => link.attributes('href'))).toEqual(['/apps/a', '/apps/b', '/apps/c'])
     expect(links[0]!.text()).toContain('Web app · Take notes')
-    expect(links[0]!.text()).toContain('private')
+    expect(links[0]!.text()).not.toContain('private')
     expect(links[0]!.text()).toContain('live')
-    expect(links[1]!.text()).toContain('action')
+    expect(links[1]!.text()).toContain('Action')
+    expect(links[1]!.text()).not.toContain('action ')
     expect(links[2]!.text()).toContain('stopped')
     expect(wrapper.text()).toContain('All · 3')
   })

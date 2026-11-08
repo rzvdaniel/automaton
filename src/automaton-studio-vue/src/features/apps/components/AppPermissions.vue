@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import Button from 'primevue/button'
-import Message from 'primevue/message'
-import Tag from 'primevue/tag'
 import { appsService } from '../services/apps.service'
 import type { AppPermissionsResponse } from '../types/apps.types'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -16,18 +13,18 @@ const failed = ref(false)
 
 const isAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 
-function severity(status: string) {
+function pillClass(status: string) {
   switch (status) {
-    case 'Approved': return 'success'
-    case 'Pending': return 'warn'
+    case 'Approved': return 'pill--ok'
+    case 'Pending': return 'pill--wait'
     case 'Rejected':
-    case 'Revoked': return 'danger'
-    default: return 'secondary'
+    case 'Revoked': return 'pill--bad'
+    default: return ''
   }
 }
 
 function label(status: string) {
-  return status === 'Pending' ? 'Waiting for approval' : status
+  return status === 'Pending' ? 'waiting for approval' : status.toLowerCase()
 }
 
 async function load() {
@@ -48,84 +45,33 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app-permissions">
-    <p class="intro">
-      An app asks for platform access in <code>automaton.json</code> under <code>application.permissions</code>.
-      It gets that access only after a system administrator approves it; the app's running copies then
-      restart on their Runners and receive the key as <code>APP_AUTOMATON_API_KEY</code>, without a deploy.
-    </p>
-
-    <Message v-if="failed" severity="error" :closable="false">Could not load the app's permissions.</Message>
-    <div v-else-if="loading && !state" class="muted">Loading…</div>
-    <div v-else-if="state && state.permissions.length === 0" class="muted">This app does not request any permissions.</div>
-
+  <section v-if="failed || (state && state.permissions.length > 0)" class="card" aria-labelledby="permissions-title">
+    <h2 id="permissions-title">Permissions</h2>
+    <p v-if="failed" class="hint">Could not load the app's permissions.</p>
     <template v-else-if="state">
-      <ul class="permission-list">
-        <li v-for="item in state.permissions" :key="item.permission" class="permission-row">
-          <code>{{ item.permission }}</code>
-          <Tag :value="label(item.status)" :severity="severity(item.status)" />
-        </li>
-      </ul>
-
-      <Message v-if="state.waiting.length > 0" severity="warn" :closable="false">
-        <template v-if="isAdministrator">
-          You can approve this as a system administrator.
-        </template>
-        <template v-else>
-          A system administrator of this server must approve {{ state.waiting.join(', ') }}. Send them the approval link.
-        </template>
-        <div v-if="state.approvalUrl" class="approval-link">
-          <Button
-            v-if="isAdministrator"
-            as="a"
-            :href="state.approvalUrl"
-            label="Review and approve"
-            icon="pi pi-arrow-right"
-            icon-pos="right"
-            size="small"
-          />
-          <code v-else class="url">{{ state.approvalUrl }}</code>
-        </div>
-      </Message>
+      <div v-for="item in state.permissions" :key="item.permission" class="row">
+        <code>{{ item.permission }}</code>
+        <span class="pill" :class="pillClass(item.status)">{{ label(item.status) }}</span>
+      </div>
+      <p v-if="state.waiting.length > 0" class="hint">
+        <template v-if="isAdministrator">You can approve this as a system administrator.</template>
+        <template v-else>A system administrator of this server must approve {{ state.waiting.join(', ') }}.</template>
+        <a v-if="state.approvalUrl && isAdministrator" :href="state.approvalUrl">Review and approve</a>
+        <code v-else-if="state.approvalUrl" class="url">{{ state.approvalUrl }}</code>
+      </p>
     </template>
-  </div>
+  </section>
 </template>
 
 <style scoped>
-.app-permissions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.intro,
-.muted {
-  margin: 0;
-  color: var(--p-text-muted-color, var(--p-text-color-secondary));
-}
-
-.permission-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.permission-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.approval-link {
-  margin-top: 0.5rem;
-}
-
-.url {
-  overflow-wrap: anywhere;
-}
+.card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.hint { margin: 0; color: var(--ink-soft); font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
+code { font-family: var(--mono); font-size: 13px; }
+.pill { padding: 3px 10px; border-radius: 999px; font-family: var(--mono); font-size: 12px; }
+.pill--ok { border: 1px solid var(--ok); color: var(--ok); }
+.pill--wait { border: 1px solid var(--signal); color: var(--signal-ink); }
+.pill--bad { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
+.url { overflow-wrap: anywhere; }
 </style>

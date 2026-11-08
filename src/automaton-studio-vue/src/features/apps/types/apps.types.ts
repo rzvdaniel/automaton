@@ -143,6 +143,11 @@ export interface ApplicationContract {
   permissions?: string[]
   isStaticSite?: boolean
   compose?: unknown
+  /** 'api' when the app declares it is an API. The server does not report this yet; web is assumed. */
+  kind?: string | null
+  /** Pages or endpoints and the OpenAPI document path the app declares (#864). Optional until the server returns them. */
+  pages?: Array<{ method?: string | null; path: string; description?: string | null }>
+  openapi?: string | null
 }
 
 export interface ApplicationSecretDeclaration {

@@ -11,7 +11,7 @@ import SharedAppsSection from '../components/SharedAppsSection.vue'
 import { organizationsService, type OrganizationAppSummary } from '@/features/organizations/services/organizationsService'
 import { useAppsStore } from '../stores/apps.store'
 import {
-  appAccess, appDescription, appState, matchesFilter, matchesSearch, type AppFilter,
+  appDescription, appState, matchesFilter, matchesSearch, type AppFilter,
 } from '../utils/app-list-display'
 
 const router = useRouter()
@@ -131,7 +131,6 @@ const handleRetry = async () => {
             :name="app.name"
             :line="appDescription(app)"
             :image-url="app.thumbnailUrl"
-            :access="appAccess(app)"
             :state="appState(app)"
           />
         </div>

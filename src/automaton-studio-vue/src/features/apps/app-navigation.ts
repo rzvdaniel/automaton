@@ -1,84 +1,51 @@
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 
-export const APP_VIEW_KEYS = [
-  'overview',
-  'settings',
-  'logs',
-  'deployments',
-  'actions',
-  'runtime',
-  'targets',
-  'contract',
-  'more',
-] as const
+export const APP_VIEW_KEYS = ['overview', 'activity', 'settings'] as const
 
 export type AppViewKey = (typeof APP_VIEW_KEYS)[number]
 
-export type AppTabKey = 'overview' | 'settings' | 'activity' | 'advanced'
-
 export interface AppTab {
-  key: AppTabKey
-  label: string
-  /** The view a click on the tab opens. */
-  view: AppViewKey
-}
-
-export interface AppSubView {
   key: AppViewKey
   label: string
 }
 
 export const DEFAULT_APP_VIEW: AppViewKey = 'overview'
 
-/** The four tabs of the app page. */
+/** The three tabs of the app page. */
 export const APP_TABS: ReadonlyArray<AppTab> = [
-  { key: 'overview', label: 'Overview', view: 'overview' },
-  { key: 'settings', label: 'Settings & secrets', view: 'settings' },
-  { key: 'activity', label: 'Activity', view: 'logs' },
-  { key: 'advanced', label: 'Advanced', view: 'runtime' },
+  { key: 'overview', label: 'Overview' },
+  { key: 'activity', label: 'Activity' },
+  { key: 'settings', label: 'Settings' },
 ]
 
-/** Views inside a tab that has more than one. */
-export const APP_SUB_VIEWS: Partial<Record<AppTabKey, ReadonlyArray<AppSubView>>> = {
-  activity: [
-    { key: 'logs', label: 'Logs' },
-    { key: 'deployments', label: 'Deploys' },
-    { key: 'actions', label: 'Schedule runs' },
-  ],
-  advanced: [
-    { key: 'runtime', label: 'Runner' },
-    { key: 'targets', label: 'Deployment targets' },
-    { key: 'contract', label: 'Raw contract' },
-    { key: 'more', label: 'Appearance, restore and delete' },
-  ],
-}
-
-const VIEW_TABS: Record<AppViewKey, AppTabKey> = {
-  overview: 'overview',
-  settings: 'settings',
+/** Earlier `?view=` values and the tab each one now lives in. */
+const LEGACY_VIEWS: Record<string, AppViewKey> = {
   logs: 'activity',
   deployments: 'activity',
   actions: 'activity',
-  runtime: 'advanced',
-  targets: 'advanced',
-  contract: 'advanced',
-  more: 'advanced',
+  runtime: 'settings',
+  targets: 'settings',
+  contract: 'settings',
+  more: 'settings',
 }
 
-export function tabForView(view: AppViewKey): AppTabKey {
-  return VIEW_TABS[view]
-}
+/** Earlier views whose content now sits in Settings, under the closed Advanced section. */
+const ADVANCED_VIEWS = new Set(['runtime', 'targets', 'contract', 'more'])
 
 export function resolveAppView(value: unknown): AppViewKey {
-  return typeof value === 'string' && (APP_VIEW_KEYS as ReadonlyArray<string>).includes(value)
-    ? (value as AppViewKey)
-    : DEFAULT_APP_VIEW
+  if (typeof value !== 'string') return DEFAULT_APP_VIEW
+  if ((APP_VIEW_KEYS as ReadonlyArray<string>).includes(value)) return value as AppViewKey
+  return LEGACY_VIEWS[value] ?? DEFAULT_APP_VIEW
 }
 
-/** Old links used `?view=settings&settings=targets`; that section now lives under Advanced. */
 export function resolveAppViewFromQuery(query: LocationQuery): AppViewKey {
-  const view = resolveAppView(query.view)
-  return view === 'settings' && query.settings === 'targets' ? 'targets' : view
+  return resolveAppView(query.view)
+}
+
+/** True when an earlier link pointed at something that is now inside Settings > Advanced. */
+export function opensAdvanced(query: LocationQuery): boolean {
+  return (typeof query.view === 'string' && ADVANCED_VIEWS.has(query.view))
+    || (query.view === 'settings' && query.settings === 'targets')
 }
 
 export function withoutAuthoringQuery(query: LocationQuery): LocationQueryRaw {

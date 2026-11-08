@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import AppMark from './AppMark.vue'
-import type { AppAccess, AppState } from '../utils/app-list-display'
+import type { AppState } from '../utils/app-list-display'
 
 /** One app in the Apps list: a link to the app page, or a button when the person cannot open the page. */
 defineProps<{
@@ -10,7 +10,6 @@ defineProps<{
   line: string
   imageUrl?: string | null
   to?: string
-  access?: AppAccess
   state?: AppState
   busy?: boolean
 }>()
@@ -23,7 +22,6 @@ defineProps<{
       <span class="app-row__name">{{ name }}</span>
       <span class="app-row__line">{{ line }}</span>
     </span>
-    <span v-if="access" class="app-row__tag">{{ access }}</span>
     <span v-if="state" class="app-row__state" :class="`app-row__state--${state.tone}`">{{ state.label }}</span>
   </component>
 </template>
@@ -50,7 +48,7 @@ defineProps<{
 .app-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .app-row__name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-row__line { color: var(--ink-soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.app-row__tag,
+
 .app-row__state {
   flex: none;
   padding: 3px 9px;
@@ -59,13 +57,12 @@ defineProps<{
   font-size: 11.5px;
   line-height: 1.3;
 }
-.app-row__tag { border: 1px solid var(--line); color: var(--ink-soft); }
 .app-row__state--live { background: var(--signal); color: var(--on-signal); font-weight: 600; }
 .app-row__state--ok { border: 1px solid var(--ok); color: var(--ok); }
+.app-row__state--failing { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
 .app-row__state--stopped { background: var(--row-line); color: var(--ink-soft); }
 @media (max-width: 640px) {
   .app-row { flex-wrap: wrap; }
   .app-row__text { flex-basis: calc(100% - 60px); }
-  .app-row__tag { margin-left: 52px; }
 }
 </style>

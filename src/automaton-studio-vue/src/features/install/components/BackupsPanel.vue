@@ -178,9 +178,9 @@ async function copy(command: string) {
 
       <div v-if="apps.length" data-test="app-restore">
         <h2 class="text-lg font-bold mt-0 mb-2">Restore one app</h2>
-        <p class="mt-0 text-color-secondary">Open an app's Advanced tab (Appearance, restore and delete) to restore only that app.</p>
+        <p class="mt-0 text-color-secondary">Open an app's Settings page, under Advanced, to go back to an earlier version of that app.</p>
         <div class="flex flex-wrap gap-3">
-          <RouterLink v-for="app in apps" :key="app.id" :to="{ path: `/apps/${app.id}`, query: { view: 'more' } }">
+          <RouterLink v-for="app in apps" :key="app.id" :to="{ path: `/apps/${app.id}`, query: { view: 'settings' } }">
             {{ app.name }}
           </RouterLink>
         </div>
