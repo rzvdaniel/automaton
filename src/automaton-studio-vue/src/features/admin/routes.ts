@@ -29,6 +29,12 @@ export const adminRoutes: RouteRecordRaw[] = [
         meta: { title: 'Installation', requiresRole: ['SysAdmin'] },
       },
       {
+        path: 'backups',
+        name: 'admin-backups',
+        component: () => import('@/features/install/views/BackupsView.vue'),
+        meta: { title: 'Backups', requiresRole: ['SysAdmin'] },
+      },
+      {
         path: '',
         redirect: '/admin/apps',
       },

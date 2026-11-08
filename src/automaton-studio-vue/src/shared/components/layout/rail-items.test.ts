@@ -29,7 +29,7 @@ describe('railItems', () => {
       Catalog: '/apps/catalog',
       People: '/people',
       Server: '/server',
-      Backups: '/admin/installation',
+      Backups: '/admin/backups',
       Settings: '/settings',
     })
   })
