@@ -92,7 +92,7 @@ public sealed class AppSecretServiceTests
     }
 
     [Test]
-    public async Task ApiUrlIsDeliveredWithoutTrailingSlashAndCannotBeOverriddenByASecret()
+    public async Task ApiUrlIsDeliveredWithoutTrailingSlashAsPlainValue()
     {
         var (_, db, appId, ownerId) = Create();
         var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());

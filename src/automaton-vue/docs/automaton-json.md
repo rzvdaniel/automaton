@@ -72,8 +72,9 @@ layout, build system, or application architecture.
 | `application.openPaths` | Optional paths of the private address that answer without Automaton sign-in, for webhooks and callbacks. See below. |
 
 The Runner supplies the effective port in `AUTOMATON_PORT` and the durable data
-path in `AUTOMATON_APP_DATA_DIR`. Every runtime and Action also gets `AUTOMATON_API_URL`, the server's public API base URL. A configured health path is ready only after a
-2xx HTTP response. On managed Linux Runners, the data directory and declared
+path in `AUTOMATON_APP_DATA_DIR`. Every runtime and Action also gets
+`AUTOMATON_API_URL`, the server's public API base URL. A configured health path
+is ready only after a 2xx HTTP response. On managed Linux Runners, the data directory and declared
 storage mounts are prepared as writable directories for the app container. File
 ownership and permissions still follow the UID that creates each file. Build
 and runtime artifacts can be replaced.
