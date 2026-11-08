@@ -18,6 +18,7 @@ const name = ref('')
 const value = ref('')
 const saving = ref(false)
 const loaded = ref(false)
+const adding = ref(false)
 const error = ref<string | null>(null)
 const namePattern = /^[A-Z_][A-Z0-9_]{0,99}$/
 
@@ -91,7 +92,7 @@ function message(failure: unknown, fallback: string) {
 </script>
 
 <template>
-  <section v-if="error || (loaded && (secrets.length > 0 || (declared?.length ?? 0) > 0))" class="card" aria-labelledby="secrets-title">
+  <section v-if="error || adding || (loaded && (secrets.length > 0 || (declared?.length ?? 0) > 0))" class="card" aria-labelledby="secrets-title">
     <div class="card-head">
       <h2 id="secrets-title">Secrets</h2>
       <span class="hint">Encrypted and never shown again. Used from the next start.</span>
@@ -123,6 +124,9 @@ function message(failure: unknown, fallback: string) {
     <small class="hint">Saving an existing name replaces its value.</small>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
   </section>
+  <div v-else-if="loaded" class="empty" data-testid="no-secrets">
+    No secrets · <button type="button" class="link" @click="adding = true">Add a secret</button>
+  </div>
 </template>
 
 <style scoped>
@@ -130,6 +134,7 @@ function message(failure: unknown, fallback: string) {
 .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
 h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .hint { color: var(--ink-soft); font-size: 13px; }
+.empty { padding: 4px 4px; color: var(--ink-soft); font-size: 13px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
 code { font-family: var(--mono); font-size: 13px; }
 .link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }

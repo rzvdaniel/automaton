@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.types'
 import { getAppOperationalSummary, isActionOnlyApp } from './app-operational-summary'
+import { getAppHealth } from './app-overview'
 
 function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarget {
   return {
@@ -31,6 +32,13 @@ describe('getAppOperationalSummary', () => {
   it('shows a deployed online target as running', () => {
     expect(getAppOperationalSummary(target({ status: DeploymentTargetStatus.Running, genericRuntimeDeployed: true })))
       .toMatchObject({ status: 'running', hasDeployedRuntime: true })
+  })
+
+  it('treats a deployed runtime on an online Runner as running even when the target says NotDeployed', () => {
+    const summary = getAppOperationalSummary(target({ status: DeploymentTargetStatus.NotDeployed, genericRuntimeDeployed: true }))
+    expect(summary.status).toBe('running')
+    expect(getAppHealth(summary)).toBe('healthy')
+    expect(getAppHealth(getAppOperationalSummary(target({ status: DeploymentTargetStatus.Running })))).toBe('failing')
   })
 
   it('reports a failed deployment, an offline Runner and a missing Runner', () => {

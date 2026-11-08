@@ -80,6 +80,16 @@ describe('AppSecrets', () => {
     expect((wrapper.find('input#secret-name').element as HTMLInputElement).value).toBe('S3_BUCKET')
   })
 
+  it('shows one small row with no secrets, and Add a secret opens the form', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([])
+    const wrapper = mount(AppSecrets, { props: { appId: 'app-1' }, global: { plugins: [PrimeVue, ConfirmationService] } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="no-secrets"]').text()).toContain('No secrets')
+    expect(wrapper.find('input#secret-name').exists()).toBe(false)
+    await wrapper.find('[data-testid="no-secrets"] button').trigger('click')
+    expect(wrapper.find('input#secret-name').exists()).toBe(true)
+  })
+
   it('lists the secrets the app needs and are not set yet', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
     const wrapper = mount(AppSecrets, {

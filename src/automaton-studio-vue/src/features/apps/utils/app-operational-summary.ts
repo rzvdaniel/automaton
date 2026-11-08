@@ -68,8 +68,9 @@ export function getAppOperationalSummary(
   else if (target.status === DeploymentTargetStatus.Failed) status = 'deployment-failed'
   else if (!hasRunner) status = 'no-runtime-assigned'
   else if (runnerUnavailable) status = 'runtime-unavailable'
-  else if (target.status === DeploymentTargetStatus.Running && hasDeployedRuntime) status = 'running'
-  else if (target.status === DeploymentTargetStatus.Running || hasDeployedRuntime) status = 'degraded'
+  // A deployed runtime on an online Runner serves the app, whatever the target's own status says.
+  else if (hasDeployedRuntime) status = 'running'
+  else if (target.status === DeploymentTargetStatus.Running) status = 'degraded'
   else status = 'not-deployed'
 
   return { ...statusDetails[status], status, hasDeployedRuntime }
