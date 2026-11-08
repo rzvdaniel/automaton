@@ -140,6 +140,20 @@ public class RuntimeCookieServiceTests
         Assert.That(options.Domain, Is.EqualTo(".runner-01.automaton.monster"));
     }
 
+    [TestCase("api.example.co.uk", "apps.example.co.uk", ".example.co.uk")]
+    [TestCase("api.com.au", "apps.com.au", null)]
+    public void BuildRuntimeCookieOptions_WithCountryCodeSecondLevelDomains_OnlyScopesToRegistrableParent(
+        string apiHost, string appsHost, string? expectedDomain)
+    {
+        var service = CreateService($"https://{apiHost}", $"https://{appsHost}");
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
+
+        var options = service.BuildRuntimeCookieOptions(Guid.NewGuid(), context.Request, DateTimeOffset.UtcNow.AddMinutes(5));
+
+        Assert.That(options.Domain, Is.EqualTo(expectedDomain));
+    }
+
     [Test]
     public void BuildRuntimeCookieOptions_WhenHostsAreLocalhost_DoesNotSetCookieDomain()
     {
