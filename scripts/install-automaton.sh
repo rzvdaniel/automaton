@@ -12,6 +12,9 @@ tls_mode=http
 configure_only=false
 quiet=false
 status_only=false
+switch_tls=false
+tls_mode_given=false
+token_file=''
 public_ips=()
 bundle_dir="${AUTOMATON_RELEASE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 [[ -f "$bundle_dir/configure.py" ]] || bundle_dir="$bundle_dir/../docker/install"
@@ -20,7 +23,9 @@ while (($#)); do
         --domain) domain="${2:?Missing domain}"; shift 2 ;;
         --public-ip) public_ips+=("${2:?Missing public IP}"); shift 2 ;;
         --email) email="${2:?Missing email}"; shift 2 ;;
-        --tls-mode) tls_mode="${2:?Missing TLS mode}"; shift 2 ;;
+        --tls-mode) tls_mode="${2:?Missing TLS mode}"; tls_mode_given=true; shift 2 ;;
+        --switch-tls) switch_tls=true; shift ;;
+        --cloudflare-token-file) token_file="${2:?Missing token file}"; shift 2 ;;
         --version) version="${2:?Missing release tag}"; shift 2 ;;
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
@@ -28,7 +33,7 @@ while (($#)); do
         --configure-only) configure_only=true; shift ;;
         --quiet) quiet=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -165,6 +170,61 @@ if [[ ! -f "$install_dir/release.env" ]]; then
         exit 1
     fi
 fi
+verify_https() {
+echo 'Waiting for HTTPS certificates…'
+explain_https_failure() {
+    printf 'The HTTPS check failed at %s. The services may be healthy, but HTTPS is not ready.\n' "$1" >&2
+    "${compose[@]}" logs --no-color --since "$certificate_attempt_started" --tail 300 traefik 2>/dev/null \
+        | python3 "$bundle_dir/explain_certificate_failure.py" "$domain" || true
+    exit 1
+}
+# Older bundles use /healthz and predate the public /health check.
+if grep -Fq 'http://127.0.0.1:8080/health]' "$install_dir/compose.yaml"; then
+    api_health=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health" 2>/dev/null) \
+        || explain_https_failure "https://api.$domain/health"
+    printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' 2>/dev/null || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
+fi
+studio_status=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" 2>/dev/null) \
+    || explain_https_failure "https://studio.$domain/api/install/status"
+python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response' <<< "$studio_status" 2>/dev/null \
+    || { echo 'The Studio installation status response was invalid.' >&2; exit 1; }
+curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null \
+    || explain_https_failure "https://studio.$domain/"
+curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
+    || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
+python3 - "$domain" <<'PYBROKER'
+import socket, ssl, sys
+with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
+    with ssl.create_default_context().wrap_socket(raw, server_hostname='api.' + sys.argv[1]) as broker:
+        broker.sendall(b'AMQP\x00\x00\x09\x01')
+        if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
+PYBROKER
+}
+if $switch_tls; then
+    [[ -f "$install_dir/release.env" ]] || { echo 'No installation was found to switch. Run the installer without --switch-tls first.' >&2; exit 1; }
+    $tls_mode_given || { echo 'Say which mode to switch to: --switch-tls --tls-mode cloudflare (or http).' >&2; exit 1; }
+    [[ -z "$domain$email" ]] || { echo '--switch-tls changes only the TLS mode; the domain and email cannot be changed.' >&2; exit 1; }
+    token_args=()
+    [[ -z "$token_file" ]] || token_args=(--cloudflare-token-file "$token_file")
+    switch_output=$(python3 "$bundle_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" "${token_args[@]}") || exit 1
+    echo "$switch_output"
+    domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "$config_dir/installation.json")
+    export CONFIG_DIR="$config_dir"
+    compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
+    "${compose[@]}" config --quiet
+    if [[ "$switch_output" == Switched* ]]; then
+        certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        # Traefik reads its certificate resolver at start; the API rewrites published app routes with the new resolver at start.
+        "${compose[@]}" restart traefik api
+        verify_https
+        if [[ "$tls_mode" == cloudflare ]]; then
+            echo "Switched to wildcard certificates: published apps now use *.apps.$domain. Traefik issues the wildcard certificate on first use through the Cloudflare DNS challenge."
+        else
+            echo 'Switched to HTTP-validated certificates. The Cloudflare token was emptied; port 80 must stay reachable.'
+        fi
+    fi
+    exit 0
+fi
 # Do not collide with an unrelated Compose installation or a server already on these ports.
 if ! $configure_only && [[ ! -f "$install_dir/release.env" ]]; then
     disk_path="$install_dir"
@@ -223,34 +283,7 @@ fi
 certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 "${compose[@]}" up -d --wait --wait-timeout 600
 # Validate actual public HTTPS/API routing as well as container health.
-echo 'Waiting for HTTPS certificates…'
-explain_https_failure() {
-    printf 'The HTTPS check failed at %s. The services may be healthy, but HTTPS is not ready.\n' "$1" >&2
-    "${compose[@]}" logs --no-color --since "$certificate_attempt_started" --tail 300 traefik 2>/dev/null \
-        | python3 "$bundle_dir/explain_certificate_failure.py" "$domain" || true
-    exit 1
-}
-# Older bundles use /healthz and predate the public /health check.
-if grep -Fq 'http://127.0.0.1:8080/health]' "$install_dir/compose.yaml"; then
-    api_health=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health" 2>/dev/null) \
-        || explain_https_failure "https://api.$domain/health"
-    printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' 2>/dev/null || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
-fi
-studio_status=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" 2>/dev/null) \
-    || explain_https_failure "https://studio.$domain/api/install/status"
-python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response' <<< "$studio_status" 2>/dev/null \
-    || { echo 'The Studio installation status response was invalid.' >&2; exit 1; }
-curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null \
-    || explain_https_failure "https://studio.$domain/"
-curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
-    || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
-python3 - "$domain" <<'PYBROKER'
-import socket, ssl, sys
-with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
-    with ssl.create_default_context().wrap_socket(raw, server_hostname='api.' + sys.argv[1]) as broker:
-        broker.sendall(b'AMQP\x00\x00\x09\x01')
-        if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
-PYBROKER
+verify_https
 if $quiet; then
     printf '\nHTTPS certificates are ready. The setup link is not printed (--quiet). Open https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
 else
