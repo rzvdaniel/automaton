@@ -12,11 +12,8 @@ const router = createRouter({
       name: 'app-marketplace-detail',
       component: () => import('@/views/AppMarketplaceDetailView.vue'),
     },
-    {
-      path: '/creators/:publicUsername/apps/:appId',
-      name: 'creator-app-detail',
-      component: () => import('@/views/CreatorAppDetailView.vue'),
-    },
+    // The creator app page was folded into the store's app page.
+    { path: '/creators/:publicUsername/apps/:appId', redirect: (to) => `/apps/${String(to.params.appId)}` },
     {
       path: '/creators/:publicUsername',
       name: 'creator-store',

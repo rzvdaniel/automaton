@@ -2,13 +2,14 @@
 import { computed } from 'vue'
 import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
 
-// The generated mark Studio shows for an app without an image (same palette and hash).
-const palette = [
+// Same palette and hash as Studio's AppMark (src/automaton-studio-vue/src/features/apps/utils/app-list-display.ts).
+// `dark` lifts the two dark tints, which would vanish on dark cards.
+const palette: { background: string; color: string; dark?: string }[] = [
   { background: '#fde3d2', color: '#a23d05' },
-  { background: '#17181c', color: '#ff7a2e' },
+  { background: '#17181c', color: '#ff7a2e', dark: '#34353c' },
   { background: '#e6e4dd', color: '#17181c' },
   { background: '#f26a1b', color: '#17181c' },
-  { background: '#2a2b31', color: '#f1f0eb' },
+  { background: '#2a2b31', color: '#f1f0eb', dark: '#42434b' },
 ]
 
 const props = withDefaults(defineProps<{ id: string; name: string; imageUrl?: string; size?: number }>(), {
@@ -30,7 +31,8 @@ const generated = computed(() => {
     hash = Math.imul(hash, 0x01000193) >>> 0
   }
   const colors = palette[hash % palette.length]!
-  return { ...box.value, ...colors, fontSize: `${Math.round(props.size * 0.45)}px` }
+  const { background, color, dark } = colors
+  return { ...box.value, '--mark-bg': background, '--mark-bg-dark': dark ?? background, color, fontSize: `${Math.round(props.size * 0.45)}px` }
 })
 </script>
 
@@ -48,6 +50,12 @@ const generated = computed(() => {
   font-family: var(--display);
   font-weight: 700;
   line-height: 1;
+  background: var(--mark-bg);
+}
+@media (prefers-color-scheme: dark) {
+  .app-mark {
+    background: var(--mark-bg-dark);
+  }
 }
 .image {
   object-fit: cover;
