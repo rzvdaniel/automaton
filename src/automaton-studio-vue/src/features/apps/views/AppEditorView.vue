@@ -54,7 +54,11 @@ const lastRun = computed(() => [...executions.value].sort((a, b) => b.createdAtU
 const health = computed(() => getAppHealth(editorStore.applicationState, lastRun.value))
 
 /** The public address, once the app is published. */
-const publicAppUrl = computed(() => kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed && app.value?.isPublished && app.value.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : '')
+// Mirrors the server's "open to the internet": published, no sign-in and a public runtime
+// (the single-app API does not return canLaunchPublicly, which is why it is not used here).
+const isOpenToInternet = computed(() =>
+  !!app.value?.isPublished && !app.value.requiresAuthentication && app.value.runtimeVisibility !== 'private')
+const publicAppUrl = computed(() => kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed && isOpenToInternet.value && app.value?.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : '')
 /** The sign-in address: opens for the owner and the people it is shared with. */
 const privateAppUrl = computed(() =>
   app.value && kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed ? getDeployedAppUrl(app.value.id) : '')
