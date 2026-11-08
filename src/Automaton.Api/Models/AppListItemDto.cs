@@ -21,14 +21,16 @@ public sealed class AppListItemDto
     /// <summary>The app has no web runtime or static site, only Actions.</summary>
     public bool ActionsOnly { get; init; }
     public AppListActionRunDto? LastActionRun { get; init; }
+    /// <summary>The soonest run of an enabled Action schedule, for Action-only apps.</summary>
+    public DateTime? NextActionRunAtUtc { get; init; }
 
-    public AppListItemDto WithLastActionRun(AppListActionRunDto? run)
+    public AppListItemDto WithActionRuns(AppListActionRunDto? run, DateTime? nextRunAtUtc)
         => new()
         {
             Id = Id, Name = Name, Summary = Summary, Description = Description, ThumbnailUrl = ThumbnailUrl, Tags = Tags,
             IsPublished = IsPublished, CanLaunchPublicly = CanLaunchPublicly, PublicUrl = PublicUrl, UpdatedAtUtc = UpdatedAtUtc,
             CanDelete = CanDelete, Runner = Runner, LiveEnvironment = LiveEnvironment, Runtime = Runtime,
-            ActionsOnly = ActionsOnly, LastActionRun = run,
+            ActionsOnly = ActionsOnly, LastActionRun = run, NextActionRunAtUtc = nextRunAtUtc,
         };
 }
 

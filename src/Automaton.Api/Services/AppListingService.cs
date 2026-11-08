@@ -22,7 +22,7 @@ internal sealed class AppListingService(
         var now = DateTime.UtcNow;
         var rows = await LoadRowsAsync(projectId, cancellationToken);
         var items = rows.Select(row => MapRow(row, now)).ToArray();
-        // Only Action-only apps show their last run, so look it up for those apps alone.
+        // Only Action-only apps show their last and next run, so look them up for those apps alone.
         for (var index = 0; index < items.Length; index++)
         {
             if (!items[index].ActionsOnly) continue;
@@ -32,7 +32,10 @@ internal sealed class AppListingService(
                 .OrderByDescending(execution => execution.CreatedAtUtc)
                 .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
                 .FirstOrDefaultAsync(cancellationToken);
-            items[index] = items[index].WithLastActionRun(run);
+            var nextRun = await dataContext.ActionSchedules.AsNoTracking()
+                .Where(schedule => schedule.ApplicationId == appId && schedule.Enabled && schedule.NextRunAtUtc != null)
+                .MinAsync(schedule => schedule.NextRunAtUtc, cancellationToken);
+            items[index] = items[index].WithActionRuns(run, nextRun);
         }
 
         return items;

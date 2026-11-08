@@ -41,7 +41,17 @@ export function appKind(app: AppListItem): AppKind {
 
 export function appDescription(app: AppListItem): string {
   const text = (app.summary || app.description || '').trim()
-  return text ? `${appKind(app)} · ${text}` : appKind(app)
+  const parts = [appKind(app), text, nextRunLabel(app)].filter(Boolean)
+  return parts.join(' · ')
+}
+
+/** "next run 02:00" today, otherwise with the date; empty when no schedule is enabled. */
+export function nextRunLabel(app: AppListItem, now = new Date()): string {
+  if (!app.actionsOnly || !app.nextActionRunAtUtc) return ''
+  const next = new Date(app.nextActionRunAtUtc)
+  if (Number.isNaN(next.getTime())) return ''
+  const time = next.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return next.toDateString() === now.toDateString() ? `next run ${time}` : `next run ${next.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`
 }
 
 export function isStopped(app: AppListItem): boolean {
