@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 
 namespace Automaton.Cli.Commands;
@@ -7,7 +8,50 @@ namespace Automaton.Cli.Commands;
 internal static class InventoryCommands
 {
     internal static Command BuildApps(ConfigService config)
-        => Build(config, "apps", "List apps in your personal workspace", WriteAppsAsync);
+    {
+        var command = Build(config, "apps", "List apps in your personal workspace", WriteAppsAsync);
+        command.AddCommand(BuildShow(config));
+        return command;
+    }
+
+    private static Command BuildShow(ConfigService config)
+    {
+        var app = new Argument<string>("app", "App ID or exact slug");
+        var json = new Option<bool>("--json", "Print the result as JSON");
+        var command = new Command("show", "Show an app with its kind, description, pages and OpenAPI path") { app, json };
+        command.SetHandler(async (InvocationContext context) =>
+        {
+            var asJson = context.ParseResult.GetValueForOption(json);
+            try
+            {
+                var (server, apiKey) = config.ResolveCredentials(directory: Directory.GetCurrentDirectory());
+                if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                    throw new InvalidOperationException("Run automaton login to connect to your server.");
+                using var client = new AutomatonApiClient(server, apiKey);
+                var details = await client.GetAppByIdOrSlugAsync(context.ParseResult.GetValueForArgument(app), context.GetCancellationToken());
+                var declaration = CliAppDeclaration.From(details);
+                var id = details.GetProperty("id").GetString();
+                var name = details.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (asJson)
+                {
+                    CliJson.Write(new { success = true, id, name, kind = declaration.Kind, description = declaration.Description, pages = declaration.Pages, openApi = declaration.OpenApi });
+                    return;
+                }
+                Console.WriteLine($"{name} ({id})");
+                Console.WriteLine($"Kind: {declaration.Kind}");
+                Console.WriteLine($"Description: {declaration.Description ?? "-"}");
+                Console.WriteLine($"OpenAPI: {declaration.OpenApi ?? "-"}");
+                Console.WriteLine("Pages: " + (declaration.Pages.Count == 0 ? "-" : string.Join(", ", declaration.Pages.Select(page => $"{page.Label} ({page.Path})"))));
+            }
+            catch (Exception exception)
+            {
+                if (asJson) CliJson.Write(new { success = false, error = exception.Message });
+                else Console.Error.WriteLine(exception.Message);
+                context.ExitCode = 1;
+            }
+        });
+        return command;
+    }
 
     internal static Command BuildInstallationStatus(ConfigService config)
         => Build(config, "installation-status", "Show server version, resource counts and last backup", WriteInstallationAsync);

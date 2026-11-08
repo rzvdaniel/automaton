@@ -67,7 +67,7 @@ const address = computed(() => (kind.value === 'tool' ? '' : publicAppUrl.value 
 const openAppUrl = computed(() => publicAppUrl.value || (privateAppUrl.value ? getStudioApplicationUrl(app.value!.id) : ''))
 const access = computed(() => kind.value === 'tool' || !sharing.value ? '' : accessLabel(sharing.value.audience))
 const apiReferenceUrl = computed(() => {
-  const path = app.value?.application?.openapi
+  const path = app.value?.application?.openApi
   return address.value && path ? new URL(path, address.value).toString() : ''
 })
 const runMenu = computed(() => actions.value.map((action) => ({
