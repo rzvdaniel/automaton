@@ -102,6 +102,12 @@ public sealed class AppSharingService(
         if (person.Id == UserId)
             throw new InvalidOperationException("You already have this app.");
 
+        // Chosen people only count for "people": narrow a team or server share, and never leave the internet silently.
+        if (IsOpenToInternet(app))
+            throw new InvalidOperationException("This app is open to anyone on the internet. Choose 'people' first.");
+        app.SharedWithServer = false;
+        app.SharedWithProjectId = null;
+
         if (!await dbContext.AppShares.AnyAsync(s => s.WebAppId == appId && s.UserId == person.Id, cancellationToken))
         {
             dbContext.AppShares.Add(new AppShare { WebAppId = appId, UserId = person.Id });

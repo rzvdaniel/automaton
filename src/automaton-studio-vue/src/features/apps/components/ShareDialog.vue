@@ -43,6 +43,7 @@ const categories = ref<string[]>([])
 const cover = ref<string | null>(null)
 const screenshots = ref<AppScreenshot[]>([])
 const savedListing = ref('')
+const listingFailed = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -81,6 +82,7 @@ function apply(state: AppSharing) {
 }
 
 async function loadListing() {
+  listingFailed.value = false
   try {
     const app = await appsService.get(props.appId)
     summary.value = app.summary ?? ''
@@ -89,7 +91,7 @@ async function loadListing() {
     cover.value = app.thumbnailUrl ?? null
     screenshots.value = app.screenshots ?? []
     categories.value = await appsService.getMarketplaceCategories()
-  } catch { /* the listing fields stay empty; sharing still works */ }
+  } catch { listingFailed.value = true }
   savedListing.value = listingText.value
 }
 
@@ -293,9 +295,10 @@ async function copyAddress() {
         <p class="share__hint">Anyone with the address can open the app, so keep private data out of it.</p>
 
         <label class="share__check" data-testid="share-list">
-          <input v-model="listed" type="checkbox">
+          <input v-model="listed" type="checkbox" :disabled="listingFailed">
           <span><strong>List in the store</strong> Show it in the public marketplace.</span>
         </label>
+        <p v-if="listingFailed" class="share__hint" data-testid="share-listing-error">The store listing could not be loaded, so it cannot be changed now. Close and reopen this dialog to retry.</p>
         <div v-if="listed" class="share__listing" data-testid="share-listing">
           <label for="share-summary" class="share__label">Summary</label>
           <InputText id="share-summary" v-model="summary" maxlength="200" placeholder="One line shown on the app card" />

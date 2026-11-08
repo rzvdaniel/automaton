@@ -293,6 +293,27 @@ public sealed class AppSharingTests
         Assert.That(state.Audience, Is.EqualTo("me"));
     }
 
+    [Test]
+    public async Task AddingAPersonWhileOnATeam_NarrowsToPeople_SoNonMembersStillCannotOpen()
+    {
+        await using var db = CreateDb();
+        var owner = AddUser(db, "owner@example.test");
+        var member = AddUser(db, "member@example.test");
+        var bob = AddUser(db, "bob@example.test");
+        var team = AddTeam(db, owner, member);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = AppId, UserId = owner.Id });
+        await db.SaveChangesAsync();
+        var service = Service(db, owner.Id);
+        await service.SetAudienceAsync(AppId, "team", null, team.Id, null, default);
+
+        var state = await service.AddPersonAsync(AppId, bob.Email!, default);
+
+        Assert.That(state.Audience, Is.EqualTo("people"));
+        Assert.That(state.Team, Is.Null);
+        Assert.That(await CanOpenAsync(db, bob.Id), Is.True);
+        Assert.That(await CanOpenAsync(db, member.Id), Is.False);
+    }
+
     private static OrganizationService Organizations(ApplicationDbContext db, UserContextService context) =>
         new(db, context, null!, null!, null!);
 }
