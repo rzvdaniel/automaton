@@ -30,7 +30,7 @@ onMounted(() => { load(); loadApps() })
 
 async function loadApps() {
   try {
-    apps.value = await appsService.getApps()
+    apps.value = (await appsService.getApps()).sort((a, b) => a.name.localeCompare(b.name))
   } catch {
     apps.value = [] // the offsite tile and the restore list are hints; the history stays usable
   } finally {
@@ -48,7 +48,8 @@ function ago(iso: string | null) {
 // The host timer is nightly; Studio is not told its exact time, so the next run is estimated from the last one.
 const nextBackup = computed(() => {
   const last = status.value?.lastAttemptAt ?? status.value?.lastSuccessAt
-  return last ? new Date(new Date(last).getTime() + 24 * 3600_000).toLocaleString() : null
+  const next = last ? new Date(last).getTime() + 24 * 3600_000 : 0
+  return next > Date.now() ? new Date(next).toLocaleString() : null
 })
 
 async function load() {
