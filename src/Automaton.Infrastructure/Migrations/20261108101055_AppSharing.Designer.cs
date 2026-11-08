@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Automaton.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261108095855_AppSharing")]
+    [Migration("20261108101055_AppSharing")]
     partial class AppSharing
     {
         /// <inheritdoc />
@@ -4631,6 +4631,21 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasOne("Automaton.Api.Entities.WebApp", null)
                         .WithMany()
                         .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppShare", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

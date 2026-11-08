@@ -29,6 +29,18 @@ namespace Automaton.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AppShares", x => new { x.WebAppId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_AppShares_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_AppShares_WebApps_WebAppId",
+                        column: x => x.WebAppId,
+                        principalTable: "WebApps",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(

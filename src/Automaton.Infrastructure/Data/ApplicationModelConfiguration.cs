@@ -59,6 +59,9 @@ internal static class ApplicationModelConfiguration
         {
             entity.HasKey(e => new { e.WebAppId, e.UserId });
             entity.HasIndex(e => e.UserId);
+            // A share goes away with the app or the person it names.
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.WebAppId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 

@@ -4632,6 +4632,21 @@ namespace Automaton.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppShare", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.WebApp", "WebApp")
