@@ -13,6 +13,8 @@ defineProps<{
   groupLabel?: string
   /** Leave out to show the chips without a search box. */
   placeholder?: string
+  /** Show the label as visible text before the chips, so a row of chips reads on purpose. */
+  showLabel?: boolean
 }>()
 const search = defineModel<string>('search', { default: '' })
 defineEmits<{ select: [value: string] }>()
@@ -25,6 +27,7 @@ defineEmits<{ select: [value: string] }>()
       <i class="pi pi-search" aria-hidden="true" />
       <input v-model="search" type="search" :placeholder="placeholder" :aria-label="label" />
     </label>
+    <span v-if="showLabel" class="apps-toolbar__label" aria-hidden="true">{{ label }}</span>
     <div class="apps-pills" role="group" :aria-label="groupLabel ?? label">
       <button
         v-for="pill in pills"
@@ -48,6 +51,7 @@ defineEmits<{ select: [value: string] }>()
   border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px;
 }
 .apps-search input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.apps-toolbar__label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .apps-pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .apps-pill {

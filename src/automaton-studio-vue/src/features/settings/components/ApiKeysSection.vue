@@ -338,7 +338,7 @@ onMounted(() => {
     v-model:visible="showCreateDialog"
     header="Create API Key"
     :modal="true"
-    :style="{ width: '500px' }"
+    :style="{ width: '500px', maxWidth: '95vw' }"
   >
     <div class="flex flex-column gap-4">
       <div class="flex flex-column gap-2">
@@ -404,7 +404,7 @@ onMounted(() => {
     header="API Key Created"
     :modal="true"
     :closable="true"
-    :style="{ width: '600px' }"
+    :style="{ width: '600px', maxWidth: '95vw' }"
   >
     <div v-if="newApiKeyData" class="flex flex-column gap-4">
       <Message severity="warn" :closable="false">

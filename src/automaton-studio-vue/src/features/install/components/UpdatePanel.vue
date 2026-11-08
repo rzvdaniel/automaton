@@ -126,7 +126,7 @@ function stateLabel(state: string) {
         />
       </div>
     </template>
-    <Dialog v-model:visible="confirming" modal header="Update the server?" append-to="self" :style="{ width: '32rem' }">
+    <Dialog v-model:visible="confirming" modal header="Update the server?" append-to="self" :style="{ width: '32rem', maxWidth: '95vw' }">
       <p class="mt-0">
         Automaton takes a recovery backup, then updates to the latest published release. Studio and the API can be
         briefly unavailable. If the update fails, the previous release is kept.
