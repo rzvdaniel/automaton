@@ -123,7 +123,7 @@ rollback_switch() {
     # Put the responder back the way it was: a server that was already delegated must keep answering for renewals.
     if $responder_was_running; then "${compose[@]}" up -d acme-responder >/dev/null 2>&1 || true
     else "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true; fi
-    "${compose[@]}" restart traefik api >/dev/null 2>&1 || true
+    "${compose[@]}" up -d --force-recreate traefik api >/dev/null 2>&1 || true
     exit 1
 }
 if $switch_tls; then
@@ -154,7 +154,7 @@ if $switch_tls; then
     certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     # Always restart and check, so a switch that failed its HTTPS check can be retried with the same command.
     # Traefik reads its certificate resolver at start; the API rewrites published app routes with the new resolver at start.
-    "${compose[@]}" restart traefik api
+    "${compose[@]}" up -d --force-recreate traefik api
     verify_https
     if [[ "$tls_mode" == delegated ]]; then
         echo "TLS mode is delegated: published apps use *.apps.$domain. Let's Encrypt asks this server's DNS responder (port 53) for the challenge; the one record is: $(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import check_dns; print(check_dns.delegation_record(sys.argv[2]))' "$bundle_dir" "$domain")"
