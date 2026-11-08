@@ -115,7 +115,21 @@ cd /opt/automaton-server
 sudo docker compose --env-file release.env --env-file .env -f compose.yaml up -d --force-recreate api worker
 ```
 
-Preserve generated encryption/signing keys and Data Protection volumes. Back up the API Data Protection key ring together with the database; restored Studio-managed SMTP settings cannot be decrypted without the matching keys. Replacing keys can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, TLS mode, configuration directory or release manifest is refused. This command resumes first installation; use the updater below for a new release. The retired source deployment scripts have been removed. Existing servers require a reviewed adoption before using the installer-managed updater.
+Preserve generated encryption/signing keys and Data Protection volumes. Back up the API Data Protection key ring together with the database; restored Studio-managed SMTP settings cannot be decrypted without the matching keys. Replacing keys can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, configuration directory or release manifest is refused; to change the TLS mode, use the switch in [Switch the TLS mode](#switch-the-tls-mode). This command resumes first installation; use the updater below for a new release. The retired source deployment scripts have been removed. Existing servers require a reviewed adoption before using the installer-managed updater.
+
+## Switch the TLS mode
+
+An installed server can move between HTTP-validated certificates (`http`) and wildcard certificates (`cloudflare`) without reinstalling. Use `cloudflare` when many published apps would exceed Let's Encrypt's limit of 50 certificates per registered domain per week. Run the installer that was copied to the server (update the server with `sudo bash /opt/automaton-server/update.sh` first if it is on a release before this option; the updater installs the tools this command uses):
+
+```bash
+sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare
+```
+
+The token (Cloudflare Zone Read + DNS Edit for the domain's zone) is read from a hidden prompt. To avoid pasting it, put it in a file that only root can read and pass `--cloudflare-token-file /root/cloudflare-token`, or set `AUTOMATON_CLOUDFLARE_TOKEN`. It is never printed. The command writes `secrets/cloudflare-token`, updates `installation.json`, `traefik.yml`, the generated files in `dynamic/` and `PublishedApps.CertificateResolver`, restarts Traefik and the API, and waits until the public HTTPS checks pass. Published apps then use `*.apps.<domain>`; the wildcard certificate is requested on first use.
+
+To go back: `sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode http` empties the token file and returns to HTTP validation (port 80 must be reachable). Running the command for the mode already in use changes nothing.
+
+The domain and email still cannot be changed. Credentials, the database and Docker volumes are never touched. If `traefik.yml` or `dynamic/installation.yml` was written by hand (an adopted installation), the command refuses without changing anything. The command can be repeated safely: it restarts Traefik and checks HTTPS each time, so a switch that failed its check can be retried. Keep your DNS records set to *DNS only*.
 
 ## Update an installed server
 

@@ -4,6 +4,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -185,6 +187,65 @@ class InstallationConfigurationTests(unittest.TestCase):
         edge = json.loads((self.root / 'dynamic/installation.yml').read_text())
         self.assertIn('*.apps.example.com', edge['tls']['stores']['default']['defaultGeneratedCert']['domain']['sans'])
         self.assertTrue((self.root / 'secrets/cloudflare-token').read_text())
+
+    def snapshot(self, *skip):
+        return {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*')
+                if p.is_file() and p.relative_to(self.root).as_posix() not in skip}
+
+    def test_switch_to_cloudflare_rewrites_only_tls_files(self):
+        self.configure()
+        touched = ('traefik.yml', 'dynamic/installation.yml', 'dynamic/store.yml', 'dynamic/studio-paths.yml',
+                   'appsettings.Production.json', 'installation.json', 'secrets/cloudflare-token')
+        before = self.snapshot(*touched)
+        self.assertTrue(module.switch_tls(self.root, 'cloudflare'))
+        self.assertEqual(before, self.snapshot(*touched))  # credentials, keys and other configuration untouched
+        fresh = Path(self.temporary.name) / 'fresh'
+        module.configure(fresh, 'example.com', 'owner@example.com', 'cloudflare')
+        for name in ('traefik.yml', 'dynamic/installation.yml', 'dynamic/store.yml', 'dynamic/studio-paths.yml'):
+            self.assertEqual(json.loads((fresh / name).read_text()), json.loads((self.root / name).read_text()), name)
+        settings = json.loads((self.root / 'appsettings.Production.json').read_text())
+        self.assertEqual(settings['PublishedApps']['CertificateResolver'], 'cloudflare')
+        self.assertEqual(json.loads((self.root / 'installation.json').read_text())['tls_mode'], 'cloudflare')
+        self.assertEqual((self.root / 'secrets/cloudflare-token').read_text(), 'test-cloudflare-token-not-a-secret')
+        self.assertFalse(module.switch_tls(self.root, 'cloudflare'))  # idempotent; keeps the token
+
+    def test_switch_back_to_http_matches_fresh_http_and_empties_token(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        self.assertTrue(module.switch_tls(self.root, 'http'))
+        fresh = Path(self.temporary.name) / 'fresh'
+        module.configure(fresh, 'example.com', 'owner@example.com')
+        for name in ('traefik.yml', 'dynamic/installation.yml', 'dynamic/store.yml', 'dynamic/studio-paths.yml'):
+            self.assertEqual(json.loads((fresh / name).read_text()), json.loads((self.root / name).read_text()), name)
+        self.assertEqual((self.root / 'secrets/cloudflare-token').read_text(), '')
+        self.assertEqual(json.loads((self.root / 'installation.json').read_text())['tls_mode'], 'http')
+
+    def test_switch_reads_token_from_file_and_rejects_bad_token_unchanged(self):
+        self.configure()
+        before = self.snapshot()
+        bad = Path(self.temporary.name) / 'bad-token'
+        bad.write_text('short')
+        with self.assertRaises(ValueError): module.switch_tls(self.root, 'cloudflare', bad)
+        self.assertEqual(before, self.snapshot())
+        good = Path(self.temporary.name) / 'token'
+        good.write_text('file-cloudflare-token-0123456789\n')
+        with patch.dict(os.environ, AUTOMATON_CLOUDFLARE_TOKEN='environment-token-should-not-win-0'):
+            module.switch_tls(self.root, 'cloudflare', good)
+        self.assertEqual((self.root / 'secrets/cloudflare-token').read_text(), 'file-cloudflare-token-0123456789')
+
+    def test_switch_refuses_hand_written_traefik_configuration_unchanged(self):
+        self.configure()
+        (self.root / 'dynamic/installation.yml').write_text('http:\n  routers: {}\n')
+        before = self.snapshot()
+        with self.assertRaises(ValueError): module.switch_tls(self.root, 'cloudflare')
+        self.assertEqual(before, self.snapshot())
+
+    def test_switch_does_not_change_domain_or_email(self):
+        self.configure()
+        result = subprocess.run([sys.executable, str(source), '--config-dir', str(self.root), '--switch-tls',
+                                 '--tls-mode', 'cloudflare', '--domain', 'other.example.com'], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(json.loads((self.root / 'installation.json').read_text())['domain'], 'example.com')
+        self.assertNotIn('test-cloudflare-token-not-a-secret', result.stdout + result.stderr)
 
     def test_invalid_domain_fails_before_creating_files(self):
         with self.assertRaises(ValueError): module.configure(self.root, 'https://example.com;command', 'owner@example.com')
