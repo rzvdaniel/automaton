@@ -18,6 +18,8 @@ const editorStore = useAppEditorStore()
 const name = ref('')
 const summary = ref('')
 const saving = ref(false)
+/** Read-only access (canUpdate is false) sees the page but cannot change anything. */
+const canEdit = computed(() => props.app.canUpdate !== false)
 
 watch(() => [props.app.id, props.app.name, props.app.summary] as const, ([, appName, appSummary]) => {
   name.value = appName
@@ -53,17 +55,17 @@ async function save() {
       <h2 id="about-title">About</h2>
       <div class="about">
         <label for="app-name">Name
-          <InputText id="app-name" v-model="name" autocomplete="off" maxlength="200" @keyup.enter="save" />
+          <InputText id="app-name" v-model="name" :disabled="!canEdit" autocomplete="off" maxlength="200" @keyup.enter="save" />
         </label>
         <label for="app-summary">Description
-          <InputText id="app-summary" v-model="summary" autocomplete="off" maxlength="300" @keyup.enter="save" />
+          <InputText id="app-summary" v-model="summary" :disabled="!canEdit" autocomplete="off" maxlength="300" @keyup.enter="save" />
         </label>
       </div>
-      <div v-if="changed" class="actions"><Button label="Save" icon="pi pi-check" :loading="saving" @click="save" /></div>
+      <div v-if="canEdit && changed" class="actions"><Button label="Save" icon="pi pi-check" :loading="saving" @click="save" /></div>
     </section>
-    <AppSecrets :app-id="app.id" :declared="app.application?.secrets" />
+    <AppSecrets v-if="canEdit" :app-id="app.id" :declared="app.application?.secrets" />
     <AppPermissions :app-id="app.id" />
-    <AppAdvanced :app="app" :targets="targets" :open="openAdvanced" @changed="emit('targetsChanged')" />
+    <AppAdvanced v-if="canEdit" :app="app" :targets="targets" :open="openAdvanced" @changed="emit('targetsChanged')" />
   </div>
 </template>
 

@@ -41,7 +41,7 @@ describe('app activity', () => {
       lastSuccessfulDeploymentAt: '2026-11-08T10:00:00Z', lastDeploymentAt: '2026-11-08T11:00:00Z', lastDeploymentError: 'build broke',
     }))
     expect(merged.map((item) => item.text)).toEqual(['Deploy failed: build broke', 'Deployed', 'Secret S3_KEY replaced by Ann'])
-    expect(buildActivity([], [event({})], [], deployActivity({ lastSuccessfulDeploymentAt: '2026-11-08T10:00:00Z' })).map((item) => item.text)).toEqual(['Deployed'])
+    expect(buildActivity([], [event({ createdAtUtc: '2026-11-08T10:01:00Z' })], [], deployActivity({ lastSuccessfulDeploymentAt: '2026-11-08T10:00:00Z' })).map((item) => item.text)).toEqual(['Deployed'])
   })
 
   it('words the time as today, yesterday or a date', () => {

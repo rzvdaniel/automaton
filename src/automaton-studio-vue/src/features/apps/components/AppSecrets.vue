@@ -91,7 +91,7 @@ function message(failure: unknown, fallback: string) {
 </script>
 
 <template>
-  <section v-if="loaded && (secrets.length > 0 || (declared?.length ?? 0) > 0)" class="card" aria-labelledby="secrets-title">
+  <section v-if="error || (loaded && (secrets.length > 0 || (declared?.length ?? 0) > 0))" class="card" aria-labelledby="secrets-title">
     <div class="card-head">
       <h2 id="secrets-title">Secrets</h2>
       <span class="hint">Encrypted and never shown again. Used from the next start.</span>

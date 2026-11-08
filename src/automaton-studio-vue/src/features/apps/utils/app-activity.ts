@@ -63,8 +63,9 @@ export function buildActivity(
       at: entry.createdAtUtc,
     })
   })
-  const recorded = events.some((event) => event.eventType.includes('Deploy'))
-  return [...items, ...(recorded ? [] : deploys)].sort((a, b) => b.at.localeCompare(a.at))
+  const near = (a: string, b: string) => Math.abs(new Date(a).getTime() - new Date(b).getTime()) < 5 * 60_000
+  const logged = events.filter((event) => event.eventType.includes('Deploy'))
+  return [...items, ...deploys.filter((deploy) => !logged.some((event) => near(event.createdAtUtc, deploy.at)))].sort((a, b) => b.at.localeCompare(a.at))
 }
 
 function describeSecretChange(entry: SecretAuditEntry): string {

@@ -143,7 +143,7 @@ watch(executions, (runs) => {
 async function refreshExecutions() {
   try {
     executions.value = await appsService.listActionExecutions(appId.value)
-    activityRefresh.value++
+    if (activeView.value === 'activity') activityRefresh.value++
   } catch {
     // Keep the list we have; the next poll tries again.
   }
@@ -280,10 +280,11 @@ async function handleSharingChanged() {
             <p v-if="app.summary" class="summary">{{ app.summary }}</p>
           </div>
           <div class="head-actions">
-            <Button v-if="kind !== 'tool'" label="Share" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
+            <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
             <template v-if="kind === 'tool'">
               <Button
                 label="Run now"
+                v-if="app.canUpdate !== false"
                 icon="pi pi-play"
                 :loading="starting"
                 :disabled="actions.length === 0"
