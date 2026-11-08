@@ -175,6 +175,11 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Maintenance · 10')
+    const chip = (label: string) => wrapper.findAll('button.apps-pill').find((b) => b.text() === label)!
+    await chip('Installed').trigger('click')
+    expect(replace).toHaveBeenLastCalledWith({ query: { installed: '1' } })
+    await chip('All catalogs').trigger('click')
+    expect(replace).toHaveBeenLastCalledWith({ query: {} })
     expect(wrapper.text()).toContain('Installed')
     expect(wrapper.find('[aria-label="Catalog"]').text()).toContain('Acme · 10')
     expect(wrapper.find('.p-paginator').exists()).toBe(true)

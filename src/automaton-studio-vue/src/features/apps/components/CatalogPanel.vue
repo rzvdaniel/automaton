@@ -83,16 +83,17 @@ const showDetails = computed({ get: () => !!details.value, set: (open: boolean) 
 const access = (app: CatalogEntry) => (app.permissions.length ? `Asks for ${app.permissions.join(', ')}` : '')
 const installTo = (app: CatalogEntry) => ({ name: 'app-install-source', query: { repo: app.repo, folder: app.folder || undefined, commit: app.commit } })
 const sourcePills = computed<FilterPill[]>(() => [
-  { value: '', label: 'All catalogs' },
-  ...sourceOptions.value.map((o) => ({ value: o.value, label: `${o.label} · ${o.count}`, icon: privateSources.value.has(o.value) ? 'pi pi-lock' : undefined })),
+  ...(sourceOptions.value.length > 1 ? [{ value: '', label: 'All catalogs' }] : []),
+  ...(sourceOptions.value.length > 1 ? sourceOptions.value : []).map((o) => ({ value: o.value, label: `${o.label} · ${o.count}`, icon: privateSources.value.has(o.value) ? 'pi pi-lock' : undefined })),
+  { value: INSTALLED, label: 'Installed' },
 ])
 const categoryPills = computed<FilterPill[]>(() => [
   { value: '', label: `All · ${catalog.value?.totalApps ?? catalog.value?.apps.length ?? 0}` },
   ...categories.value.map((c) => ({ value: c.value, label: `${c.label} · ${c.count}` })),
-  { value: INSTALLED, label: 'Installed' },
 ])
-const pickCategory = (value: string) => (value === INSTALLED ? show({ installed: !query.value.installed, page: 1 }) : show({ category: value || undefined, page: 1 }))
-const categoryActive = (value: string) => (value === INSTALLED ? !!query.value.installed : value === '' ? !query.value.category : query.value.category?.toLowerCase() === value.toLowerCase())
+const pickSource = (value: string) => (value === INSTALLED ? show({ installed: !query.value.installed, page: 1 }) : show({ source: value || undefined, page: 1 }))
+const sourceActive = (value: string) => (value === INSTALLED ? !!query.value.installed : (query.value.source ?? '') === value)
+const categoryActive = (value: string) => (value === '' ? !query.value.category : query.value.category?.toLowerCase() === value.toLowerCase())
 
 const showTime = computed(() => (catalog.value?.fetchedAt ? new Date(catalog.value.fetchedAt).toLocaleString() : ''))
 
@@ -168,15 +169,9 @@ async function installFromUrl() {
           :pills="categoryPills"
           :active="categoryActive"
           @update:search="onSearch"
-          @select="pickCategory"
+          @select="show({ category: $event || undefined, page: 1 })"
         />
-        <AppFilterBar
-          v-if="sourceOptions.length > 1"
-          label="Catalog"
-          :pills="sourcePills"
-          :active="(value) => (query.source ?? '') === value"
-          @select="show({ source: $event || undefined, page: 1 })"
-        />
+        <AppFilterBar label="Catalog" :pills="sourcePills" :active="sourceActive" @select="pickSource" />
       </template>
       <p v-if="(catalog.totalApps ?? catalog.apps.length) === 0" class="catalog-note">The catalog has no apps yet.</p>
       <div v-else-if="catalog.apps.length === 0" class="apps-card apps-empty" role="status">
@@ -230,12 +225,11 @@ async function installFromUrl() {
           <dt>Asks for</dt><dd>{{ details.permissions.length ? details.permissions.join(', ') : 'No access' }}</dd>
           <dt>Version</dt><dd>Commit <code>{{ details.commit.slice(0, 7) }}</code>, needs Automaton Server {{ details.minServerVersion }} or newer</dd>
           <dt v-if="showSourceLink(details)">Source</dt>
-          <dd v-if="showSourceLink(details)"><a :href="sourceUrl(details)" target="_blank" rel="noopener" :aria-label="`Source of ${details.name}`">{{ details.repo }}</a></dd>
+          <dd v-if="showSourceLink(details)"><a :href="sourceUrl(details)" target="_blank" rel="noopener" :aria-label="`Source of ${catalogName(details.name)}`">{{ details.repo }}</a></dd>
         </dl>
         <div class="catalog-details__actions">
           <RouterLink v-if="details.installedAppId" :to="{ name: 'app-editor', params: { id: details.installedAppId } }" class="p-button p-component p-button-outlined catalog-button">Manage</RouterLink>
-          <small v-if="details.requiresNewerServer" class="catalog-note">Needs Automaton Server {{ details.minServerVersion }} or newer</small>
-          <RouterLink v-else :to="installTo(details)" class="p-button p-component catalog-button" :aria-label="`${details.installedAppId ? 'Install another copy of' : 'Install'} ${catalogName(details.name)}`">
+          <RouterLink v-if="!details.requiresNewerServer" :to="installTo(details)" class="p-button p-component catalog-button catalog-details__install" :aria-label="`${details.installedAppId ? 'Install another copy of' : 'Install'} ${catalogName(details.name)}`">
             {{ details.installedAppId ? 'Install again' : 'Install' }}
           </RouterLink>
         </div>
@@ -283,6 +277,8 @@ async function installFromUrl() {
 .catalog-install.p-button { flex: none; min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; text-decoration: none; }
 .catalog-install.p-button:hover { border-color: var(--signal); background: transparent; color: var(--ink); }
 .catalog-button { text-decoration: none; }
+.catalog-details__install.p-button { background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; }
+.catalog-details__install.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
 .catalog-details { display: flex; flex-direction: column; gap: 12px; }
 .catalog-details__summary { margin: 0; }
 .catalog-details__list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
@@ -292,5 +288,6 @@ async function installFromUrl() {
 .catalog a:not(.p-button), .catalog-details a:not(.p-button) { color: var(--p-primary-color); }
 @media (max-width: 640px) {
   .catalog-category { display: none; }
+  .catalog-install.p-button { min-height: 44px; }
 }
 </style>
