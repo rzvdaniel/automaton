@@ -182,10 +182,14 @@ public class RuntimeCookieService
         return true;
     }
 
+    // Accepts the shared parent of the API and app hosts, such as automaton.monster or runner-01.automaton.monster
+    // (standalone installs live under a subdomain), but not a bare public suffix like co.uk.
     private static bool LooksLikeCookieDomainParent(string domain)
     {
         var parts = domain.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return parts.Length == 2 && parts.All(part => part.Length >= 2);
+        if (parts.Length < 2 || parts.Any(part => part.Length < 2)) return false;
+        return !(parts.Length == 2 && parts[1].Length == 2 &&
+                 parts[0] is "co" or "com" or "org" or "net" or "gov" or "edu" or "ac");
     }
 
     private static bool IsLocalhost(string host) =>
