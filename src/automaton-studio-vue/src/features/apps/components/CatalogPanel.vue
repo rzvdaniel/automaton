@@ -9,12 +9,12 @@ import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
-import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Tag from 'primevue/tag'
 import CatalogSources from './CatalogSources.vue'
 import { appsService } from '../services/apps.service'
-import type { CatalogQuery, CatalogResponse } from '../types/apps.types'
+import AppMark from './AppMark.vue'
+import type { CatalogEntry, CatalogQuery, CatalogResponse } from '../types/apps.types'
 
 /** Filters stay hidden until the catalog is big enough to need them. */
 const FILTERS_FROM = 12
@@ -46,7 +46,17 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined
 const filtering = computed(() => (catalog.value?.totalApps ?? 0) > FILTERS_FROM)
 const filtered = computed(() => !!(query.value.q || query.value.category || query.value.source || query.value.installed))
 const categories = computed(() => catalog.value?.categories ?? [])
-const sourceOptions = computed(() => [{ value: '', label: 'All sources', count: catalog.value?.totalApps ?? 0 }, ...(catalog.value?.sources ?? [])])
+const sourceOptions = computed(() => catalog.value?.sources ?? [])
+/** Only administrators can read the sources, so only they see which are private. */
+const privateSources = ref<Set<string>>(new Set())
+async function loadPrivate() {
+  if (!isSystemAdministrator.value) return
+  try {
+    privateSources.value = new Set((await appsService.getCatalogSources()).filter((s) => s.hasToken).map((s) => s.id))
+  } catch { privateSources.value = new Set() }
+}
+const sourceUrl = (app: CatalogEntry) => `https://github.com/${app.repo}/tree/${app.commit}${app.folder ? `/${app.folder}` : ''}`
+function onSourcesChanged() { load(); loadPrivate() }
 
 /** The address keeps the view, so a filtered page can be bookmarked or shared. */
 function show(patch: Record<string, string | number | boolean | undefined>) {
@@ -88,7 +98,7 @@ async function load(refresh = false) {
   }
 }
 
-onMounted(() => load())
+onMounted(() => { load(); loadPrivate() })
 watch(query, () => load())
 watch(() => route.query.q, (q) => { search.value = one(q) })
 onBeforeUnmount(() => clearTimeout(searchTimer))
@@ -111,13 +121,13 @@ async function installFromUrl() {
   <div class="catalog flex flex-column gap-4">
     <div class="flex align-items-start justify-content-between gap-3 flex-wrap">
     <p class="m-0 text-color-secondary">
-      Apps you can install on this server, read from the official
+      Apps you can install on this server, from the official
       <a href="https://github.com/rzvdaniel/automaton-apps" target="_blank" rel="noopener">automaton-apps</a> repository
       and any sources an administrator added.
       Installing fetches the app at the listed commit and asks for its settings, secrets and permissions first.
     </p>
     <div v-if="isSystemAdministrator" class="flex gap-2 flex-shrink-0">
-      <Button label="Manage sources" icon="pi pi-cog" severity="secondary" outlined @click="showSources = true" />
+      <Button label="Add a catalog" icon="pi pi-plus" severity="secondary" outlined @click="showSources = true" />
       <Button label="Install from URL" icon="pi pi-link" severity="secondary" outlined @click="showGit = true" />
     </div>
     </div>
@@ -135,21 +145,22 @@ async function installFromUrl() {
 
     <template v-else-if="catalog">
       <Message v-if="catalog.stale" severity="warn" :closable="false">{{ catalog.message }}</Message>
-      <div v-if="filtering" class="catalog-filters flex flex-column gap-3">
-        <div class="flex align-items-center gap-3 flex-wrap">
+      <div class="catalog-filters flex flex-column gap-3">
+        <div v-if="sourceOptions.length > 1" class="flex gap-2 flex-wrap" role="group" aria-label="Catalog">
+          <Button label="All catalogs" size="small" rounded :outlined="!!query.source" @click="show({ source: undefined, page: 1 })" />
+          <Button
+            v-for="option in sourceOptions"
+            :key="option.value"
+            :label="`${option.label} (${option.count})`"
+            :icon="privateSources.has(option.value) ? 'pi pi-lock' : undefined"
+            size="small"
+            rounded
+            :outlined="query.source !== option.value"
+            @click="show({ source: option.value, page: 1 })"
+          />
+        </div>
+        <div v-if="filtering || filtered" class="flex align-items-center gap-3 flex-wrap">
           <InputText v-model="search" class="catalog-search" type="search" placeholder="Search apps" aria-label="Search apps" @input="onSearch" />
-          <Select
-            :model-value="query.source ?? ''"
-            :options="sourceOptions"
-            option-value="value"
-            option-label="label"
-            aria-label="Source"
-            placeholder="All sources"
-            class="catalog-source"
-            @update:model-value="show({ source: $event, page: 1 })"
-          >
-            <template #option="{ option }">{{ option.label }} <small class="text-color-secondary">({{ option.count }})</small></template>
-          </Select>
           <label class="flex align-items-center gap-2">
             <ToggleSwitch :model-value="!!query.installed" input-id="catalog-installed" @update:model-value="show({ installed: $event, page: 1 })" />
             Installed
@@ -176,22 +187,24 @@ async function installFromUrl() {
       </div>
       <ul v-else class="catalog-list m-0 p-0">
         <li v-for="app in catalog.apps" :key="`${app.repo}/${app.folder}`" class="catalog-row">
-          <div class="flex flex-column gap-1">
-            <strong>{{ app.name }}</strong>
-            <span class="flex align-items-center gap-2 flex-wrap">
-              <Tag :value="app.category" severity="secondary" />
-              <Tag v-if="app.customSource" :value="`Source: ${app.sourceName}`" severity="warn" icon="pi pi-link" />
-              <Tag v-if="app.installedAppId" value="Installed" severity="success" icon="pi pi-check" />
-            </span>
-            <span class="text-color-secondary">{{ app.summary }}</span>
-            <small class="text-color-secondary">
-              {{ app.repo }} · commit {{ app.commit.slice(0, 7) }}<template v-if="app.permissions.length"> · asks for {{ app.permissions.join(', ') }}</template>
-            </small>
+          <div class="flex gap-3">
+            <AppMark :id="app.id" :name="app.name" :image-url="app.icon" />
+            <div class="flex flex-column gap-1 min-w-0">
+              <strong>{{ app.name }}</strong>
+              <span class="flex align-items-center gap-2 flex-wrap">
+                <Tag :value="app.category" severity="secondary" />
+                <Tag v-if="app.customSource" :value="app.sourceName" severity="warn" icon="pi pi-link" />
+                <Tag v-if="app.installedAppId" value="Installed" severity="success" icon="pi pi-check" />
+              </span>
+              <span class="text-color-secondary">{{ app.summary }}</span>
+              <small class="text-color-secondary">{{ app.permissions.length ? `Asks for ${app.permissions.join(', ')}` : 'Asks for no access' }}</small>
+            </div>
           </div>
           <div class="flex gap-2 flex-shrink-0 align-items-center flex-wrap">
             <RouterLink v-if="app.installedAppId" :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="p-button p-component p-button-outlined catalog-button">
               Manage
             </RouterLink>
+            <a :href="sourceUrl(app)" target="_blank" rel="noopener" class="catalog-source-link" :aria-label="`Source of ${app.name}`">Source</a>
             <small v-if="app.requiresNewerServer" class="text-color-secondary">Needs Automaton Server {{ app.minServerVersion }} or newer</small>
             <RouterLink
               v-else
@@ -219,8 +232,8 @@ async function installFromUrl() {
       </div>
     </template>
 
-    <Drawer v-if="isSystemAdministrator" v-model:visible="showSources" position="right" header="Catalog sources" :style="{ width: '32rem', maxWidth: '100vw' }">
-      <CatalogSources @changed="load()" />
+    <Drawer v-if="isSystemAdministrator" v-model:visible="showSources" position="right" header="Add a catalog" :style="{ width: '32rem', maxWidth: '100vw' }">
+      <CatalogSources @changed="onSourcesChanged" />
     </Drawer>
 
     <Dialog v-if="isSystemAdministrator" v-model:visible="showGit" modal header="Install from a Git address" :style="{ width: '32rem', maxWidth: '100vw' }" @hide="gitError = null; gitUrl = ''">
@@ -251,9 +264,6 @@ async function installFromUrl() {
 .catalog-search {
   width: 18rem;
   max-width: 100%;
-}
-.catalog-source {
-  min-width: 12rem;
 }
 .catalog-row,
 .catalog-empty {

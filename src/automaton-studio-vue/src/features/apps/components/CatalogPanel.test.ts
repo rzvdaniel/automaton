@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 const getCatalog = vi.fn()
+const getCatalogSources = vi.fn()
 const resolveGitUrl = vi.fn()
 const push = vi.fn()
 const replace = vi.fn()
 const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }))
 const roles = vi.hoisted(() => ({ value: [] as string[] }))
 vi.mock('@/features/auth/stores/auth.store', () => ({ useAuthStore: () => ({ user: { roles: roles.value } }) }))
-vi.mock('../services/apps.service', () => ({ appsService: { getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a) } }))
+vi.mock('../services/apps.service', () => ({ appsService: { getCatalogSources: (...a: unknown[]) => getCatalogSources(...a), getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a) } }))
 vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push, replace }), useRoute: () => ({ query: routeQuery.value }) }))
 
 import source from './CatalogPanel.vue?raw'
@@ -30,8 +31,8 @@ describe('CatalogPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
     expect(wrapper.text()).toContain('Off-site Backup')
-    expect(wrapper.text()).toContain('commit 0123456')
-    expect(wrapper.text()).toContain('backups:read')
+    expect(wrapper.text()).toContain('Asks for backups:read')
+    expect(wrapper.find('a[aria-label="Source of Off-site Backup"]').attributes('href')).toBe('https://github.com/o/apps/tree/0123456789abcdef0123456789abcdef01234567/m/backup')
     expect(wrapper.find('.link').attributes('data-to')).toContain('"commit":"0123456789abcdef0123456789abcdef01234567"')
   })
 
@@ -99,28 +100,38 @@ describe('CatalogPanel', () => {
     getCatalog.mockResolvedValue({ apps: [{ ...entry, customSource: true, sourceName: 'Acme store' }], fetchedAt: null, stale: false, unavailable: false, message: null })
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.text()).toContain('Source: Acme store')
+    expect(wrapper.text()).toContain('Acme store')
   })
 
-  it('offers Manage sources only to a system administrator and opens the sources panel from it', async () => {
+  it('offers Add a catalog only to a system administrator and opens the sources panel from it', async () => {
     getCatalog.mockResolvedValue({ apps: [entry], fetchedAt: null, stale: false, unavailable: false, message: null })
     const plain = mountPanel()
     await flushPromises()
-    expect(button('Manage sources')).toBeUndefined()
+    expect(button('Add a catalog')).toBeUndefined()
     expect(button('Install from URL')).toBeUndefined()
     plain.unmount()
     roles.value = ['SysAdmin']
     const admin = mountPanel()
     await flushPromises()
     expect(document.body.querySelector('.sources-stub')).toBeNull()
-    button('Manage sources')!.click()
+    button('Add a catalog')!.click()
     await flushPromises()
     expect(document.body.querySelector('.sources-stub')).not.toBeNull()
     admin.unmount()
   })
 
+  it('marks private sources with a lock for an administrator', async () => {
+    roles.value = ['SysAdmin']
+    getCatalogSources.mockResolvedValue([{ id: 'acme', name: 'Acme', repo: 'a/b', branch: 'main', official: false, enabled: true, hasToken: true }])
+    getCatalog.mockResolvedValue(big())
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('[aria-label="Catalog"] .pi-lock').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   const many = (count: number) => Array.from({ length: count }, (_, i) => ({ ...entry, id: `a${i}`, name: `App ${i}`, folder: `m/a${i}` }))
-  const facets = { categories: [{ value: 'Maintenance', label: 'Maintenance', count: 10 }, { value: 'Tools', label: 'Tools', count: 20 }], sources: [{ value: 'official', label: 'Official', count: 30 }] }
+  const facets = { categories: [{ value: 'Maintenance', label: 'Maintenance', count: 10 }, { value: 'Tools', label: 'Tools', count: 20 }], sources: [{ value: 'official', label: 'Official', count: 20 }, { value: 'acme', label: 'Acme', count: 10 }] }
   const big = (extra: object = {}) => ({ apps: many(24), fetchedAt: null, stale: false, unavailable: false, message: null, total: 30, totalApps: 30, page: 1, pageSize: 24, ...facets, ...extra })
 
   it('hides the filters and the pager while the catalog has 12 apps or fewer', async () => {
@@ -139,7 +150,7 @@ describe('CatalogPanel', () => {
     expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Maintenance (10)')
     expect(wrapper.text()).toContain('Installed')
-    expect(wrapper.find('.catalog-source').text()).toContain('All sources')
+    expect(wrapper.find('[aria-label="Catalog"]').text()).toContain('Acme (10)')
     expect(wrapper.find('.p-paginator').exists()).toBe(true)
   })
 
