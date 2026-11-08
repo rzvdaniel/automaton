@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { App } from '../types/apps.types'
-import { getMadeOf } from '../utils/app-made-of'
+import { getMadeOf, type MadeOfItem } from '../utils/app-made-of'
 
 const props = defineProps<{ app: App }>()
-const emit = defineEmits<{ select: [key: 'settings' | 'advanced' | 'publishing'] }>()
+const emit = defineEmits<{ select: [key: 'settings' | 'advanced'] }>()
 
 const items = computed(() => getMadeOf(props.app))
-const target: Record<string, 'settings' | 'advanced' | 'publishing'> = {
+const target: Record<MadeOfItem['key'], 'settings' | 'advanced'> = {
   runs: 'advanced',
   source: 'advanced',
   data: 'advanced',
@@ -21,7 +21,7 @@ const target: Record<string, 'settings' | 'advanced' | 'publishing'> = {
     <h2 id="made-of-title">What this app is made of</h2>
     <ul class="made-of-strip">
       <li v-for="item in items" :key="item.key" :data-testid="`made-of-${item.key}`">
-        <button type="button" @click="emit('select', target[item.key] ?? 'advanced')">
+        <button type="button" @click="emit('select', target[item.key])">
           <span class="made-of-label">{{ item.label }}</span>
           <span class="made-of-value">{{ item.value }}</span>
           <span class="made-of-detail">{{ item.detail }}</span>

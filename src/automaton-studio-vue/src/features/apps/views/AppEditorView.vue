@@ -80,7 +80,7 @@ function openApp() {
   if (openAppUrl.value) window.open(openAppUrl.value, '_blank', 'noopener')
 }
 
-function handleMadeOfSelect(key: 'settings' | 'advanced' | 'publishing') {
+function handleMadeOfSelect(key: 'settings' | 'advanced') {
   handleNavigation(key === 'advanced' ? 'runtime' : key)
 }
 let unsubscribeBackendRuntimeLogs: (() => void) | null = null
@@ -318,15 +318,14 @@ function handleUnpublish() {
         </div>
       </header>
 
-      <nav class="app-tabs" role="tablist" aria-label="App page">
+      <nav class="app-tabs" aria-label="App page">
         <button
           v-for="tab in APP_TABS"
           :key="tab.key"
           type="button"
-          role="tab"
           class="app-tab"
           :class="{ active: activeTab === tab.key }"
-          :aria-selected="activeTab === tab.key"
+          :aria-current="activeTab === tab.key ? 'page' : undefined"
           @click="handleNavigation(tab.view)"
         >{{ tab.label }}</button>
       </nav>
