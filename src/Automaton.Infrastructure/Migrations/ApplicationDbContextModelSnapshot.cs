@@ -1032,6 +1032,24 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("AppPermissionApprovals");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppShare", b =>
+                {
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("WebAppId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AppShares");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4226,6 +4244,9 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<int>("Scope")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("SharedWithServer")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("StarCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -4607,6 +4628,21 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasOne("Automaton.Api.Entities.WebApp", null)
                         .WithMany()
                         .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppShare", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -6,7 +6,6 @@ import type {
   App,
   AppDeploymentTarget,
   ApplicationViewportMode,
-  PublishAppRequest,
 } from '../types/apps.types'
 import type { BackendRuntimeLogEvent, ConsoleEntry } from '../types/console.types'
 
@@ -38,50 +37,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     defaultTarget.value = target
   }
 
-  async function publishApp(request: PublishAppRequest): Promise<void> {
-    if (!currentApp.value) return
-    const publishRequest: PublishAppRequest = {
-      ...request,
-      isForkable: request.isForkable ?? currentApp.value.isForkable,
-    }
-    try {
-      await appsService.publish(currentApp.value.id, publishRequest)
-      currentApp.value = {
-        ...currentApp.value,
-        isPublished: true,
-        publicUrl: request.publicUrl,
-        requiresAuthentication: request.requiresAuthentication,
-        runtimeVisibility: request.runtimeVisibility,
-        catalogVisibility: request.catalogVisibility,
-        marketplacePreviewMode: request.marketplacePreviewMode,
-        isForkable: publishRequest.isForkable ?? currentApp.value.isForkable,
-        canLaunchPublicly: request.runtimeVisibility === 'public' && !request.requiresAuthentication && currentApp.value.accessStatus.toLocaleLowerCase() === 'active',
-        publishedAt: new Date().toISOString(),
-        category: request.category ?? currentApp.value.category,
-        tags: request.tags ?? currentApp.value.tags,
-      }
-    } catch (caught: unknown) {
-      error.value = caught instanceof Error ? caught.message : 'Failed to publish app'
-      throw caught
-    }
-  }
-
-  async function unpublishApp(): Promise<void> {
-    if (!currentApp.value) return
-    try {
-      await appsService.unpublish(currentApp.value.id)
-      currentApp.value = {
-        ...currentApp.value,
-        isPublished: false,
-        runtimeVisibility: 'private',
-        catalogVisibility: 'unlisted',
-        canLaunchPublicly: false,
-        publishedAt: undefined,
-      }
-    } catch (caught: unknown) {
-      error.value = caught instanceof Error ? caught.message : 'Failed to unpublish app'
-      throw caught
-    }
+  /** Reloads the app in place, without the page-wide loading state, so open dialogs stay open. */
+  async function refreshApp(appId: string): Promise<void> {
+    currentApp.value = await appsService.get(appId)
   }
 
   function addConsoleEntry(entry: ConsoleEntry): void {
@@ -131,8 +89,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     applicationState,
     loadApp,
     setDefaultTarget,
-    publishApp,
-    unpublishApp,
+    refreshApp,
     addConsoleEntry,
     addBackendRuntimeLogEntry,
     clearConsole,

@@ -6,36 +6,24 @@ import { useAppEditorStore } from './app-editor.store'
 
 vi.mock('../services/apps.service', () => ({
   appsService: {
-    publish: vi.fn(),
+    get: vi.fn(),
   },
 }))
 
-describe('app editor publishing', () => {
+describe('app editor store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
-  it('preserves the stored remix capability when saving publishing settings', async () => {
+  it('refreshes the app without the page-wide loading state so the Share dialog stays open', async () => {
     const store = useAppEditorStore()
-    store.currentApp = {
-      id: 'app-id',
-      isForkable: true,
-      accessStatus: 'Active',
-    } as App
+    vi.mocked(appsService.get).mockResolvedValue({ id: 'app-id', isPublished: true } as App)
 
-    await store.publishApp({
-      publicUrl: 'clock',
-      requiresAuthentication: false,
-      runtimeVisibility: 'private',
-      catalogVisibility: 'listed',
-      marketplacePreviewMode: 'mediaOnly',
-    })
+    const refreshing = store.refreshApp('app-id')
+    expect(store.isLoading).toBe(false)
+    await refreshing
 
-    expect(appsService.publish).toHaveBeenCalledWith('app-id', expect.objectContaining({
-      publicUrl: 'clock',
-      isForkable: true,
-    }))
-    expect(store.currentApp?.isForkable).toBe(true)
+    expect(store.currentApp?.isPublished).toBe(true)
   })
 })

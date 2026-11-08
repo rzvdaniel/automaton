@@ -323,6 +323,36 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    /// <summary>Who can open the app: audience (me, people, server, internet) and the chosen people.</summary>
+    public async Task<JsonElement> GetSharingAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/sharing", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> SetSharingAsync(string appId, string audience, string? publicUrl, CancellationToken ct = default)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new { audience, publicUrl }, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/apps/{appId}/sharing", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> AddSharedPersonAsync(string appId, string email, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/apps/{appId}/sharing/people", JsonSerializer.Serialize(new { email }, JsonOptions), ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> RemoveSharedPersonAsync(string appId, string userId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{appId}/sharing/people/{Uri.EscapeDataString(userId)}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task<JsonElement> GetSecretStatusAsync(string appId, IReadOnlyList<ApplicationSecretDeclaration> secrets, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { secrets }, JsonOptions);

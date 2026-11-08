@@ -13,6 +13,7 @@ internal static class ApplicationModelConfiguration
     {
         ConfigureMarketplaceCategory(modelBuilder);
         ConfigureWebAppUser(modelBuilder);
+        ConfigureAppShare(modelBuilder);
         ConfigureWebAppStar(modelBuilder);
         ConfigureWebAppScreenshot(modelBuilder);
         ConfigureWebAppStep(modelBuilder);
@@ -50,6 +51,18 @@ internal static class ApplicationModelConfiguration
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.WebAppId).IsRequired();
             });
+    }
+
+    private static void ConfigureAppShare(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AppShare>(entity =>
+        {
+            entity.HasKey(e => new { e.WebAppId, e.UserId });
+            entity.HasIndex(e => e.UserId);
+            // A share goes away with the app or the person it names.
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.WebAppId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureWebAppStar(ModelBuilder modelBuilder)

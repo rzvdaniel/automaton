@@ -137,6 +137,8 @@ automaton runners
 automaton project runners       # list, add or remove a project's Runners
 automaton project list
 automaton publish --yes --slug NAME
+automaton share status           # who can open the app: me, people, server or internet (same choices as the Share dialog)
+automaton share set server       # or: me, people, internet --slug NAME; add/remove EMAIL manage "people"
 automaton delete --yes          # permanently delete the linked remote app
 automaton listing show
 automaton catalog init my-apps  # files for your own apps repository (writes only; no git, no GitHub)

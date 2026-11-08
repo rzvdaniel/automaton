@@ -4,18 +4,16 @@ import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
-import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import ActionSchedulingPanel from '../components/ActionSchedulingPanel.vue'
 import AppDeploymentTargets from '../components/AppDeploymentTargets.vue'
 import AppMadeOf from '../components/AppMadeOf.vue'
 import AppMark from '../components/AppMark.vue'
 import AppOperationsOverview from '../components/AppOperationsOverview.vue'
-import AppPublishingView from '../components/AppPublishingView.vue'
 import AppRuntimeOperations from '../components/AppRuntimeOperations.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppSettings from '../components/AppSettings.vue'
-import PublishDialog from '../components/PublishDialog.vue'
+import ShareDialog from '../components/ShareDialog.vue'
 import {
   APP_SUB_VIEWS,
   APP_TABS,
@@ -27,10 +25,9 @@ import {
 import { appsService } from '../services/apps.service'
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { AppDeploymentTarget, PublishSettingsRequest } from '../types/apps.types'
+import type { AppDeploymentTarget } from '../types/apps.types'
 import type { RuntimeLogConnectionState } from '../types/console.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
-import { getEnvironmentDisplayName } from '../utils/environment-display'
 import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
 import { isActionOnlyApp } from '../utils/app-operational-summary'
 import { getPublishingConsistencyIssue } from '../utils/publishing-state'
@@ -39,7 +36,6 @@ import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const route = useRoute()
 const router = useRouter()
-const confirm = useConfirm()
 const toast = useToast()
 const editorStore = useAppEditorStore()
 
@@ -57,7 +53,7 @@ const runtimeLogConnectionState = ref<RuntimeLogConnectionState>(backendRuntimeL
 const isRuntimeLogSubscribed = ref(false)
 const runtimeLogSubscriptionFailed = ref(false)
 const targetsRevision = ref(0)
-const showPublishDialog = ref(false)
+const showShareDialog = ref(false)
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
 const publicAppUrl = computed(() => {
   const app = editorStore.currentApp
@@ -95,6 +91,8 @@ watch(() => route.query.target, () => {
 })
 
 onMounted(async () => {
+  // ?share=1 (and the old ?view=publishing) open the Share dialog.
+  const wantsShare = route.query.share === '1' || route.query.view === 'publishing'
   await router.replace({ query: withoutAuthoringQuery(route.query) })
 
   unsubscribeBackendRuntimeLogs = backendRuntimeLogClient.onLog((event) => {
@@ -111,6 +109,7 @@ onMounted(async () => {
   try {
     await editorStore.loadApp(appId.value)
     handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
+    if (wantsShare) showShareDialog.value = true
   } catch (error: unknown) {
     toast.add({
       severity: 'error',
@@ -237,56 +236,9 @@ async function handleViewTargetLogs(target: AppDeploymentTarget) {
   activeView.value = 'logs'
 }
 
-async function handlePublish(request: PublishSettingsRequest) {
-  try {
-    const app = editorStore.currentApp
-    if (!app) return
-    await editorStore.publishApp({
-      ...request,
-      category: app.category ?? null,
-      tags: app.tags ?? null,
-      isForkable: app.isForkable,
-    })
-    showPublishDialog.value = false
-    toast.add({
-      severity: 'success',
-      summary: 'Published',
-      detail: request.runtimeVisibility === 'public'
-        ? `Public access configured at ${getPublishedAppUrl(request.publicUrl)}. Publishing does not deploy or update the Live runtime.`
-        : 'Publishing settings saved. The runtime remains private.',
-      life: 5000,
-    })
-  } catch (error: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to publish app',
-      life: 5000,
-    })
-  }
-}
-
-function handleUnpublish() {
-  confirm.require({
-    message: 'Unpublish this app? Public access and its marketplace listing will be removed. The Live deployment and runtime will remain in place.',
-    header: 'Confirm unpublish',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Unpublish',
-    rejectLabel: 'Cancel',
-    accept: async () => {
-      try {
-        await editorStore.unpublishApp()
-        toast.add({ severity: 'success', summary: 'Unpublished', detail: 'Public access was removed. The Live deployment and runtime were not changed.', life: 4000 })
-      } catch (error: unknown) {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: error instanceof Error ? error.message : 'Failed to unpublish app',
-          life: 5000,
-        })
-      }
-    },
-  })
+async function handleSharingChanged() {
+  // Publishing state (and the Open app address) follows who can open the app.
+  await editorStore.refreshApp(appId.value)
 }
 </script>
 
@@ -313,7 +265,7 @@ function handleUnpublish() {
           </div>
         </div>
         <div class="header-actions">
-          <Button label="Share" icon="pi pi-share-alt" severity="secondary" outlined data-testid="share-app" @click="handleNavigation('publishing')" />
+          <Button label="Share" icon="pi pi-share-alt" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
           <Button v-if="openAppUrl" label="Open app" icon="pi pi-external-link" data-testid="open-app" @click="openApp" />
         </div>
       </header>
@@ -350,19 +302,9 @@ function handleUnpublish() {
               :targets="deploymentTargets"
               :application-state="editorStore.applicationState"
               @navigate="handleNavigation"
+              @share="showShareDialog = true"
             />
           </div>
-
-          <template v-else-if="activeView === 'publishing'">
-            <AppPublishingView
-              :app="editorStore.currentApp"
-              :has-live-target="!!getLiveTarget(deploymentTargets)"
-              :operational-state="editorStore.applicationState"
-              @publish="showPublishDialog = true"
-              @unpublish="handleUnpublish"
-              @navigate="handleNavigation"
-            />
-          </template>
 
           <AppSettings
             v-else-if="activeView === 'settings'"
@@ -440,20 +382,11 @@ function handleUnpublish() {
         </main>
       </div>
 
-      <PublishDialog
-        v-model:visible="showPublishDialog"
-        :current-slug="editorStore.currentApp.publicUrl"
-        :is-published="editorStore.currentApp.isPublished"
-        :requires-auth="editorStore.currentApp.requiresAuthentication"
-        :current-runtime-visibility="editorStore.currentApp.runtimeVisibility"
-        :current-catalog-visibility="editorStore.currentApp.catalogVisibility"
+      <ShareDialog
+        v-model:visible="showShareDialog"
+        :app-id="editorStore.currentApp.id"
         :app-name="editorStore.currentApp.name"
-        :has-live-target="!!getLiveTarget(deploymentTargets)"
-        :live-target-name="getLiveTarget(deploymentTargets) ? getEnvironmentDisplayName(getLiveTarget(deploymentTargets)) : undefined"
-        :live-target-slug="getLiveTarget(deploymentTargets)?.slug"
-        :viewing-target-name="selectedViewingTarget ? getEnvironmentDisplayName(selectedViewingTarget) : undefined"
-        :viewing-target-slug="selectedViewingTarget?.slug"
-        @publish="handlePublish"
+        @changed="handleSharingChanged"
       />
     </template>
 

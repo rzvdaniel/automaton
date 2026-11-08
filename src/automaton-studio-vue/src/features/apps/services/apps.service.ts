@@ -20,6 +20,8 @@ import type {
   AppTagSettings,
   AppScreenshot,
   PublishAppRequest,
+  AppSharing,
+  SharingAudience,
   ExportAppResponse,
   LinkedStepInfo,
   FileNode,
@@ -206,6 +208,23 @@ class AppsService {
    */
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/apps/${id}`)
+  }
+
+  /** Who can open the app. GET /api/apps/{id}/sharing */
+  async getSharing(id: string): Promise<AppSharing> {
+    return (await apiClient.get<AppSharing>(`/api/apps/${id}/sharing`)).data
+  }
+
+  async setSharing(id: string, audience: SharingAudience, publicUrl?: string): Promise<AppSharing> {
+    return (await apiClient.put<AppSharing>(`/api/apps/${id}/sharing`, { audience, publicUrl })).data
+  }
+
+  async addSharedPerson(id: string, email: string): Promise<AppSharing> {
+    return (await apiClient.post<AppSharing>(`/api/apps/${id}/sharing/people`, { email })).data
+  }
+
+  async removeSharedPerson(id: string, userId: string): Promise<AppSharing> {
+    return (await apiClient.delete<AppSharing>(`/api/apps/${id}/sharing/people/${userId}`)).data
   }
 
   /**

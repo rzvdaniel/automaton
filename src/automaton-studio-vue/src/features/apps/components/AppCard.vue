@@ -253,13 +253,11 @@ const menuItems = computed(() => {
     })
   }
 
-  if (props.app.isPublished) {
-    items.push({
-      label: 'Manage publishing',
-      icon: 'pi pi-globe',
-      command: async () => { await router.push(`/apps/${props.app.id}?view=publishing`) },
-    })
-  }
+  items.push({
+    label: 'Share',
+    icon: 'pi pi-share-alt',
+    command: async () => { await router.push(`/apps/${props.app.id}?share=1`) },
+  })
 
   if (props.app.canDelete) items.push({ label: 'Delete', icon: 'pi pi-trash', command: handleDelete })
 

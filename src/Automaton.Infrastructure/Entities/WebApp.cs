@@ -23,6 +23,9 @@ public class WebApp
     
     // Publishing fields
     public bool IsPublished { get; set; }
+
+    /// <summary>Any signed-in person on this server may open the app (not the public internet).</summary>
+    public bool SharedWithServer { get; set; }
     public bool IsForkable { get; set; } = false;
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
