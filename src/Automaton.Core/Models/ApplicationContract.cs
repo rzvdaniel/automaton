@@ -357,6 +357,7 @@ public static class ApplicationContractValidator
     public static string? DescriptionError(string? text, string name)
     {
         if (string.IsNullOrEmpty(text)) return null;
+        if (text.Any(char.IsControl)) return $"{name} must be one line of plain text";
         if (text.Length > MaxDescriptionLength) return $"{name} can be at most {MaxDescriptionLength} characters";
         if (text.Contains('\n') || text.Contains('\r')) return $"{name} must be one line";
         return null;
@@ -374,7 +375,8 @@ public static class ApplicationContractValidator
 
     private static bool IsPlainPath(string? path)
         => !string.IsNullOrEmpty(path) && path.Length is >= 2 and <= 200 && path[0] == '/'
-            && !path.Contains("..", StringComparison.Ordinal) && !path.Any(char.IsWhiteSpace);
+            && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains("..", StringComparison.Ordinal)
+            && path.All(c => c is not ('?' or '#' or '\\') && !char.IsWhiteSpace(c) && !char.IsControl(c));
 
     private static void ValidatePages(List<ApplicationPageDeclaration> pages, ICollection<string> errors)
     {
@@ -382,7 +384,7 @@ public static class ApplicationContractValidator
         foreach (var page in pages)
         {
             if (page is null || !(page.Path == "/" || IsPlainPath(page.Path)))
-                errors.Add($"pages entry '{page?.Path}' needs a path that starts with / and has no spaces or ..");
+                errors.Add($"pages entry '{page?.Label}' needs a path that starts with / and has no spaces or ..");
             if (page is null || string.IsNullOrWhiteSpace(page.Label) || page.Label.Length > MaxPageLabelLength)
                 errors.Add($"pages entry '{page?.Path}' needs a label of 1-{MaxPageLabelLength} characters");
         }

@@ -40,6 +40,10 @@ public class ApplicationContractDescriptorTests
         Assert.That(Check(c => c.Pages = Enumerable.Range(0, 11).Select(i => new ApplicationPageDeclaration { Path = "/" + i, Label = "x" }).ToList()), Is.Not.Empty);
         Assert.That(Check(c => c.OpenApi = "openapi.json"), Is.Not.Empty);
         Assert.That(Check(c => c.OpenApi = "/../x"), Is.Not.Empty);
+        Assert.That(Check(c => c.OpenApi = "//evil.example/o.json"), Is.Not.Empty);
+        Assert.That(Check(c => c.Pages = [new() { Path = "//evil.example", Label = "x" }]), Is.Not.Empty);
+        Assert.That(Check(c => c.Pages = [new() { Path = "/a?b#c", Label = "x" }]), Is.Not.Empty);
+        Assert.That(Check(c => c.Description = "a\tb"), Is.Not.Empty);
     }
 
     [Test]
