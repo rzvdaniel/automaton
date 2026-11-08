@@ -2,7 +2,7 @@
 
 Subscription plans let the owner of a self-hosted Automaton server set limits and capabilities for the people they open the server to: their team, their customers or their own users. If you run Automaton only for yourself, you do not need plans. Automaton does not ship preset plans or prices; you define your own.
 
-Manage plans in Studio under **Admin → Subscription Plans** (administrators only; API: `api/admin/subscription-plans`).
+The Studio page and the `api/admin/subscription-plans` endpoint were removed (#831, #843); plans are no longer managed from Studio or the API. The text below describes the plan model that remains in the database.
 
 ## What a plan holds
 

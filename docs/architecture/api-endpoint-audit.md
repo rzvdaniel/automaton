@@ -7,23 +7,22 @@ the install scripts and the docs. Studio pages were removed in #831; this lists 
 
 | Controller | Endpoints |
 |---|---|
-| `FlowsController`, `FlowExecutionsController` | `api/flows`, `api/flow-executions` |
 | `CustomStepsController`, `AppsStepsController` | `api/customsteps`, `api/apps/{id}/steps` (link, create, list) |
 | `AiStepConversationController`, `AiConversationController`, `AiUtilityController` | `api/ai/step/conversation`, AI conversation and name generation |
 | `AiApiKeysController` | `api/AiApiKeys` |
 | `AdminAiProvidersController`, `AdminAiModelsController`, `AdminAiProviderKeysController`, `AdminAiSettingsController`, `AdminAiGuidanceController` | `api/admin/ai-providers`, `api/admin/ai-guidance` |
 | `BillingController`, `AccountSubscriptionController`, `AdminSubscriptionPlansController` | `api/billing`, `api/Account` subscription, `api/admin/subscription-plans` |
-| `ProjectsController`, `ProjectMembersController`, `ProjectResourcesController` | `api/projects/...` |
 | `DashboardController`, `AdminDashboardController`, `RecentActivitiesController` | dashboard stats, recent activity |
 | `AdminMarketplaceAppsController` | `api/admin/marketplace-apps` |
 
-Also removed: the Studio client methods for those calls (`apps.service.ts`), the `projects`, `flows` and `customsteps`
-checks of `docker/install/migration_app_check.py`, and the tests that only covered the removed controllers.
+Also removed: the Studio client methods for those calls (`apps.service.ts`) and the tests that only covered the removed controllers.
 
 ## Kept on purpose
 
 | Endpoint | Client that needs it |
 |---|---|
+| `api/projects`, `api/projects/{id}/members`, `apps`, `runners` | CLI (`project`, `runners install`, `share`) and the Studio share dialog (`listMyTeams`) |
+| `api/flows/{id}`, `api/flowexecutions` | Runner (`FlowExecutionService`, `AppConfig.FlowsUrl`) |
 | `api/ai-guidance` (`AiGuidanceController`) | CLI (`AiGuidancePackService`) |
 | `api/web-apps/...` flow and step execution (`AppsFlowExecutionController`, `AppsStepExecutionController`) | Published apps: the generated config sets `backendApiPath` to `/api/web-apps/{slug}` |
 | `api/webhooks/stripe` (`StripeWebhookController`) | Stripe calls it; not a Studio caller |

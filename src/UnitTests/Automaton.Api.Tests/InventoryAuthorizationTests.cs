@@ -70,6 +70,9 @@ public sealed class InventoryAuthorizationTests
         Assert.That(response.StatusCode, Is.EqualTo(expected));
     }
 
+    [TestCase("GET", "/api/projects/00000000-0000-0000-0000-000000000001/runners")]
+    [TestCase("POST", "/api/projects/00000000-0000-0000-0000-000000000001/runners/00000000-0000-0000-0000-000000000002")]
+    [TestCase("DELETE", "/api/projects/00000000-0000-0000-0000-000000000001/runners/00000000-0000-0000-0000-000000000002")]
     [TestCase("POST", "/api/runners/00000000-0000-0000-0000-000000000002/removal")]
     [TestCase("DELETE", "/api/runners/00000000-0000-0000-0000-000000000002")]
     public async Task RunnerManagementRejectsNonDeveloperApiKeys(string method, string path)
