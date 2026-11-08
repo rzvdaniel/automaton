@@ -98,4 +98,14 @@ describe('AppListView', () => {
     const buttons = wrapper.find('.apps-empty').findAll('button').map((b) => b.text())
     expect(buttons).toEqual(['From the catalog', 'New app'])
   })
+
+  it('opens the New app dialog and routes to the catalog when asked', async () => {
+    const wrapper = await mountView(apps)
+    const dialog = wrapper.findComponent({ name: 'NewAppDialog' })
+    expect(dialog.props('visible')).toBe(false)
+    await wrapper.findAll('button').find((b) => b.text() === 'New app')!.trigger('click')
+    expect(dialog.props('visible')).toBe(true)
+    dialog.vm.$emit('catalog')
+    expect(push).toHaveBeenCalledWith({ name: 'apps-catalog' })
+  })
 })
