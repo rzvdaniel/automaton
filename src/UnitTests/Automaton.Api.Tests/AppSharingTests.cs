@@ -252,6 +252,47 @@ public sealed class AppSharingTests
         Assert.That(closed.Listed, Is.False);
     }
 
+    [Test]
+    public async Task PersonSharedEarlier_IsDeniedAfterSwitchingToATeamOrAServerOrTheInternet()
+    {
+        await using var db = CreateDb();
+        var owner = AddUser(db, "owner@example.test");
+        var friend = AddUser(db, "friend@example.test");
+        var team = AddTeam(db, owner);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = AppId, UserId = owner.Id });
+        await db.SaveChangesAsync();
+        var service = Service(db, owner.Id);
+        await service.AddPersonAsync(AppId, friend.Email!, default);
+        Assert.That(await CanOpenAsync(db, friend.Id), Is.True);
+
+        await service.SetAudienceAsync(AppId, "team", null, team.Id, null, default);
+
+        Assert.That(await CanOpenAsync(db, friend.Id), Is.False);
+        Assert.That((await service.GetAsync(AppId, default)).People, Is.Empty);
+    }
+
+    [Test]
+    public async Task DeactivatedTeam_GrantsNoAccess_AndIsNotShownAsTheAudience()
+    {
+        await using var db = CreateDb();
+        var owner = AddUser(db, "owner@example.test");
+        var member = AddUser(db, "member@example.test");
+        var team = AddTeam(db, owner, member);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = AppId, UserId = owner.Id });
+        await db.SaveChangesAsync();
+        var service = Service(db, owner.Id);
+        await service.SetAudienceAsync(AppId, "team", null, team.Id, null, default);
+        Assert.That(await CanOpenAsync(db, member.Id), Is.True);
+
+        team.IsActive = false;
+        await db.SaveChangesAsync();
+
+        Assert.That(await CanOpenAsync(db, member.Id), Is.False);
+        var state = await service.GetAsync(AppId, default);
+        Assert.That(state.Team, Is.Null);
+        Assert.That(state.Audience, Is.EqualTo("me"));
+    }
+
     private static OrganizationService Organizations(ApplicationDbContext db, UserContextService context) =>
         new(db, context, null!, null!, null!);
 }

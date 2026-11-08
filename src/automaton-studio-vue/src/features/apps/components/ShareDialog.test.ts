@@ -128,6 +128,35 @@ describe('ShareDialog', () => {
     expect(wrapper.emitted('changed')).toHaveLength(1)
   })
 
+  it('shows an error with Retry when the teams cannot be loaded, not "not in a team"', async () => {
+    vi.mocked(appsService.listMyTeams).mockRejectedValueOnce(new Error('down'))
+    const wrapper = open()
+    await flushPromises()
+    await wrapper.find('[data-testid="share-choice-team"] input').setValue(true)
+
+    expect(wrapper.find('[data-testid="share-teams-error"]').text()).toContain('could not be loaded')
+    expect(wrapper.text()).not.toContain('not in a team yet')
+
+    await wrapper.find('[data-testid="share-teams-retry"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="share-teams-error"]').exists()).toBe(false)
+    expect(wrapper.find('#share-team').text()).toContain('Design')
+  })
+
+  it('keeps the dialog as it was and shows the error when the listing cannot be saved', async () => {
+    vi.mocked(appsService.updateListing).mockRejectedValueOnce({ response: { data: { message: 'Unknown category' } } })
+    const wrapper = open()
+    await flushPromises()
+    await wrapper.find('[data-testid="share-choice-internet"] input').setValue(true)
+    await wrapper.find('[data-testid="share-list"] input').setValue(true)
+    await wrapper.find('[data-testid="share-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="share-error"]').text()).toContain('Unknown category')
+    expect(appsService.setSharing).not.toHaveBeenCalled()
+    expect(wrapper.emitted('changed')).toBeUndefined()
+  })
+
   it('lists the app in the store with its summary, category and tags', async () => {
     vi.mocked(appsService.setSharing).mockResolvedValue({ audience: 'internet', people: [], publicUrlSlug: 'static-tool', listed: true })
     const wrapper = open()

@@ -93,8 +93,11 @@ async function loadListing() {
   savedListing.value = listingText.value
 }
 
+const teamsFailed = ref(false)
+
 async function loadTeams() {
-  try { teams.value = await appsService.listMyTeams() } catch { teams.value = [] }
+  teamsFailed.value = false
+  try { teams.value = await appsService.listMyTeams() } catch { teams.value = []; teamsFailed.value = true }
 }
 
 async function load() {
@@ -271,7 +274,11 @@ async function copyAddress() {
           <option value="" disabled>Pick a team</option>
           <option v-for="team in teams" :key="team.id" :value="team.id">{{ team.displayName }}</option>
         </select>
-        <p v-if="teams.length === 0" class="share__hint">You are not in a team yet. Create one under Teams first.</p>
+        <p v-if="teamsFailed" class="share__hint" data-testid="share-teams-error">
+          Your teams could not be loaded.
+          <Button label="Retry" text size="small" data-testid="share-teams-retry" @click="loadTeams" />
+        </p>
+        <p v-else-if="teams.length === 0" class="share__hint">You are not in a team yet. Create one under Teams first.</p>
         <p v-else class="share__hint">Members can open the app. They cannot change it or share it.</p>
       </section>
 

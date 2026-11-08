@@ -79,9 +79,11 @@ public sealed class AppSharingService(
         {
             if (app.IsPublished) await publicationService.Unpublish(appId, cancellationToken);
             app.SharedWithServer = audience == AppSharingAudiences.Server;
-            if (audience == AppSharingAudiences.OnlyMe)
-                dbContext.AppShares.RemoveRange(await dbContext.AppShares.Where(share => share.WebAppId == appId).ToListAsync(cancellationToken));
         }
+
+        // Chosen people only count while the audience is "people"; any other choice forgets them.
+        if (audience != AppSharingAudiences.People)
+            dbContext.AppShares.RemoveRange(await dbContext.AppShares.Where(share => share.WebAppId == appId).ToListAsync(cancellationToken));
 
         app.SharedWithProjectId = team?.Id;
         await dbContext.SaveChangesAsync(cancellationToken);
