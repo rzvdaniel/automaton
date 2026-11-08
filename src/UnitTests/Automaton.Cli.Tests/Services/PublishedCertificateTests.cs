@@ -37,6 +37,18 @@ public class PublishedCertificateTests
     }
 
     [Test]
+    public async Task CheckAsync_ReturnsLastErrorWhenCertificateNeverArrives()
+    {
+        using var client = new HttpClient(new ProbeHandler(
+            _ => throw new HttpRequestException(HttpRequestError.SecureConnectionError, "Certificate is not ready")));
+
+        var error = await PublishedCertificate.CheckAsync(
+            client, AppUrl, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1), CancellationToken.None);
+
+        Assert.That(error, Does.Contain("Certificate is not ready"));
+    }
+
+    [Test]
     public void WaitAsync_PropagatesCallerCancellation()
     {
         using var client = new HttpClient(new ProbeHandler(token => throw new OperationCanceledException(token)));

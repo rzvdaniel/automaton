@@ -395,12 +395,22 @@ public static class DeployCommand
         => !asJson && !alreadyWritten &&
            !string.IsNullOrWhiteSpace(appName) && !string.IsNullOrWhiteSpace(appId);
 
+    // The default profile is not worth naming; only a profile the person chose is.
+    private static bool ShowProfile(string? profileName)
+        => !string.IsNullOrWhiteSpace(profileName) &&
+           !string.Equals(profileName, ConfigService.DefaultEnvironmentName, StringComparison.OrdinalIgnoreCase);
+
+    private static string TargetLabel(DeploymentTargetInfo target)
+        => string.Equals(target.Name, target.Slug, StringComparison.OrdinalIgnoreCase)
+            ? target.Name
+            : $"{target.Name} ({target.Slug})";
+
     private static void WritePlainHeading(
         string appName, string appId, string? profileName, DeploymentTargetInfo target, string? server)
     {
         Console.WriteLine($"Deploying {appName} ({appId})");
-        Console.WriteLine($"Local profile: {profileName ?? "default credentials"}");
-        Console.WriteLine($"Deployment target: {target.Name} ({target.Slug})");
+        if (ShowProfile(profileName)) Console.WriteLine($"Local profile: {profileName}");
+        Console.WriteLine($"Deployment target: {TargetLabel(target)}");
         if (!string.IsNullOrWhiteSpace(server)) Console.WriteLine($"Server: {server}");
     }
 
@@ -408,8 +418,8 @@ public static class DeployCommand
         string appName, string appId, string? profileName, DeploymentTargetInfo target, string? server)
     {
         AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appName}[/] ({appId})");
-        AnsiConsole.MarkupLine($"[bold]Local profile:[/] {Markup.Escape(profileName ?? "default credentials")}");
-        AnsiConsole.MarkupLine($"[bold]Deployment target:[/] {Markup.Escape(target.Name)} ({Markup.Escape(target.Slug)})");
+        if (ShowProfile(profileName)) AnsiConsole.MarkupLine($"[bold]Local profile:[/] {Markup.Escape(profileName!)}");
+        AnsiConsole.MarkupLine($"[bold]Deployment target:[/] {Markup.Escape(TargetLabel(target))}");
         if (!string.IsNullOrWhiteSpace(server))
         {
             AnsiConsole.MarkupLine($"[bold]Server:[/] {Markup.Escape(server)}");
@@ -511,7 +521,7 @@ public static class DeployCommand
         CliJson.Write(new
         {
             success = deployResult.Success && publishResult.Success,
-            summary = publishResult.CertificatePending ? "Deployed and published, certificate pending"
+            summary = publishResult.CertificatePending ? "Deployed and published, but the HTTPS certificate request failed"
                 : publishResult.Success ? "Deploy and publish complete" : "Deploy complete, publish failed",
             deployed = deployResult.Success,
             published = publishResult.Success,

@@ -11,7 +11,7 @@ def explain(logs, domain):
     if 'ratelimited' in text or 'rate limit' in text or 'too many certificates' in text:
         when = f' Retry after {retry.group(1).upper()}.' if retry else ' Wait for the limit to reset.'
         return ("Let's Encrypt refused a certificate because its issuance limit was reached." + when +
-                f' Reinstalling with the same host names will not help before then. Use another host name or retry after the limit resets.')
+                f' Reinstalling with the same host names will not help before then. Use another host name, or after the limit resets rerun the installer: it restarts Traefik so it requests the certificates again.')
     if 'dns problem' in text or 'nxdomain' in text or 'no valid a records' in text:
         return (f"Let's Encrypt could not resolve the installation host names under {domain}. "
                 'Point their public DNS records directly to this server, wait for DNS to propagate, then rerun the installer.')

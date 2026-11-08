@@ -281,7 +281,14 @@ if $configure_only; then
 fi
 "${compose[@]}" pull
 certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+traefik_existed=$("${compose[@]}" ps -q traefik 2>/dev/null || true)
 "${compose[@]}" up -d --wait --wait-timeout 600
+# On a rerun Traefik keeps running and does not retry a refused certificate (for example after Let's Encrypt's limit lifted).
+if [[ -n "$traefik_existed" ]] && ! curl --silent --max-time 15 --output /dev/null "https://api.$domain/health" 2>/dev/null; then
+    echo 'HTTPS is not answering yet; restarting Traefik so it requests the certificates again.'
+    "${compose[@]}" restart traefik
+    certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+fi
 # Validate actual public HTTPS/API routing as well as container health.
 verify_https
 if $quiet; then
