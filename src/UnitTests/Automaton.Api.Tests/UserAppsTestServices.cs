@@ -59,6 +59,26 @@ internal static class UserAppsTestServices
             new AppQueryService(dbContext, userContextService, authorizationService, null!));
     }
 
+    public static AppSharingService CreateSharingService(ApplicationDbContext dbContext, HttpContext httpContext)
+    {
+        var userContextService = new UserContextService(new HttpContextAccessor { HttpContext = httpContext });
+        var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+        var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(dbContext, authorizationService);
+        var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
+            dbContext,
+            runnerAuthorizationPolicy,
+            new AppDeploymentTargetResolver(dbContext, authorizationService, runnerAuthorizationPolicy));
+        var auditEventService = new NoOpAuditEventService();
+        return new AppSharingService(
+            dbContext,
+            userContextService,
+            authorizationService,
+            CreatePublicationService(
+                dbContext, userContextService, authorizationService,
+                runnerAssignmentPolicy, auditEventService, new NoOpApplicationEventService()),
+            auditEventService);
+    }
+
     private static AppPublicationService CreatePublicationService(
         ApplicationDbContext dbContext,
         UserContextService userContextService,

@@ -251,7 +251,6 @@ export interface PublishAppRequest {
   marketplacePreviewMode?: 'launchable' | 'mediaOnly'
 }
 
-export type PublishSettingsRequest = Omit<PublishAppRequest, 'category' | 'tags' | 'isForkable'>
 
 export interface ExportAppResponse {
   blob: Blob
@@ -590,4 +589,19 @@ export interface InstallManifest {
     timeZone?: string
     input?: Record<string, unknown> | null
   }>
+}
+
+/** Who can open an app: only the owner, chosen people, everyone signed in on the server, or anyone on the internet. */
+export type SharingAudience = 'me' | 'people' | 'server' | 'internet'
+
+export interface SharedPerson {
+  userId: string
+  email: string
+  displayName: string
+}
+
+export interface AppSharing {
+  audience: SharingAudience
+  people: SharedPerson[]
+  publicUrlSlug?: string | null
 }

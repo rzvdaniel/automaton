@@ -22,6 +22,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   navigate: [view: AppViewKey]
+  share: []
 }>()
 
 const isActionsOnly = computed(() => props.applicationState.status === 'actions-only')
@@ -200,7 +201,7 @@ function navigate(action: AppOperationalAction): void {
               </span>
             </template>
             <span v-else class="muted">{{ publishingIssue || 'Deployment and publishing are separate.' }}</span>
-            <Button label="Manage publishing" icon="pi pi-arrow-right" icon-pos="right" text @click="emit('navigate', 'publishing')" />
+            <Button label="Share" icon="pi pi-share-alt" text @click="emit('share')" />
           </div>
         </template>
       </Card>

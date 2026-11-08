@@ -2,7 +2,6 @@ import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 
 export const APP_VIEW_KEYS = [
   'overview',
-  'publishing',
   'settings',
   'logs',
   'deployments',
@@ -56,7 +55,6 @@ export const APP_SUB_VIEWS: Partial<Record<AppTabKey, ReadonlyArray<AppSubView>>
 
 const VIEW_TABS: Record<AppViewKey, AppTabKey> = {
   overview: 'overview',
-  publishing: 'overview',
   settings: 'settings',
   logs: 'activity',
   deployments: 'activity',
@@ -89,6 +87,7 @@ export function withoutAuthoringQuery(query: LocationQuery): LocationQueryRaw {
   delete result.mode
   delete result.model
   delete result.tab
+  delete result.share
   if (resolveAppView(query.view) === DEFAULT_APP_VIEW) delete result.view
   return result
 }

@@ -18,6 +18,7 @@ public static class AuditEventTypes
     public const string AppMetadataUpdated = "AppMetadataUpdated";
     public const string AppVisibilityChanged = "AppVisibilityChanged";
     public const string AppPublished = "AppPublished";
+    public const string AppSharingChanged = "AppSharingChanged";
     public const string AppUnpublished = "AppUnpublished";
     public const string AppSlugChanged = "AppSlugChanged";
     public const string AppForked = "AppForked";

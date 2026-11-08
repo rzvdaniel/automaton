@@ -18,14 +18,12 @@ describe('app page navigation', () => {
   it('keeps every earlier destination reachable inside a tab', () => {
     const views = new Set<string>(APP_TABS.map((tab) => tab.view))
     for (const subViews of Object.values(APP_SUB_VIEWS)) subViews?.forEach((item) => views.add(item.key))
-    views.add('publishing')
-    for (const key of ['overview', 'deployments', 'runtime', 'logs', 'actions', 'publishing', 'settings']) {
+    for (const key of ['overview', 'deployments', 'runtime', 'logs', 'actions', 'settings']) {
       expect(views.has(key)).toBe(true)
     }
     expect(tabForView('logs')).toBe('activity')
     expect(tabForView('deployments')).toBe('activity')
     expect(tabForView('runtime')).toBe('advanced')
-    expect(tabForView('publishing')).toBe('overview')
   })
 
   it('falls back to Overview for removed authoring views and unknown values', () => {
@@ -39,7 +37,7 @@ describe('app page navigation', () => {
   it('maps old settings deep links to their new place', () => {
     expect(resolveAppViewFromQuery({ view: 'settings', settings: 'targets' })).toBe('targets')
     expect(resolveAppViewFromQuery({ view: 'settings', settings: 'permissions' })).toBe('settings')
-    expect(resolveAppViewFromQuery({ view: 'publishing' })).toBe('publishing')
+    expect(resolveAppViewFromQuery({ view: 'publishing' })).toBe('overview')
   })
 
   it('removes prompt and authoring-view deep links without dropping operational context', () => {

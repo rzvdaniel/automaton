@@ -53,6 +53,7 @@ public partial class ApplicationDbContext
     public virtual DbSet<WebAppStar> WebAppStars { get; set; }
     public virtual DbSet<WebAppScreenshot> WebAppScreenshots { get; set; }
     public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
+    public virtual DbSet<AppShare> AppShares { get; set; }
     public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
     public virtual DbSet<AppVersion> AppVersions { get; set; }
     public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }

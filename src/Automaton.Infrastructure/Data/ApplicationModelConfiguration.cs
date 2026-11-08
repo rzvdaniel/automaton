@@ -13,6 +13,7 @@ internal static class ApplicationModelConfiguration
     {
         ConfigureMarketplaceCategory(modelBuilder);
         ConfigureWebAppUser(modelBuilder);
+        ConfigureAppShare(modelBuilder);
         ConfigureWebAppStar(modelBuilder);
         ConfigureWebAppScreenshot(modelBuilder);
         ConfigureWebAppStep(modelBuilder);
@@ -50,6 +51,15 @@ internal static class ApplicationModelConfiguration
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.WebAppId).IsRequired();
             });
+    }
+
+    private static void ConfigureAppShare(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AppShare>(entity =>
+        {
+            entity.HasKey(e => new { e.WebAppId, e.UserId });
+            entity.HasIndex(e => e.UserId);
+        });
     }
 
     private static void ConfigureWebAppStar(ModelBuilder modelBuilder)

@@ -966,6 +966,11 @@ public class OrganizationService : IOrganizationService
         var apps = await GetAssignedAppsQuery(userId, null)
             .Select(assignment => assignment.App!)
             .ToListAsync(cancellationToken);
+        // Apps an owner shared with this person, or with everyone on the server, belong in the same list.
+        apps.AddRange(await dbContext.WebApps
+            .Where(app => app.DeletionClaimId == null &&
+                          (app.SharedWithServer || dbContext.AppShares.Any(share => share.WebAppId == app.Id && share.UserId == userId)))
+            .ToListAsync(cancellationToken));
         return apps
             .DistinctBy(app => app.Id)
             .ToArray();

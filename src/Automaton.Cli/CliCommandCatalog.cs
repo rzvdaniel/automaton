@@ -39,6 +39,7 @@ internal static class CliCommandCatalog
         root.AddCommand(LogsCommand.Build(config));
         root.AddCommand(PullCommand.Build(config));
         root.AddCommand(PublishCommand.Build(config));
+        root.AddCommand(ShareCommand.Build(config));
         root.AddCommand(RunnersCommand.Build(config));
         root.AddCommand(InventoryCommands.BuildApps(config));
         root.AddCommand(InventoryCommands.BuildInstallationStatus(config));
