@@ -2,15 +2,6 @@ namespace Automaton.Cli.Services;
 
 internal static class PublishedCertificate
 {
-    internal static async Task<bool> WaitAsync(Uri url, CancellationToken cancellationToken)
-    {
-        if (url.Scheme != Uri.UriSchemeHttps) return true;
-
-        using var handler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
-        return await WaitAsync(client, url, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(2), cancellationToken);
-    }
-
     internal static async Task<string?> CheckAsync(Uri url, CancellationToken cancellationToken)
     {
         if (url.Scheme != Uri.UriSchemeHttps) return null;
@@ -19,10 +10,6 @@ internal static class PublishedCertificate
         using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
         return await CheckAsync(client, url, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(2), cancellationToken);
     }
-
-    internal static async Task<bool> WaitAsync(
-        HttpClient client, Uri url, TimeSpan timeout, TimeSpan retryDelay, CancellationToken cancellationToken)
-        => await CheckAsync(client, url, timeout, retryDelay, cancellationToken) is null;
 
     /// <summary>Waits for the HTTPS endpoint; returns null when it answered, else the last error seen.</summary>
     internal static async Task<string?> CheckAsync(

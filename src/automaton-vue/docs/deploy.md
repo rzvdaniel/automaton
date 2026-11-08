@@ -31,7 +31,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
    automaton apps
    ```
 
-3. Publish when it is within what was asked for. `--yes` skips the prompt (use it for automation after approval); `--slug` sets the public URL name. Publishing waits for the TLS certificate before it reports success.
+3. Publish when it is within what was asked for. `--yes` skips the prompt (use it for automation after approval); `--slug` sets the public URL name. Publishing waits up to a minute for the TLS certificate. If none arrives, publish says the certificate request failed and why (for example Let's Encrypt's weekly limit); the server's administrator fixes that as the install guide's HTTPS troubleshooting describes, then you publish again.
 
    ```bash
    automaton publish --yes --slug my-app

@@ -17,10 +17,10 @@ public class PublishedCertificateTests
             ? throw new HttpRequestException(HttpRequestError.SecureConnectionError, "Certificate is not ready")
             : new HttpResponseMessage(HttpStatusCode.Unauthorized)));
 
-        var ready = await PublishedCertificate.WaitAsync(
+        var error = await PublishedCertificate.CheckAsync(
             client, AppUrl, TimeSpan.FromSeconds(5), TimeSpan.Zero, CancellationToken.None);
 
-        Assert.That(ready, Is.True);
+        Assert.That(error, Is.Null);
         Assert.That(attempts, Is.EqualTo(2));
     }
 
@@ -30,17 +30,17 @@ public class PublishedCertificateTests
         using var client = new HttpClient(new ProbeHandler(
             _ => throw new HttpRequestException(HttpRequestError.SecureConnectionError, "Certificate is not ready")));
 
-        var ready = await PublishedCertificate.WaitAsync(
+        var error = await PublishedCertificate.CheckAsync(
             client, AppUrl, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1), CancellationToken.None);
 
-        Assert.That(ready, Is.False);
+        Assert.That(error, Is.Not.Null);
     }
 
     [Test]
     public async Task CheckAsync_ReturnsLastErrorWhenCertificateNeverArrives()
     {
         using var client = new HttpClient(new ProbeHandler(
-            _ => throw new HttpRequestException(HttpRequestError.SecureConnectionError, "Certificate is not ready")));
+            _ => throw new HttpRequestException(HttpRequestError.SecureConnectionError, "outer", new InvalidOperationException("Certificate is not ready"))));
 
         var error = await PublishedCertificate.CheckAsync(
             client, AppUrl, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1), CancellationToken.None);
@@ -55,7 +55,7 @@ public class PublishedCertificateTests
         using var caller = new CancellationTokenSource();
         caller.Cancel();
 
-        Assert.CatchAsync<OperationCanceledException>(async () => await PublishedCertificate.WaitAsync(
+        Assert.CatchAsync<OperationCanceledException>(async () => await PublishedCertificate.CheckAsync(
             client, AppUrl, TimeSpan.FromSeconds(5), TimeSpan.Zero, caller.Token));
     }
 

@@ -396,11 +396,11 @@ public static class DeployCommand
            !string.IsNullOrWhiteSpace(appName) && !string.IsNullOrWhiteSpace(appId);
 
     // The default profile is not worth naming; only a profile the person chose is.
-    private static bool ShowProfile(string? profileName)
+    internal static bool ShowProfile(string? profileName)
         => !string.IsNullOrWhiteSpace(profileName) &&
            !string.Equals(profileName, ConfigService.DefaultEnvironmentName, StringComparison.OrdinalIgnoreCase);
 
-    private static string TargetLabel(DeploymentTargetInfo target)
+    internal static string TargetLabel(DeploymentTargetInfo target)
         => string.Equals(target.Name, target.Slug, StringComparison.OrdinalIgnoreCase)
             ? target.Name
             : $"{target.Name} ({target.Slug})";
