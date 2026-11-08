@@ -16,6 +16,18 @@ public sealed class ApplicationContract
     public ApplicationStorageSpec Storage { get; set; } = new();
     public ApplicationComposeSpec? Compose { get; set; }
 
+    /// <summary>Optional: <c>web</c> or <c>api</c> for a running app. Missing means web.</summary>
+    public string? Kind { get; set; }
+
+    /// <summary>Optional one-line description of the app.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Optional key paths of a web app, each with a label.</summary>
+    public List<ApplicationPageDeclaration> Pages { get; set; } = [];
+
+    /// <summary>Optional path of the app's OpenAPI document (an API app), relative to the app's address.</summary>
+    public string? OpenApi { get; set; }
+
     /// <summary>
     /// Secrets the app needs by name. An app secret of that name wins; otherwise a declared name is
     /// filled from the project vault, then the owner's vault. Undeclared vault secrets never reach the app.
@@ -45,6 +57,16 @@ public sealed class ApplicationContract
         && Compose is null
         && Build.Command is not null
         && !string.IsNullOrWhiteSpace(Build.OutputDirectory);
+}
+
+/// <summary>A key path of a web app with a short label.</summary>
+public sealed class ApplicationPageDeclaration
+{
+    public string Path { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 /// <summary>A secret the app expects as an environment variable.</summary>
@@ -315,6 +337,7 @@ public static class ApplicationContractValidator
         ValidateOpenPaths(contract.OpenPaths, errors);
         ValidateSettings(contract.Settings, contract.Secrets, errors);
         ValidateSchedules(contract.Schedules, errors);
+        ValidateDescriptors(contract, errors);
 
         return errors;
     }
@@ -326,6 +349,49 @@ public static class ApplicationContractValidator
     public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read"];
 
     public const int MaxOpenPaths = 20;
+    public const int MaxDescriptionLength = 200;
+    public const int MaxPages = 10;
+    public const int MaxPageLabelLength = 40;
+
+    /// <summary>Why <paramref name="text"/> is not a valid one-line description, or null.</summary>
+    public static string? DescriptionError(string? text, string name)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        if (string.IsNullOrWhiteSpace(text)) return $"{name} cannot be empty";
+        if (text.Any(char.IsControl)) return $"{name} must be one line of plain text";
+        if (text.Length > MaxDescriptionLength) return $"{name} can be at most {MaxDescriptionLength} characters";
+        if (text.Contains('\n') || text.Contains('\r')) return $"{name} must be one line";
+        return null;
+    }
+
+    private static void ValidateDescriptors(ApplicationContract contract, ICollection<string> errors)
+    {
+        if (contract.Kind is not null && contract.Kind is not ("web" or "api"))
+            errors.Add("kind must be 'web' or 'api'");
+        if (DescriptionError(contract.Description, "description") is { } descriptionError) errors.Add(descriptionError);
+        ValidatePages(contract.Pages ?? [], errors);
+        if (contract.OpenApi is not null && !IsPlainPath(contract.OpenApi))
+            errors.Add("openApi must be a path that starts with / (for example /openapi.json)");
+    }
+
+    private static bool IsPlainPath(string? path)
+        => !string.IsNullOrEmpty(path) && path.Length is >= 2 and <= 200 && path[0] == '/'
+            && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains("..", StringComparison.Ordinal)
+            && path.All(c => c is not ('?' or '#' or '\\') && !char.IsWhiteSpace(c) && !char.IsControl(c));
+
+    private static void ValidatePages(List<ApplicationPageDeclaration> pages, ICollection<string> errors)
+    {
+        if (pages.Count > MaxPages) errors.Add($"pages can contain at most {MaxPages} entries");
+        var index = 0;
+        foreach (var page in pages)
+        {
+            index++;
+            if (page is null || !(page.Path == "/" || IsPlainPath(page.Path)))
+                errors.Add($"pages entry {index} ('{page?.Path}') needs a path that starts with / and has no spaces or ..");
+            if (page is null || string.IsNullOrWhiteSpace(page.Label) || page.Label.Length > MaxPageLabelLength)
+                errors.Add($"pages entry {index} needs a label of 1-{MaxPageLabelLength} characters");
+        }
+    }
 
     /// <summary>True for <c>/exact/path</c> or <c>/folder/*</c>, using only URL path characters.</summary>
     public static bool IsValidOpenPath(string? path)

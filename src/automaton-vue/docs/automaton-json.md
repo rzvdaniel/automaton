@@ -65,6 +65,10 @@ layout, build system, or application architecture.
 | `application.health.path` | Optional HTTP readiness path. |
 | `application.health.startupTimeoutSeconds` | Maximum startup duration. |
 | `application.storage.dataDirectory` | Durable app data directory. |
+| `application.kind` | Optional, `web` or `api`, for a running app. Missing means web. Static sites and actions-only apps are known from the rest of the contract. |
+| `application.description` | Optional one line about the app, at most 200 characters. Each Action can add its own one-line `metadata.description` in `action.yaml` (same limit). |
+| `application.pages` | Optional key paths of a web app, up to 10 entries such as `{ "path": "/", "label": "Home" }` (path starts with `/`, label up to 40 characters). |
+| `application.openApi` | Optional path of an API app's OpenAPI document, such as `/openapi.json`. Studio lists the endpoints from it and shows the API reference button. |
 | `application.openPaths` | Optional paths of the private address that answer without Automaton sign-in, for webhooks and callbacks. See below. |
 
 The Runner supplies the effective port in `AUTOMATON_PORT` and the durable data

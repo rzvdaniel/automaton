@@ -136,6 +136,8 @@ public static class AppActionManifestParser
     {
         ValidateKey(actionKey);
         ValidateIdentity(manifest, actionKey);
+        if (ApplicationContractValidator.DescriptionError(manifest.Metadata.Description, "Action metadata.description") is { } descriptionError)
+            throw new InvalidOperationException(descriptionError + ".");
         ValidateExecutionSettings(manifest.Spec);
         ValidateCapabilities(manifest.Spec);
         ValidateScheduling(manifest.Spec);
