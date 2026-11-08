@@ -88,11 +88,8 @@ onMounted(async () => {
     <main>
       <section class="band intro">
         <div class="wrap">
-          <p class="eyebrow">Public apps</p>
           <h1>{{ publicAppConfig.storeTitle }}</h1>
-          <p class="lede">
-            Apps published on this server. Open one, see who made it, or list your own.
-          </p>
+          <p class="lede">Apps published on this server.</p>
         </div>
       </section>
 
@@ -157,21 +154,12 @@ onMounted(async () => {
       </section>
 
       <section class="band" aria-labelledby="publish-title">
-        <div class="wrap">
-          <div class="publish">
-            <div class="section-head">
-              <p class="eyebrow">Your app here</p>
-              <h2 id="publish-title">List your own app</h2>
-              <p>
-                Deploy an app to this server, then open it in Studio and choose
-                <strong>Publishing</strong> to list it here.
-              </p>
-            </div>
-            <div class="cta">
-              <a v-if="publicAppConfig.studioUrl" class="btn primary" :href="publicAppConfig.studioUrl">Open Studio <span class="arrow" aria-hidden="true">→</span></a>
-              <a class="btn" :href="publishDocsUrl" target="_blank" rel="noopener">How publishing works</a>
-            </div>
-          </div>
+        <div class="wrap publish">
+          <p id="publish-title">
+            Want your app here? Publish it from
+            <a v-if="publicAppConfig.studioUrl" :href="publicAppConfig.studioUrl">Studio</a><template v-else>Studio</template>
+            (<a :href="publishDocsUrl" target="_blank" rel="noopener">how publishing works</a>).
+          </p>
         </div>
       </section>
     </main>
@@ -182,12 +170,12 @@ onMounted(async () => {
 
 <style scoped>
 .intro .wrap {
-  padding-block: 40px 28px;
+  padding-block: 28px 12px;
   display: grid;
-  gap: 16px;
+  gap: 4px;
 }
 .intro h1 {
-  font-size: clamp(2.4rem, 5.4vw, 4rem);
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
   font-weight: 800;
 }
 
@@ -201,10 +189,10 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   max-width: 560px;
-  padding: 12px 18px;
-  border: 1.5px solid var(--ink);
+  padding: 9px 16px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--card);
 }
 .search:focus-within {
   outline: 3px solid var(--signal);
@@ -226,7 +214,7 @@ onMounted(async () => {
   outline: 0;
   background: transparent;
   color: var(--ink);
-  font: 400 1rem var(--body);
+  font: 400 0.95rem var(--body);
 }
 .search input::placeholder {
   color: var(--ink-soft);
@@ -237,13 +225,13 @@ onMounted(async () => {
   gap: 8px;
 }
 .site .chip {
-  font: 500 0.9rem var(--body);
-  padding: 7px 14px;
+  font: 500 0.82rem var(--body);
+  padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--ink-soft);
   text-decoration: none;
-  background: var(--paper);
+  background: var(--card);
 }
 .site .chip:hover {
   color: var(--ink);
@@ -270,7 +258,7 @@ onMounted(async () => {
   list-style: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 .app-grid.single {
   grid-template-columns: minmax(0, 560px);
@@ -295,30 +283,14 @@ onMounted(async () => {
 }
 
 .publish {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) auto;
-  gap: 32px;
-  align-items: end;
-  margin-block: 8px 72px;
-  padding: 34px;
-  border-radius: 26px;
-  background: var(--panel);
-}
-.publish .cta {
-  margin-top: 0;
+  padding-block: 8px 56px;
+  color: var(--ink-soft);
 }
 
 @media (max-width: 900px) {
   .app-grid,
-  .app-grid.single,
-  .publish {
+  .app-grid.single {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 620px) {
-  .publish {
-    padding: 22px;
   }
 }
 </style>

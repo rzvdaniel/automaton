@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
+import AppMark from '@/components/AppMark.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
 const props = defineProps<{ app: MarketplaceAppCard }>()
 
-const initial = computed(() => [...props.app.name.trim()][0]?.toUpperCase() ?? '?')
-const thumbnail = computed(() => resolveMarketplaceAssetUrl(props.app.thumbnailUrl))
 const creator = computed(() => props.app.creatorDisplayName || props.app.creatorPublicUsername || '')
 const installUrl = computed(() =>
   props.app.isForkable && publicAppConfig.studioUrl ? `${publicAppConfig.studioUrl}apps/install/${props.app.id}` : '',
@@ -19,8 +17,7 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
 
 <template>
   <article class="app-row">
-    <img v-if="thumbnail" class="app-thumb" :src="thumbnail" alt="" loading="lazy" />
-    <span v-else class="app-thumb app-initial" aria-hidden="true">{{ initial }}</span>
+    <AppMark :id="app.id" :name="app.name" :image-url="app.thumbnailUrl" :size="40" />
     <div class="app-text">
       <div class="app-title">
         <RouterLink class="app-name" :to="`/apps/${app.id}`">{{ app.name }}</RouterLink>
@@ -49,41 +46,27 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
 <style scoped>
 .app-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
-  gap: 16px;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
-  padding: 14px;
-  border-radius: 18px;
-  background: var(--paper);
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--card);
   border: 1px solid var(--line);
-}
-.app-thumb {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  object-fit: cover;
-  border: 1.5px solid var(--ink);
-}
-.app-initial {
-  display: grid;
-  place-items: center;
-  background: var(--signal);
-  color: var(--on-signal);
-  font: 800 1.5rem var(--display);
 }
 .app-text {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 .app-title {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .site .app-name {
-  font: 700 1.15rem var(--display);
+  font: 700 1rem var(--display);
   text-decoration: none;
 }
 .site .app-name:hover {
@@ -91,10 +74,10 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
   text-decoration-color: var(--signal);
 }
 .badge {
-  font: 600 0.7rem var(--body);
+  font: 600 0.65rem var(--body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: var(--signal);
   color: var(--on-signal);
@@ -106,29 +89,32 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
 }
 .app-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 .app-summary,
 .app-by {
   color: var(--ink-soft);
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   overflow-wrap: anywhere;
 }
+.app-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .app-by {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 @media (max-width: 620px) {
   .app-row {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr);
   }
   .app-row .app-actions {
     grid-column: 2;
     justify-self: start;
-  }
-  .app-thumb {
-    width: 48px;
-    height: 48px;
   }
 }
 </style>
