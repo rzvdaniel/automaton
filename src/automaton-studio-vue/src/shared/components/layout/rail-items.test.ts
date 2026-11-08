@@ -27,7 +27,7 @@ describe('railItems', () => {
     expect(Object.fromEntries(main.map((item) => [item.label, item.to]))).toEqual({
       Apps: '/apps',
       Catalog: '/apps/catalog',
-      People: '/organizations',
+      People: '/people',
       Server: '/runners',
       Backups: '/admin/installation',
       Settings: '/settings',

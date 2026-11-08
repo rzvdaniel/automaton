@@ -5,6 +5,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authRoutes } from '@/features/auth/routes'
 import { appsRoutes } from '@/features/apps/routes'
 import { runnersRoutes } from '@/features/runners/routes'
+import { peopleRoutes } from '@/features/people/routes'
 import { organizationsRoutes } from '@/features/organizations/routes'
 import { settingsRoutes } from '@/features/settings/routes'
 import { downloadsRoutes } from '@/features/downloads/routes'
@@ -39,6 +40,7 @@ const router = createRouter({
     // Features
     ...appsRoutes,
     ...runnersRoutes,
+    ...peopleRoutes,
     ...organizationsRoutes,
     ...settingsRoutes,
     ...downloadsRoutes,
