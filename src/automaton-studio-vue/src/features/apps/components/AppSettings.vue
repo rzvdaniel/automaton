@@ -32,7 +32,12 @@ const router = useRouter()
 const editorStore = useAppEditorStore()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
-const props = defineProps<{ targetsRevision?: number }>()
+const props = withDefaults(defineProps<{ targetsRevision?: number; sections?: Array<'basic' | 'targets' | 'secrets' | 'permissions' | 'appearance' | 'templates' | 'connect' | 'danger'> }>(), {
+  targetsRevision: 0,
+  sections: () => ['basic', 'targets', 'secrets', 'permissions', 'appearance', 'templates', 'connect', 'danger'],
+})
+type SettingsSection = (typeof props.sections)[number]
+const show = (section: SettingsSection) => props.sections.includes(section)
 const emit = defineEmits<{
   viewTargetLogs: [target: AppDeploymentTarget]
   targetsChanged: [targets: AppDeploymentTarget[]]
@@ -45,13 +50,13 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'targets' | 'secrets' | 'permissions' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+const activeSection = ref<SettingsSection>(props.sections[0] ?? 'basic')
 
 watch(
   () => route.query.settings,
   (section) => {
-    if (section === 'targets') activeSection.value = 'targets'
-    if (section === 'permissions') activeSection.value = 'permissions'
+    if (section === 'targets' && show('targets')) activeSection.value = 'targets'
+    if (section === 'permissions' && show('permissions')) activeSection.value = 'permissions'
   },
   { immediate: true },
 )
@@ -520,7 +525,7 @@ async function handleSaveTemplateStatus() {
   <div class="app-settings">
     <div class="grid">
       <!-- Sidebar -->
-      <div class="col-12 lg:col-3">
+      <div v-if="sections.length > 1" class="col-12 lg:col-3">
         <Card>
           <template #content>
             <div class="flex flex-column gap-1">
@@ -531,6 +536,7 @@ async function handleSaveTemplateStatus() {
                 text
                 :class="{ 'surface-hover': activeSection === 'basic' }"
                 class="w-full justify-content-start"
+                v-if="show('basic')"
                 @click="activeSection = 'basic'"
               />
               <Button
@@ -539,6 +545,7 @@ async function handleSaveTemplateStatus() {
                 text
                 :class="{ 'surface-hover': activeSection === 'targets' }"
                 class="w-full justify-content-start"
+                v-if="show('targets')"
                 @click="activeSection = 'targets'"
               />
               <Button
@@ -547,6 +554,7 @@ async function handleSaveTemplateStatus() {
                 text
                 :class="{ 'surface-hover': activeSection === 'secrets' }"
                 class="w-full justify-content-start"
+                v-if="show('secrets')"
                 @click="activeSection = 'secrets'"
               />
               <Button
@@ -555,6 +563,7 @@ async function handleSaveTemplateStatus() {
                 text
                 :class="{ 'surface-hover': activeSection === 'permissions' }"
                 class="w-full justify-content-start"
+                v-if="show('permissions')"
                 @click="activeSection = 'permissions'"
               />
               <Button
@@ -563,11 +572,12 @@ async function handleSaveTemplateStatus() {
                 text
                 :class="{ 'surface-hover': activeSection === 'appearance' }"
                 class="w-full justify-content-start"
+                v-if="show('appearance')"
                 @click="activeSection = 'appearance'"
               />
       
               <Button
-                v-if="isAdmin"
+                v-if="isAdmin && show('templates')"
                 label="Templates"
                 icon="pi pi-star"
                 text
@@ -576,19 +586,20 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'templates'"
               />
 
-              <div class="border-top-1 surface-border my-2" />
+              <div v-if="show('connect') && sections.length > 3" class="border-top-1 surface-border my-2" />
               <Button
                 label="Local project"
                 icon="pi pi-link"
                 text
                 :class="{ 'surface-hover': activeSection === 'connect' }"
                 class="w-full justify-content-start"
+                v-if="show('connect')"
                 @click="activeSection = 'connect'"
               />
 
-              <div v-if="!isLinkedToProject" class="border-top-1 surface-border my-2" />
+              <div v-if="!isLinkedToProject && show('danger')" class="border-top-1 surface-border my-2" />
               <Button
-                v-if="!isLinkedToProject"
+                v-if="!isLinkedToProject && show('danger')"
                 label="Danger Zone"
                 icon="pi pi-exclamation-triangle"
                 text
@@ -602,7 +613,7 @@ async function handleSaveTemplateStatus() {
       </div>
 
       <!-- Content -->
-      <div class="col-12 lg:col-9">
+      <div class="col-12" :class="{ 'lg:col-9': sections.length > 1 }">
         <!-- Basic Information -->
         <Card v-if="activeSection === 'basic'">
           <template #title>Basic Information</template>
@@ -730,7 +741,7 @@ async function handleSaveTemplateStatus() {
         <Card v-if="activeSection === 'secrets'">
           <template #title>Secrets</template>
           <template #content>
-            <AppSecrets v-if="app" :app-id="app.id" />
+            <AppSecrets v-if="app" :app-id="app.id" :declared="app.application?.secrets" />
           </template>
         </Card>
 

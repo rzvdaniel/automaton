@@ -8,7 +8,8 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import ActionSchedulingPanel from '../components/ActionSchedulingPanel.vue'
 import AppDeploymentTargets from '../components/AppDeploymentTargets.vue'
-import AppEditorSideNav from '../components/AppEditorSideNav.vue'
+import AppMadeOf from '../components/AppMadeOf.vue'
+import AppMark from '../components/AppMark.vue'
 import AppOperationsOverview from '../components/AppOperationsOverview.vue'
 import AppPublishingView from '../components/AppPublishingView.vue'
 import AppRuntimeOperations from '../components/AppRuntimeOperations.vue'
@@ -16,8 +17,10 @@ import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppSettings from '../components/AppSettings.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import {
-  APP_NAVIGATION_GROUPS,
-  resolveAppView,
+  APP_SUB_VIEWS,
+  APP_TABS,
+  resolveAppViewFromQuery,
+  tabForView,
   withoutAuthoringQuery,
   type AppViewKey,
 } from '../app-navigation'
@@ -28,7 +31,8 @@ import type { AppDeploymentTarget, PublishSettingsRequest } from '../types/apps.
 import type { RuntimeLogConnectionState } from '../types/console.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
-import { getPublishedAppUrl } from '../utils/public-app-url'
+import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
+import { isActionOnlyApp } from '../utils/app-operational-summary'
 import { getPublishingConsistencyIssue } from '../utils/publishing-state'
 import { resolveViewingTarget } from '../utils/viewing-target'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
@@ -43,7 +47,9 @@ const appId = computed(() => String(route.params.id ?? ''))
 const publishingStateLabel = computed(() => editorStore.currentApp && getPublishingConsistencyIssue(editorStore.currentApp)
   ? 'Needs review'
   : editorStore.isPublished ? 'Published' : 'Unpublished')
-const activeView = ref<AppViewKey>(resolveAppView(route.query.view))
+const activeView = ref<AppViewKey>(resolveAppViewFromQuery(route.query))
+const activeTab = computed(() => tabForView(activeView.value))
+const subViews = computed(() => APP_SUB_VIEWS[activeTab.value] ?? [])
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
 const selectedLogTargetId = ref<string | null>(null)
@@ -53,6 +59,30 @@ const runtimeLogSubscriptionFailed = ref(false)
 const targetsRevision = ref(0)
 const showPublishDialog = ref(false)
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
+const publicAppUrl = computed(() => {
+  const app = editorStore.currentApp
+  return app?.isPublished && app.canLaunchPublicly && app.publicUrl ? getPublishedAppUrl(app.publicUrl) : ''
+})
+const openAppUrl = computed(() => {
+  const app = editorStore.currentApp
+  if (!app || isActionOnlyApp(app)) return ''
+  if (publicAppUrl.value) return publicAppUrl.value
+  return getLiveTarget(deploymentTargets.value)?.genericRuntimeDeployed ? getStudioApplicationUrl(app.id) : ''
+})
+const addressText = computed(() => {
+  const app = editorStore.currentApp
+  if (!app || isActionOnlyApp(app)) return 'Runs when started, no web address'
+  const url = publicAppUrl.value || (openAppUrl.value ? getDeployedAppUrl(app.id) : '')
+  return url ? new URL(url).host : 'Not live yet'
+})
+
+function openApp() {
+  if (openAppUrl.value) window.open(openAppUrl.value, '_blank', 'noopener')
+}
+
+function handleMadeOfSelect(key: 'settings' | 'advanced' | 'publishing') {
+  handleNavigation(key === 'advanced' ? 'runtime' : key)
+}
 let unsubscribeBackendRuntimeLogs: (() => void) | null = null
 let unsubscribeBackendRuntimeLogState: (() => void) | null = null
 
@@ -271,62 +301,76 @@ function handleUnpublish() {
       <header class="operations-header">
         <div class="app-identity">
           <Button icon="pi pi-arrow-left" aria-label="Back to apps" text rounded @click="router.push('/apps')" />
-          <div>
+          <AppMark :id="editorStore.currentApp.id" :name="editorStore.currentApp.name" :image-url="editorStore.currentApp.thumbnailUrl" :size="44" />
+          <div class="app-identity-text">
             <h1>{{ editorStore.currentApp.name }}</h1>
+            <p v-if="editorStore.currentApp.summary" class="app-summary">{{ editorStore.currentApp.summary }}</p>
             <div class="header-status">
+              <span class="app-address" data-testid="app-address">{{ addressText }}</span>
               <Tag :value="editorStore.applicationState.label" :severity="editorStore.applicationState.severity" />
-              <Tag :value="publishingStateLabel" :severity="publishingStateLabel === 'Needs review' ? 'warn' : editorStore.isPublished ? 'success' : 'secondary'" />
-              <Tag v-if="editorStore.currentApp.forkedFromAppId" value="Installed from store" severity="info" icon="pi pi-download" />
-              <Tag v-if="editorStore.isPublished && editorStore.currentApp.catalogVisibility !== 'unlisted'" value="Store listing" severity="contrast" icon="pi pi-shop" />
+              <Tag v-if="publishingStateLabel === 'Needs review'" value="Needs review" severity="warn" />
             </div>
           </div>
         </div>
+        <div class="header-actions">
+          <Button label="Share" icon="pi pi-share-alt" severity="secondary" outlined data-testid="share-app" @click="handleNavigation('publishing')" />
+          <Button v-if="openAppUrl" label="Open app" icon="pi pi-external-link" data-testid="open-app" @click="openApp" />
+        </div>
       </header>
 
+      <nav class="app-tabs" role="tablist" aria-label="App page">
+        <button
+          v-for="tab in APP_TABS"
+          :key="tab.key"
+          type="button"
+          role="tab"
+          class="app-tab"
+          :class="{ active: activeTab === tab.key }"
+          :aria-selected="activeTab === tab.key"
+          @click="handleNavigation(tab.view)"
+        >{{ tab.label }}</button>
+      </nav>
+
+      <nav v-if="subViews.length > 0" class="app-sub-tabs" aria-label="Sections">
+        <button
+          v-for="item in subViews"
+          :key="item.key"
+          type="button"
+          class="app-sub-tab"
+          :class="{ active: activeView === item.key }"
+          @click="handleNavigation(item.key)"
+        >{{ item.label }}</button>
+      </nav>
+
       <div class="operations-shell">
-        <AppEditorSideNav
-          :active-item="activeView"
-          :groups="APP_NAVIGATION_GROUPS"
-          @select="handleNavigation"
-        />
-
         <main class="operations-content">
-          <AppOperationsOverview
-            v-if="activeView === 'overview'"
-            :app="editorStore.currentApp"
-            :targets="deploymentTargets"
-            :application-state="editorStore.applicationState"
-            @navigate="handleNavigation"
-          />
+          <div v-if="activeView === 'overview'" class="overview-stack">
+            <AppMadeOf :app="editorStore.currentApp" @select="handleMadeOfSelect" />
+            <AppOperationsOverview
+              :app="editorStore.currentApp"
+              :targets="deploymentTargets"
+              :application-state="editorStore.applicationState"
+              @navigate="handleNavigation"
+            />
+          </div>
 
-          <AppPublishingView
-            v-else-if="activeView === 'publishing'"
-            :app="editorStore.currentApp"
-            :has-live-target="!!getLiveTarget(deploymentTargets)"
-            :operational-state="editorStore.applicationState"
-            @publish="showPublishDialog = true"
-            @unpublish="handleUnpublish"
-            @navigate="activeView = $event"
-          />
+          <template v-else-if="activeView === 'publishing'">
+            <AppPublishingView
+              :app="editorStore.currentApp"
+              :has-live-target="!!getLiveTarget(deploymentTargets)"
+              :operational-state="editorStore.applicationState"
+              @publish="showPublishDialog = true"
+              @unpublish="handleUnpublish"
+              @navigate="handleNavigation"
+            />
+          </template>
 
-          <AppDeploymentTargets
-            v-else-if="activeView === 'deployments'"
-            :app-id="appId"
-            :project-id="editorStore.currentApp.projectId"
-            :refresh-revision="targetsRevision"
-            :show-deploy-action="false"
-            @view-logs="handleViewTargetLogs"
-            @targets-changed="handleTargetsChanged"
-          />
-
-          <AppRuntimeOperations
-            v-else-if="activeView === 'runtime'"
-            :app="editorStore.currentApp"
-            :targets="deploymentTargets"
-            :selected-target="selectedViewingTarget"
-            @select-target="handleSelectViewingTarget"
-            @navigate="handleNavigation"
-            @deployed="refreshTargets"
+          <AppSettings
+            v-else-if="activeView === 'settings'"
+            key="settings-tab"
+            :sections="['basic', 'secrets', 'permissions']"
+            :targets-revision="targetsRevision"
+            class="settings-pane"
           />
 
           <AppRuntimeLogs
@@ -344,18 +388,55 @@ function handleUnpublish() {
             @navigate="handleNavigation"
           />
 
+          <AppDeploymentTargets
+            v-else-if="activeView === 'deployments'"
+            :app-id="appId"
+            :project-id="editorStore.currentApp.projectId"
+            :refresh-revision="targetsRevision"
+            :show-deploy-action="false"
+            class="padded-pane"
+            @view-logs="handleViewTargetLogs"
+            @targets-changed="handleTargetsChanged"
+          />
+
           <ActionSchedulingPanel
             v-else-if="activeView === 'actions'"
             :key="appId"
             :app-id="appId"
           />
 
+          <AppRuntimeOperations
+            v-else-if="activeView === 'runtime'"
+            :app="editorStore.currentApp"
+            :targets="deploymentTargets"
+            :selected-target="selectedViewingTarget"
+            @select-target="handleSelectViewingTarget"
+            @navigate="handleNavigation"
+            @deployed="refreshTargets"
+          />
+
           <AppSettings
-            v-else-if="activeView === 'settings'"
-            :key="activeView"
+            v-else-if="activeView === 'targets'"
+            key="targets-tab"
+            :sections="['targets']"
             :targets-revision="targetsRevision"
+            class="settings-pane"
             @view-target-logs="handleViewTargetLogs"
             @targets-changed="handleTargetsChanged"
+          />
+
+          <div v-else-if="activeView === 'contract'" class="padded-pane">
+            <h2 class="pane-title">Raw contract</h2>
+            <p class="pane-hint">The stack-neutral contract this app deploys with, as the API stores it.</p>
+            <pre class="contract-json" data-testid="raw-contract">{{ JSON.stringify(editorStore.currentApp.application, null, 2) }}</pre>
+          </div>
+
+          <AppSettings
+            v-else-if="activeView === 'more'"
+            key="more-tab"
+            :sections="['appearance', 'templates', 'connect', 'danger']"
+            :targets-revision="targetsRevision"
+            class="settings-pane"
           />
         </main>
       </div>
@@ -431,6 +512,119 @@ function handleUnpublish() {
 
 .operations-content > :deep(*) {
   height: 100%;
+}
+
+.operations-content > .overview-stack,
+.operations-content > .settings-pane,
+.operations-content > .padded-pane {
+  box-sizing: border-box;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.overview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.overview-stack > :deep(.operations-overview) {
+  height: auto;
+  padding: 0;
+  overflow: visible;
+}
+
+.app-identity-text {
+  min-width: 0;
+}
+
+.app-identity .app-identity-text h1 {
+  margin: 0;
+}
+
+.app-summary {
+  margin: 0.1rem 0 0.3rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+}
+
+.app-address {
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.app-tabs,
+.app-sub-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 1rem;
+  overflow-x: auto;
+  background: var(--p-surface-card);
+}
+
+.app-tabs {
+  border-bottom: 1px solid var(--p-surface-border);
+}
+
+.app-sub-tabs {
+  padding-block: 0.6rem;
+  border-bottom: 1px solid var(--p-surface-border);
+}
+
+.app-tab {
+  padding: 0.7rem 1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.app-tab.active {
+  border-bottom-color: var(--p-primary-color);
+  color: var(--p-text-color);
+  font-weight: 600;
+}
+
+.app-sub-tab {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--p-surface-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--p-text-color);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.app-sub-tab.active {
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
+  font-weight: 600;
+}
+
+.pane-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.pane-hint {
+  margin: 0 0 1rem;
+  color: var(--p-text-muted-color);
+}
+
+.contract-json {
+  padding: 1rem;
+  border: 1px solid var(--p-surface-border);
+  border-radius: 0.75rem;
+  background: var(--p-content-background);
+  font-size: 0.8rem;
+  overflow: auto;
 }
 
 .state-container {

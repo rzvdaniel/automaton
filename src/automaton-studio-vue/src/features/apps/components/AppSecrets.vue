@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { isAxiosError } from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
@@ -9,9 +9,11 @@ import Message from 'primevue/message'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import { appsService } from '../services/apps.service'
-import type { AppSecretSummary, SecretAuditEntry } from '../types/apps.types'
+import type { AppSecretSummary, ApplicationSecretDeclaration, SecretAuditEntry } from '../types/apps.types'
 
-const props = defineProps<{ appId: string }>()
+const props = defineProps<{ appId: string; declared?: ApplicationSecretDeclaration[] }>()
+/** Secrets the app declares that have no value yet. */
+const missing = computed(() => (props.declared ?? []).filter((item) => !secrets.value.some((secret) => secret.name === item.name)))
 const confirm = useConfirm()
 const secrets = ref<AppSecretSummary[]>([])
 const name = ref('')
@@ -122,6 +124,15 @@ function message(failure: unknown, fallback: string) {
       next start: redeploy it with <code>automaton deploy</code>. Static sites cannot use secrets, because their files
       are sent to the browser.
     </p>
+    <Message v-if="missing.length > 0" severity="warn" :closable="false" data-testid="missing-secrets">
+      <div class="font-medium">Needed by this app and not set yet</div>
+      <ul class="m-0 mt-2 pl-4">
+        <li v-for="item in missing" :key="item.name">
+          <button type="button" class="p-link font-medium" @click="edit(item.name)"><code>{{ item.name }}</code></button>
+          <span v-if="item.description"> {{ item.description }}</span>
+        </li>
+      </ul>
+    </Message>
     <DataTable :value="secrets" size="small" data-key="name">
       <template #empty>No secrets yet.</template>
       <Column field="name" header="Name" />

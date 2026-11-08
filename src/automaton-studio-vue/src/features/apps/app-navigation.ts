@@ -1,62 +1,86 @@
+import type { LocationQuery, LocationQueryRaw } from 'vue-router'
+
 export const APP_VIEW_KEYS = [
   'overview',
-  'deployments',
-  'runtime',
-  'logs',
-  'actions',
   'publishing',
   'settings',
+  'logs',
+  'deployments',
+  'actions',
+  'runtime',
+  'targets',
+  'contract',
+  'more',
 ] as const
 
 export type AppViewKey = (typeof APP_VIEW_KEYS)[number]
 
-export interface AppNavigationItem {
-  key: AppViewKey
+export type AppTabKey = 'overview' | 'settings' | 'activity' | 'advanced'
+
+export interface AppTab {
+  key: AppTabKey
   label: string
-  icon: string
+  /** The view a click on the tab opens. */
+  view: AppViewKey
 }
 
-export interface AppNavigationGroup {
-  label?: string
-  description?: string
-  items: ReadonlyArray<AppNavigationItem>
+export interface AppSubView {
+  key: AppViewKey
+  label: string
 }
 
 export const DEFAULT_APP_VIEW: AppViewKey = 'overview'
 
-export const APP_NAVIGATION_GROUPS: ReadonlyArray<AppNavigationGroup> = [
-  {
-    label: 'Operate',
-    items: [
-      { key: 'overview', label: 'Overview', icon: 'pi pi-home' },
-      { key: 'deployments', label: 'Deployments', icon: 'pi pi-cloud-upload' },
-      { key: 'runtime', label: 'Runtime', icon: 'pi pi-desktop' },
-      { key: 'logs', label: 'Logs', icon: 'pi pi-list' },
-      { key: 'actions', label: 'Actions', icon: 'pi pi-bolt' },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
-      { key: 'publishing', label: 'Publishing', icon: 'pi pi-globe' },
-      { key: 'settings', label: 'Settings', icon: 'pi pi-cog' },
-    ],
-  },
+/** The four tabs of the app page. */
+export const APP_TABS: ReadonlyArray<AppTab> = [
+  { key: 'overview', label: 'Overview', view: 'overview' },
+  { key: 'settings', label: 'Settings & secrets', view: 'settings' },
+  { key: 'activity', label: 'Activity', view: 'logs' },
+  { key: 'advanced', label: 'Advanced', view: 'runtime' },
 ]
 
+/** Views inside a tab that has more than one. */
+export const APP_SUB_VIEWS: Partial<Record<AppTabKey, ReadonlyArray<AppSubView>>> = {
+  activity: [
+    { key: 'logs', label: 'Logs' },
+    { key: 'deployments', label: 'Deploys' },
+    { key: 'actions', label: 'Schedule runs' },
+  ],
+  advanced: [
+    { key: 'runtime', label: 'Runner' },
+    { key: 'targets', label: 'Deployment targets' },
+    { key: 'contract', label: 'Raw contract' },
+    { key: 'more', label: 'Appearance, restore and delete' },
+  ],
+}
+
+const VIEW_TABS: Record<AppViewKey, AppTabKey> = {
+  overview: 'overview',
+  publishing: 'overview',
+  settings: 'settings',
+  logs: 'activity',
+  deployments: 'activity',
+  actions: 'activity',
+  runtime: 'advanced',
+  targets: 'advanced',
+  contract: 'advanced',
+  more: 'advanced',
+}
+
+export function tabForView(view: AppViewKey): AppTabKey {
+  return VIEW_TABS[view]
+}
+
 export function resolveAppView(value: unknown): AppViewKey {
-  switch (value) {
-    case 'overview':
-    case 'deployments':
-    case 'runtime':
-    case 'logs':
-    case 'actions':
-    case 'publishing':
-    case 'settings':
-      return value
-    default:
-      return DEFAULT_APP_VIEW
-  }
+  return typeof value === 'string' && (APP_VIEW_KEYS as ReadonlyArray<string>).includes(value)
+    ? (value as AppViewKey)
+    : DEFAULT_APP_VIEW
+}
+
+/** Old links used `?view=settings&settings=targets`; that section now lives under Advanced. */
+export function resolveAppViewFromQuery(query: LocationQuery): AppViewKey {
+  const view = resolveAppView(query.view)
+  return view === 'settings' && query.settings === 'targets' ? 'targets' : view
 }
 
 export function withoutAuthoringQuery(query: LocationQuery): LocationQueryRaw {
@@ -68,4 +92,3 @@ export function withoutAuthoringQuery(query: LocationQuery): LocationQueryRaw {
   if (resolveAppView(query.view) === DEFAULT_APP_VIEW) delete result.view
   return result
 }
-import type { LocationQuery, LocationQueryRaw } from 'vue-router'

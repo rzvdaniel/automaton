@@ -1,29 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import {
-  APP_NAVIGATION_GROUPS,
+  APP_SUB_VIEWS,
+  APP_TABS,
   DEFAULT_APP_VIEW,
   resolveAppView,
+  resolveAppViewFromQuery,
+  tabForView,
   withoutAuthoringQuery,
 } from './app-navigation'
 
-describe('app operations navigation', () => {
-  it('opens on Overview and exposes only operational destinations', () => {
+describe('app page navigation', () => {
+  it('opens on Overview and has four tabs', () => {
     expect(DEFAULT_APP_VIEW).toBe('overview')
-    expect(APP_NAVIGATION_GROUPS.map((group) => group.label)).toEqual([
-      'Operate',
-      'Manage',
-    ])
-    expect(APP_NAVIGATION_GROUPS[0]?.items.map((item) => item.label)).toEqual([
-      'Overview',
-      'Deployments',
-      'Runtime',
-      'Logs',
-      'Actions',
-    ])
-    expect(APP_NAVIGATION_GROUPS[1]?.items.map((item) => item.label)).toEqual([
-      'Publishing',
-      'Settings',
-    ])
+    expect(APP_TABS.map((tab) => tab.label)).toEqual(['Overview', 'Settings & secrets', 'Activity', 'Advanced'])
+  })
+
+  it('keeps every earlier destination reachable inside a tab', () => {
+    const views = new Set<string>(APP_TABS.map((tab) => tab.view))
+    for (const subViews of Object.values(APP_SUB_VIEWS)) subViews?.forEach((item) => views.add(item.key))
+    views.add('publishing')
+    for (const key of ['overview', 'deployments', 'runtime', 'logs', 'actions', 'publishing', 'settings']) {
+      expect(views.has(key)).toBe(true)
+    }
+    expect(tabForView('logs')).toBe('activity')
+    expect(tabForView('deployments')).toBe('activity')
+    expect(tabForView('runtime')).toBe('advanced')
+    expect(tabForView('publishing')).toBe('overview')
   })
 
   it('falls back to Overview for removed authoring views and unknown values', () => {
@@ -34,15 +36,10 @@ describe('app operations navigation', () => {
     expect(resolveAppView('unknown')).toBe('overview')
   })
 
-  it('keeps Publishing and Settings as distinct app destinations', () => {
-    const items = APP_NAVIGATION_GROUPS.flatMap((group) => group.items)
-    const publishing = items.find((item) => item.label === 'Publishing')
-    const settings = items.find((item) => item.label === 'Settings')
-
-    expect(publishing?.key).toBe('publishing')
-    expect(settings?.key).toBe('settings')
-    expect(resolveAppView('publishing')).toBe('publishing')
-    expect(resolveAppView('settings')).toBe('settings')
+  it('maps old settings deep links to their new place', () => {
+    expect(resolveAppViewFromQuery({ view: 'settings', settings: 'targets' })).toBe('targets')
+    expect(resolveAppViewFromQuery({ view: 'settings', settings: 'permissions' })).toBe('settings')
+    expect(resolveAppViewFromQuery({ view: 'publishing' })).toBe('publishing')
   })
 
   it('removes prompt and authoring-view deep links without dropping operational context', () => {
