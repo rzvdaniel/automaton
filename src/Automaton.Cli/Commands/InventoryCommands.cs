@@ -54,13 +54,12 @@ internal static class InventoryCommands
     {
         var value = identifier.Trim();
         if (Guid.TryParse(value, out var guid)) return guid.ToString();
-        var matches = apps.Where(item => string.Equals(item.PublicUrl, value, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var matches = apps.Where(item => string.Equals(item.PublicUrl, value, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.Name, value, StringComparison.OrdinalIgnoreCase)).DistinctBy(item => item.Id).ToArray();
         if (matches.Length == 0)
-            matches = apps.Where(item => string.Equals(item.Name, value, StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (matches.Length == 0)
-            throw new InvalidOperationException($"App '{value}' was not found. Use an app ID, exact slug or exact name.");
+            throw new InvalidOperationException($"App '{value}' was not found among your personal apps. Use an app ID, exact slug or exact name; project apps need the app ID.");
         if (matches.Length > 1)
-            throw new InvalidOperationException($"More than one app is named '{value}'. Use the app ID: {string.Join(", ", matches.Select(item => item.Id.ToString()))}.");
+            throw new InvalidOperationException($"More than one app matches '{value}' by name or slug. Use the app ID: {string.Join(", ", matches.Select(item => item.Id.ToString()))}.");
         return matches[0].Id.ToString();
     }
 

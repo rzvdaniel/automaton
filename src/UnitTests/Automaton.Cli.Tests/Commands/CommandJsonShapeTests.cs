@@ -82,6 +82,10 @@ public class CommandJsonShapeTests
         Assert.That(InventoryCommands.ResolveAppId(apps, "demo"), Is.EqualTo(first.Id.ToString()));
         Assert.Throws<InvalidOperationException>(() => InventoryCommands.ResolveAppId(apps, "twin"));
         Assert.Throws<InvalidOperationException>(() => InventoryCommands.ResolveAppId(apps, "missing"));
+        var clash = new Automaton.Cli.Models.AppInventoryItem(Guid.NewGuid(), "billing", false, null, null, null);
+        var slugOwner = new Automaton.Cli.Models.AppInventoryItem(Guid.NewGuid(), "Other", true, "billing", null, null);
+        Assert.Throws<InvalidOperationException>(() => InventoryCommands.ResolveAppId([clash, slugOwner], "billing"));
+        Assert.That(InventoryCommands.ResolveAppId(apps, first.Id.ToString().ToUpperInvariant()), Is.EqualTo(first.Id.ToString()));
     }
 
     [Test]
