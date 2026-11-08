@@ -78,7 +78,7 @@ async function prepareRemoval(runner: Runner) {
       </div>
       <dl class="runner-row__facts">
         <div><dt>OS</dt><dd data-testid="runner-os">{{ runner.operatingSystem || 'Unknown' }}</dd></div>
-        <div><dt>Apps</dt><dd data-testid="runner-apps">{{ runner.appCount ?? 0 }}</dd></div>
+        <div><dt>Apps</dt><dd data-testid="runner-apps">{{ runner.appCount ?? '-' }}</dd></div>
         <div><dt>Version</dt><dd data-testid="runner-version">{{ runner.version || 'Unknown' }}</dd></div>
       </dl>
       <div class="runner-row__actions">
