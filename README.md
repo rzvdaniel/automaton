@@ -36,6 +36,8 @@ The [catalog](https://automaton.monster/catalog) lets you install apps from GitH
    automaton login --server https://api.your-domain.com
    ```
 
+   If you already use the CLI with another server, add `--profile NAME` to `login` (and to later commands) so this server gets its own profile and your existing login is not overwritten.
+
 4. **Add a Runner**, which hosts your apps ([deploy-runner](https://automaton.monster/docs/deploy-runner)). Run on the server with `--local`, or from anywhere with `--ssh user@host`:
 
    ```bash

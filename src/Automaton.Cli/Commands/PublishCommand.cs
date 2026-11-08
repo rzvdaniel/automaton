@@ -91,7 +91,7 @@ public static class PublishCommand
 
         if (!string.IsNullOrWhiteSpace(result.Url))
         {
-            AnsiConsole.MarkupLine(result.CertificatePending ? "[yellow bold]Published, certificate pending.[/]" : "[green bold]Publish complete.[/]");
+            AnsiConsole.MarkupLine(result.CertificatePending ? "[yellow bold]Published, but the HTTPS certificate request failed.[/]" : "[green bold]Publish complete.[/]");
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine($"[bold]Public app:[/] {result.Url}");
             if (result.CertificatePending) AnsiConsole.WriteLine(result.NextSteps[0] + ".");

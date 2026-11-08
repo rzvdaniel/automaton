@@ -221,25 +221,28 @@ public sealed class PublishService
         CancellationToken cancellationToken)
     {
         var publishedUrl = CliAppUrlBuilder.BuildPublishedUrl(context.Server, settings.Slug);
-        var certificatePending = true;
+        string? certificateError = "the check was cancelled";
         try
         {
-            certificatePending = !await PublishedCertificate.WaitAsync(new Uri(publishedUrl), cancellationToken);
+            certificateError = await PublishedCertificate.CheckAsync(new Uri(publishedUrl), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Publication already succeeded. Only the certificate check was cancelled.
         }
+        var certificatePending = certificateError is not null;
         var resultChecks = checks.ToList();
         resultChecks.Add(new CommandDiagnosticCheck(
             CommandDiagnosticCheckNames.Publish, true, $"published at {publishedUrl}"));
         return new PublishResult
         {
             Success = true,
-            Summary = certificatePending ? "Published, certificate pending" : "Publish complete",
+            Summary = certificatePending ? "Published, but the HTTPS certificate request failed" : "Publish complete",
             CertificatePending = certificatePending,
             Checks = resultChecks,
-            NextSteps = certificatePending ? ["Retry opening the public URL in a minute"] : [],
+            NextSteps = certificatePending
+                ? [$"The server could not get a valid certificate for {new Uri(publishedUrl).Host} ({certificateError}). Often Let's Encrypt refused it (weekly limit) or DNS for the host is missing; see \"If HTTPS setup fails\" in the install guide, then rerun the server installer or restart Traefik and publish again"]
+                : [],
             AppId = context.AppId,
             AppName = context.AppConfig.Name,
             Slug = settings.Slug,
