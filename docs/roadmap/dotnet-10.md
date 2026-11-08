@@ -14,5 +14,5 @@ Updated: 3 November 2026. Status: retarget (#493) done: all 22 projects target `
 
 - `Automaton.All.sln` builds with no new analyzer errors; affected tests show no new failures against the current baseline.
 - A server release, a Runner image and a CLI package built on .NET 10 are published.
-- The test server updates to that release with `update.sh`; Runners upgrade with **Runners → Upgrade runner**; a fresh CLI install deploys and publishes an app; a nightly backup and restore still work.
+- The test server updates to that release with `update.sh`; Runners upgrade with **Server → Upgrade**; a fresh CLI install deploys and publishes an app; a nightly backup and restore still work.
 - Production is updated the same way, with public URLs checked before and after.

@@ -55,6 +55,7 @@ describe('studio router', () => {
     ['/apps', 'apps'],
     ['/apps/catalog', 'apps-catalog'],
     ['/runners', 'runners'],
+    ['/server', 'server'],
     ['/settings', 'settings'],
     ['/people', 'people'],
     ['/organizations', 'organizations'],

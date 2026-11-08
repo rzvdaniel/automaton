@@ -6,6 +6,7 @@ import { authRoutes } from '@/features/auth/routes'
 import { appsRoutes } from '@/features/apps/routes'
 import { runnersRoutes } from '@/features/runners/routes'
 import { peopleRoutes } from '@/features/people/routes'
+import { serverRoutes } from '@/features/server/routes'
 import { organizationsRoutes } from '@/features/organizations/routes'
 import { settingsRoutes } from '@/features/settings/routes'
 import { downloadsRoutes } from '@/features/downloads/routes'
@@ -41,6 +42,7 @@ const router = createRouter({
     ...appsRoutes,
     ...runnersRoutes,
     ...peopleRoutes,
+    ...serverRoutes,
     ...organizationsRoutes,
     ...settingsRoutes,
     ...downloadsRoutes,

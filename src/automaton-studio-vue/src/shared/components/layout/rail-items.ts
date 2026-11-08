@@ -20,7 +20,7 @@ const MAIN: RailItem[] = [
   { label: 'Apps', icon: 'pi pi-th-large', to: '/apps', match: (p) => startsWith('/apps')(p) && !startsWith('/apps/catalog')(p) },
   { label: 'Catalog', icon: 'pi pi-download', to: '/apps/catalog', match: startsWith('/apps/catalog'), hideForAppUser: true },
   { label: 'People', icon: 'pi pi-users', to: '/people', match: (p) => startsWith('/people')(p) || startsWith('/organizations')(p) || startsWith('/admin/users')(p) },
-  { label: 'Server', icon: 'pi pi-server', to: '/runners', match: startsWith('/runners'), hideForAppUser: true },
+  { label: 'Server', icon: 'pi pi-server', to: '/server', match: (p) => startsWith('/server')(p) || startsWith('/runners')(p), hideForAppUser: true },
   { label: 'Backups', icon: 'pi pi-database', to: '/admin/installation', match: startsWith('/admin/installation'), sysAdminOnly: true },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings', match: startsWith('/settings') },
 ]

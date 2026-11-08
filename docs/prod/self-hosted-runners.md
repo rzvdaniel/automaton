@@ -24,8 +24,7 @@ installation identifiers, and the selected profile. The command is intended to b
 copied and run on the user's own Linux machine. The enrollment secret is returned
 only in this response and is stored by the API as a hash.
 
-For the supported self-hosted machine flow, open **Runners → Install Self-Hosted
-Runner**, choose **Machine Management**, acknowledge the Docker access warning, and
+For the supported self-hosted machine flow, open **Server → Add a Runner**, choose **Machine Management**, acknowledge the Docker access warning, and
 run the generated command on the customer machine. Prepare an Ubuntu or Debian host with Docker
 Engine installed and running. The generated command checks Linux, Docker and the Docker socket
 availability before pulling the Runner image. ext4 is the tested storage baseline;

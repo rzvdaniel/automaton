@@ -30,6 +30,8 @@ public class RunnerDetails
     public string? ApiCompatibilityVersion { get; set; }
     public string? OperatingSystem { get; set; }
     public string? Architecture { get; set; }
+    /// <summary>Apps whose live environment runs on this Runner.</summary>
+    public int AppCount { get; set; }
     public string? ContainerHealth { get; set; }
     public string Purpose { get; set; } = RunnerPurposes.Managed;
     public string? ApplicationProfile { get; set; }

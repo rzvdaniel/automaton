@@ -5,7 +5,7 @@ order: 20
 
 # Runner Administration
 
-Machine Management is the supported Runner profile. Install it from **Runners → Install Machine Management Runner**, then assign it to the app environment. Each machine runs one management Runner and can host multiple isolated applications.
+Machine Management is the supported Runner profile. Install it from **Server → Add a Runner**, then assign it to the app environment. Each machine runs one management Runner and can host multiple isolated applications.
 
 - [Server installation and setup](./server-installation.md)
 - [Environments, deployment targets, and Runner assignments](./deployment-targets.md)
@@ -44,7 +44,7 @@ A Runner on an old image shows **Update available** on its card, with an **Upgra
 
 ## Remove a Machine Management Runner
 
-The personal owner uses **Runners → Delete runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove it from active projects (deleted projects do not count; a deleted project also stops giving its members access to the Runner, and gets it back if the project is reactivated), and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.
+The personal owner uses **Server → Delete Runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove it from active projects (deleted projects do not count; a deleted project also stops giving its members access to the Runner, and gets it back if the project is reactivated), and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.
 
 With a Developer API key, `automaton runners delete <runner>` performs the same preparation and prints the host uninstall command. After it succeeds, `automaton runners delete <runner> --host-cleanup-confirmed` removes the registration. The key holder must still be the Runner's personal owner; project membership alone does not allow deletion.
 

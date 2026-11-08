@@ -18,7 +18,7 @@
     </Card>
 
     <p class="text-color-secondary">
-      Runners are installed from <RouterLink to="/runners">Runners</RouterLink>. See the
+      Runners are installed from <RouterLink to="/server">Server</RouterLink>. See the
       <a :href="cliDocsUrl" target="_blank" rel="noopener">CLI guide</a> for every command.
     </p>
   </div>
