@@ -14,6 +14,7 @@ import { useAppEditorStore } from '../stores/app-editor.store'
 import type { App, AppDeploymentTarget } from '../types/apps.types'
 import { getDeploymentTargetRunnerOptions, getDeploymentTargetRunnerProjectId } from '../utils/deployment-target-runner'
 import { getLiveTarget } from '../utils/deployment-target-actions'
+import { formatWhen } from '../utils/app-overview'
 
 const props = defineProps<{ app: App; targets: ReadonlyArray<AppDeploymentTarget>; open?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -203,7 +204,7 @@ function askDelete() {
       <strong>{{ action.key }}</strong>
       <p v-if="action.versions.length === 0" class="hint">No versions kept.</p>
       <div v-for="version in action.versions" :key="version.version" class="row">
-        <code>{{ version.version }}</code>
+        <span>{{ formatWhen(version.createdAtUtc) }} <span class="hint">· {{ Math.ceil(version.sizeBytes / 1024) }} KB</span></span>
         <span v-if="version.isCurrent" class="hint">current</span>
         <Button v-else label="Restore" size="small" text @click="restore(action.key, version.version)" />
       </div>
