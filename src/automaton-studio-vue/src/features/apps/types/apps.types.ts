@@ -148,7 +148,7 @@ export interface ApplicationContract {
   /** One-line description of the app, from automaton.json. */
   description?: string | null
   /** Key paths of a web app, each with a label. */
-  pages?: Array<{ path: string; label: string }>
+  pages?: Array<{ path: string; label?: string; method?: string; description?: string }>
   /** Path of an API app's OpenAPI document. */
   openApi?: string | null
 }

@@ -145,7 +145,7 @@ const source = computed(() => {
           :class="{ 'row--link': kind === 'web' && address }"
           v-bind="kind === 'web' && address ? { href: pageUrl(page.path), target: '_blank', rel: 'noopener noreferrer' } : {}"
         >
-          <span><span v-if="page.method" class="mono">{{ page.method }} </span><strong>{{ page.path }}</strong><span v-if="page.description" class="hint"> · {{ page.description }}</span></span>
+          <span><span v-if="page.method" class="mono">{{ page.method }} </span><strong>{{ page.label || page.path }}</strong><span v-if="page.description" class="hint"> · {{ page.description }}</span></span>
           <i v-if="kind === 'web' && address" class="pi pi-chevron-right chevron" aria-hidden="true"></i>
         </component>
         <div v-if="pages.length === 0 && kind === 'site'" class="row"><span><strong>Pages</strong> <span class="hint">· files served as they are</span></span></div>
