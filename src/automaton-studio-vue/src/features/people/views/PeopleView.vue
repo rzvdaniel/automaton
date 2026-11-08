@@ -25,6 +25,8 @@ const isAdmin = computed(() => (auth.user?.roles ?? []).some((role) => role === 
 const loading = ref(true)
 const failed = ref(false)
 const users = ref<AdminUser[] | null>(null)
+const pending = ref<AdminUser[]>([])
+const search = ref('')
 const totalUsers = ref(0)
 const teams = ref<OrganizationListItem[]>([])
 const teamDetails = ref<TeamWithMembers[]>([])
@@ -36,7 +38,6 @@ const isSysAdmin = computed(() => (auth.user?.roles ?? []).includes('SysAdmin'))
 const resending = ref<string | null>(null)
 
 const members = computed(() => memberRows(users.value, teamDetails.value))
-const pending = computed(() => (users.value ?? []).filter(isPendingInvite))
 const adminTeams = computed(() => teams.value.filter((team) => team.role === 'OrgAdmin'))
 const canInvite = computed(() => isAdmin.value || adminTeams.value.length > 0)
 
@@ -45,15 +46,26 @@ async function load() {
   failed.value = false
   try {
     teams.value = await organizationsService.listOrganizations()
-    const [page, details, apps] = await Promise.all([
-      isAdmin.value ? adminUsersService.getUsers({ pageSize: 100 }) : Promise.resolve(null),
-      Promise.all(teams.value.map(async (team) => ({ name: team.name, members: await organizationsService.getMembers(team.id) }))),
-      Promise.all(teams.value.map(async (team) => [team.id, (await organizationsService.getOrganizationApps(team.id)).length] as const)),
+    // One team failing to load must not blank the page: it shows without members and with no app count.
+    const [page, invited, details, apps] = await Promise.all([
+      isAdmin.value ? adminUsersService.getUsers({ search: search.value.trim() || undefined, pageSize: 100 }) : Promise.resolve(null),
+      isAdmin.value
+        ? adminUsersService.getUsers({ registrationProvider: 'invitation', emailConfirmed: false, pageSize: 100 })
+        : Promise.resolve(null),
+      Promise.all(teams.value.map(async (team) => ({
+        name: team.name,
+        members: await organizationsService.getMembers(team.id).catch(() => []),
+      }))),
+      Promise.all(teams.value.map(async (team) => [
+        team.id,
+        await organizationsService.getOrganizationApps(team.id).then((list) => list.length).catch(() => undefined),
+      ] as const)),
     ])
-    users.value = page?.items ?? null
+    users.value = page?.items.filter((user) => !isPendingInvite(user)) ?? null
     totalUsers.value = page?.totalCount ?? 0
+    pending.value = invited?.items.filter(isPendingInvite) ?? []
     teamDetails.value = details
-    sharedApps.value = Object.fromEntries(apps)
+    sharedApps.value = Object.fromEntries(apps.filter((entry): entry is [string, number] => entry[1] !== undefined))
   } catch {
     failed.value = true
   } finally {
@@ -104,6 +116,7 @@ onMounted(load)
     <template v-else>
       <section aria-labelledby="members-title">
         <h2 id="members-title">Members <span class="count">{{ members.length }}</span></h2>
+        <input v-if="isAdmin" v-model="search" class="search" type="search" placeholder="Search by name or email" aria-label="Search people" @keyup.enter="load" />
         <p v-if="!members.length" class="empty">No one yet. Invite the first person.</p>
         <table v-else class="grid">
           <thead>
@@ -121,7 +134,7 @@ onMounted(load)
             </tr>
           </tbody>
         </table>
-        <p v-if="isAdmin && totalUsers > 100" class="muted">Showing the first 100 of {{ totalUsers }} accounts.</p>
+        <p v-if="isAdmin && totalUsers > 100" class="muted">Showing the first 100 of {{ totalUsers }} accounts. Search to narrow the list.</p>
       </section>
 
       <section v-if="isAdmin" aria-labelledby="pending-title">
@@ -187,6 +200,7 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; font-weight: 600; }
 .grid td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--p-content-border-color); vertical-align: middle; }
 .grid .num { text-align: right; white-space: nowrap; }
 .name { font-weight: 500; }
+.search { width: 100%; max-width: 20rem; margin-bottom: 0.6rem; padding: 0.45rem 0.6rem; border: 1px solid var(--p-content-border-color); border-radius: 6px; background: var(--p-content-background); color: inherit; }
 .clickable { cursor: pointer; }
 .clickable:hover { background: var(--p-content-hover-background); }
 @media (max-width: 640px) { .people { padding: 1rem; } }

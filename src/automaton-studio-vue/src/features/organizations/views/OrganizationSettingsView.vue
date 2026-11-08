@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { organizationsService } from '../services/organizationsService'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -16,6 +17,7 @@ import { OrganizationRole } from '../types'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 
 // State
 const organization = ref<OrganizationDto | null>(null)
@@ -55,6 +57,25 @@ onMounted(async () => {
     router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
   }
 })
+
+function confirmDeleteTeam() {
+  const team = organization.value
+  if (!team) return
+  confirm.require({
+    message: `Delete "${team.name}"? The team is deactivated and its members lose the apps shared through it.`,
+    header: 'Delete team',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await organizationsService.deleteOrganization(team.id)
+        router.push({ name: 'people' })
+      } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete the team', life: 3000 })
+      }
+    },
+  })
+}
 
 // Load organization details
 async function loadOrganization() {
@@ -307,6 +328,13 @@ function navigateBack() {
               />
             </div>
           </div>
+        </template>
+      </Card>
+
+      <Card class="mt-3">
+        <template #title>Delete team</template>
+        <template #content>
+          <Button label="Delete team" icon="pi pi-trash" severity="danger" outlined @click="confirmDeleteTeam" />
         </template>
       </Card>
     </div>

@@ -4,7 +4,7 @@ import type { OrganizationMemberDto } from '@/features/organizations/types'
 import { adminRoleLabel, isPendingInvite, memberRows, teamsByUser } from './people'
 
 const user = (over: Partial<AdminUser>): AdminUser => ({
-  id: 'u1', name: 'Ann', email: 'ann@example.test', emailConfirmed: true, isLocked: false, appCount: 2,
+  id: 'u1', name: 'Ann', email: 'ann@example.test', emailConfirmed: true, registrationProvider: 'invitation', isLocked: false, appCount: 2,
   publishedAppCount: 0, privateAppCount: 2, runnerCount: 0, apps: [], roles: ['User'], ...over,
 })
 const member = (userId: string, role: OrganizationMemberDto['role'] = 'AppUser'): OrganizationMemberDto => ({
@@ -17,6 +17,8 @@ describe('people', () => {
     expect(isPendingInvite(user({ emailConfirmed: false }))).toBe(true)
     expect(isPendingInvite(user({ emailConfirmed: false, lastLoginAtUtc: '2026-01-01' }))).toBe(false)
     expect(isPendingInvite(user({}))).toBe(false)
+    expect(isPendingInvite(user({ emailConfirmed: false, isLocked: true }))).toBe(false)
+    expect(isPendingInvite(user({ emailConfirmed: false, registrationProvider: 'email' }))).toBe(false)
   })
 
   it('labels administrators', () => {

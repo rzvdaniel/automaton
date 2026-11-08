@@ -31,6 +31,7 @@ const role = ref<OrganizationRoleType>('AppUser')
 const saving = ref(false)
 const error = ref<string | null>(null)
 const messages = ref<string[]>([])
+const finished = ref(false)
 
 const canSubmit = computed(() =>
   email.value.includes('@') && (props.canInviteAccounts || teamId.value !== null) && !saving.value)
@@ -42,6 +43,7 @@ function reset() {
   role.value = 'AppUser'
   error.value = null
   messages.value = []
+  finished.value = false
 }
 
 watch(visible, (open) => {
@@ -57,7 +59,7 @@ async function submit() {
   saving.value = true
   error.value = null
   messages.value = []
-  const address = email.value.trim()
+  const address = email.value.trim().toLowerCase()
   try {
     if (props.canInviteAccounts) {
       try {
@@ -75,9 +77,12 @@ async function submit() {
       const team = props.teams.find((t) => t.id === teamId.value)
       messages.value.push(`Invited to ${team?.name ?? 'the team'}. They join when they accept.`)
     }
+    finished.value = true
     emit('done')
   } catch (err) {
     error.value = messageOf(err, 'The invitation could not be sent.')
+    // The account may exist already: refresh the lists, and let the team invitation be retried.
+    if (messages.value.length) emit('done')
   } finally {
     saving.value = false
   }
@@ -113,8 +118,8 @@ async function submit() {
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     </div>
     <template #footer>
-      <Button :label="messages.length ? 'Done' : 'Cancel'" text @click="visible = false" />
-      <Button v-if="!messages.length" label="Send invitation" :loading="saving" :disabled="!canSubmit" @click="submit" />
+      <Button :label="finished ? 'Done' : 'Cancel'" text @click="visible = false" />
+      <Button v-if="!finished" label="Send invitation" :loading="saving" :disabled="!canSubmit" @click="submit" />
     </template>
   </Dialog>
 </template>

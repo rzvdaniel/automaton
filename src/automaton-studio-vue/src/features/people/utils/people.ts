@@ -16,9 +16,9 @@ export interface TeamWithMembers {
   members: OrganizationMemberDto[]
 }
 
-/** An invited account that has not set a password yet. */
-export function isPendingInvite(user: Pick<AdminUser, 'emailConfirmed' | 'lastLoginAtUtc'>): boolean {
-  return !user.emailConfirmed && !user.lastLoginAtUtc
+/** An account created by an invitation whose owner has not joined yet (no confirmed email, never signed in). */
+export function isPendingInvite(user: Pick<AdminUser, 'emailConfirmed' | 'lastLoginAtUtc' | 'isLocked' | 'registrationProvider'>): boolean {
+  return user.registrationProvider?.toLowerCase() === 'invitation' && !user.emailConfirmed && !user.lastLoginAtUtc && !user.isLocked
 }
 
 export function adminRoleLabel(roles: string[]): string {
