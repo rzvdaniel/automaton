@@ -56,11 +56,16 @@ describe('studio router', () => {
     ['/apps/catalog', 'apps-catalog'],
     ['/runners', 'runners'],
     ['/settings', 'settings'],
+    ['/people', 'people'],
     ['/organizations', 'organizations'],
     ['/organizations/abc/members', 'organization-members'],
     ['/admin/users', 'admin-users'],
     ['/admin/apps', 'admin-apps'],
   ])('keeps %s', (path, name) => {
     expect(router.resolve(path).name).toBe(name)
+  })
+
+  it.each(['organizations', 'admin-users'])('sends the %s list to the People page', (name) => {
+    expect(router.getRoutes().find((route) => route.name === name)?.redirect).toEqual({ name: 'people' })
   })
 })

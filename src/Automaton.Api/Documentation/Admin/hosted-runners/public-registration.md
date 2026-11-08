@@ -29,7 +29,7 @@ To reopen, set the same property to `true` and apply it through the normal API d
 
 ## Adding users while signup is paused
 
-Administrators add people from **Admin → Users → Add user**:
+Administrators add people from **People → Invite people** (or **Create with password**):
 
 - **Invite by email** creates the account without a password and emails a link to **Set your password** (template `AutomatonUserInvitation`). The link works once and expires after 24 hours; inviting the same address again sends a new link while the account has no password. Setting the password from the link confirms the email address. Configure **Admin → Installation → Outgoing email** first; if sending fails, the account is kept and Studio says so.
 - **Create with password** creates the account with a password the administrator types or generates. A generated password is shown once and never stored in readable form; no email is sent. Use it for test accounts and people without email. **Must choose a new password at first sign-in** is on by default, because the administrator knows this password: after signing in, the user sees only a page to choose their own password, the API refuses every other call with `403` and code `password_change_required` (so the CLI and API keys cannot be used either), and after the change they sign in again with the new password. Turn it off for shared test accounts (`"mustChangePassword": false` in `POST api/admin/users`). The creation and the completed change are recorded under **Admin → Audit Events**.

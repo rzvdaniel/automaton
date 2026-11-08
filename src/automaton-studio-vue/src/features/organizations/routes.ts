@@ -4,7 +4,7 @@ export const organizationsRoutes: RouteRecordRaw[] = [
   {
     path: '/organizations',
     name: 'organizations',
-    component: () => import('./views/OrganizationsListView.vue'),
+    redirect: { name: 'people' },
     meta: { requiresAuth: true },
   },
   {

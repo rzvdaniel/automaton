@@ -37,7 +37,7 @@ per IP, 10 per 15 minutes per account): reuse tokens, and on 429 wait for `Retry
 key with `POST api/ApiKeys`, pass it with `AUTOMATON_SERVER` and `AUTOMATON_API_KEY`, keep it in a file, and delete it
 afterwards.
 
-New accounts are created by the system administrator in **Admin → Users → Add user** or `POST api/admin/users`, with
+New accounts are created by the system administrator in **People → Invite people** (or **Create with password**) or `POST api/admin/users`, with
 `"mustChangePassword": false`; add `"administrator": true` for a plain Admin and store its password in the
 credentials file. On the test server agents act fully as the administrator (approve permissions, add users, change
 settings) and report what they did.

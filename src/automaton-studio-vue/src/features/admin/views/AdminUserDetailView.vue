@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import { useConfirm } from 'primevue/useconfirm'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -13,6 +16,7 @@ import type { AdminUser } from '../types/admin.types'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 const authStore = useAuthStore()
 
 const isLoading = ref(false)
@@ -38,6 +42,8 @@ const hasAccountActions = computed(() => {
   return true
 })
 
+const canHardDelete = computed(() =>
+  isCurrentUserSystemAdministrator.value && !isViewingSelf.value && !isTargetAdministrator.value && !isTargetSystemAdministrator.value)
 const canToggleAccountLock = computed(() => !isViewingSelf.value && !isTargetSystemAdministrator.value)
 const canGrantAdmin = computed(() => !isViewingSelf.value && !isAlreadyAdmin.value && isCurrentUserSystemAdministrator.value && !isTargetSystemAdministrator.value)
 const accountProtectionMessages = computed(() => {
@@ -149,6 +155,70 @@ function verificationSeverity(confirmed: boolean) {
   return confirmed ? 'success' : 'warn'
 }
 
+const actionBusy = ref(false)
+const showDelete = ref(false)
+const deleteInput = ref('')
+
+function failure(error: unknown, fallback: string) {
+  const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message
+  toast.add({ severity: 'error', summary: 'Action Failed', detail: message ?? fallback, life: 4000 })
+}
+
+async function resendConfirmation() {
+  if (!user.value) return
+  actionBusy.value = true
+  try {
+    await adminUsersService.resendConfirmation(user.value.id)
+    toast.add({ severity: 'success', summary: 'Confirmation Sent', detail: `Sent a new verification email to ${user.value.email}.`, life: 4000 })
+  } catch (error) {
+    failure(error, 'Could not resend the verification email.')
+  } finally {
+    actionBusy.value = false
+  }
+}
+
+function confirmToggleLock() {
+  const target = user.value
+  if (!target) return
+  const disable = !target.isLocked
+  confirm.require({
+    message: disable
+      ? `Disable ${target.name}? They will not be able to sign in and existing sessions are revoked. Apps, runners and data stay intact.`
+      : `Enable ${target.name}? They will be able to sign in again.`,
+    header: disable ? 'Disable User' : 'Enable User',
+    icon: disable ? 'pi pi-ban' : 'pi pi-lock-open',
+    acceptLabel: disable ? 'Disable' : 'Enable',
+    rejectLabel: 'Cancel',
+    accept: async () => {
+      actionBusy.value = true
+      try {
+        await (disable ? adminUsersService.disableUser(target.id) : adminUsersService.enableUser(target.id))
+        await loadUser()
+      } catch (error) {
+        failure(error, `Could not ${disable ? 'disable' : 'enable'} ${target.name}.`)
+      } finally {
+        actionBusy.value = false
+      }
+    },
+  })
+}
+
+async function submitDelete() {
+  const target = user.value
+  if (!target || deleteInput.value !== 'DELETE') return
+  actionBusy.value = true
+  try {
+    await adminUsersService.hardDeleteUser(target.id, deleteInput.value)
+    toast.add({ severity: 'success', summary: 'User Permanently Deleted', detail: `${target.name} was permanently removed.`, life: 4000 })
+    showDelete.value = false
+    goBack()
+  } catch (error) {
+    failure(error, `Could not delete ${target.name}.`)
+  } finally {
+    actionBusy.value = false
+  }
+}
+
 function triggerAction(actionLabel: string) {
   const userName = user.value?.name || 'this user'
   toast.add({
@@ -170,7 +240,7 @@ onMounted(() => {
       <div>
         <div class="breadcrumb-row">
           <Button
-            label="Users"
+            label="People"
             link
             class="breadcrumb-link"
             @click="goBack"
@@ -184,7 +254,7 @@ onMounted(() => {
 
       <Button
         icon="pi pi-arrow-left"
-        label="Back to Users"
+        label="Back to People"
         outlined
         @click="goBack"
       />
@@ -301,17 +371,26 @@ onMounted(() => {
                   label="Resend Confirmation"
                   icon="pi pi-envelope"
                   outlined
-                  :disabled="user.emailConfirmed"
+                  :disabled="actionBusy"
                   v-if="!user.emailConfirmed"
-                  @click="triggerAction('Resend confirmation')"
+                  @click="resendConfirmation"
                 />
                 <Button
                   :label="user.isLocked ? 'Unlock Account' : 'Disable Account'"
                   :icon="user.isLocked ? 'pi pi-lock-open' : 'pi pi-ban'"
                   :severity="user.isLocked ? 'success' : 'danger'"
                   outlined
-                  :disabled="!canToggleAccountLock"
-                  @click="triggerAction(user.isLocked ? 'Unlock account' : 'Disable account')"
+                  :disabled="!canToggleAccountLock || actionBusy"
+                  @click="confirmToggleLock"
+                />
+                <Button
+                  v-if="canHardDelete"
+                  label="Delete permanently"
+                  icon="pi pi-trash"
+                  severity="danger"
+                  outlined
+                  :disabled="actionBusy"
+                  @click="deleteInput = ''; showDelete = true"
                 />
                 <Button
                   label="Grant Admin"
@@ -357,6 +436,18 @@ onMounted(() => {
         </div>
       </div>
     </template>
+
+    <Dialog v-model:visible="showDelete" modal header="Delete user permanently" :style="{ width: '30rem' }" :breakpoints="{ '640px': '95vw' }">
+      <p>
+        Permanently delete <strong>{{ user?.name }}</strong>? This removes the account if it owns no Automaton resources.
+        Intended for test or disposable accounts. Type <strong>DELETE</strong> to continue.
+      </p>
+      <InputText v-model="deleteInput" placeholder="Type DELETE" autocomplete="off" class="w-full" @keyup.enter="submitDelete" />
+      <template #footer>
+        <Button label="Cancel" text :disabled="actionBusy" @click="showDelete = false" />
+        <Button label="Delete" icon="pi pi-trash" severity="danger" :loading="actionBusy" :disabled="deleteInput !== 'DELETE'" @click="submitDelete" />
+      </template>
+    </Dialog>
   </div>
 </template>
 

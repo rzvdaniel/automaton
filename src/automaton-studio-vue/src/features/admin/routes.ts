@@ -8,7 +8,6 @@ import AdminLayout from './views/AdminLayout.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminAppActivityView from './views/AdminAppActivityView.vue'
 import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
-import AdminUsersView from './views/AdminUsersView.vue'
 import AdminUserDetailView from './views/AdminUserDetailView.vue'
 import AdminUserAppsView from './views/AdminUserAppsView.vue'
 import AdminAppDetailView from './views/AdminAppDetailView.vue'
@@ -31,15 +30,13 @@ export const adminRoutes: RouteRecordRaw[] = [
       },
       {
         path: '',
-        redirect: '/admin/users',
+        redirect: '/admin/apps',
       },
       {
         path: 'users',
         name: 'admin-users',
-        component: AdminUsersView,
-        meta: {
-          title: 'Users',
-        },
+        // The user list now lives on the People page.
+        redirect: { name: 'people' },
       },
       {
         path: 'users/:userId',
