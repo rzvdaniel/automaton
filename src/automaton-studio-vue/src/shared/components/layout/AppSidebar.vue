@@ -6,7 +6,7 @@ import type { MenuItem } from 'primevue/menuitem'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
-import { railItems, roleLabel, type RailItem } from './rail-items'
+import { DOCS_LINK, railItems, roleLabel, type RailItem } from './rail-items'
 
 const router = useRouter()
 const route = useRoute()
@@ -36,11 +36,10 @@ const visible = computed(() => railItems({ roles: roles.value, appUserOnly: appU
 const userName = computed(() => authStore.userName || authStore.userEmail || 'User')
 const userRole = computed(() => roleLabel(roles.value, appUserOnly.value))
 
-const isActive = (item: RailItem) => !item.external && item.match(route.path)
+const isActive = (item: RailItem) => item.match(route.path)
 
 function go(item: RailItem) {
-  if (item.external) window.open(item.to, '_blank', 'noopener')
-  else void router.push(item.to)
+  void router.push(item.to)
 }
 
 const userMenu = ref<InstanceType<typeof Menu> | null>(null)
@@ -88,21 +87,13 @@ const userMenuItems = computed<MenuItem[]>(() => [
             <i :class="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
           </a>
-          <div v-if="visible.more.length" class="rail-group">More</div>
-          <a
-            v-for="item in visible.more"
-            :key="item.to"
-            :href="item.to"
-            class="rail-item rail-item-quiet"
-            :class="{ active: isActive(item) }"
-            :aria-current="isActive(item) ? 'page' : undefined"
-            @click.prevent="go(item)"
-          >
-            <i :class="item.icon" aria-hidden="true"></i>
-            <span>{{ item.label }}</span>
-          </a>
         </template>
       </nav>
+
+      <a :href="DOCS_LINK.href" class="rail-docs" target="_blank" rel="noopener">
+        <i :class="DOCS_LINK.icon" aria-hidden="true"></i>
+        <span>{{ DOCS_LINK.label }}</span>
+      </a>
 
       <button
         type="button"
@@ -206,16 +197,18 @@ const userMenuItems = computed<MenuItem[]>(() => [
   text-align: center;
 }
 
-.rail-item-quiet {
-  font-size: 0.9rem;
+.rail-docs {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--rail-ink-soft);
+  text-decoration: none;
 }
 
-.rail-group {
-  margin: 1rem 0.7rem 0.25rem;
-  font: 500 0.7rem var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rail-ink-soft);
+.rail-docs:hover {
+  color: var(--rail-ink);
 }
 
 .rail-user {
@@ -295,7 +288,7 @@ const userMenuItems = computed<MenuItem[]>(() => [
     white-space: nowrap;
   }
 
-  .rail-group {
+  .rail-docs {
     display: none;
   }
 }

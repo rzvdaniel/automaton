@@ -25,8 +25,8 @@ export const adminRoutes: RouteRecordRaw[] = [
       {
         path: 'installation',
         name: 'admin-installation',
-        component: () => import('@/features/install/views/InstallationStatusView.vue'),
-        meta: { title: 'Installation', requiresRole: ['SysAdmin'] },
+        // Configuration status and outgoing email now live in Settings.
+        redirect: { path: '/settings', hash: '#server' },
       },
       {
         path: 'backups',

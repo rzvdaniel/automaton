@@ -69,4 +69,10 @@ describe('studio router', () => {
   it.each(['organizations', 'admin-users'])('sends the %s list to the People page', (name) => {
     expect(router.getRoutes().find((route) => route.name === name)?.redirect).toEqual({ name: 'people' })
   })
+
+  it.each(['apikeys', 'downloads', 'admin-installation'])('sends the old %s page to Settings', (name) => {
+    const redirect = router.getRoutes().find((route) => route.name === name)?.redirect as { path: string; hash: string }
+    expect(redirect.path).toBe('/settings')
+    expect(['#agents', '#server']).toContain(redirect.hash)
+  })
 })

@@ -114,7 +114,7 @@ function formatDate(value?: string) {
         <Button label="Approve" class="auth-signal" :loading="approving || loadingDetails" :disabled="loadingDetails || !details" @click="approve" />
       </div>
       <p class="auth-note">
-        Remove this access later under <router-link to="/apikeys" class="auth-link auth-link--inline">API Keys</router-link>.
+        Remove this access later under <router-link to="/settings#agents" class="auth-link auth-link--inline">API Keys</router-link>.
       </p>
     </template>
     <Button v-else label="Return to Studio" class="auth-outline" @click="returnToDashboard" />

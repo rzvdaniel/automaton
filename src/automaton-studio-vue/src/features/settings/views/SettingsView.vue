@@ -15,6 +15,10 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
+import ApiKeysSection from '../components/ApiKeysSection.vue'
+import CliSteps from '../components/CliSteps.vue'
+import SetupChecks from '@/features/install/components/SetupChecks.vue'
+import SmtpSettingsForm from '@/features/install/components/SmtpSettingsForm.vue'
 const {
   theme: themePreference,
   fontSize,
@@ -26,7 +30,7 @@ const {
 const authStore = useAuthStore()
 const toast = useToast()
 
-const activeSection = ref('account')
+const isSysAdmin = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 
 // Account settings - use actual user data
 const displayName = ref('')
@@ -285,53 +289,20 @@ const passwordLoading = computed(() => passwordSaving.value)
 
 <template>
   <div class="settings-view">
-    <!-- Page Header -->
-    <div class="mb-5">
+    <div class="mb-4">
       <h1 class="text-3xl font-bold m-0">Settings</h1>
-      <p class="text-color-secondary mt-1 mb-0">Manage your account and preferences</p>
+      <p class="text-color-secondary mt-1 mb-0">Your account, your agents and keys<template v-if="isSysAdmin">, and this server</template></p>
     </div>
 
-    <div class="grid">
-      <!-- Sidebar -->
-      <div class="col-12 lg:col-3">
-        <Card>
-          <template #content>
-            <div class="flex flex-column gap-1">
-              <div class="text-color-secondary text-sm font-semibold mb-2 px-3">Profile</div>
-              <Button
-                label="Account"
-                icon="pi pi-user"
-                text
-                :class="{ 'surface-hover': activeSection === 'account' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'account'"
-              />
-              <div class="text-color-secondary text-sm font-semibold mb-2 mt-4 px-3">Preferences</div>
-              <Button
-                label="Appearance"
-                icon="pi pi-palette"
-                text
-                :class="{ 'surface-hover': activeSection === 'appearance' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'appearance'"
-              />
-              <Button
-                label="Notifications"
-                icon="pi pi-bell"
-                text
-                :class="{ 'surface-hover': activeSection === 'notifications' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'notifications'"
-              />
-            </div>
-          </template>
-        </Card>
-      </div>
+    <nav class="section-links text-sm mb-4" aria-label="Sections">
+      <a href="#account">Account</a>
+      <a href="#agents">Agents and keys</a>
+      <a v-if="isSysAdmin" href="#server">Server settings</a>
+    </nav>
 
-      <!-- Content -->
-      <div class="col-12 lg:col-9">
+    <div class="flex flex-column gap-4">
         <!-- Account Section -->
-        <Card v-if="activeSection === 'account'">
+        <Card id="account">
           <template #title>Account Settings</template>
           <template #content>
             <div class="flex flex-column gap-4">
@@ -430,7 +401,7 @@ const passwordLoading = computed(() => passwordSaving.value)
           </template>
         </Card>
         <!-- Appearance Section -->
-        <Card v-if="activeSection === 'appearance'">
+        <Card>
           <template #title>Appearance</template>
           <template #content>
             <div class="flex flex-column gap-5">
@@ -499,38 +470,29 @@ const passwordLoading = computed(() => passwordSaving.value)
           </template>
         </Card>
 
-        <!-- Notifications Section -->
-        <Card v-if="activeSection === 'notifications'">
-          <template #title>Notification Preferences</template>
-          <template #content>
-            <div class="flex flex-column gap-4">
-              <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
-                <div>
-                  <div class="font-medium">Email Notifications</div>
-                  <div class="text-color-secondary text-sm">Receive emails for flow failures</div>
-                </div>
-                <Button label="Configure" outlined size="small" />
-              </div>
 
-              <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
-                <div>
-                  <div class="font-medium">Slack Notifications</div>
-                  <div class="text-color-secondary text-sm">Send notifications to Slack channel</div>
-                </div>
-                <Button label="Connect" outlined size="small" />
-              </div>
+        <section id="agents" class="flex flex-column gap-3" data-testid="agents-section">
+          <div>
+            <h2 class="text-xl font-semibold m-0">Agents and keys</h2>
+            <p class="text-color-secondary text-sm mt-1 mb-0">
+              AI agents and the CLI sign in with an approved login or an API key. Revoke either here.
+            </p>
+          </div>
+          <CliSteps />
+          <ApiKeysSection />
+        </section>
 
-              <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
-                <div>
-                  <div class="font-medium">Webhook Notifications</div>
-                  <div class="text-color-secondary text-sm">POST to custom endpoint</div>
-                </div>
-                <Button label="Configure" outlined size="small" />
-              </div>
-            </div>
-          </template>
-        </Card>
-      </div>
+        <section v-if="isSysAdmin" id="server" class="flex flex-column gap-3" data-testid="server-settings">
+          <div>
+            <h2 class="text-xl font-semibold m-0">Server settings</h2>
+            <p class="text-color-secondary text-sm mt-1 mb-0">
+              Configuration checks and outgoing email. Updates and Runners are on
+              <RouterLink to="/server">Server</RouterLink>.
+            </p>
+          </div>
+          <Card><template #title>Configuration status</template><template #content><SetupChecks /></template></Card>
+          <Card><template #title>Outgoing email</template><template #content><SmtpSettingsForm /></template></Card>
+        </section>
     </div>
 
     <!-- Change Password Dialog -->
@@ -637,7 +599,12 @@ const passwordLoading = computed(() => passwordSaving.value)
 
 <style scoped>
 .settings-view {
-  max-width: 1400px;
+  max-width: 900px;
   margin: 0 auto;
+}
+
+.section-links {
+  display: flex;
+  gap: 1rem;
 }
 </style>

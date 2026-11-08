@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { isAxiosError } from 'axios'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import SelfHostedRunnerInstallDialog from '@/features/runners/components/SelfHostedRunnerInstallDialog.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { isVisibleApplicationRunner } from '@/features/runners/utils/runner-classification'
@@ -14,6 +15,15 @@ import { serverHealthService } from '../services/server-health.service'
 import type { ServerHealth } from '../types/server.types'
 
 const refreshMilliseconds = 15000
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => ['Admin', 'SysAdmin'].some((role) => authStore.user?.roles?.includes(role)))
+const adminLinks = [
+  { label: 'All apps', to: '/admin/apps' },
+  { label: 'App activity', to: '/admin/app-activity' },
+  { label: 'File exclusions', to: '/admin/app-deploy-rules' },
+  { label: 'Audit events', to: '/admin/logs' },
+]
 
 const loading = ref(true)
 const runners = ref<Runner[]>([])
@@ -101,6 +111,16 @@ onBeforeUnmount(() => clearInterval(timer))
         No Runners yet. A Runner is the machine that runs your apps; add one to deploy.
       </div>
       <RunnersList v-else :runners="visibleRunners" @changed="loadRunners" />
+    </section>
+
+    <section v-if="isAdmin" class="mt-5" data-testid="admin-links">
+      <h2 class="text-xl font-semibold m-0 mb-2">Administration</h2>
+      <p class="text-sm m-0">
+        <template v-for="(link, i) in adminLinks" :key="link.to">
+          <span v-if="i" class="text-color-secondary"> · </span>
+          <RouterLink :to="link.to">{{ link.label }}</RouterLink>
+        </template>
+      </p>
     </section>
 
     <SelfHostedRunnerInstallDialog v-model:visible="showInstall" @created="loadRunners" />

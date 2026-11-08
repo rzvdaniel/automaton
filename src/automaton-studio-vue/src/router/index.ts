@@ -9,7 +9,6 @@ import { peopleRoutes } from '@/features/people/routes'
 import { serverRoutes } from '@/features/server/routes'
 import { organizationsRoutes } from '@/features/organizations/routes'
 import { settingsRoutes } from '@/features/settings/routes'
-import { downloadsRoutes } from '@/features/downloads/routes'
 import { installRoutes } from '@/features/install/routes'
 import { adminRoutes } from '@/features/admin/routes'
 
@@ -45,7 +44,6 @@ const router = createRouter({
     ...serverRoutes,
     ...organizationsRoutes,
     ...settingsRoutes,
-    ...downloadsRoutes,
     ...adminRoutes,
 
     // Unknown paths, including removed pages, show the not-found page

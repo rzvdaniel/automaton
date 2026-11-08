@@ -2,20 +2,17 @@ export interface RailItem {
   label: string
   icon: string
   to: string
-  external?: boolean
   /** True when the current path belongs to this item. */
   match: (path: string) => boolean
   /** Hidden from people whose only role is AppUser in every organization. */
   hideForAppUser?: boolean
   /** Only for system administrators. */
   sysAdminOnly?: boolean
-  /** Only for administrators (Admin or SysAdmin). */
-  adminOnly?: boolean
 }
 
 const startsWith = (prefix: string) => (path: string) => path === prefix || path.startsWith(`${prefix}/`)
 
-// The six places of Studio. Server points at the page that exists today until its redesign.
+// The six places of Studio.
 const MAIN: RailItem[] = [
   { label: 'Apps', icon: 'pi pi-th-large', to: '/apps', match: (p) => startsWith('/apps')(p) && !startsWith('/apps/catalog')(p) },
   { label: 'Catalog', icon: 'pi pi-download', to: '/apps/catalog', match: startsWith('/apps/catalog'), hideForAppUser: true },
@@ -25,20 +22,14 @@ const MAIN: RailItem[] = [
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings', match: startsWith('/settings') },
 ]
 
-// Pages not yet moved into the six places stay reachable from here.
-const MORE: RailItem[] = [
-  { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', match: startsWith('/apikeys'), hideForAppUser: true },
-  { label: 'CLI', icon: 'pi pi-code', to: '/downloads', match: startsWith('/downloads'), hideForAppUser: true },
-  { label: 'Admin', icon: 'pi pi-shield', to: '/admin', match: (p) => startsWith('/admin')(p) && !startsWith('/admin/installation')(p) && !startsWith('/admin/backups')(p), adminOnly: true },
-  { label: 'Documentation', icon: 'pi pi-book', to: 'https://automaton.monster/docs', external: true, match: () => false },
-]
+// Small link at the bottom of the rail, not a place of its own.
+export const DOCS_LINK = { label: 'Documentation', icon: 'pi pi-book', href: 'https://automaton.monster/docs' }
 
-export function railItems(who: { roles: string[]; appUserOnly: boolean }): { main: RailItem[]; more: RailItem[] } {
+export function railItems(who: { roles: string[]; appUserOnly: boolean }): { main: RailItem[] } {
   const sysAdmin = who.roles.includes('SysAdmin')
-  const admin = sysAdmin || who.roles.includes('Admin')
   const allowed = (item: RailItem) =>
-    !(item.hideForAppUser && who.appUserOnly) && !(item.sysAdminOnly && !sysAdmin) && !(item.adminOnly && !admin)
-  return { main: MAIN.filter(allowed), more: MORE.filter(allowed) }
+    !(item.hideForAppUser && who.appUserOnly) && !(item.sysAdminOnly && !sysAdmin)
+  return { main: MAIN.filter(allowed) }
 }
 
 export function roleLabel(roles: string[], appUserOnly: boolean): string {
