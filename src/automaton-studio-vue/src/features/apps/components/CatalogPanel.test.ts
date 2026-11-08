@@ -126,7 +126,18 @@ describe('CatalogPanel', () => {
     getCatalog.mockResolvedValue(big())
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.find('[aria-label="Catalog"] .pi-lock').exists()).toBe(true)
+    const buttons = wrapper.findAll('[aria-label="Catalog"] button')
+    expect(buttons.find((b) => b.text().includes('Acme'))!.find('.pi-lock').exists()).toBe(true)
+    expect(buttons.find((b) => b.text().includes('Official'))!.find('.pi-lock').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('does not read the admin sources for a plain user and hides the Source link of a custom source', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, customSource: true, sourceName: 'Acme store' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(getCatalogSources).not.toHaveBeenCalled()
+    expect(wrapper.find('a[aria-label="Source of Off-site Backup"]').exists()).toBe(false)
     wrapper.unmount()
   })
 

@@ -56,7 +56,9 @@ async function loadPrivate() {
   } catch { privateSources.value = new Set() }
 }
 const sourceUrl = (app: CatalogEntry) => `https://github.com/${app.repo}/tree/${app.commit}${app.folder ? `/${app.folder}` : ''}`
-function onSourcesChanged() { load(); loadPrivate() }
+/** GitHub 404s for people without access, so a custom source's link shows only when an administrator knows it is public. */
+const showSourceLink = (app: CatalogEntry) => !app.customSource || (isSystemAdministrator.value && !privateSources.value.has(app.sourceId))
+function reload() { load(); loadPrivate() }
 
 /** The address keeps the view, so a filtered page can be bookmarked or shared. */
 function show(patch: Record<string, string | number | boolean | undefined>) {
@@ -98,7 +100,7 @@ async function load(refresh = false) {
   }
 }
 
-onMounted(() => { load(); loadPrivate() })
+onMounted(reload)
 watch(query, () => load())
 watch(() => route.query.q, (q) => { search.value = one(q) })
 onBeforeUnmount(() => clearTimeout(searchTimer))
@@ -204,7 +206,7 @@ async function installFromUrl() {
             <RouterLink v-if="app.installedAppId" :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="p-button p-component p-button-outlined catalog-button">
               Manage
             </RouterLink>
-            <a :href="sourceUrl(app)" target="_blank" rel="noopener" class="catalog-source-link" :aria-label="`Source of ${app.name}`">Source</a>
+            <a v-if="showSourceLink(app)" :href="sourceUrl(app)" target="_blank" rel="noopener" class="catalog-source-link" :aria-label="`Source of ${app.name}`">Source</a>
             <small v-if="app.requiresNewerServer" class="text-color-secondary">Needs Automaton Server {{ app.minServerVersion }} or newer</small>
             <RouterLink
               v-else
@@ -233,7 +235,7 @@ async function installFromUrl() {
     </template>
 
     <Drawer v-if="isSystemAdministrator" v-model:visible="showSources" position="right" header="Add a catalog" :style="{ width: '32rem', maxWidth: '100vw' }">
-      <CatalogSources @changed="onSourcesChanged" />
+      <CatalogSources @changed="reload" />
     </Drawer>
 
     <Dialog v-if="isSystemAdministrator" v-model:visible="showGit" modal header="Install from a Git address" :style="{ width: '32rem', maxWidth: '100vw' }" @hide="gitError = null; gitUrl = ''">
