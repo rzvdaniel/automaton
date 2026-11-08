@@ -15,12 +15,6 @@ const pageTitle = computed(() => pageTitleForRoute(route.name as string | undefi
   <header class="app-toolbar">
     <span class="toolbar-title">{{ pageTitle }}</span>
     <div class="toolbar-end">
-      <span
-        v-tooltip.bottom="'Developer Preview\nAPIs and features may change as the platform evolves.'"
-        class="preview-tag"
-      >
-        Preview
-      </span>
       <Button
         :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'"
         severity="secondary"
@@ -53,15 +47,6 @@ const pageTitle = computed(() => pageTitleForRoute(route.name as string | undefi
   gap: 0.5rem;
 }
 
-.preview-tag {
-  padding: 0.15rem 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--signal-ink);
-  font: 500 0.72rem var(--mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 
 @media (max-width: 1023px) {
   .app-toolbar {

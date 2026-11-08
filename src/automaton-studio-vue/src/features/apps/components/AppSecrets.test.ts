@@ -11,7 +11,7 @@ vi.mock('../services/apps.service', () => ({
 }))
 
 const mountSecrets = () => mount(AppSecrets, {
-  props: { appId: 'app-1' },
+  props: { appId: 'app-1', declared: [{ name: 'S3_BUCKET' }] },
   global: { plugins: [PrimeVue, ConfirmationService] },
 })
 

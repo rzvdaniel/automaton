@@ -45,7 +45,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="card" aria-labelledby="permissions-title">
+  <section v-if="state && state.permissions.length > 0" class="card" aria-labelledby="permissions-title">
     <h2 id="permissions-title">Permissions</h2>
     <p v-if="failed" class="hint">Could not load the app's permissions.</p>
     <p v-else-if="loading && !state" class="hint">Loading…</p>

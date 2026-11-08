@@ -2,8 +2,8 @@ import type { AppListItem } from '../types/apps.types'
 
 export type AppFilter = 'all' | 'web' | 'actions' | 'stopped'
 export type AppKind = 'Web app' | 'Website' | 'Action'
-export type AppAccess = 'private' | 'public' | 'action'
-export type AppStateTone = 'live' | 'ok' | 'stopped'
+
+export type AppStateTone = 'live' | 'ok' | 'stopped' | 'failing'
 
 export interface AppState {
   label: string
@@ -38,11 +38,6 @@ export function appKind(app: AppListItem): AppKind {
   return app.liveEnvironment?.isStaticHosting ? 'Website' : 'Web app'
 }
 
-/** The list data has no per-app visibility or team flag, so access is public when it can launch publicly. */
-export function appAccess(app: AppListItem): AppAccess {
-  if (app.actionsOnly) return 'action'
-  return app.canLaunchPublicly ? 'public' : 'private'
-}
 
 export function appDescription(app: AppListItem): string {
   const text = (app.summary || app.description || '').trim()
@@ -62,8 +57,10 @@ export function appState(app: AppListItem): AppState {
     const run = app.lastActionRun
     if (!run) return { label: 'no runs yet', tone: 'stopped' }
     const ok = run.status === 'Succeeded'
-    return { label: `${ok ? 'ran' : run.status.toLowerCase()} ${formatShortTime(run.createdAtUtc)}`, tone: ok ? 'ok' : 'stopped' }
+    const failed = ['Failed', 'TimedOut', 'Lost', 'RunnerUnavailable'].includes(run.status)
+    return { label: failed ? 'failing' : `${ok ? 'ran' : run.status.toLowerCase()} ${formatShortTime(run.createdAtUtc)}`, tone: ok ? 'ok' : failed ? 'failing' : 'stopped' }
   }
+  if (app.liveEnvironment?.status === 'Failed') return { label: 'failing', tone: 'failing' }
   return isStopped(app) ? { label: 'stopped', tone: 'stopped' } : { label: 'live', tone: 'live' }
 }
 

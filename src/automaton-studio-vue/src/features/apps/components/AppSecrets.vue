@@ -17,6 +17,7 @@ const secrets = ref<AppSecretSummary[]>([])
 const name = ref('')
 const value = ref('')
 const saving = ref(false)
+const loaded = ref(false)
 const error = ref<string | null>(null)
 const namePattern = /^[A-Z_][A-Z0-9_]{0,99}$/
 
@@ -30,6 +31,7 @@ async function load() {
   error.value = null
   try {
     secrets.value = await appsService.listSecrets(props.appId)
+    loaded.value = true
   } catch (failure) {
     error.value = message(failure, 'Secrets could not be loaded.')
   }
@@ -89,7 +91,7 @@ function message(failure: unknown, fallback: string) {
 </script>
 
 <template>
-  <section class="card" aria-labelledby="secrets-title">
+  <section v-if="loaded && (secrets.length > 0 || (declared?.length ?? 0) > 0)" class="card" aria-labelledby="secrets-title">
     <div class="card-head">
       <h2 id="secrets-title">Secrets</h2>
       <span class="hint">Encrypted and never shown again. Used from the next start.</span>

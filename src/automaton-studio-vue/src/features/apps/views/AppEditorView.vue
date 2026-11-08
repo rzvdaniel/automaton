@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -269,8 +269,8 @@ async function handleSharingChanged() {
 
     <template v-else-if="app">
       <main class="page">
+        <nav class="crumb" aria-label="Breadcrumb"><RouterLink to="/apps">Apps</RouterLink> / {{ app.name }}</nav>
         <header class="head">
-          <Button icon="pi pi-arrow-left" aria-label="Back to apps" text rounded @click="router.push('/apps')" />
           <AppMark :id="app.id" :name="app.name" :image-url="app.thumbnailUrl" :size="52" />
           <div class="head-text">
             <div class="title-line">
@@ -280,7 +280,7 @@ async function handleSharingChanged() {
             <p v-if="app.summary" class="summary">{{ app.summary }}</p>
           </div>
           <div class="head-actions">
-            <Button label="Share" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
+            <Button v-if="kind !== 'tool'" label="Share" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
             <template v-if="kind === 'tool'">
               <Button
                 label="Run now"
@@ -374,6 +374,9 @@ async function handleSharingChanged() {
   padding: 28px clamp(16px, 4vw, 48px) 48px;
   box-sizing: border-box;
 }
+
+.crumb { color: var(--ink-soft); font-size: 13px; }
+.crumb a { color: inherit; text-decoration: none; }
 
 .head {
   display: flex;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AppListItem } from '../types/apps.types'
-import { appAccess, appDescription, appKind, appState, formatShortTime, markColors, markInitial, markPalette, matchesFilter, matchesSearch } from './app-list-display'
+import { appDescription, appKind, appState, formatShortTime, markColors, markInitial, markPalette, matchesFilter, matchesSearch } from './app-list-display'
 
 const app = (over: Partial<AppListItem> = {}): AppListItem => ({
   id: 'a1', name: 'Notes', summary: '', description: '', tags: [], isPublished: false, updatedAtUtc: '2026-01-01T00:00:00Z',
@@ -31,12 +31,6 @@ describe('app list display', () => {
     expect(appDescription(app())).toBe('Web app')
   })
 
-  it('derives access from public launch and actions', () => {
-    expect(appAccess(app())).toBe('private')
-    expect(appAccess(app({ canLaunchPublicly: true }))).toBe('public')
-    expect(appAccess(app({ actionsOnly: true }))).toBe('action')
-  })
-
   it('derives state: live, stopped, and the last run for actions', () => {
     expect(appState(app()).label).toBe('live')
     expect(appState(app({ liveEnvironment: { ...app().liveEnvironment!, runnerOnline: false } })).tone).toBe('stopped')
@@ -44,7 +38,8 @@ describe('app list display', () => {
     expect(appState(app({ actionsOnly: true })).label).toBe('no runs yet')
     const run = { moduleKey: 'm', status: 'Succeeded', createdAtUtc: new Date(Date.now() - 3 * 3600_000).toISOString() }
     expect(appState(app({ actionsOnly: true, lastActionRun: run }))).toEqual({ label: 'ran 3h ago', tone: 'ok' })
-    expect(appState(app({ actionsOnly: true, lastActionRun: { ...run, status: 'Failed' } }))).toEqual({ label: 'failed 3h ago', tone: 'stopped' })
+    expect(appState(app({ actionsOnly: true, lastActionRun: { ...run, status: 'Failed' } }))).toEqual({ label: 'failing', tone: 'failing' })
+    expect(appState(app({ liveEnvironment: { ...app().liveEnvironment!, status: 'Failed' } }))).toEqual({ label: 'failing', tone: 'failing' })
   })
 
   it('filters by kind and stopped state', () => {
