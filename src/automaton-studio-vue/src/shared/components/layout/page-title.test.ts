@@ -4,7 +4,7 @@ import { pageTitleForRoute } from './page-title'
 describe('pageTitleForRoute', () => {
   it('uses the mapped title', () => {
     expect(pageTitleForRoute('cli-authorize')).toBe('Authorize CLI')
-    expect(pageTitleForRoute('apikeys')).toBe('API Keys')
+    expect(pageTitleForRoute('apikeys')).toBe('Settings')
   })
 
   it('turns unmapped route names into title-case words', () => {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
@@ -36,7 +37,7 @@ const runner = (overrides = {}) => ({
 
 const mountView = () => mount(ServerView, {
   attachTo: document.body,
-  global: { plugins: [PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} } },
+  global: { plugins: [createPinia(), PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} } },
 })
 
 describe('ServerView', () => {

@@ -37,12 +37,6 @@ async function refreshWaiting() {
 
 const navItems: AdminNavItem[] = [
   {
-    label: 'Installation',
-    icon: 'pi pi-check-circle',
-    to: '/admin/installation',
-    routePrefix: '/admin/installation',
-  },
-  {
     label: 'Apps',
     icon: 'pi pi-th-large',
     to: '/admin/apps',
@@ -69,7 +63,7 @@ const navItems: AdminNavItem[] = [
   },
 ]
 
-const visibleNavItems = computed(() => navItems.filter(item => item.to !== '/admin/installation' || isSystemAdministrator.value))
+const visibleNavItems = navItems
 
 const isActive = (item: AdminNavItem) => {
   return route.path.startsWith(item.routePrefix)

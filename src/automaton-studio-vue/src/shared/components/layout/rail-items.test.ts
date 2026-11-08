@@ -4,22 +4,19 @@ import { railItems, roleLabel } from './rail-items'
 const labels = (items: { label: string }[]) => items.map((item) => item.label)
 
 describe('railItems', () => {
-  it('shows the six places to a system administrator, plus Admin under More', () => {
-    const { main, more } = railItems({ roles: ['SysAdmin'], appUserOnly: false })
+  it('shows exactly the six places to a system administrator', () => {
+    const { main } = railItems({ roles: ['SysAdmin'], appUserOnly: false })
     expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Backups', 'Settings'])
-    expect(labels(more)).toContain('Admin')
   })
 
-  it('hides Backups and Admin from members', () => {
-    const { main, more } = railItems({ roles: ['User'], appUserOnly: false })
+  it('hides Backups from members', () => {
+    const { main } = railItems({ roles: ['User'], appUserOnly: false })
     expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Settings'])
-    expect(labels(more)).not.toContain('Admin')
   })
 
   it('leaves app-only members with Apps, People and Settings', () => {
-    const { main, more } = railItems({ roles: ['User'], appUserOnly: true })
+    const { main } = railItems({ roles: ['User'], appUserOnly: true })
     expect(labels(main)).toEqual(['Apps', 'People', 'Settings'])
-    expect(labels(more)).toEqual(['Documentation'])
   })
 
   it('points each place at the page that exists today', () => {
