@@ -111,20 +111,24 @@ check_port_53() {
 switch_backup=''
 files_touched=(traefik.yml installation.json appsettings.Production.json dynamic secrets/cloudflare-token)
 backup_switch() {
-    switch_backup=$(mktemp -d); chmod 0700 "$switch_backup"
+    switch_backup=$(mktemp -d); chmod 0700 "$switch_backup"; trap 'rm -rf "$switch_backup"' EXIT
+    responder_was_running=false
+    ! "${compose[@]}" ps --services --status running 2>/dev/null | grep -qx acme-responder || responder_was_running=true
     (cd "$config_dir" && cp -a --parents "${files_touched[@]}" "$switch_backup/") && cp -a "$install_dir/.env" "$switch_backup/dotenv"
 }
 rollback_switch() {
     echo 'The switch failed; restoring the previous TLS configuration.' >&2
     [[ -n "$switch_backup" ]] || exit 1
     cp -a "$switch_backup"/. "$config_dir"/ 2>/dev/null; mv "$config_dir/dotenv" "$install_dir/.env" 2>/dev/null
-    "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true
+    # Put the responder back the way it was: a server that was already delegated must keep answering for renewals.
+    if $responder_was_running; then "${compose[@]}" up -d acme-responder >/dev/null 2>&1 || true
+    else "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true; fi
     "${compose[@]}" restart traefik api >/dev/null 2>&1 || true
-    rm -rf "$switch_backup"; exit 1
+    exit 1
 }
 if $switch_tls; then
     [[ -f "$install_dir/release.env" && -f "$install_dir/.env" ]] || { echo 'No installation was found to switch. Run the installer without --switch-tls first.' >&2; exit 1; }
-    [[ -f "$install_dir/configure.py" && -f "$install_dir/explain_certificate_failure.py" && ( "$tls_mode" != delegated || -f "$install_dir/acme_responder.py" ) ]] || { echo "This server's installed tools predate the TLS switch. Update to a release that includes it first: sudo bash $install_dir/update.sh" >&2; exit 1; }
+    [[ -f "$install_dir/configure.py" && -f "$install_dir/explain_certificate_failure.py" && ( "$tls_mode" != delegated || ( -f "$install_dir/acme_responder.py" && -f "$install_dir/check_dns.py" ) ) ]] || { echo "This server's installed tools predate the TLS switch. Update to a release that includes it first: sudo bash $install_dir/update.sh" >&2; exit 1; }
     bundle_dir="$install_dir"
     $tls_mode_given || { echo 'Say which mode to switch to: --switch-tls --tls-mode cloudflare (delegated or http).' >&2; exit 1; }
     [[ -z "$domain$email" ]] || { echo '--switch-tls changes only the TLS mode; the domain and email cannot be changed.' >&2; exit 1; }

@@ -129,7 +129,9 @@ def port_53_free(address=''):
 
 
 def probe_responder(domain):
-    """Ask the responder over UDP and TCP at the address api.<domain> resolves to (the real path Let's Encrypt takes)."""
+    """Ask the responder over UDP and TCP at each address api.<domain> resolves to that is assigned to this server.
+    This proves the responder is published on port 53 for both protocols. It is a local test: a firewall in front of
+    the server is covered by the public NS lookup in check_delegation. Behind NAT there is no local address to test."""
     zone = f'_acme-challenge.apps.{domain}'
     name = b''.join(bytes([len(label)]) + label.encode() for label in zone.split('.')) + b'\x00'
     query = struct.pack('!HHHHHH', 0x4153, 0, 1, 0, 0, 0) + name + struct.pack('!HH', 6, 1)
@@ -138,7 +140,7 @@ def probe_responder(domain):
         addresses = sorted({e[4][0] for e in socket.getaddrinfo(host, 53, socket.AF_INET, socket.SOCK_STREAM)})
     except socket.gaierror as error:
         raise ValueError(f'{host} does not resolve: {error}') from error
-    for address in addresses:
+    for address in [a for a in addresses if locally_assigned(a)]:
         for protocol in ('UDP', 'TCP'):
             try:
                 if protocol == 'UDP':
@@ -154,7 +156,7 @@ def probe_responder(domain):
             except OSError:
                 ok = False
             if not ok:
-                raise ValueError(f'the DNS responder did not answer on {protocol} port 53 at {address}. Open UDP and TCP port 53 in the firewall and any cloud security group.')
+                raise ValueError(f'the DNS responder did not answer on {protocol} port 53 at {address} from this server. Check that nothing else holds port 53 and that Docker published it.')
 
 
 def check_delegation(domain):
