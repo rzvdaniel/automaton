@@ -35,7 +35,7 @@ namespace Automaton.Api.Application.Commands.Handlers
         {
             try
             {
-                var user = await UserManagerService.GetUserByEmailOrUserName(command.Email);
+                var user = await UserManagerService.FindByEmailOrUserName(command.Email);
 
                 // An unknown email gets the same answer as a bad link, so the response never reveals accounts.
                 var decoded = TryDecode(command.Code, out var decodedCode);
@@ -74,7 +74,7 @@ namespace Automaton.Api.Application.Commands.Handlers
 
                 await EmailService.Send(userDetails, CancellationToken.None);
             }
-            catch (InvalidResetLinkException)
+            catch (Exception ex) when (ex is InvalidResetLinkException or PasswordChangeRejectedException)
             {
                 throw;
             }

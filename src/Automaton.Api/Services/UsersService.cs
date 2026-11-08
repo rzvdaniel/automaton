@@ -186,14 +186,10 @@ public class UsersService
         return result;
     }
 
-    public async Task<ApplicationUser> GetUserByEmailOrUserName(string emailOrUserName)
+    public async Task<ApplicationUser?> FindByEmailOrUserName(string emailOrUserName)
     {
-        var result = await _userManager.FindByEmailAsync(emailOrUserName) ??
-                     await _userManager.FindByNameAsync(emailOrUserName);
-        if (result == null)
-            throw new InvalidOperationException($"User with Email or UserName '{emailOrUserName}' not found!");
-
-        return result;
+        return await _userManager.FindByEmailAsync(emailOrUserName) ??
+               await _userManager.FindByNameAsync(emailOrUserName);
     }
 
     public async Task<ApplicationUser?> FindByEmailAsync(string email)
@@ -441,6 +437,10 @@ public class UsersService
         {
             if (result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.InvalidToken)))
                 throw new InvalidResetLinkException("invalid");
+
+            // Password rule failures are the caller's to fix; the descriptions are safe to show.
+            if (result.Errors.Any(e => e.Code.StartsWith("Password", StringComparison.Ordinal)))
+                throw new PasswordChangeRejectedException(string.Join(" ", result.Errors.Select(error => error.Description)));
 
             throw new InvalidOperationException($"Error in resetting password");
         }

@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using System.Text;
+using Automaton.Api.Application.Commands;
+using Automaton.Api.Application.Commands.Handlers;
 using Automaton.Api.Authentication;
+using Automaton.Api.Middleware;
 using Automaton.Api.Constants;
 using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Data;
@@ -123,6 +126,45 @@ public sealed class AdminUserProvisioningServiceTests
         Assert.That(user!.EmailConfirmed, Is.True, "setting the password from the emailed link proves the address");
         Assert.ThrowsAsync<InvalidResetLinkException>(() => fixture.UsersService.ResetPasswordAsync(user.Id, token, "Again-Pass-123"),
             "the link works only once");
+    }
+
+    [Test]
+    public async Task ResetWithAnUnknownEmailLooksLikeABadLinkAndSendsNothing()
+    {
+        var fixture = await Fixture.CreateAsync();
+
+        var ex = Assert.ThrowsAsync<InvalidResetLinkException>(() => fixture.ResetHandler().Handle(
+            new ResetUserPasswordCommand("nobody@example.com", "Fresh-Pass-123", WebEncoders.Base64UrlEncode("x"u8.ToArray())), default));
+
+        Assert.That(FilterResult(ex!).StatusCode, Is.EqualTo(400));
+        Assert.That(fixture.Email.Sent, Is.Empty);
+    }
+
+    [Test]
+    public async Task ResetWithAWeakPasswordIsRejectedWithTheRuleMessages()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var invited = await fixture.Service.InviteAsync(new AdminInviteUserRequest("person@example.com", "Person"), "Admin", false, default);
+        var link = new Uri(fixture.Email.Sent.Single().Variables["SetupPasswordUrl"]);
+        var code = (string)QueryHelpers.ParseQuery(link.Query)["code"]!;
+
+        var ex = Assert.ThrowsAsync<PasswordChangeRejectedException>(() => fixture.ResetHandler().Handle(
+            new ResetUserPasswordCommand("person@example.com", "short", code), default));
+
+        Assert.That(FilterResult(ex!).StatusCode, Is.EqualTo(400));
+        Assert.That(ex!.Message, Does.Contain("at least 8"));
+        var user = await fixture.Users.FindByIdAsync(invited.UserId.ToString());
+        Assert.That(await fixture.Users.HasPasswordAsync(user!), Is.False);
+    }
+
+    private static ObjectResult FilterResult(Exception exception)
+    {
+        var context = new Microsoft.AspNetCore.Mvc.Filters.ExceptionContext(
+            new ActionContext(new DefaultHttpContext(), new Microsoft.AspNetCore.Routing.RouteData(),
+                new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor()), [])
+        { Exception = exception };
+        new GlobalExceptionFilter(NullLogger<GlobalExceptionFilter>.Instance).OnException(context);
+        return (ObjectResult)context.Result!;
     }
 
     [Test]
@@ -330,6 +372,10 @@ public sealed class AdminUserProvisioningServiceTests
         public required UserContextService Context { get; init; }
         public required ConfigurationService Configuration { get; init; }
         public required IAuditEventService Audit { get; init; }
+
+        public ResetUserPasswordCommandHandler ResetHandler() => new(UsersService, Configuration, Email,
+            NullLogger<ResetUserPasswordCommandHandler>.Instance, new EphemeralDataProtectionProvider(),
+            Options.Create(new DataProtectionTokenProviderOptions()));
 
         public static async Task<Fixture> CreateAsync(bool emailWorks = true)
         {
