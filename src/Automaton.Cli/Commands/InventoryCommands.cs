@@ -11,7 +11,57 @@ internal static class InventoryCommands
     {
         var command = Build(config, "apps", "List apps in your personal workspace", WriteAppsAsync);
         command.AddCommand(BuildShow(config));
+        command.AddCommand(BuildDelete(config));
         return command;
+    }
+
+    private static Command BuildDelete(ConfigService config)
+    {
+        var app = new Argument<string>("app", "App ID, exact slug or exact name");
+        var yes = new Option<bool>("--yes", "Confirm permanent deletion of the app, its runtime and its data");
+        var json = new Option<bool>("--json", "Print the result as JSON");
+        var command = new Command("delete", "Permanently delete an app, its runtime and its data") { app, yes, json };
+        command.SetHandler(async (InvocationContext context) =>
+        {
+            var asJson = context.ParseResult.GetValueForOption(json);
+            try
+            {
+                var identifier = context.ParseResult.GetValueForArgument(app);
+                if (!context.ParseResult.GetValueForOption(yes))
+                    throw new InvalidOperationException($"Pass --yes to permanently delete '{identifier}' with its runtime and data. This cannot be undone.");
+                var (server, apiKey) = config.ResolveCredentials(directory: Directory.GetCurrentDirectory());
+                if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                    throw new InvalidOperationException("Run automaton login to connect to your server.");
+                using var client = new AutomatonApiClient(server, apiKey);
+                var inventory = await client.ListAppInventoryAsync(context.GetCancellationToken());
+                var id = ResolveAppId(inventory, identifier);
+                var name = inventory.FirstOrDefault(item => item.Id.ToString() == id.ToLowerInvariant())?.Name;
+                await client.DeleteAppAsync(id, context.GetCancellationToken());
+                if (asJson) CliJson.Write(new { success = true, appId = id, name, deleted = true });
+                else Console.WriteLine($"Deleted app {name ?? id} ({id}) with its runtime and data.");
+            }
+            catch (Exception exception)
+            {
+                if (asJson) CliJson.Write(new { success = false, error = exception.Message });
+                else Console.Error.WriteLine(exception.Message);
+                context.ExitCode = 1;
+            }
+        });
+        return command;
+    }
+
+    internal static string ResolveAppId(IReadOnlyCollection<AppInventoryItem> apps, string identifier)
+    {
+        var value = identifier.Trim();
+        if (Guid.TryParse(value, out var guid)) return guid.ToString();
+        var matches = apps.Where(item => string.Equals(item.PublicUrl, value, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (matches.Length == 0)
+            matches = apps.Where(item => string.Equals(item.Name, value, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (matches.Length == 0)
+            throw new InvalidOperationException($"App '{value}' was not found. Use an app ID, exact slug or exact name.");
+        if (matches.Length > 1)
+            throw new InvalidOperationException($"More than one app is named '{value}'. Use the app ID: {string.Join(", ", matches.Select(item => item.Id.ToString()))}.");
+        return matches[0].Id.ToString();
     }
 
     private static Command BuildShow(ConfigService config)
