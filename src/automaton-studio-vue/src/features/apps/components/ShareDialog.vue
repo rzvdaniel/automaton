@@ -57,7 +57,7 @@ const publicUrl = computed(() => getPublishedAppUrl(address.value || 'your-app')
 const unchanged = computed(() => !!sharing.value
   && sharing.value.audience === selected.value
   && (selected.value !== 'internet' || address.value === (sharing.value.publicUrlSlug ?? '')))
-const listingText = computed(() => JSON.stringify([listed.value, summary.value.trim(), category.value, tags.value.trim()]))
+const listingText = computed(() => JSON.stringify(listed.value ? [true, summary.value.trim(), category.value, tags.value.trim()] : [false]))
 const tagList = computed(() => tags.value.split(',').map(tag => tag.trim()).filter(Boolean))
 const listingChanged = computed(() => selected.value === 'internet' && listingText.value !== savedListing.value)
 const teamChanged = computed(() => selected.value === 'team' && teamId.value !== (sharing.value?.team?.id ?? ''))
@@ -130,6 +130,10 @@ async function save() {
   error.value = ''
   try {
     const internet = selected.value === 'internet'
+    // The listing text goes first, so a rejected category leaves sharing exactly as it was.
+    if (internet && listed.value) {
+      await appsService.updateListing(props.appId, { summary: summary.value.trim(), category: category.value, tags: tagList.value })
+    }
     const state = await appsService.setSharing(
       props.appId,
       selected.value,
@@ -137,9 +141,6 @@ async function save() {
       selected.value === 'team' ? teamId.value : undefined,
       internet ? listed.value : undefined,
     )
-    if (internet && listed.value) {
-      await appsService.updateListing(props.appId, { summary: summary.value.trim(), category: category.value, tags: tagList.value })
-    }
     apply(state)
     emit('changed')
   } catch (reason) {
@@ -298,6 +299,7 @@ async function copyAddress() {
           </select>
           <label for="share-tags" class="share__label">Tags</label>
           <InputText id="share-tags" v-model="tags" placeholder="game, multiplayer" />
+          <p class="share__hint">Covers and screenshots are saved as soon as you add or remove them.</p>
           <span class="share__label">Cover</span>
           <div class="share__images">
             <img v-if="cover" :src="cover" alt="Cover" class="share__image">

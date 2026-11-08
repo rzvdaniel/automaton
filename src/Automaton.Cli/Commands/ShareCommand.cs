@@ -58,6 +58,8 @@ public static class ShareCommand
                     throw new InvalidOperationException($"Choose one of: {string.Join(", ", Audiences)}.");
                 if (parse.GetValueForOption(list) && parse.GetValueForOption(noList))
                     throw new InvalidOperationException("Use either --list or --no-list, not both.");
+                if ((parse.GetValueForOption(list) || parse.GetValueForOption(noList)) && choice != "internet")
+                    throw new InvalidOperationException("--list and --no-list only apply to 'internet'.");
                 bool? listed = parse.GetValueForOption(list) ? true : parse.GetValueForOption(noList) ? false : null;
                 var (client, appId) = Connect(config);
                 using (client)

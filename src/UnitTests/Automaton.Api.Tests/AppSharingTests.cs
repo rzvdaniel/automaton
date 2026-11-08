@@ -247,6 +247,7 @@ public sealed class AppSharingTests
         Assert.That(kept.Listed, Is.True);
 
         Assert.ThrowsAsync<InvalidOperationException>(() => service.SetAudienceAsync(AppId, "server", null, null, true, default));
+        Assert.That((await service.GetAsync(AppId, default)).Audience, Is.EqualTo("internet"), "a rejected request changes nothing");
         var closed = await service.SetAudienceAsync(AppId, "server", null, null, null, default);
         Assert.That(closed.Listed, Is.False);
     }

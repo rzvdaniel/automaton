@@ -53,6 +53,8 @@ public sealed class AppSharingService(
     {
         if (!AppSharingAudiences.IsValid(audience))
             throw new InvalidOperationException("Choose one of: me, people, team, server, internet.");
+        if (listed == true && audience != AppSharingAudiences.Internet)
+            throw new InvalidOperationException("Only an app open to anyone on the internet can be listed in the store.");
         var app = await LoadManagedAppAsync(appId, cancellationToken);
         var team = audience == AppSharingAudiences.Team ? await LoadOwnTeamAsync(teamId, cancellationToken) : null;
 
@@ -77,8 +79,6 @@ public sealed class AppSharingService(
         {
             if (app.IsPublished) await publicationService.Unpublish(appId, cancellationToken);
             app.SharedWithServer = audience == AppSharingAudiences.Server;
-            if (listed == true)
-                throw new InvalidOperationException("Only an app open to anyone on the internet can be listed in the store.");
             if (audience == AppSharingAudiences.OnlyMe)
                 dbContext.AppShares.RemoveRange(await dbContext.AppShares.Where(share => share.WebAppId == appId).ToListAsync(cancellationToken));
         }
@@ -151,7 +151,7 @@ public sealed class AppSharingService(
                             select new AppSharingPerson(user.Id, user.Email ?? string.Empty, user.DisplayName ?? string.Empty))
             .ToListAsync(cancellationToken);
         var team = app.SharedWithProjectId is null ? null
-            : await dbContext.Projects.Where(project => project.Id == app.SharedWithProjectId)
+            : await dbContext.Projects.Where(project => project.Id == app.SharedWithProjectId && project.IsActive)
                 .Select(project => new AppSharingTeam(project.Id, project.DisplayName)).FirstOrDefaultAsync(cancellationToken);
         var internet = IsOpenToInternet(app);
         var audience = internet ? AppSharingAudiences.Internet
