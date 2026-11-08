@@ -121,7 +121,7 @@ public sealed class AdminUserProvisioningServiceTests
         user = await fixture.Users.FindByIdAsync(invited.UserId.ToString());
         Assert.That(await fixture.Users.CheckPasswordAsync(user!, "Fresh-Pass-123"), Is.True);
         Assert.That(user!.EmailConfirmed, Is.True, "setting the password from the emailed link proves the address");
-        Assert.ThrowsAsync<InvalidOperationException>(() => fixture.UsersService.ResetPasswordAsync(user.Id, token, "Again-Pass-123"),
+        Assert.ThrowsAsync<InvalidResetLinkException>(() => fixture.UsersService.ResetPasswordAsync(user.Id, token, "Again-Pass-123"),
             "the link works only once");
     }
 
