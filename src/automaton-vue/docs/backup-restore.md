@@ -13,7 +13,7 @@ SSH access with sudo on the server.
 
 ## What you get by default
 
-The installer turns on a nightly backup between 03:00 and 04:00 server time and keeps the newest 7 in `/opt/automaton-server/backups/nightly`. Each holds a PostgreSQL dump and the keys that decrypt it. **Admin → Installation → Backups** in Studio lists them with the restore command.
+The installer turns on a nightly backup between 03:00 and 04:00 server time and keeps the newest 7 in `/opt/automaton-server/backups/nightly`. Each holds a PostgreSQL dump and the keys that decrypt it. The **Backups** page in Studio shows the last, next and offsite backup, lists them and gives the restore command.
 
 ## Take or list a backup
 

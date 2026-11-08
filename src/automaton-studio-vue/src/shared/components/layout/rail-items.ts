@@ -15,13 +15,13 @@ export interface RailItem {
 
 const startsWith = (prefix: string) => (path: string) => path === prefix || path.startsWith(`${prefix}/`)
 
-// The six places of Studio. Server and Backups point at the pages that exist today until their redesign.
+// The six places of Studio. Server points at the page that exists today until its redesign.
 const MAIN: RailItem[] = [
   { label: 'Apps', icon: 'pi pi-th-large', to: '/apps', match: (p) => startsWith('/apps')(p) && !startsWith('/apps/catalog')(p) },
   { label: 'Catalog', icon: 'pi pi-download', to: '/apps/catalog', match: startsWith('/apps/catalog'), hideForAppUser: true },
   { label: 'People', icon: 'pi pi-users', to: '/people', match: (p) => startsWith('/people')(p) || startsWith('/organizations')(p) || startsWith('/admin/users')(p) },
   { label: 'Server', icon: 'pi pi-server', to: '/server', match: (p) => startsWith('/server')(p) || startsWith('/runners')(p), hideForAppUser: true },
-  { label: 'Backups', icon: 'pi pi-database', to: '/admin/installation', match: startsWith('/admin/installation'), sysAdminOnly: true },
+  { label: 'Backups', icon: 'pi pi-database', to: '/admin/backups', match: startsWith('/admin/backups'), sysAdminOnly: true },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings', match: startsWith('/settings') },
 ]
 
@@ -29,7 +29,7 @@ const MAIN: RailItem[] = [
 const MORE: RailItem[] = [
   { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', match: startsWith('/apikeys'), hideForAppUser: true },
   { label: 'CLI', icon: 'pi pi-code', to: '/downloads', match: startsWith('/downloads'), hideForAppUser: true },
-  { label: 'Admin', icon: 'pi pi-shield', to: '/admin', match: (p) => startsWith('/admin')(p) && !startsWith('/admin/installation')(p), adminOnly: true },
+  { label: 'Admin', icon: 'pi pi-shield', to: '/admin', match: (p) => startsWith('/admin')(p) && !startsWith('/admin/installation')(p) && !startsWith('/admin/backups')(p), adminOnly: true },
   { label: 'Documentation', icon: 'pi pi-book', to: 'https://automaton.monster/docs', external: true, match: () => false },
 ]
 

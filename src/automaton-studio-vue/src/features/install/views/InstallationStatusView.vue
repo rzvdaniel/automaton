@@ -2,7 +2,6 @@
 import Card from 'primevue/card'
 import SetupChecks from '../components/SetupChecks.vue'
 import SmtpSettingsForm from '../components/SmtpSettingsForm.vue'
-import BackupsPanel from '../components/BackupsPanel.vue'
 import UpdatePanel from '../components/UpdatePanel.vue'
 </script>
 <template>
@@ -11,7 +10,7 @@ import UpdatePanel from '../components/UpdatePanel.vue'
     <Card><template #title>Configuration status</template><template #content><SetupChecks /></template></Card>
     <Card><template #title>Outgoing email</template><template #content><SmtpSettingsForm /></template></Card>
     <Card><template #title>Update</template><template #content><UpdatePanel /></template></Card>
-    <Card><template #title>Backups</template><template #content><BackupsPanel /></template></Card>
+    <Card><template #title>Backups</template><template #content><RouterLink to="/admin/backups">Backups have their own page: last, next and offsite backup, history and restore.</RouterLink></template></Card>
     <Card><template #title>Next steps</template><template #content>
       <p>Install a Machine Management Runner from Runners to deploy applications. The control plane does not execute your applications itself.</p>
       <p>Check public DNS and inbound ports from outside the server. SMTP can be configured above; optional OAuth and billing settings are managed in the protected server configuration.</p>

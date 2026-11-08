@@ -58,7 +58,7 @@ A column that exists only in MySQL is ignored only if every row holds its defaul
 
 ## Check it yourself
 
-After the script finishes, sign in to Studio and look at your apps, Runners, schedules and projects. The script's comparison checks that the same items are listed for the accounts you gave it (the first page of each list, ids only), so also open an app, and run an Action that reads a secret: secrets are encrypted with the keys in the API key volume, which the migration does not touch, and only a real run proves they decrypt. Studio **Admin → Installation → Backups** shows the first PostgreSQL backup.
+After the script finishes, sign in to Studio and look at your apps, Runners, schedules and projects. The script's comparison checks that the same items are listed for the accounts you gave it (the first page of each list, ids only), so also open an app, and run an Action that reads a secret: secrets are encrypted with the keys in the API key volume, which the migration does not touch, and only a real run proves they decrypt. Studio **Backups** shows the first PostgreSQL backup.
 
 Developers can decrypt every protected value of the migrated database with the key ring:
 `dotnet run --project scripts/tests/protected-data-check -- <key-ring-dir> "<connection string>"`.
