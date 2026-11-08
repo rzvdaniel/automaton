@@ -9,15 +9,13 @@ import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
-import ToggleSwitch from 'primevue/toggleswitch'
-import Tag from 'primevue/tag'
+import AppFilterBar, { type FilterPill } from './AppFilterBar.vue'
+import AppRow from './AppRow.vue'
 import CatalogSources from './CatalogSources.vue'
 import { appsService } from '../services/apps.service'
-import AppMark from './AppMark.vue'
+import { catalogName } from '../utils/app-list-display'
 import type { CatalogEntry, CatalogQuery, CatalogResponse } from '../types/apps.types'
 
-/** Filters stay hidden until the catalog is big enough to need them. */
-const FILTERS_FROM = 12
 const PAGE_SIZE = 24
 const router = useRouter()
 const route = useRoute()
@@ -43,7 +41,6 @@ const query = computed<CatalogQuery>(() => ({
 }))
 const search = ref(one(route.query.q))
 let searchTimer: ReturnType<typeof setTimeout> | undefined
-const filtering = computed(() => (catalog.value?.totalApps ?? 0) > FILTERS_FROM)
 const filtered = computed(() => !!(query.value.q || query.value.category || query.value.source || query.value.installed))
 const categories = computed(() => catalog.value?.categories ?? [])
 const sourceOptions = computed(() => catalog.value?.sources ?? [])
@@ -79,6 +76,24 @@ function clearFilters() {
   search.value = ''
   show({ q: undefined, category: undefined, source: undefined, installed: undefined, page: undefined })
 }
+
+const INSTALLED = '__installed__'
+const details = ref<CatalogEntry | null>(null)
+const showDetails = computed({ get: () => !!details.value, set: (open: boolean) => { if (!open) details.value = null } })
+const access = (app: CatalogEntry) => (app.permissions.length ? `Asks for ${app.permissions.join(', ')}` : '')
+const installTo = (app: CatalogEntry) => ({ name: 'app-install-source', query: { repo: app.repo, folder: app.folder || undefined, commit: app.commit } })
+const sourcePills = computed<FilterPill[]>(() => [
+  ...(sourceOptions.value.length > 1 ? [{ value: '', label: 'All catalogs' }] : []),
+  ...(sourceOptions.value.length > 1 ? sourceOptions.value : []).map((o) => ({ value: o.value, label: `${o.label} · ${o.count}`, icon: privateSources.value.has(o.value) ? 'pi pi-lock' : undefined })),
+  { value: INSTALLED, label: 'Installed' },
+])
+const categoryPills = computed<FilterPill[]>(() => [
+  { value: '', label: `All · ${catalog.value?.totalApps ?? catalog.value?.apps.length ?? 0}` },
+  ...categories.value.map((c) => ({ value: c.value, label: `${c.label} · ${c.count}` })),
+])
+const pickSource = (value: string) => (value === INSTALLED ? show({ installed: !query.value.installed, page: 1 }) : show({ source: value || undefined, page: 1 }))
+const sourceActive = (value: string) => (value === INSTALLED ? !!query.value.installed : (query.value.source ?? '') === value)
+const categoryActive = (value: string) => (value === '' ? !query.value.category : query.value.category?.toLowerCase() === value.toLowerCase())
 
 const showTime = computed(() => (catalog.value?.fetchedAt ? new Date(catalog.value.fetchedAt).toLocaleString() : ''))
 
@@ -120,106 +135,74 @@ async function installFromUrl() {
 </script>
 
 <template>
-  <div class="catalog flex flex-column gap-4">
-    <div class="flex align-items-start justify-content-between gap-3 flex-wrap">
-    <p class="m-0 text-color-secondary">
-      Apps you can install on this server, from the official
-      <a href="https://github.com/rzvdaniel/automaton-apps" target="_blank" rel="noopener">automaton-apps</a> repository
-      and any sources an administrator added.
-      Installing fetches the app at the listed commit and asks for its settings, secrets and permissions first.
-    </p>
-    <div v-if="isSystemAdministrator" class="flex gap-2 flex-shrink-0">
-      <Button label="Add a catalog" icon="pi pi-plus" severity="secondary" outlined @click="showSources = true" />
-      <Button label="Install from URL" icon="pi pi-link" severity="secondary" outlined @click="showGit = true" />
-    </div>
-    </div>
+  <div class="catalog">
+    <header class="apps-head">
+      <div>
+        <h1 class="apps-head__title">Catalog</h1>
+        <p class="apps-head__line">Apps you can install on this server.</p>
+      </div>
+      <div v-if="isSystemAdministrator" class="apps-head__buttons">
+        <Button label="Add a catalog" outlined class="btn-small" @click="showSources = true" />
+        <Button label="Install from URL" outlined class="btn-small" @click="showGit = true" />
+      </div>
+    </header>
 
-    <p v-if="loading" class="m-0 text-color-secondary">Loading…</p>
+    <p v-if="loading" class="catalog-note">Loading…</p>
 
-    <div v-else-if="failed || catalog?.unavailable" class="catalog-empty flex flex-column gap-3" role="status">
-      <strong>The catalog could not be loaded</strong>
-      <span class="text-color-secondary">
+    <div v-else-if="failed || catalog?.unavailable" class="apps-card apps-empty" role="status">
+      <p class="apps-empty__title">The catalog could not be loaded</p>
+      <p class="apps-empty__line">
         {{ catalog?.message ?? 'The server could not answer.' }} This server reads the list from GitHub and has no saved copy yet.
         Check that the server can reach github.com, then try again.
-      </span>
-      <div><Button label="Retry" icon="pi pi-refresh" @click="load(true)" /></div>
+      </p>
+      <Button label="Retry" icon="pi pi-refresh" @click="load(true)" />
     </div>
 
     <template v-else-if="catalog">
       <Message v-if="catalog.stale" severity="warn" :closable="false">{{ catalog.message }}</Message>
-      <div class="catalog-filters flex flex-column gap-3">
-        <div v-if="sourceOptions.length > 1" class="flex gap-2 flex-wrap" role="group" aria-label="Catalog">
-          <Button label="All catalogs" size="small" rounded :outlined="!!query.source" @click="show({ source: undefined, page: 1 })" />
-          <Button
-            v-for="option in sourceOptions"
-            :key="option.value"
-            :label="`${option.label} (${option.count})`"
-            :icon="privateSources.has(option.value) ? 'pi pi-lock' : undefined"
-            size="small"
-            rounded
-            :outlined="query.source !== option.value"
-            @click="show({ source: option.value, page: 1 })"
-          />
-        </div>
-        <div v-if="filtering || filtered" class="flex align-items-center gap-3 flex-wrap">
-          <InputText v-model="search" class="catalog-search" type="search" placeholder="Search apps" aria-label="Search apps" @input="onSearch" />
-          <label class="flex align-items-center gap-2">
-            <ToggleSwitch :model-value="!!query.installed" input-id="catalog-installed" @update:model-value="show({ installed: $event, page: 1 })" />
-            Installed
-          </label>
-        </div>
-        <div v-if="categories.length > 1" class="flex gap-2 flex-wrap" role="group" aria-label="Category">
-          <Button label="All" size="small" rounded :outlined="!!query.category" @click="show({ category: undefined, page: 1 })" />
-          <Button
-            v-for="category in categories"
-            :key="category.value"
-            :label="`${category.label} (${category.count})`"
-            size="small"
-            rounded
-            :outlined="query.category?.toLowerCase() !== category.value.toLowerCase()"
-            @click="show({ category: category.value, page: 1 })"
-          />
-        </div>
+      <template v-if="(catalog.totalApps ?? catalog.apps.length) > 0">
+        <AppFilterBar
+          v-model:search="search"
+          label="Search apps"
+          group-label="Category"
+          placeholder="Search apps"
+          :pills="categoryPills"
+          :active="categoryActive"
+          @update:search="onSearch"
+          @select="show({ category: $event || undefined, page: 1 })"
+        />
+        <AppFilterBar label="Catalog" :pills="sourcePills" :active="sourceActive" @select="pickSource" />
+      </template>
+      <p v-if="(catalog.totalApps ?? catalog.apps.length) === 0" class="catalog-note">The catalog has no apps yet.</p>
+      <div v-else-if="catalog.apps.length === 0" class="apps-card apps-empty" role="status">
+        <p class="apps-empty__title">No apps match</p>
+        <p class="apps-empty__line">Nothing in the catalog matches these filters.</p>
+        <Button v-if="filtered" label="Clear filters" outlined class="btn-small" @click="clearFilters" />
       </div>
-      <p v-if="(catalog.totalApps ?? catalog.apps.length) === 0" class="m-0 text-color-secondary">The catalog has no apps yet.</p>
-      <div v-else-if="catalog.apps.length === 0" class="catalog-empty flex flex-column gap-2" role="status">
-        <strong>No apps match</strong>
-        <span class="text-color-secondary">Nothing in the catalog matches these filters.</span>
-        <div><Button v-if="filtered" label="Clear filters" icon="pi pi-filter-slash" severity="secondary" outlined @click="clearFilters" /></div>
+      <div v-else class="apps-card">
+        <AppRow
+          v-for="app in catalog.apps"
+          :id="app.id"
+          :key="`${app.repo}/${app.folder}`"
+          :name="catalogName(app.name)"
+          :line="app.summary"
+          :image-url="app.icon"
+          :label="`Details of ${catalogName(app.name)}`"
+          @open="details = app"
+        >
+          <template #meta>
+            <span v-if="access(app)" class="catalog-access">{{ access(app) }}</span>
+          </template>
+          <template #tag>
+            <span class="catalog-category">{{ app.category }}<template v-if="app.customSource"> · {{ app.sourceName }}</template></span>
+          </template>
+          <template #action>
+            <span v-if="app.installedAppId" class="catalog-installed">Installed</span>
+            <span v-else-if="app.requiresNewerServer" class="catalog-access">Needs Automaton Server {{ app.minServerVersion }} or newer</span>
+            <RouterLink v-else :to="installTo(app)" class="p-button p-component p-button-outlined p-button-sm catalog-install" :aria-label="`Install ${catalogName(app.name)}`">Install</RouterLink>
+          </template>
+        </AppRow>
       </div>
-      <ul v-else class="catalog-list m-0 p-0">
-        <li v-for="app in catalog.apps" :key="`${app.repo}/${app.folder}`" class="catalog-row">
-          <div class="flex gap-3">
-            <AppMark :id="app.id" :name="app.name" :image-url="app.icon" />
-            <div class="flex flex-column gap-1 min-w-0">
-              <strong>{{ app.name }}</strong>
-              <span class="flex align-items-center gap-2 flex-wrap">
-                <Tag :value="app.category" severity="secondary" />
-                <Tag v-if="app.customSource" :value="app.sourceName" severity="warn" icon="pi pi-link" />
-                <Tag v-if="app.installedAppId" value="Installed" severity="success" icon="pi pi-check" />
-              </span>
-              <span class="text-color-secondary">{{ app.summary }}</span>
-              <small class="text-color-secondary">{{ app.permissions.length ? `Asks for ${app.permissions.join(', ')}` : 'Asks for no access' }}</small>
-            </div>
-          </div>
-          <div class="flex gap-2 flex-shrink-0 align-items-center flex-wrap">
-            <RouterLink v-if="app.installedAppId" :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="p-button p-component p-button-outlined catalog-button">
-              Manage
-            </RouterLink>
-            <a v-if="showSourceLink(app)" :href="sourceUrl(app)" target="_blank" rel="noopener" class="catalog-source-link" :aria-label="`Source of ${app.name}`">Source</a>
-            <small v-if="app.requiresNewerServer" class="text-color-secondary">Needs Automaton Server {{ app.minServerVersion }} or newer</small>
-            <RouterLink
-              v-else
-              :to="{ name: 'app-install-source', query: { repo: app.repo, folder: app.folder || undefined, commit: app.commit } }"
-              class="p-button p-component catalog-button"
-              :class="{ 'p-button-outlined': !!app.installedAppId }"
-              :aria-label="`${app.installedAppId ? 'Install another copy of' : 'Install'} ${app.name}`"
-            >
-              {{ app.installedAppId ? 'Install again' : 'Install' }}
-            </RouterLink>
-          </div>
-        </li>
-      </ul>
       <Paginator
         v-if="(catalog.total ?? 0) > PAGE_SIZE"
         :rows="PAGE_SIZE"
@@ -228,11 +211,30 @@ async function installFromUrl() {
         template="PrevPageLink PageLinks NextPageLink"
         @page="show({ page: $event.page + 1 })"
       />
-      <div class="flex align-items-center gap-3">
-        <Button label="Refresh" icon="pi pi-refresh" severity="secondary" outlined @click="load(true)" />
-        <small v-if="showTime" class="text-color-secondary">Read {{ showTime }}</small>
+      <div class="catalog-foot">
+        <Button label="Refresh" icon="pi pi-refresh" severity="secondary" outlined class="btn-small" @click="load(true)" />
+        <small v-if="showTime" class="catalog-note">Read {{ showTime }}</small>
       </div>
     </template>
+
+    <Dialog v-model:visible="showDetails" modal :header="details ? catalogName(details.name) : ''" :style="{ width: '32rem', maxWidth: '100vw' }">
+      <div v-if="details" class="catalog-details">
+        <p class="catalog-details__summary">{{ details.summary }}</p>
+        <dl class="catalog-details__list">
+          <dt>Category</dt><dd>{{ details.category }}<template v-if="details.customSource"> · {{ details.sourceName }}</template></dd>
+          <dt>Asks for</dt><dd>{{ details.permissions.length ? details.permissions.join(', ') : 'No access' }}</dd>
+          <dt>Version</dt><dd>Commit <code>{{ details.commit.slice(0, 7) }}</code>, needs Automaton Server {{ details.minServerVersion }} or newer</dd>
+          <dt v-if="showSourceLink(details)">Source</dt>
+          <dd v-if="showSourceLink(details)"><a :href="sourceUrl(details)" target="_blank" rel="noopener" :aria-label="`Source of ${catalogName(details.name)}`">{{ details.repo }}</a></dd>
+        </dl>
+        <div class="catalog-details__actions">
+          <RouterLink v-if="details.installedAppId" :to="{ name: 'app-editor', params: { id: details.installedAppId } }" class="p-button p-component p-button-outlined catalog-button">Manage</RouterLink>
+          <RouterLink v-if="!details.requiresNewerServer" :to="installTo(details)" class="p-button p-component catalog-button catalog-details__install" :aria-label="`${details.installedAppId ? 'Install another copy of' : 'Install'} ${catalogName(details.name)}`">
+            {{ details.installedAppId ? 'Install again' : 'Install' }}
+          </RouterLink>
+        </div>
+      </div>
+    </Dialog>
 
     <Drawer v-if="isSystemAdministrator" v-model:visible="showSources" position="right" header="Add a catalog" :style="{ width: '32rem', maxWidth: '100vw' }">
       <CatalogSources @changed="reload" />
@@ -254,36 +256,38 @@ async function installFromUrl() {
 </template>
 
 <style scoped>
-.catalog {
-  max-width: 72rem;
+.catalog { max-width: 1400px; margin: 0 auto; }
+.apps-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.apps-head__title { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); }
+.apps-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; }
+.apps-head__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-small.p-button { min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; }
+.apps-card {
+  display: flex; flex-direction: column; gap: 8px; padding: 16px; margin-bottom: 16px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 18px;
 }
-.catalog-list {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
-  gap: 0.75rem;
-}
-.catalog-search {
-  width: 18rem;
-  max-width: 100%;
-}
-.catalog-row,
-.catalog-empty {
-  padding: 1rem;
-  border: 1px solid var(--p-content-border-color);
-  border-radius: var(--p-content-border-radius);
-  background: var(--p-content-background);
-}
-.catalog a:not(.p-button) {
-  color: var(--p-primary-color);
-}
-.catalog-row {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.catalog-button {
-  text-decoration: none;
+.apps-empty { align-items: center; text-align: center; padding: 40px 16px; }
+.apps-empty__title { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 600; }
+.apps-empty__line { margin: 0 0 8px; color: var(--ink-soft); }
+.catalog-note { margin: 0; color: var(--ink-soft); }
+.catalog-foot { display: flex; align-items: center; gap: 12px; }
+.catalog-category { flex: none; color: var(--ink-soft); font-size: 12.5px; }
+.catalog-access { color: var(--ink-soft); font-size: 12px; opacity: 0.85; }
+.catalog-installed { flex: none; color: var(--ink-soft); font-family: var(--mono); font-size: 12px; }
+.catalog-install.p-button { flex: none; min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; text-decoration: none; }
+.catalog-install.p-button:hover { border-color: var(--signal); background: transparent; color: var(--ink); }
+.catalog-button { text-decoration: none; }
+.catalog-details__install.p-button { background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; }
+.catalog-details__install.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
+.catalog-details { display: flex; flex-direction: column; gap: 12px; }
+.catalog-details__summary { margin: 0; }
+.catalog-details__list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.catalog-details__list dt { color: var(--ink-soft); }
+.catalog-details__list dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.catalog-details__actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.catalog a:not(.p-button), .catalog-details a:not(.p-button) { color: var(--p-primary-color); }
+@media (max-width: 640px) {
+  .catalog-category { display: none; }
+  .catalog-install.p-button { min-height: 44px; }
 }
 </style>

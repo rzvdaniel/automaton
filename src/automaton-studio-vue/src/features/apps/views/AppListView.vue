@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import AppFilterBar from '../components/AppFilterBar.vue'
 import AppRow from '../components/AppRow.vue'
 import NewAppDialog from '../components/NewAppDialog.vue'
 import CatalogPanel from '../components/CatalogPanel.vue'
@@ -91,24 +92,16 @@ const handleRetry = async () => {
         </div>
       </header>
 
-      <div v-if="appsStore.hasApps" class="apps-toolbar">
-        <label class="apps-search">
-          <span class="sr-only">Search apps</span>
-          <i class="pi pi-search" aria-hidden="true" />
-          <input v-model="searchQuery" type="search" placeholder="Search apps" />
-        </label>
-        <div class="apps-pills" role="group" aria-label="Filter apps">
-          <button
-            v-for="pill in filterPills"
-            :key="pill.value"
-            type="button"
-            class="apps-pill"
-            :class="{ 'apps-pill--active': filter === pill.value }"
-            :aria-pressed="filter === pill.value"
-            @click="filter = pill.value"
-          >{{ pill.label }}</button>
-        </div>
-      </div>
+      <AppFilterBar
+        v-if="appsStore.hasApps"
+        v-model:search="searchQuery"
+        label="Search apps"
+        group-label="Filter apps"
+        placeholder="Search apps"
+        :pills="filterPills"
+        :active="(value) => filter === value"
+        @select="filter = $event as AppFilter"
+      />
 
       <div v-if="appsStore.isLoading" class="apps-card" aria-busy="true">
         <Skeleton v-for="i in 4" :key="i" height="68px" border-radius="12px" />
@@ -171,22 +164,6 @@ const handleRetry = async () => {
 .btn-ink.p-button { min-height: 44px; background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; }
 .btn-ink.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
 .btn-outline.p-button { min-height: 44px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; }
-.apps-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
-.apps-search { position: relative; flex: 1 1 240px; max-width: 360px; }
-.apps-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); }
-.apps-search input {
-  width: 100%; min-height: 44px; padding: 8px 12px 8px 34px; box-sizing: border-box;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px;
-}
-.apps-search input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.apps-pills { display: flex; flex-wrap: wrap; gap: 8px; }
-.apps-pill {
-  min-height: 44px; padding: 6px 16px; border: 1px solid var(--line); border-radius: 999px;
-  background: transparent; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
-}
-.apps-pill--active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-.apps-pill:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 .apps-card {
   display: flex; flex-direction: column; gap: 8px; padding: 16px;
   background: var(--paper); border: 1px solid var(--line); border-radius: 18px;

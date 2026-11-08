@@ -12,11 +12,25 @@ defineProps<{
   to?: string
   state?: AppState
   busy?: boolean
+  label?: string
 }>()
+defineEmits<{ open: [] }>()
 </script>
 
 <template>
-  <component :is="to ? RouterLink : 'button'" class="app-row" :to="to" :type="to ? undefined : 'button'" :aria-busy="busy || undefined">
+  <div v-if="$slots.action" class="app-row app-row--split">
+    <component :is="to ? RouterLink : 'button'" class="app-row__main" :to="to" :type="to ? undefined : 'button'" :aria-label="label" @click="$emit('open')">
+      <AppMark :id="id" :name="name" :image-url="imageUrl" />
+      <span class="app-row__text">
+        <span class="app-row__name">{{ name }}</span>
+        <span class="app-row__line">{{ line }}</span>
+        <slot name="meta" />
+      </span>
+      <slot name="tag" />
+    </component>
+    <slot name="action" />
+  </div>
+  <component :is="to ? RouterLink : 'button'" v-else class="app-row" :to="to" :type="to ? undefined : 'button'" :aria-busy="busy || undefined">
     <AppMark :id="id" :name="name" :image-url="imageUrl" />
     <span class="app-row__text">
       <span class="app-row__name">{{ name }}</span>
@@ -43,6 +57,13 @@ defineProps<{
   text-decoration: none;
   cursor: pointer;
 }
+.app-row--split { padding: 0 14px 0 0; }
+.app-row--split:focus-within { border-color: var(--signal); }
+.app-row__main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 0 12px 14px;
+  border: 0; background: transparent; color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+}
+.app-row__main:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 12px; }
 .app-row:hover { border-color: var(--signal); }
 .app-row:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 .app-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
