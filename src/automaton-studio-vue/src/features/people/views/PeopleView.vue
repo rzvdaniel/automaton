@@ -118,7 +118,7 @@ onMounted(load)
         <h2 id="members-title">Members <span class="count">{{ members.length }}</span></h2>
         <input v-if="isAdmin" v-model="search" class="search" type="search" placeholder="Search by name or email" aria-label="Search people" @keyup.enter="load" />
         <p v-if="!members.length" class="empty">No one yet. Invite the first person.</p>
-        <table v-else class="grid">
+        <table v-else class="rows">
           <thead>
             <tr><th>Name</th><th>Role</th><th>Teams</th><th v-if="isAdmin" class="num">Apps</th></tr>
           </thead>
@@ -140,7 +140,7 @@ onMounted(load)
       <section v-if="isAdmin" aria-labelledby="pending-title">
         <h2 id="pending-title">Pending invites <span class="count">{{ pending.length }}</span></h2>
         <p v-if="!pending.length" class="empty">No pending invites.</p>
-        <table v-else class="grid">
+        <table v-else class="rows">
           <thead>
             <tr><th>Email</th><th>Invited</th><th></th></tr>
           </thead>
@@ -162,7 +162,7 @@ onMounted(load)
       <section aria-labelledby="teams-title">
         <h2 id="teams-title">Teams <span class="count">{{ teams.length }}</span></h2>
         <p v-if="!teams.length" class="empty">No teams yet. A team shares apps with its members.</p>
-        <table v-else class="grid">
+        <table v-else class="rows">
           <thead>
             <tr><th>Team</th><th class="num">Members</th><th class="num">Shared apps</th></tr>
           </thead>
@@ -195,10 +195,10 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; font-weight: 600; }
 .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .count { margin-left: 0.4rem; font-weight: 400; color: var(--p-text-muted-color); }
 .empty, .muted { color: var(--p-text-muted-color); font-size: 0.9rem; margin: 0; }
-.grid { width: 100%; border-collapse: collapse; }
-.grid th { text-align: left; font-weight: 500; font-size: 0.85rem; color: var(--p-text-muted-color); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--p-content-border-color); }
-.grid td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--p-content-border-color); vertical-align: middle; }
-.grid .num { text-align: right; white-space: nowrap; }
+.rows { width: 100%; border-collapse: collapse; }
+.rows th { text-align: left; font-weight: 500; font-size: 0.85rem; color: var(--p-text-muted-color); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--p-content-border-color); }
+.rows td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--p-content-border-color); vertical-align: middle; }
+.rows .num { text-align: right; white-space: nowrap; }
 .name { font-weight: 500; }
 .search { width: 100%; max-width: 20rem; margin-bottom: 0.6rem; padding: 0.45rem 0.6rem; border: 1px solid var(--p-content-border-color); border-radius: 6px; background: var(--p-content-background); color: inherit; }
 .clickable { cursor: pointer; }
