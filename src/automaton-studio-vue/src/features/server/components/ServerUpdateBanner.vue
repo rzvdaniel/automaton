@@ -13,6 +13,7 @@ const pollMilliseconds = 3000
 const confirming = ref(false)
 const starting = ref(false)
 const error = ref<string | null>(null)
+const done = ref(false) // the update finished; hide the banner even if health still reports the old version
 const status = ref<InstallationUpdateStatus | null>(null)
 // Set from the click until the host reports a run that started later than the one seen before.
 const waitingForRun = ref<string | null | undefined>(undefined)
@@ -33,6 +34,7 @@ async function poll() {
     if (waitingForRun.value !== undefined && next.run && started !== waitingForRun.value) waitingForRun.value = undefined
     if (next.hint) waitingForRun.value = undefined // the host did not pick the request up
     if (!updating.value && next.run?.state === 'succeeded') {
+      done.value = true
       emit('updated')
       return
     }
@@ -67,7 +69,7 @@ async function start() {
     <Message v-if="updating" severity="info" :closable="false" data-testid="update-running">
       Updating to {{ props.latest ?? 'the latest release' }}. Studio can be unavailable for a few minutes; this page keeps checking.
     </Message>
-    <Message v-else severity="warn" :closable="false" data-testid="update-available">
+    <Message v-else-if="!done" severity="warn" :closable="false" data-testid="update-available">
       <div class="flex align-items-center justify-content-between gap-3 flex-wrap w-full">
         <span>
           <strong>{{ props.latest }}</strong> is available. This server runs {{ props.current ?? 'an unknown version' }}.
