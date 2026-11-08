@@ -33,7 +33,7 @@ while (($#)); do
         --configure-only) configure_only=true; shift ;;
         --quiet) quiet=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare (Cloudflare DNS token) or delegated (one NS record, port 53; no token) enables wildcard certificates.' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|delegated|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -84,6 +84,25 @@ with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
         if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
 PYBROKER
 }
+# Delegated mode (#891): the DNS responder runs in a Compose profile; DOMAIN, the profile and the port 53 address live in .env.
+set_delegated_env() {
+    local env_file="$install_dir/.env" bind=''
+    local lines; lines=$(grep -Ev '^(DOMAIN|COMPOSE_PROFILES|DNS_BIND)=' "$env_file" || true)
+    { [[ -z "$lines" ]] || printf '%s\n' "$lines"
+      if [[ "$tls_mode" == delegated ]]; then
+          bind=$(python3 "$bundle_dir/check_dns.py" --bind-address ${public_ips[@]+"${public_ips[@]}"}) || bind=''
+          printf 'DOMAIN=%s\nCOMPOSE_PROFILES=delegated\n' "$domain"
+          [[ -z "$bind" ]] || printf 'DNS_BIND=%s\n' "$bind"
+      fi; } > "$env_file.new"
+    chmod 0600 "$env_file.new"; mv "$env_file.new" "$env_file"
+}
+check_delegated_ready() {
+    python3 "$bundle_dir/check_dns.py" --delegation "$domain" || exit 1
+    if ss -lunH | awk '{print $4}' | grep -Ev '^(127\.|\[::1\])' | grep -Eq ':53$' && ! "${compose[@]}" ps --services --status running 2>/dev/null | grep -qx acme-responder; then
+        echo 'Port 53 is already used on this server (often systemd-resolved listening on all addresses). Free it or pass --public-ip ADDRESS so the responder binds only that address; nothing was changed.' >&2
+        exit 1
+    fi
+}
 if $switch_tls; then
     [[ -f "$install_dir/release.env" && -f "$install_dir/.env" ]] || { echo 'No installation was found to switch. Run the installer without --switch-tls first.' >&2; exit 1; }
     [[ -f "$install_dir/configure.py" && -f "$install_dir/explain_certificate_failure.py" ]] || { echo "This server's installed tools predate the TLS switch. Update to a release that includes it first: sudo bash $install_dir/update.sh" >&2; exit 1; }
@@ -93,16 +112,22 @@ if $switch_tls; then
     command -v python3 >/dev/null && docker info >/dev/null || { echo 'Docker and python3 are required.' >&2; exit 1; }
     token_args=()
     [[ -z "$token_file" ]] || token_args=(--cloudflare-token-file "$token_file")
-    python3 "$install_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" ${token_args[@]+"${token_args[@]}"} || exit 1
     domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "$config_dir/installation.json")
     export CONFIG_DIR="$config_dir"
+    [[ "$tls_mode" != delegated ]] || check_delegated_ready
+    python3 "$install_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" ${token_args[@]+"${token_args[@]}"} || exit 1
+    "${compose[@]}" --profile delegated stop acme-responder >/dev/null 2>&1 || true
+    set_delegated_env
     "${compose[@]}" config --quiet
+    if [[ "$tls_mode" == delegated ]]; then "${compose[@]}" up -d acme-responder || exit 1; else "${compose[@]}" --profile delegated rm -f acme-responder >/dev/null 2>&1 || true; fi
     certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     # Always restart and check, so a switch that failed its HTTPS check can be retried with the same command.
     # Traefik reads its certificate resolver at start; the API rewrites published app routes with the new resolver at start.
     "${compose[@]}" restart traefik api
     verify_https
-    if [[ "$tls_mode" == cloudflare ]]; then
+    if [[ "$tls_mode" == delegated ]]; then
+        echo "TLS mode is delegated: published apps use *.apps.$domain. Let's Encrypt asks this server's DNS responder (port 53) for the challenge; the one record is: $(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import check_dns; print(check_dns.delegation_record(sys.argv[2]))' "$bundle_dir" "$domain")"
+    elif [[ "$tls_mode" == cloudflare ]]; then
         echo "TLS mode is cloudflare: published apps use *.apps.$domain. Traefik requests the wildcard certificate on first use through the Cloudflare DNS challenge."
     else
         echo 'TLS mode is http (HTTP-validated certificates). The Cloudflare token file is empty; port 80 must stay reachable.'
@@ -240,6 +265,7 @@ fi
 [[ -n "$email" ]] || read -r -p 'Certificate notification email: ' email
 if ! $configure_only && [[ -f "$bundle_dir/check_dns.py" ]]; then
     python3 "$bundle_dir/check_dns.py" "$domain" "${public_ips[@]}"
+    if [[ "$tls_mode" == delegated ]]; then python3 "$bundle_dir/check_dns.py" --delegation "$domain" || exit 1; fi
 fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
@@ -261,7 +287,7 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py; do
+for script in backup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py acme_responder.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
@@ -272,6 +298,7 @@ fi
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.
 printf 'CONFIG_DIR=%s\nBACKUP_DIR=%s/backups\n' "$config_dir" "$install_dir" > "$install_dir/.env"
+set_delegated_env
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 "${compose[@]}" config --quiet
 printf 'DNS must resolve api.%s, studio.%s, store.%s, apps.%s and *.apps.%s to this server. Allow inbound TCP 80, 443 and 5671.\n' "$domain" "$domain" "$domain" "$domain" "$domain"

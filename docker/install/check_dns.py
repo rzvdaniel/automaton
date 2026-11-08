@@ -2,6 +2,7 @@
 import ipaddress
 import json
 import socket
+import struct
 import subprocess
 import sys
 import uuid
@@ -66,6 +67,57 @@ def check_dns(domain, expected):
             raise ValueError(f'{record}: points outside this server. Correct or remove any wrong A/AAAA records.')
 
 
+def ns_query(zone, resolver='1.1.1.1'):
+    """Names the public DNS returns for the NS records of zone (one UDP query; stdlib only)."""
+    ident = uuid.uuid4().int & 0xFFFF
+    name = b''.join(bytes([len(label)]) + label.encode() for label in zone.split('.')) + b'\x00'
+    query = struct.pack('!HHHHHH', ident, 0x0100, 1, 0, 0, 0) + name + struct.pack('!HH', 2, 1)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(5)
+        sock.sendto(query, (resolver, 53))
+        data = sock.recv(4096)
+    answers = struct.unpack('!H', data[6:8])[0]
+    offset = 12 + len(name) + 4
+
+    def read_name(offset):
+        labels, jumped, end = [], False, offset
+        while True:
+            length = data[offset]
+            if length & 0xC0:
+                pointer = struct.unpack('!H', data[offset:offset + 2])[0] & 0x3FFF
+                end = end if jumped else offset + 2
+                offset, jumped = pointer, True
+            elif length == 0:
+                return '.'.join(labels).lower(), (end if jumped else offset + 1)
+            else:
+                labels.append(data[offset + 1:offset + 1 + length].decode('ascii'))
+                offset += 1 + length
+
+    names = []
+    for _ in range(answers):
+        _, offset = read_name(offset)
+        rtype, _, _, length = struct.unpack('!HHIH', data[offset:offset + 10])
+        offset += 10
+        if rtype == 2:
+            names.append(read_name(offset)[0])
+        offset += length
+    return names
+
+
+def delegation_record(domain):
+    return f'_acme-challenge.apps.{domain}  NS  api.{domain}'
+
+
+def check_delegation(domain):
+    zone = f'_acme-challenge.apps.{domain}'
+    try:
+        names = ns_query(zone)
+    except (OSError, struct.error, IndexError, ValueError) as error:
+        raise ValueError(f'could not look up {zone}: {error}') from error
+    if f'api.{domain}' not in names:
+        raise ValueError(f'the DNS record is missing. Add this record at your DNS host, then run the command again:\n    {delegation_record(domain)}')
+
+
 def main(domain, overrides):
     try:
         expected = public_addresses(overrides)
@@ -78,4 +130,13 @@ def main(domain, overrides):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2:])
+    if sys.argv[1] == '--delegation':  # check the one record of the delegated TLS mode
+        try:
+            check_delegation(sys.argv[2])
+        except ValueError as error:
+            raise SystemExit(f'Delegated TLS preflight failed: {error}') from error
+        print('The delegation record was found.')
+    elif sys.argv[1] == '--bind-address':  # the IPv4 address the DNS responder listens on (empty when none)
+        print(next(iter(sorted(str(a) for a in public_addresses(sys.argv[2:]) if a.version == 4)), ''))
+    else:
+        main(sys.argv[1], sys.argv[2:])

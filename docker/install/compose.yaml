@@ -95,6 +95,8 @@ services:
     ports: ['80:80', '443:443', '5671:5671']
     environment:
       CF_DNS_API_TOKEN_FILE: /run/secrets/cloudflare_token
+      # Used only by the delegated TLS mode (#891): Traefik hands DNS challenges to the responder below.
+      HTTPREQ_ENDPOINT: http://acme-responder:8053
     secrets: [cloudflare_token]
     volumes:
       - ${CONFIG_DIR:?}/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -106,6 +108,19 @@ services:
       test: [CMD, traefik, healthcheck, --ping]
       interval: 10s
       retries: 30
+  # Delegated TLS mode only (COMPOSE_PROFILES=delegated in .env): answers Let's Encrypt's DNS challenge for
+  # _acme-challenge.apps.<domain> and nothing else. Port 53 is published only when this service runs.
+  acme-responder:
+    profiles: [delegated]
+    image: ${RESPONDER_IMAGE:-python:3-alpine}
+    restart: unless-stopped
+    logging: *logging
+    command: [python, -u, /responder.py, --zone, '_acme-challenge.apps.${DOMAIN:-}', --ns-name, 'api.${DOMAIN:-}']
+    ports: ['${DNS_BIND:-0.0.0.0}:53:53/udp', '${DNS_BIND:-0.0.0.0}:53:53/tcp']
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    volumes: ['./acme_responder.py:/responder.py:ro']
 secrets:
   postgres_password: {file: '${CONFIG_DIR:?}/secrets/postgres-password'}
   cloudflare_token: {file: '${CONFIG_DIR:?}/secrets/cloudflare-token'}

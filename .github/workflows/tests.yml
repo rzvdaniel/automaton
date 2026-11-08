@@ -64,6 +64,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 scripts/tests/mysql-to-postgres-conversion-test.py
       - run: python3 scripts/tests/postgres-migration-override-test.py
+      - run: python3 scripts/tests/acme-responder-test.py
       - run: python3 scripts/tests/server-install-dns-test.py
       - run: python3 scripts/tests/server-install-certificate-test.py
       - run: bash -n docker/install/migrate-to-postgresql.sh
