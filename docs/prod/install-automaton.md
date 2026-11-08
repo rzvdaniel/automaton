@@ -34,6 +34,8 @@ Use records that reach the server directly for setup. Keep the API hostname dire
 
 The default HTTPS mode issues certificates through HTTP validation, including individual application hostnames when they are deployed. Port 80 must remain publicly reachable for issuance/renewal. For many application hostnames, `--tls-mode cloudflare` enables a wildcard certificate instead: provide a Cloudflare API token with Zone Read and DNS Edit restricted to the domain's zone. The token prompt is hidden. A local evaluation mode without a public domain is not yet supported.
 
+On a fresh install, the first administrator and connected Runner trigger installation of Server Console, Website Monitor and Heartbeat from their pinned commits in the official catalog. They appear in the administrator's **Apps** list, unpublished and without approved permissions. Before connecting the Runner, set `Catalog.InstallEssentialsOnFirstRunner` to `false` in `/etc/automaton/appsettings.Production.json` and restart the API to opt out. Apps already installed are not removed by changing this setting; remove an unwanted app through **Apps → Settings → Danger Zone**.
+
 ## Install
 
 For the latest stable server release, download the public installer, review it, then run it. It selects the release from GitHub, downloads the bundle, and verifies its checksum:

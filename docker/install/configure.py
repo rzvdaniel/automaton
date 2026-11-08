@@ -192,6 +192,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
                                    RequireLowercase=True, RequireNonAlphanumeric=True),
         'CloudflareTurnstile': {'Enabled': False},
         'HostedRunners': {'Enabled': False, 'ServerUrl': api, 'DockerImage': runner_image},
+        'Catalog': {'InstallEssentialsOnFirstRunner': True},
         'PublishedApps': dict(ApiBaseUrl=api, PublicBaseUrl=apps, RootPath='/app/AppData/published-apps',
                               RuntimeProxyAuthKey=secret(root, 'runtime-proxy-key'), TraefikDynamicConfigRoot='/app/AppData/traefik-dynamic', RuntimeTunnelServiceName='api', CertificateResolver=resolver),
         'DataProtection': {'KeysPath': '/app/data-protection-keys'},
