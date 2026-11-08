@@ -265,9 +265,9 @@ public sealed class AppCatalogService(
         return result;
     }
 
-    /// <summary>GitHub names ignore case, and a folder may be saved with a stray slash, so installed apps match the catalog on a normalised key.</summary>
+    /// <summary>GitHub repo names ignore case (folders do not), and a folder may be saved with a stray slash, so installed apps match the catalog on a normalised key.</summary>
     private static (string Repo, string Folder) InstalledKey(string repo, string? folder) =>
-        (repo.Trim().ToLowerInvariant(), (folder ?? "").Trim().Trim('/').ToLowerInvariant());
+        (repo.Trim().ToLowerInvariant(), (folder ?? "").Trim().Trim('/'));
 
     private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source)
     {

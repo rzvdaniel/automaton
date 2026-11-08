@@ -187,6 +187,22 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task Get_DoesNotMatchInstalledAppWhenOnlyTheFolderCaseDiffers()
+    {
+        await using var db = CreateDb();
+        var owner = Guid.NewGuid();
+        var app = new WebApp { Id = Guid.NewGuid(), Name = "Backup", InstalledFromRepo = "owner/apps", InstalledFromFolder = "Maintenance/Backup" };
+        db.WebApps.Add(app);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = app.Id, UserId = owner });
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeHandler(_ => Respond(CatalogJson, null)), version: "server-v0.2.30");
+
+        var response = await service.GetAsync(owner, refresh: true, default);
+
+        Assert.That(response.Apps.Single().InstalledAppId, Is.Null);
+    }
+
+    [Test]
     public async Task Get_MarksInstalledEntriesForTheirOwnerOnly_AndEntriesNeedingANewerServer()
     {
         await using var db = CreateDb();
