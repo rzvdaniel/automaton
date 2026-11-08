@@ -63,7 +63,7 @@ const navItems: AdminNavItem[] = [
   },
 ]
 
-const visibleNavItems = computed(() => navItems)
+const visibleNavItems = navItems
 
 const isActive = (item: AdminNavItem) => {
   return route.path.startsWith(item.routePrefix)

@@ -14,6 +14,8 @@ import { adminRoutes } from '@/features/admin/routes'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  // Links such as /settings#agents scroll to their section.
+  scrollBehavior: (to, _from, saved) => saved ?? (to.hash ? { el: to.hash, behavior: 'smooth', top: 16 } : undefined),
   routes: [
     {
       path: '/terms',
