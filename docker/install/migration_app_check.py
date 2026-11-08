@@ -24,17 +24,13 @@ ADMIN_ENDPOINTS = {
     'apps': '/api/admin/apps',
     'runners': '/api/runners',
     'schedules': '/api/action-schedules',
-    'projects': '/api/projects',
     'apikeys': '/api/ApiKeys',
 }
 USER_ENDPOINTS = {
     'apps': '/api/apps',
     'runners': '/api/runners',
     'schedules': '/api/action-schedules',
-    'projects': '/api/projects',
     'apikeys': '/api/ApiKeys',
-    'flows': '/api/flows',
-    'customsteps': '/api/customsteps',
 }
 
 

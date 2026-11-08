@@ -681,7 +681,6 @@ internal static class ApiOperationsRegistration
     {
         services.AddScoped<ApiKeyService>();
         services.AddScoped<AiApiKeyService>();
-        services.AddScoped<AdminAiProviderCreationService>();
         services.AddScoped<AiProviderMetadataService>();
         services.AddScoped<AiConversationProviderResolver>();
         services.AddScoped<AiConversationHistoryPersistenceService>();
