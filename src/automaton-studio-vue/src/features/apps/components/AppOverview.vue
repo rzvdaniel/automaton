@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
 import type { ActionModule, ActionSchedule } from '../services/action-schedules.service'
 import { appsService, type AppActionExecution } from '../services/apps.service'
 import type { App, AppDeploymentTarget, AppPermissionStatus, AppSharing } from '../types/apps.types'
@@ -20,41 +22,45 @@ const props = defineProps<{
   executions: ReadonlyArray<AppActionExecution>
   schedules: ReadonlyArray<ActionSchedule>
   actions: ReadonlyArray<ActionModule>
-  /** The address people open the app at; empty when it is not live. */
+  /** The address people open the app at (the public one once published); empty when it is not live. */
   address: string
+  /** The public address, set only while the app is published. */
+  publicAddress: string
+  /** The sign-in address, for people the app is shared with. */
+  privateAddress: string
+  sharing: AppSharing | null
 }>()
 const emit = defineEmits<{ navigate: [view: AppViewKey]; share: [] }>()
+const toast = useToast()
 
 const secretNames = ref<string[] | null>(null)
 const permissions = ref<AppPermissionStatus[]>([])
-const sharing = ref<AppSharing | null>(null)
 
 watch(() => props.app.id, async (id) => {
   secretNames.value = null
   permissions.value = []
-  sharing.value = null
-  const [secrets, perms, share] = await Promise.allSettled([
+  const [secrets, perms] = await Promise.allSettled([
     appsService.listSecrets(id),
     appsService.getPermissions(id),
-    appsService.getSharing(id),
   ])
   if (props.app.id !== id) return
   if (secrets.status === 'fulfilled') secretNames.value = secrets.value.map((secret) => secret.name)
   if (perms.status === 'fulfilled') permissions.value = perms.value.permissions
-  if (share.status === 'fulfilled') sharing.value = share.value
 }, { immediate: true })
 
+/** Only people who can change the app change who opens it. */
+const canShare = computed(() => props.app.canUpdate !== false)
 const kind = computed(() => appKindOf(props.app))
 const liveTarget = computed(() => getLiveTarget([...props.targets]))
 const host = computed(() => (props.address ? new URL(props.address).host : ''))
 const lastRun = computed(() => [...props.executions].sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0] ?? null)
-const peopleCount = computed(() => sharing.value?.people.length ?? 0)
+const peopleCount = computed(() => props.sharing?.people.length ?? 0)
 const sentence = computed<Segment[]>(() => statusSentence({
   kind: kind.value,
   lastRun: lastRun.value,
   schedules: props.schedules,
   host: host.value,
-  audience: sharing.value?.audience,
+  audience: props.sharing?.audience,
   peopleCount: peopleCount.value,
   lastDeployedAt: liveTarget.value?.lastSuccessfulDeploymentAt,
   deployError: liveTarget.value?.lastDeploymentError,
@@ -73,12 +79,21 @@ const missingSecrets = computed(() => secretNames.value === null
 const secretCount = computed(() => Math.max(declaredSecrets.value.length, secretNames.value?.length ?? 0))
 const dataDirectory = computed(() => props.app.application?.storage?.dataDirectory ?? '')
 const pageUrl = (path: string) => new URL(path, props.address).toString()
+
+async function copy(url: string) {
+  try {
+    await navigator.clipboard.writeText(url)
+    toast.add({ severity: 'success', summary: 'Address copied', life: 2000 })
+  } catch {
+    toast.add({ severity: 'warn', summary: 'Copy this address', detail: url, life: 6000 })
+  }
+}
 const pages = computed(() => props.app.application?.pages ?? [])
 const healthPath = computed(() => props.app.application?.health?.path ?? '')
 const whoLabel = computed(() => kind.value === 'api' ? 'Who can call it' : 'Who can open it')
-const whoValue = computed(() => kind.value === 'api' && sharing.value?.audience !== 'internet'
+const whoValue = computed(() => kind.value === 'api' && props.sharing?.audience !== 'internet'
   ? 'Callers with an API key'
-  : audienceLabel(sharing.value?.audience, peopleCount.value))
+  : audienceLabel(props.sharing?.audience, peopleCount.value))
 
 const source = computed(() => {
   const runner = liveTarget.value?.runner?.name
@@ -103,44 +118,67 @@ const source = computed(() => {
       </p>
     </section>
 
+    <section v-if="privateAddress && kind !== 'tool'" class="card" aria-labelledby="addresses-title" data-testid="addresses">
+      <h2 id="addresses-title">Addresses</h2>
+      <div v-if="publicAddress" class="row">
+        <span><strong>Public</strong> <span class="hint">· anyone with the link</span><br><span class="mono">{{ publicAddress }}</span></span>
+        <Button label="Copy" icon="pi pi-copy" size="small" severity="secondary" outlined @click="copy(publicAddress)" />
+      </div>
+      <div class="row">
+        <span><strong>Private</strong> <span class="hint">· sign-in, for people it is shared with</span><br><span class="mono">{{ privateAddress }}</span></span>
+        <Button label="Copy" icon="pi pi-copy" size="small" severity="secondary" outlined @click="copy(privateAddress)" />
+      </div>
+    </section>
+
     <div class="grid">
       <section class="card" aria-labelledby="does-title">
-        <h2 id="does-title">What it does</h2>
-        <div v-for="page in pages" :key="(page.method ?? '') + page.path" class="row">
+        <div class="card-head">
+          <h2 id="does-title">What it does</h2>
+          <Button :label="'Activity ›'" size="small" severity="secondary" outlined @click="emit('navigate', 'activity')" />
+        </div>
+        <component
+          :is="kind === 'web' && address ? 'a' : 'div'"
+          v-for="page in pages"
+          :key="(page.method ?? '') + page.path"
+          class="row"
+          :class="{ 'row--link': kind === 'web' && address }"
+          v-bind="kind === 'web' && address ? { href: pageUrl(page.path), target: '_blank', rel: 'noopener noreferrer' } : {}"
+        >
           <span><span v-if="page.method" class="mono">{{ page.method }} </span><strong>{{ page.path }}</strong><span v-if="page.description" class="hint"> · {{ page.description }}</span></span>
-          <a v-if="kind === 'web' && address" :href="pageUrl(page.path)" target="_blank" rel="noopener noreferrer">open</a>
-        </div>
+          <i v-if="kind === 'web' && address" class="pi pi-chevron-right chevron" aria-hidden="true"></i>
+        </component>
         <div v-if="pages.length === 0 && kind === 'site'" class="row"><span><strong>Pages</strong> <span class="hint">· files served as they are</span></span></div>
-        <div v-else-if="pages.length === 0 && kind === 'web'" class="row">
-          <span><strong>Web pages</strong> <span class="hint">· served at its address</span></span>
-          <a v-if="address" :href="address" target="_blank" rel="noopener noreferrer">open</a>
-        </div>
+        <div v-else-if="pages.length === 0 && kind === 'web'" class="row"><span><strong>Web pages</strong> <span class="hint">· served at its address</span></span></div>
         <div v-if="kind === 'web' && healthPath" class="row"><span><strong>{{ healthPath }}</strong> <span class="hint">· health check</span></span></div>
         <div v-for="action in actions" :key="action.key" class="row">
           <span><strong>{{ action.name || action.key }}</strong><span v-if="action.description" class="hint"> · {{ action.description }}</span><span v-else-if="kind !== 'tool'" class="hint"> · action</span></span>
           <span class="mono hint">{{ scheduleFor(action.key) }}</span>
         </div>
         <p v-if="kind === 'tool' && actions.length === 0" class="hint">No actions are listed. They show once the app is deployed and its Runner is online.</p>
-        <a href="#activity" class="more" @click.prevent="emit('navigate', 'activity')">{{ kind === 'tool' ? 'See every run' : 'See activity' }}</a>
       </section>
 
       <section class="card" aria-labelledby="needs-title">
-        <h2 id="needs-title">What it needs</h2>
-        <div v-if="dataDirectory && kind !== 'site' && kind !== 'tool'" class="row"><span>Data folder</span><span class="mono hint">{{ dataDirectory }}</span></div>
-        <div v-if="secretCount > 0" class="row">
-          <span>{{ secretCount }} {{ secretCount === 1 ? 'secret' : 'secrets' }}</span>
-          <span v-if="secretNames !== null" class="pill" :class="missingSecrets > 0 ? 'pill--bad' : 'pill--ok'">{{ missingSecrets > 0 ? `${missingSecrets} missing` : 'all set' }}</span>
+        <div class="card-head">
+          <h2 id="needs-title">What it needs</h2>
+          <Button label="Settings ›" size="small" severity="secondary" outlined @click="emit('navigate', 'settings')" />
         </div>
+        <div v-if="dataDirectory && kind !== 'site' && kind !== 'tool'" class="row"><span>Data folder</span><span class="mono hint">{{ dataDirectory }}</span></div>
+        <button v-if="secretCount > 0" type="button" class="row row--link" @click="emit('navigate', 'settings')">
+          <span>{{ secretCount }} {{ secretCount === 1 ? 'secret' : 'secrets' }}</span>
+          <span class="end">
+            <span v-if="secretNames !== null" class="pill" :class="missingSecrets > 0 ? 'pill--bad' : 'pill--ok'">{{ missingSecrets > 0 ? `${missingSecrets} missing` : 'all set' }}</span>
+            <i class="pi pi-chevron-right chevron" aria-hidden="true"></i>
+          </span>
+        </button>
         <div v-for="item in permissions" :key="item.permission" class="row">
           <span>{{ item.permission }}</span>
           <span class="pill" :class="item.approved ? 'pill--ok' : 'pill--bad'">{{ item.approved ? 'approved' : 'waiting for approval' }}</span>
         </div>
         <p v-if="kind === 'tool' && secretCount === 0 && permissions.length === 0" class="hint">Nothing to set up.</p>
         <div v-if="kind !== 'tool'" class="row">
-          <span>{{ whoLabel }}</span>
-          <span class="hint">{{ whoValue }} · <a href="#share" @click.prevent="emit('share')">share</a></span>
+          <span>{{ whoLabel }}<br><span class="hint">{{ whoValue }}</span></span>
+          <Button v-if="canShare" label="Change" size="small" severity="secondary" outlined @click="emit('share')" />
         </div>
-        <a href="#settings" class="more" @click.prevent="emit('navigate', 'settings')">Change in Settings</a>
       </section>
     </div>
 
@@ -162,7 +200,11 @@ h2 { margin: 0; font-size: 16px; font-weight: 600; }
 p.hint { margin: 0; }
 .mono { font-family: var(--mono); font-size: 12px; }
 .status .mono { font-size: 15px; }
-.more { font-size: 13px; color: var(--signal-ink); }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.row--link { width: 100%; border-width: 0 0 1px; background: none; color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.row--link:hover { background: var(--row-line); }
+.chevron { color: var(--ink-soft); font-size: 12px; }
+.end { display: inline-flex; align-items: center; gap: 10px; }
 .pill { padding: 3px 10px; border-radius: 999px; font-family: var(--mono); font-size: 12px; }
 .pill--ok { border: 1px solid var(--ok); color: var(--ok); }
 .pill--bad { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }

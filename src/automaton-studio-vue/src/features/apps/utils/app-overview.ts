@@ -76,6 +76,16 @@ export function audienceSentence(audience: SharingAudience | undefined, peopleCo
   }
 }
 
+/** The short label for the access pill in the header. */
+export function accessLabel(audience: SharingAudience | undefined): string {
+  switch (audience) {
+    case 'internet': return 'Public'
+    case 'server': return 'Everyone on this server'
+    case 'people': return 'People I choose'
+    default: return 'Only you'
+  }
+}
+
 export function audienceLabel(audience: SharingAudience | undefined, peopleCount: number): string {
   switch (audience) {
     case 'internet': return 'Anyone with the link'
