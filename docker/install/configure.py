@@ -129,9 +129,9 @@ def read_cloudflare_token(token_file=None):
     return token
 
 
-def replace_text(path, content):
+def replace_text(path, content, mode=None):
     # Atomically replace a private file, keeping its permissions (0600 for a new one).
-    mode = path.stat().st_mode & 0o777 if path.exists() else 0o600
+    mode = mode or (path.stat().st_mode & 0o777 if path.exists() else 0o600)
     with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
         temporary = Path(stream.name)
         stream.write(content)
@@ -210,7 +210,7 @@ def switch_tls(root, tls_mode, token_file=None):
     updates[token_path] = token
     updates[state_path] = json.dumps(dict(state, tls_mode=tls_mode), indent=2)
     for path, content in updates.items():  # installation.json last: it records the completed switch.
-        replace_text(path, content)
+        replace_text(path, content, 0o600 if path == token_path else None)
     return True
 
 

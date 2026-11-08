@@ -119,7 +119,7 @@ Preserve generated encryption/signing keys and Data Protection volumes. Back up 
 
 ## Switch the TLS mode
 
-An installed server can move between HTTP-validated certificates (`http`) and wildcard certificates (`cloudflare`) without reinstalling. Use `cloudflare` when many published apps would exceed Let's Encrypt's limit of 50 certificates per registered domain per week. Run the installer that was copied to the server (install the latest release with the updater first if your copy predates this option):
+An installed server can move between HTTP-validated certificates (`http`) and wildcard certificates (`cloudflare`) without reinstalling. Use `cloudflare` when many published apps would exceed Let's Encrypt's limit of 50 certificates per registered domain per week. Run the installer that was copied to the server (update the server with `sudo bash /opt/automaton-server/update.sh` first if it is on a release before this option; the updater installs the tools this command uses):
 
 ```bash
 sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare
@@ -129,7 +129,7 @@ The token (Cloudflare Zone Read + DNS Edit for the domain's zone) is read from a
 
 To go back: `sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode http` empties the token file and returns to HTTP validation (port 80 must be reachable). Running the command for the mode already in use changes nothing.
 
-The domain and email still cannot be changed. Credentials, the database and Docker volumes are never touched. If `traefik.yml` or `dynamic/installation.yml` was written by hand (an adopted installation), the command refuses without changing anything. Keep your DNS records set to *DNS only*.
+The domain and email still cannot be changed. Credentials, the database and Docker volumes are never touched. If `traefik.yml` or `dynamic/installation.yml` was written by hand (an adopted installation), the command refuses without changing anything. The command can be repeated safely: it restarts Traefik and checks HTTPS each time, so a switch that failed its check can be retried. Keep your DNS records set to *DNS only*.
 
 ## Update an installed server
 

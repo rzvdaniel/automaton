@@ -316,6 +316,9 @@ install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
 install -m 0644 "$bundle/version" "$install_dir/version"
 install -m 0700 "$bundle/update.sh" "$install_dir/update.sh"
 install -m 0700 "$bundle/install.sh" "$install_dir/install.sh"
+for tool in configure.py explain_certificate_failure.py; do
+    [[ ! -f "$bundle/$tool" ]] || install -m 0700 "$bundle/$tool" "$install_dir/$tool"
+done
 echo "Updated to $version. Recovery backup: $backup"
 ensure_backups
 # Housekeeping runs only after success; a failure here never affects the completed update.

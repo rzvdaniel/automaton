@@ -45,14 +45,69 @@ done
 exec 9>/run/lock/automaton-install.lock
 flock -n 9 || { echo 'Another installer is running.' >&2; exit 1; }
 unset API_IMAGE WORKER_IMAGE STUDIO_IMAGE STORE_IMAGE POSTGRES_IMAGE RABBITMQ_IMAGE TRAEFIK_IMAGE RUNNER_IMAGE
+compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
+if [[ -e "$install_dir/compose.override.yaml" || -L "$install_dir/compose.override.yaml" ]]; then
+    [[ -f "$install_dir/compose.override.yaml" && ! -L "$install_dir/compose.override.yaml" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
+    compose+=(-f "$install_dir/compose.override.yaml")
+fi
 if $status_only; then
-    compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
-    if [[ -e "$install_dir/compose.override.yaml" || -L "$install_dir/compose.override.yaml" ]]; then
-        [[ -f "$install_dir/compose.override.yaml" && ! -L "$install_dir/compose.override.yaml" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
-        compose+=(-f "$install_dir/compose.override.yaml")
-    fi
     "${compose[@]}" ps
     exit
+fi
+verify_https() {
+echo 'Waiting for HTTPS certificates…'
+explain_https_failure() {
+    printf 'The HTTPS check failed at %s. The services may be healthy, but HTTPS is not ready.\n' "$1" >&2
+    "${compose[@]}" logs --no-color --since "$certificate_attempt_started" --tail 300 traefik 2>/dev/null \
+        | python3 "$bundle_dir/explain_certificate_failure.py" "$domain" || true
+    exit 1
+}
+# Older bundles use /healthz and predate the public /health check.
+if grep -Fq 'http://127.0.0.1:8080/health]' "$install_dir/compose.yaml"; then
+    api_health=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health" 2>/dev/null) \
+        || explain_https_failure "https://api.$domain/health"
+    printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' 2>/dev/null || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
+fi
+studio_status=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" 2>/dev/null) \
+    || explain_https_failure "https://studio.$domain/api/install/status"
+python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response' <<< "$studio_status" 2>/dev/null \
+    || { echo 'The Studio installation status response was invalid.' >&2; exit 1; }
+curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null \
+    || explain_https_failure "https://studio.$domain/"
+curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
+    || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
+python3 - "$domain" <<'PYBROKER'
+import socket, ssl, sys
+with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
+    with ssl.create_default_context().wrap_socket(raw, server_hostname='api.' + sys.argv[1]) as broker:
+        broker.sendall(b'AMQP\x00\x00\x09\x01')
+        if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
+PYBROKER
+}
+if $switch_tls; then
+    [[ -f "$install_dir/release.env" && -f "$install_dir/.env" ]] || { echo 'No installation was found to switch. Run the installer without --switch-tls first.' >&2; exit 1; }
+    [[ -f "$install_dir/configure.py" && -f "$install_dir/explain_certificate_failure.py" ]] || { echo "This server's installed tools predate the TLS switch. Update to a release that includes it first: sudo bash $install_dir/update.sh" >&2; exit 1; }
+    bundle_dir="$install_dir"
+    $tls_mode_given || { echo 'Say which mode to switch to: --switch-tls --tls-mode cloudflare (or http).' >&2; exit 1; }
+    [[ -z "$domain$email" ]] || { echo '--switch-tls changes only the TLS mode; the domain and email cannot be changed.' >&2; exit 1; }
+    command -v python3 >/dev/null && docker info >/dev/null || { echo 'Docker and python3 are required.' >&2; exit 1; }
+    token_args=()
+    [[ -z "$token_file" ]] || token_args=(--cloudflare-token-file "$token_file")
+    python3 "$install_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" ${token_args[@]+"${token_args[@]}"} || exit 1
+    domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "$config_dir/installation.json")
+    export CONFIG_DIR="$config_dir"
+    "${compose[@]}" config --quiet
+    certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    # Always restart and check, so a switch that failed its HTTPS check can be retried with the same command.
+    # Traefik reads its certificate resolver at start; the API rewrites published app routes with the new resolver at start.
+    "${compose[@]}" restart traefik api
+    verify_https
+    if [[ "$tls_mode" == cloudflare ]]; then
+        echo "TLS mode is cloudflare: published apps use *.apps.$domain. Traefik requests the wildcard certificate on first use through the Cloudflare DNS challenge."
+    else
+        echo 'TLS mode is http (HTTP-validated certificates). The Cloudflare token file is empty; port 80 must stay reachable.'
+    fi
+    exit 0
 fi
 if [[ -e "$install_dir/compose.override.yaml" || -L "$install_dir/compose.override.yaml" ]]; then
     echo 'This installation has reviewed Compose overrides. Use update.sh for releases; the fresh installer cannot reconfigure it.' >&2
@@ -170,61 +225,6 @@ if [[ ! -f "$install_dir/release.env" ]]; then
         exit 1
     fi
 fi
-verify_https() {
-echo 'Waiting for HTTPS certificates…'
-explain_https_failure() {
-    printf 'The HTTPS check failed at %s. The services may be healthy, but HTTPS is not ready.\n' "$1" >&2
-    "${compose[@]}" logs --no-color --since "$certificate_attempt_started" --tail 300 traefik 2>/dev/null \
-        | python3 "$bundle_dir/explain_certificate_failure.py" "$domain" || true
-    exit 1
-}
-# Older bundles use /healthz and predate the public /health check.
-if grep -Fq 'http://127.0.0.1:8080/health]' "$install_dir/compose.yaml"; then
-    api_health=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health" 2>/dev/null) \
-        || explain_https_failure "https://api.$domain/health"
-    printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' 2>/dev/null || { echo "Unexpected response from https://api.$domain/health." >&2; exit 1; }
-fi
-studio_status=$(curl --fail --silent --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" 2>/dev/null) \
-    || explain_https_failure "https://studio.$domain/api/install/status"
-python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response' <<< "$studio_status" 2>/dev/null \
-    || { echo 'The Studio installation status response was invalid.' >&2; exit 1; }
-curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null \
-    || explain_https_failure "https://studio.$domain/"
-curl --fail --silent --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
-    || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
-python3 - "$domain" <<'PYBROKER'
-import socket, ssl, sys
-with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
-    with ssl.create_default_context().wrap_socket(raw, server_hostname='api.' + sys.argv[1]) as broker:
-        broker.sendall(b'AMQP\x00\x00\x09\x01')
-        if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
-PYBROKER
-}
-if $switch_tls; then
-    [[ -f "$install_dir/release.env" ]] || { echo 'No installation was found to switch. Run the installer without --switch-tls first.' >&2; exit 1; }
-    $tls_mode_given || { echo 'Say which mode to switch to: --switch-tls --tls-mode cloudflare (or http).' >&2; exit 1; }
-    [[ -z "$domain$email" ]] || { echo '--switch-tls changes only the TLS mode; the domain and email cannot be changed.' >&2; exit 1; }
-    token_args=()
-    [[ -z "$token_file" ]] || token_args=(--cloudflare-token-file "$token_file")
-    switch_output=$(python3 "$bundle_dir/configure.py" --config-dir "$config_dir" --switch-tls --tls-mode "$tls_mode" "${token_args[@]}") || exit 1
-    echo "$switch_output"
-    domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "$config_dir/installation.json")
-    export CONFIG_DIR="$config_dir"
-    compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
-    "${compose[@]}" config --quiet
-    if [[ "$switch_output" == Switched* ]]; then
-        certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        # Traefik reads its certificate resolver at start; the API rewrites published app routes with the new resolver at start.
-        "${compose[@]}" restart traefik api
-        verify_https
-        if [[ "$tls_mode" == cloudflare ]]; then
-            echo "Switched to wildcard certificates: published apps now use *.apps.$domain. Traefik issues the wildcard certificate on first use through the Cloudflare DNS challenge."
-        else
-            echo 'Switched to HTTP-validated certificates. The Cloudflare token was emptied; port 80 must stay reachable.'
-        fi
-    fi
-    exit 0
-fi
 # Do not collide with an unrelated Compose installation or a server already on these ports.
 if ! $configure_only && [[ ! -f "$install_dir/release.env" ]]; then
     disk_path="$install_dir"
@@ -261,7 +261,7 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh restore.sh update-from-request.sh; do
+for script in backup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
