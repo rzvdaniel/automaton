@@ -83,7 +83,7 @@ internal static class StatusCommandHandler
             : 0;
         return new RemoteStatus(
             targets, defaultTarget, artifactDirectory, publicUrl, isPublished,
-            liveUrl, openAppUrl, version);
+            liveUrl, openAppUrl, version, CliAppDeclaration.From(app));
     }
 
     private static string? ResolveArtifactDirectory(ProjectContext context)
@@ -151,7 +151,8 @@ internal static class StatusCommandHandler
                 liveUrl = remote.LiveUrl,
                 defaultTarget = remote.DefaultTarget,
                 remote.Targets,
-                remote.Version
+                remote.Version,
+                declaration = remote.Declaration
             }
         });
     }
@@ -174,6 +175,12 @@ internal static class StatusCommandHandler
         table.AddRow("open app", Optional(remote.OpenAppUrl));
         table.AddRow("published", remote.IsPublished ? "yes" : "no");
         table.AddRow("public url", remote.LiveUrl ?? "-");
+        table.AddRow("kind", remote.Declaration.Kind);
+        table.AddRow("description", Optional(remote.Declaration.Description));
+        table.AddRow("OpenAPI", Optional(remote.Declaration.OpenApi));
+        table.AddRow("pages", remote.Declaration.Pages.Count == 0
+            ? "-"
+            : string.Join(", ", remote.Declaration.Pages.Select(page => $"{page.Label} ({page.Path})")));
         return table;
     }
 
@@ -235,5 +242,6 @@ internal static class StatusCommandHandler
         bool IsPublished,
         string? LiveUrl,
         string? OpenAppUrl,
-        int Version);
+        int Version,
+        CliAppDeclaration Declaration);
 }

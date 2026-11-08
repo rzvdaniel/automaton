@@ -136,6 +136,7 @@ const source = computed(() => {
           <h2 id="does-title">What it does</h2>
           <Button :label="'Activity ›'" size="small" severity="secondary" outlined @click="emit('navigate', 'activity')" />
         </div>
+        <p v-if="props.app.application?.description" class="hint" data-testid="app-description">{{ props.app.application.description }}</p>
         <component
           :is="kind === 'web' && address ? 'a' : 'div'"
           v-for="page in pages"
