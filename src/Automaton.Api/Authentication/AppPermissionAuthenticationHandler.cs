@@ -11,12 +11,13 @@ public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOpt
     public const string BackupsReadPolicy = "AppPermission:backups:read";
     public const string ServerReadPolicy = "AppPermission:server:read";
 
-    /// <summary>Allows system administrators and apps whose approved credential carries the permission.</summary>
+    /// <summary>Allows system administrators (signed in or with a Developer API key) and apps whose approved credential carries the permission.</summary>
     public static void AddPermissionPolicy(Microsoft.AspNetCore.Authorization.AuthorizationOptions options, string policyName, string permission)
         => options.AddPolicy(policyName, policy => policy
-            .AddAuthenticationSchemes(Scheme, Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+            .AddAuthenticationSchemes(Scheme, ApiKeyAuthenticationSchemeOptions.DefaultScheme, Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
             .RequireAuthenticatedUser()
-            .RequireAssertion(context => context.User.IsInRole(Automaton.Api.Enums.UserRole.SystemAdministrator)
+            .RequireAssertion(context => (context.User.IsInRole(Automaton.Api.Enums.UserRole.SystemAdministrator)
+                    && context.User.FindFirst("api_key_scope")?.Value is null or nameof(Automaton.Core.Enums.ApiKeyScope.Developer))
                 || context.User.HasClaim("app_permission", permission)));
 }
 
