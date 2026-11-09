@@ -57,7 +57,7 @@ Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-vX.Y.Z"}`
 
 - **DNS check fails.** The installer lists the names that do not resolve to this server. Fix the records, wait for DNS, rerun the same command. Proxied (orange cloud) records break certificates and the Runner broker.
 - **Port in use or different installation found.** The installer refuses to take over. Free the port or use a clean server.
-- **Certificate not issued.** Port 80 must be reachable from the internet. If the installer reports a Let's Encrypt `429 rateLimited` error, the same host names have used their weekly limit (five certificates in seven days; repeated installs on one domain use it up). Wait until the retry time it prints or use other host names, then rerun the same command: it restarts Traefik so the certificates are requested again.
+- **Certificate not issued.** Port 80 must be reachable from the internet. If the installer reports a Let's Encrypt `429 rateLimited` error, the same host names have used their weekly limit (five certificates in seven days; repeated installs on one domain use it up). Wait until the retry time it prints or use other host names, then rerun the same command: if HTTPS is not answering it restarts Traefik so the certificates are requested again.
 - **Retrying.** Rerun the same command with the same domain and email; generated credentials are kept. Never run `docker compose down -v`: it deletes data.
 
 For custom paths, protected settings, adopted installs and recovery, see the [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md). To update or restore later: [Update the server](./update-server), [Back up and restore](./backup-restore).
