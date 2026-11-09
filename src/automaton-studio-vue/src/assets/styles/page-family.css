@@ -5,7 +5,9 @@
 .page-head__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .p-button.btn-small { min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; text-decoration: none; }
 .p-button.btn-small:hover { border-color: var(--signal); background: transparent; color: var(--ink); }
-.p-button.btn-main { min-height: 36px; background: var(--signal); border-color: var(--signal); color: var(--on-signal); border-radius: 999px; font-weight: 600; font-size: 13px; }
+.p-button.btn-main { min-height: 36px; background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; font-size: 13px; }
+.p-button.btn-main:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
+.p-button.btn-main:disabled { opacity: 0.6; }
 .studio-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; margin-bottom: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; }
 .studio-section { margin: 24px 0 8px; font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--ink); }
 .studio-section__count { margin-left: 6px; font-weight: 400; color: var(--ink-soft); }

@@ -261,15 +261,19 @@ public sealed class AppCatalogService(
             .Select(app => new { app.Id, Repo = app.InstalledFromRepo!, Folder = app.InstalledFromFolder ?? "" })
             .ToListAsync(cancellationToken);
         var result = new Dictionary<(string, string), Guid>();
-        foreach (var row in rows) result.TryAdd((row.Repo, row.Folder), row.Id);
+        foreach (var row in rows) result.TryAdd(InstalledKey(row.Repo, row.Folder), row.Id);
         return result;
     }
+
+    /// <summary>GitHub repo names ignore case (folders do not), and a folder may be saved with a stray slash, so installed apps match the catalog on a normalised key.</summary>
+    private static (string Repo, string Folder) InstalledKey(string repo, string? folder) =>
+        (repo.Trim().ToLowerInvariant(), (folder ?? "").Trim().Trim('/'));
 
     private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source)
     {
         var minimum = ParseVersion(app.MinServerVersion);
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
-        Guid? installedId = installed.TryGetValue((repo, app.Folder), out var id) ? id : null;
+        Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id : null;
         return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
             app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon);
     }

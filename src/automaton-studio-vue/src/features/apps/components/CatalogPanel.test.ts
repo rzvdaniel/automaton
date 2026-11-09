@@ -14,10 +14,12 @@ vi.mock('../services/apps.service', () => ({ appsService: { getCatalogSources: (
 vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push, replace }), useRoute: () => ({ query: routeQuery.value }) }))
 
 import source from './CatalogPanel.vue?raw'
+import { readFileSync } from 'node:fs'
 import PrimeVue from 'primevue/config'
 import CatalogPanel from './CatalogPanel.vue'
 
 const RouterLink = { props: ['to'], template: '<a class="link" :data-to="JSON.stringify(to)"><slot /></a>' }
+const pageFamily = readFileSync('src/assets/styles/page-family.css', 'utf8')
 const entry = { id: 'backup', name: 'Off-site Backup', summary: 'Copies backups away', category: 'Maintenance', repo: 'o/apps', folder: 'm/backup', commit: '0123456789abcdef0123456789abcdef01234567', minServerVersion: '0.2.31', permissions: ['backups:read'], requiresNewerServer: false, installedAppId: null, sourceId: 'official', sourceName: 'Official', customSource: false }
 const mountPanel = () => mount(CatalogPanel, { attachTo: document.body, global: { plugins: [PrimeVue], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
 const button = (label: string) => document.body.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
@@ -40,12 +42,27 @@ describe('CatalogPanel', () => {
     wrapper.unmount()
   })
 
+  it('shows Installed, not Install, for an app installed from the official source', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, sourceId: 'official', customSource: false, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('.catalog-installed').text()).toBe('Installed')
+    expect(wrapper.find('.catalog-install').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps the Catalog and Installed chips on a labelled row and styles main buttons with ink on paper', () => {
+    expect(source).toContain(':show-label="true"')
+    expect(pageFamily).toMatch(/\.p-button\.btn-main \{[^}]*background: var\(--ink\)[^}]*color: var\(--paper\)/)
+    expect(pageFamily).not.toMatch(/\.p-button\.btn-main \{[^}]*on-signal/)
+  })
+
   it('shows Installed with a Manage link for an installed entry', async () => {
     getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-1' }], fetchedAt: null, stale: false, unavailable: false, message: null })
     const wrapper = mountPanel()
     await flushPromises()
     expect(wrapper.find('.catalog-installed').text()).toBe('Installed')
-    expect(wrapper.find('.link').exists()).toBe(false)
+    expect(wrapper.find('a.catalog-installed').attributes('data-to')).toBe(JSON.stringify({ name: 'app-editor', params: { id: 'app-1' } }))
     await wrapper.find('button[aria-label="Details of Off-site Backup"]').trigger('click')
     await flushPromises()
     expect(document.body.textContent).toContain('Manage')

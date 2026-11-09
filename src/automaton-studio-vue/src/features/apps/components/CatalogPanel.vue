@@ -171,7 +171,7 @@ async function installFromUrl() {
           @update:search="onSearch"
           @select="show({ category: $event || undefined, page: 1 })"
         />
-        <AppFilterBar :label="sourcePills.length > 1 ? 'Catalog' : 'Show'" :pills="sourcePills" :active="sourceActive" @select="pickSource" />
+        <AppFilterBar :label="sourcePills.length > 1 ? 'Catalog' : 'Show'" :pills="sourcePills" :active="sourceActive" :show-label="true" @select="pickSource" />
       </template>
       <p v-if="(catalog.totalApps ?? catalog.apps.length) === 0" class="catalog-note">The catalog has no apps yet.</p>
       <div v-else-if="catalog.apps.length === 0" class="apps-card apps-empty" role="status">
@@ -197,7 +197,7 @@ async function installFromUrl() {
             <span class="catalog-category">{{ app.category }}<template v-if="app.customSource"> · {{ app.sourceName }}</template></span>
           </template>
           <template #action>
-            <span v-if="app.installedAppId" class="catalog-installed">Installed</span>
+            <RouterLink v-if="app.installedAppId" :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="catalog-installed" :aria-label="`Open ${catalogName(app.name)}, installed`">Installed</RouterLink>
             <span v-else-if="app.requiresNewerServer" class="catalog-access">Needs Automaton Server {{ app.minServerVersion }} or newer</span>
             <RouterLink v-else :to="installTo(app)" class="p-button p-component p-button-outlined p-button-sm catalog-install" :aria-label="`Install ${catalogName(app.name)}`">Install</RouterLink>
           </template>
@@ -273,7 +273,8 @@ async function installFromUrl() {
 .catalog-foot { display: flex; align-items: center; gap: 12px; }
 .catalog-category { flex: none; color: var(--ink-soft); font-size: 12.5px; }
 .catalog-access { color: var(--ink-soft); font-size: 12px; opacity: 0.85; }
-.catalog-installed { flex: none; color: var(--ink-soft); font-family: var(--mono); font-size: 12px; }
+.catalog-installed { flex: none; color: var(--ink-soft); font-family: var(--mono); font-size: 12px; text-decoration: none; }
+.catalog-installed:hover { color: var(--ink); text-decoration: underline; }
 .catalog-install.p-button { flex: none; min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; text-decoration: none; }
 .catalog-install.p-button:hover { border-color: var(--signal); background: transparent; color: var(--ink); }
 .catalog-button { text-decoration: none; }

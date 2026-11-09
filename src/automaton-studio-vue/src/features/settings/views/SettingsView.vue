@@ -499,7 +499,7 @@ const passwordLoading = computed(() => passwordSaving.value)
       header="Change Password"
       :modal="true"
       :closable="!passwordLoading"
-      :style="{ width: '400px' }"
+      :style="{ width: '400px', maxWidth: '95vw' }"
     >
       <template v-if="passwordSuccess">
         <Message severity="success" :closable="false">
