@@ -29,7 +29,7 @@ This page installs the CLI, signs in and creates an app folder with `automaton.j
 
    On a server without a browser (SSH, an AI agent) use `automaton login --device --server https://api.example.com`. It prints an approval URL and a code, then waits; approve it from a signed-in session or with the terminal snippet in [Log in without a browser](./automaton-cli#log-in-without-a-browser). The `--device` output contains the code: do not share it.
 
-   Several servers: add `--profile NAME`, list with `automaton profiles`, switch with `automaton profiles use NAME` or the `AUTOMATON_PROFILE` environment variable. See [CLI reference](./automaton-cli#several-servers).
+   **Already signed in to another server?** `automaton login` replaces your default login. Add `--profile NAME` (for example `automaton login --profile mine --server https://api.example.com`) to keep the other one, then add `--profile NAME` to every later command or set `AUTOMATON_PROFILE`. Without a profile the CLI has one login and the deploy output shows `Deployment target: Live (default)`. List with `automaton profiles`, switch with `automaton profiles use NAME`. See [CLI reference](./automaton-cli#several-servers).
 
 3. Create the app in an empty folder. `--template` writes a runnable starter: `node`, `python`, `dotnet` or `static`. Omit it for an empty contract.
 

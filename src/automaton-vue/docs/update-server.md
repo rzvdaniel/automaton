@@ -25,7 +25,9 @@ This page updates the API, Worker, Studio and app store of your server to a newe
 
 2. In Studio instead: **Admin → Installation → Update** (the **Update to the latest release** button).
 
-3. Check the last run any time.
+3. Upgrade the Runners. A server update does not change Runners that are already installed; each keeps its old image until you upgrade it. `automaton server update --runners` waits for the update, names every Runner with its state and upgrades the ones on an old image (without `--runners`, `--wait` lists them with the command to upgrade each). In Studio, open **Runners**: a Runner on an old image shows **Update available** and an **Upgrade** button (**Upgrade → Upgrade now**); Studio then says whether it reconnected or rolled back. A Runner that is offline or busy with a deploy cannot upgrade; try again when it is idle, or run `automaton runners upgrade RUNNER --wait` later.
+
+4. Check the last run any time.
 
    ```bash
    automaton server update-status
