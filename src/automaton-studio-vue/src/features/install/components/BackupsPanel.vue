@@ -236,4 +236,5 @@ async function copy(command: string) {
 .backup-restore summary::-webkit-details-marker { display: none; }
 .backup-restore[open] { flex-basis: 100%; }
 .backup-row { flex-wrap: wrap; }
+.backup-row .studio-row__text { flex: 1 1 10rem; }
 </style>
