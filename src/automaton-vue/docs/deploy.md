@@ -9,7 +9,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
 
 ## Prerequisites
 
-- An app folder with `automaton.json` ([Create your first app](./getting-started)).
+- An app folder with `automaton.json` ([Your first app](./getting-started)).
 - At least one online Runner ([Add a Runner](./deploy-runner)).
 
 ## Steps
@@ -21,7 +21,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
    automaton deploy
    ```
 
-   With one online Runner it is assigned automatically. With several, add `--runner NAME`. `automaton deploy <target-slug>` selects a remote deployment target; `--env NAME` selects a local project profile, not a remote target.
+   With one online Runner it is assigned automatically. With several, add `--runner NAME`. `automaton deploy <target-slug>` selects a remote deployment target; `--env NAME` selects a local project profile, not a remote target. `deploy` has no `--yes`: a bare `--yes` is read as an environment name.
 
 2. Check the result. `automaton status` shows the linked app and publish settings, but does not show the deployment state; `automaton apps` shows it in the Status column.
 
@@ -37,7 +37,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
    automaton publish --yes --slug my-app
    ```
 
-   The *private address* is the `app-<id>.apps...` URL that `automaton status` shows. It needs about a minute for its certificate, and it needs sign-in: an anonymous `curl` gets `401` until the app is published, so check a private app in a signed-in browser. A static site (`--template static`) has no process behind it, so that URL answers `503` until you publish; after `automaton publish` the public URL answers.
+   The *private address* is the `app-<id>.apps...` URL that `automaton status` shows. It needs about a minute for its certificate, and it needs sign-in: an anonymous `curl` gets `401`, so check a private app in a signed-in browser. A static site (`--template static`) has no process behind it, so that URL answers `503` until you publish; after `automaton publish` the public URL answers.
 
    `automaton deploy --publish` deploys and publishes in one step.
 
@@ -58,7 +58,7 @@ automaton listing show
 
 Or put `"summary"` and `"description"` at the top level of `automaton.json`: `automaton deploy` copies them to the listing while the app has none set in Studio or with `automaton listing`.
 
-Every server lists installable apps under **Apps → Catalog**. The list is read from the official [automaton-apps repository](https://github.com/rzvdaniel/automaton-apps) (its generated `catalog.json`, in the root of the repository's `main` branch; servers before 0.2.35 read a `catalog` branch that CI keeps publishing until no such server is left; the owner decides when it goes); nothing is preinstalled, so the server needs to reach `raw.githubusercontent.com` (GitHub sees the server's IP address and nothing else about it). The server keeps the last list it read, so a short GitHub outage leaves the tab working with a notice; if it never read a list, the tab says so and offers **Retry**. An entry that needs a newer server version says so instead of offering Install, and one you already installed shows **Installed** with a link to **Manage**.
+Every server lists installable apps under **Apps → Catalog**. The list is read from the official [automaton-apps repository](https://github.com/rzvdaniel/automaton-apps) (its generated `catalog.json`, in the root of the repository's `main` branch); nothing is preinstalled, so the server needs to reach `raw.githubusercontent.com` (GitHub sees the server's IP address and nothing else about it). The server keeps the last list it read, so a short GitHub outage leaves the tab working with a notice; if it never read a list, the tab says so and offers **Retry**. An entry that needs a newer server version says so instead of offering Install, and one you already installed shows **Installed** with a link to **Manage**.
 
 **Catalog sources.** A system administrator can add more sources under **Apps → Catalog → Catalog sources**: a GitHub repository (`owner/name` or `https://github.com/owner/name`) with a `catalog.json` in the root of its `main` branch (another branch can be named). The server reads the file when you add the source and refuses a source it cannot read. Each entry shows the name of its source, and entries always install from that source's own repository. For a private repository, paste a fine-grained, read-only token (Contents access to that one repository): it is stored encrypted, used only by the server to read the catalog and to fetch an app that source lists at its listed commit, and is never shown again. Turn the official source off with its switch, or select the trash icon to remove a custom source: its entries disappear, apps already installed from it keep running. Only add sources you trust: an app is code that runs on your Runners. An installer sees the source, the pinned commit and the requested permissions before anything is created, permissions always need a system administrator's approval, and nothing updates automatically. Regular users and plain Admins cannot manage sources (the API answers 403).
 
@@ -80,7 +80,7 @@ Summary up to 200 characters, description up to 500. Images are PNG, JPG, WEBP o
 automaton delete --yes
 ```
 
-This permanently deletes the linked remote app, its runtime and its data.
+This permanently deletes the linked remote app, its runtime and its data. Without a linked folder (for example a catalog-installed app), use `automaton apps delete <name-or-id> --yes`; it deletes any app you may delete.
 
 ## Common errors
 

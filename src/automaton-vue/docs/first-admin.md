@@ -55,7 +55,7 @@ jq -n --arg name "$NAME" --arg email "$EMAIL" --arg password "$PASSWORD" \
 unset PASSWORD
 ```
 
-`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token the installer printed is single-purpose: when setup completes the server replaces the content of `/etc/automaton/secrets/setup-token` with a new random value that is never printed, so the printed one stops working. Re-running the installer or the updater does not print or reset it. The new value is what lets root create [one-time password links](#when-an-ai-agent-sets-up-the-server-for-you). A server that was set up before this change gets a new value once, when it first starts on the updated release. If you edit the token file by hand, restart the API afterwards (it is mounted into the container as one file).
+`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token the installer printed is single-purpose: when setup completes the server replaces the content of `/etc/automaton/secrets/setup-token` with a new random value that is never printed, so the printed one stops working. Re-running the installer or the updater does not print or reset it. The new value is what lets root create [one-time password links](#when-an-ai-agent-sets-up-the-server-for-you). If you edit the token file by hand, restart the API afterwards (it is mounted into the container as one file).
 
 `EMAIL` and `PASSWORD` in the snippet are the sign-in you are creating now: the email you chose, not the certificate email. Keep both: the CLI sign-in below asks for them again. Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
 
@@ -63,7 +63,7 @@ The password never goes on the command line: `jq --arg` receives it from the she
 
 ## When an AI agent sets up the server for you
 
-An agent needs a signed-in CLI to deploy, so it creates the administrator itself, but you still choose the password. The agent creates the account with a password it generates and never prints or writes to a file (for example `PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n=')` in the snippet above, used in the same shell, then `unset`), signs in its CLI, deploys, and ends with a one-time link for you:
+The full agent procedure is [Install with your AI agent](./install-with-ai). An agent needs a signed-in CLI to deploy, so it creates the administrator itself with a password it generates and never prints or writes to a file (`PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n=')` in the snippet above, used in the same shell, then `unset`). It ends with a one-time link for you:
 
 ```bash
 sudo "$(command -v automaton)" server password-link --email admin@example.com

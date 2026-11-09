@@ -9,7 +9,7 @@ A Runner is the trusted service on a machine that builds and runs your apps in D
 
 ## Prerequisites
 
-- A server with an administrator ([first administrator](./first-admin)) and the CLI signed in: `automaton login --server https://api.example.com` (see [Create your first app](./getting-started)).
+- A server with an administrator ([first administrator](./first-admin)) and the CLI signed in: `automaton login --server https://api.example.com` (see [Install with your AI agent](./install-with-ai) or [Your first app](./getting-started)).
 - An x86_64 Linux host running **Ubuntu or Debian** (apt based, systemd) with Docker Engine running. It can be the Automaton server itself or another machine. The install does not check the distribution name: it needs a Linux host, a running Docker daemon and `/var/run/docker.sock`, so other distributions with Docker may work but are not tested. Otherwise it stops and names what is missing.
 - The Runner controls the host's Docker. Install it only on machines you trust.
 
@@ -20,8 +20,8 @@ The `automaton` commands below need a signed-in CLI. On a host without a browser
 Pick the one that matches where you run the command.
 
 ```bash
-# On the Runner host itself
-automaton runners install --name main --local
+# On the Runner host itself (same host as the server: the usual case)
+automaton runners install --name main --local --yes
 
 # From your computer, over SSH
 automaton runners install --name main --ssh user@host

@@ -10,7 +10,7 @@ This page updates the API, Worker, Studio and app store of your server to a newe
 ## Prerequisites
 
 - You are a system administrator, and the CLI is signed in to the server: `automaton login --server https://api.example.com`.
-- A server installed with the current installer. Older servers get the update trigger the first time `update.sh` runs over SSH (see the fallback below).
+- A server installed with the current installer. An older one needs the SSH fallback below once.
 - Servers still on MySQL cannot take this update; move them first with the [migration guide](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/migrate-to-postgresql.md).
 
 ## Steps

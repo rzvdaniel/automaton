@@ -115,10 +115,10 @@ useSiteTheme()
 </div></section>
 
 <section class="band alt"><div class="wrap">
-  <div class="head"><p class="eyebrow">Setup</p><h2>Your AI installs it. You just say where.</h2><p>Rent a small Linux server, point a domain at it, and hand your agent the address. It follows the public guide and reports back. Measured installs took 90 to 118 seconds.</p></div>
+  <div class="head"><p class="eyebrow">Setup</p><h2>Your AI installs it. You just say where.</h2><p>Rent a small Linux server, point a domain at it, and hand your agent the address. It follows the public guide and reports back. A working server took 2-3 minutes in test runs.</p></div>
   <div class="setup">
     <div class="step"><h3>Rent a server and a domain</h3><p>Any x86_64 Ubuntu or Debian machine with 4 GB of memory. About €7 a month at common providers.</p></div>
-    <div class="step"><h3>Ask your agent</h3><p>Give it SSH access and one sentence. It reads automaton.monster/llms.txt and does the rest.</p><div class="chat"><b>You</b>Install Automaton on my server at example.com and make me the administrator.</div></div>
+    <div class="step"><h3>Ask your agent</h3><p>Give it SSH access, your domain and an email. It reads automaton.monster/llms.txt and does the rest.</p><div class="chat"><b>You</b>Install Automaton on my server (ssh root@203.0.113.10) at example.com, use me@example.com for certificates, and deploy a small app.</div></div>
     <div class="step"><h3>Start building</h3><p>Open Studio, invite your people, and ask for your first app. It shows up with its own address.</p><div class="chat"><b>You</b>Build a lunch poll for my team and share it with them.</div></div>
   </div>
   <p style="margin-top:24px"><RouterLink class="btn" to="/how-setup-works">How setup works, step by step →</RouterLink></p>
