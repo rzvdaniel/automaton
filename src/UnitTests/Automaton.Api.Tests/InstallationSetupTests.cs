@@ -83,10 +83,38 @@ public sealed class InstallationEndpointTests
         db.Users.Add(new ApplicationUser { Id = Guid.NewGuid(), UserName = "operator", PublicUsername = "operator" });
         await db.SaveChangesAsync();
 
-        var result = await Controller(db).GetSummary(CancellationToken.None);
+        var result = await SummaryController(db, new Automaton.Api.Config.EmailConfig()).GetSummary(CancellationToken.None);
 
         Assert.That(((OkObjectResult)result.Result!).Value,
-            Is.EqualTo(new Automaton.Core.Models.InstallationSummary(null, 1, 0, 0, null)));
+            Is.EqualTo(new Automaton.Core.Models.InstallationSummary(null, 1, 0, 0, null, false)));
+    }
+
+    private static InstallController SummaryController(ApplicationDbContext db, Automaton.Api.Config.EmailConfig file)
+        => new(Service(db), Configuration("server-token"), new SetupEnvironment(), db, SmtpTestFixture.Service(db, null, file), null!);
+
+    [Test]
+    public async Task SummaryReportsWhetherEmailIsConfigured()
+    {
+        await using var db = Database();
+        var configured = new Automaton.Api.Config.EmailConfig { EmailHost = "smtp.example.test", EmailPort = 587, EmailAccount = "account", EmailPassword = "secret" };
+        var noPassword = new Automaton.Api.Config.EmailConfig { EmailHost = "smtp.example.test", EmailPort = 587, EmailAccount = "account" };
+
+        async Task<bool?> Reported(Automaton.Api.Config.EmailConfig file)
+            => ((Automaton.Core.Models.InstallationSummary)((OkObjectResult)(await SummaryController(db, file).GetSummary(CancellationToken.None)).Result!).Value!).EmailConfigured;
+
+        Assert.That(await Reported(configured), Is.True);
+        Assert.That(await Reported(new Automaton.Api.Config.EmailConfig()), Is.False, "a fresh install has no EmailConfig");
+        Assert.That(await Reported(noPassword), Is.False);
+    }
+
+    [Test]
+    public void OnlySystemAdministratorsCanReadTheSummary()
+    {
+        var authorize = typeof(InstallController).GetMethod(nameof(InstallController.GetSummary))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().Single();
+
+        Assert.That(authorize.Roles, Is.EqualTo(UserRole.SystemAdministrator));
     }
 
     [Test]

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
+import EmailNotConfiguredNotice from '@/features/install/components/EmailNotConfiguredNotice.vue'
 import DocumentationDrawer from '@/shared/documentation/components/DocumentationDrawer.vue'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
@@ -48,6 +49,7 @@ const isNoLayout = computed(() => route.meta.layout === 'none')
 
         <!-- Page Content -->
         <main class="app-main">
+        <EmailNotConfiguredNotice />
         <RouterView />
       </main>
     </div>

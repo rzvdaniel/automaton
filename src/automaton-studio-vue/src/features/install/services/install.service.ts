@@ -1,5 +1,5 @@
 import apiClient from '@/shared/services/api/axios-instance'
-import type { InstallCommand, InstallationStatusResponse, InstallationCheck, InstallationBackupStatus, InstallationUpdateStatus } from '../types/install.types'
+import type { InstallCommand, InstallationStatusResponse, InstallationCheck, InstallationBackupStatus, InstallationUpdateStatus, InstallationSummary } from '../types/install.types'
 
 class InstallService {
   async getStatus(): Promise<InstallationStatusResponse> {
@@ -11,6 +11,12 @@ class InstallService {
     const { data } = await apiClient.post<InstallationCheck[]>('/api/install/checks', null, {
       headers: { 'X-Automaton-Setup-Token': setupToken },
     })
+    return data
+  }
+
+  /** Counts, version and whether email is configured (system administrators). */
+  async getSummary(): Promise<InstallationSummary> {
+    const { data } = await apiClient.get<InstallationSummary>('/api/install/summary')
     return data
   }
 
