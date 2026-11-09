@@ -302,8 +302,35 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
             var fullRoot = Path.GetFullPath(destinationRoot);
             if (!target.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Deployment package entry escapes the staging directory.");
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            CreateReadableDirectories(fullRoot, Path.GetDirectoryName(target)!);
             entry.ExtractToFile(target, overwrite: true);
+            MakeReadableByRuntimeUser(target);
         }
     }
+
+    // The app's runtime user is not the Runner user, and a container started without capabilities cannot override
+    // modes, so owner-only files (author umask 077) would be unreadable. Normalize like Docker COPY: 0644, or 0755
+    // when the author set the owner's executable bit.
+    private static void MakeReadableByRuntimeUser(string file)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var executable = (File.GetUnixFileMode(file) & UnixFileMode.UserExecute) != 0;
+        File.SetUnixFileMode(file, ReadableFileMode | (executable ? ExecutableBits : UnixFileMode.None));
+    }
+
+    private static void CreateReadableDirectories(string root, string directory)
+    {
+        var missing = new Stack<string>();
+        for (var current = directory; current.Length > root.Length && !Directory.Exists(current); current = Path.GetDirectoryName(current)!)
+            missing.Push(current);
+        while (missing.Count > 0)
+        {
+            var next = missing.Pop();
+            Directory.CreateDirectory(next);
+            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(next, ReadableFileMode | ExecutableBits);
+        }
+    }
+
+    private const UnixFileMode ReadableFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+    private const UnixFileMode ExecutableBits = UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
 }
