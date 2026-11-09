@@ -83,5 +83,5 @@ public static class AuditEventTypes
     public const string AiGuidanceDeleted = "AiGuidanceDeleted";
     public const string ServerUpdateRequested = "ServerUpdateRequested";
     public const string ServerBackupRequested = "ServerBackupRequested";
-    public const string PasswordLinkCreated = "PasswordLinkCreated";
+    public const string OneTimeLinkCreated = "OneTimeLinkCreated";
 }

@@ -252,7 +252,7 @@ public sealed class AdminUserProvisioningServiceTests
             Assert.That(await Ask("server-token", "nobody@example.com"), Is.InstanceOf<NotFoundObjectResult>());
             var ok = (await Ask("server-token", admin.Email!) as OkObjectResult)!.Value as PasswordLinkResponse;
             Assert.That(ok!.Url, Does.StartWith("https://studio.example.com/reset-password?"));
-            Assert.That(await fixture.Db.AuditEvents.CountAsync(e => e.EventType == AuditEventTypes.PasswordLinkCreated), Is.EqualTo(1));
+            Assert.That(await fixture.Db.AuditEvents.CountAsync(e => e.EventType == AuditEventTypes.OneTimeLinkCreated), Is.EqualTo(1));
         });
     }
 

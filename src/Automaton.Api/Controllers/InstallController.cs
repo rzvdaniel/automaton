@@ -145,7 +145,7 @@ public class InstallController(InstallService installService, IConfiguration con
         var (url, expiresAt) = await OneTimePasswordLink.CreateAsync(userManager, user, configurationService.WebsiteUrl, DateTimeOffset.UtcNow);
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
-            EventType = AuditEventTypes.PasswordLinkCreated,
+            EventType = AuditEventTypes.OneTimeLinkCreated,
             Action = AuditActions.Created,
             EntityType = AuditEntityTypes.User,
             EntityId = user.Id,
