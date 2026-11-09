@@ -80,7 +80,7 @@ Summary up to 200 characters, description up to 500. Images are PNG, JPG, WEBP o
 automaton delete --yes
 ```
 
-This permanently deletes the linked remote app, its runtime and its data.
+This permanently deletes the linked remote app, its runtime and its data. Without a linked folder (for example a catalog-installed app), use `automaton apps delete <name-or-id> --yes`; it deletes any app you may delete.
 
 ## Common errors
 

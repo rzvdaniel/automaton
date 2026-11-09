@@ -147,6 +147,7 @@ automaton publish --yes --slug NAME
 automaton share status           # who can open the app: me, people, a team, server or internet (same choices as the Share dialog)
 automaton share set server       # or: me, people, team --team NAME, internet --slug NAME [--list|--no-list] (store listing text: automaton listing); add/remove EMAIL manage "people"
 automaton delete --yes          # permanently delete the linked remote app
+automaton apps delete <name-or-id> --yes   # delete any app you may delete, no linked folder needed (for example a catalog-installed app)
 automaton listing show
 automaton catalog init my-apps  # files for your own apps repository (writes only; no git, no GitHub)
 automaton catalog build         # generate catalog.json from catalog-apps.json
