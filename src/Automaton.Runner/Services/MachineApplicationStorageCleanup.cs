@@ -30,7 +30,12 @@ public sealed class MachineApplicationStorageCleanup
             "--cap-drop", "ALL", "--cap-add", "DAC_OVERRIDE", "--security-opt", "no-new-privileges",
             "--mount", $"type=bind,source={DockerContainerRuntime.MapHostPath(path)},target=/purge",
             helperImage, "find", "/purge", "-mindepth", "1", "-delete"], token);
-        if (!emptied.Success) throw new InvalidOperationException("The Runner could not remove files the app's runtime user owns. App storage was preserved for retry.");
+        if (!emptied.Success)
+        {
+            var detail = (emptied.Error ?? "").Trim();
+            throw new InvalidOperationException("The Runner could not remove files the app's runtime user owns. App storage was preserved for retry."
+                + (detail.Length == 0 ? "" : $" Docker said: {detail[..Math.Min(detail.Length, 200)]}"));
+        }
     }
 
     public async Task DeleteComposeVolumesAsync(Guid appId, CancellationToken token = default)

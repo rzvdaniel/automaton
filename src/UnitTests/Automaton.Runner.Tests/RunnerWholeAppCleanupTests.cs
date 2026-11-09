@@ -49,6 +49,45 @@ public sealed class RunnerWholeAppCleanupTests
         Assert.That(await File.ReadAllTextAsync(marker), Is.EqualTo("preserve"));
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task WholeAppCleanup_WhenTheRunnerCannotDelete_EmptiesTheAppDirectoriesWithTheHelperAndRetries(bool helperWorks)
+    {
+        if (OperatingSystem.IsWindows() || Environment.UserName == "root") Assert.Ignore("Needs a non-root Unix user.");
+        var workspace = new RunnerWorkspaceService();
+        var service = new RunnerDeploymentService(workspace, new CleanupProcessManager(), new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var data = workspace.GetAppDataDirectory(appId);
+        Directory.CreateDirectory(data);
+        var parent = Path.GetDirectoryName(data)!;
+        File.SetUnixFileMode(parent, UnixFileMode.UserRead | UnixFileMode.UserExecute); // the directory cannot be removed
+        var purged = new List<string>();
+        var cleanup = new MachineApplicationStorageCleanup((args, _) =>
+        {
+            if (args[1] != "run") return Task.FromResult(new InfrastructureCommandResponse { Success = true });
+            purged.Add(args.First(a => a.StartsWith("type=bind,source=")));
+            if (helperWorks) File.SetUnixFileMode(parent, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            return Task.FromResult(new InfrastructureCommandResponse { Success = helperWorks, Error = "no such image" });
+        });
+        try
+        {
+            if (helperWorks)
+            {
+                await service.CleanupApplicationAsync(appId, Guid.NewGuid(), cleanup);
+                Assert.That(Directory.Exists(data), Is.False);
+            }
+            else
+            {
+                var error = Assert.ThrowsAsync<InvalidOperationException>(() => service.CleanupApplicationAsync(appId, Guid.NewGuid(), cleanup));
+                Assert.That(error!.Message, Does.Contain("preserved for retry").And.Contain("no such image").And.Contain("First error"));
+                Assert.That(error.InnerException, Is.InstanceOf<IOException>().Or.InstanceOf<UnauthorizedAccessException>());
+                Assert.That(Directory.Exists(data), Is.True);
+            }
+            Assert.That(purged.Any(p => p.Contains(appId.ToString())), Is.True);
+        }
+        finally { File.SetUnixFileMode(parent, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute); }
+    }
+
     [Test]
     public async Task EmptyDirectory_RunsAnIsolatedHelperAndReportsFailure()
     {

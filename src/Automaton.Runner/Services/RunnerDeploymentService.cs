@@ -132,8 +132,15 @@ public class RunnerDeploymentService
         catch (Exception error) when (error is UnauthorizedAccessException or IOException)
         {
             // The app's runtime user (for example root or UID 33) may own files the Runner user cannot remove.
-            foreach (var root in runnerWorkspaceService.GetApplicationCleanupRoots(appId, deploymentTargetId))
-                await storageCleanup.EmptyDirectoryAsync(root);
+            try
+            {
+                foreach (var root in runnerWorkspaceService.GetApplicationCleanupRoots(appId, deploymentTargetId))
+                    await storageCleanup.EmptyDirectoryAsync(root);
+            }
+            catch (InvalidOperationException helperError)
+            {
+                throw new InvalidOperationException($"{helperError.Message} First error: {error.Message}", error);
+            }
             DeleteApplicationFiles(appId, deploymentTargetId);
         }
     }
