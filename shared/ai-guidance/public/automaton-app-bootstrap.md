@@ -2,6 +2,14 @@
 
 Automaton is a self-hosted platform for building, deploying and publishing web apps. The user runs their own server (Studio, API, app store) and one or more Runners that run the apps. Documentation: https://automaton.monster/docs/ . This file is the index for AI agents; every page below is one task with exact commands, a way to verify the result and common errors.
 
+## Installing a server for the user
+
+Before you run the installer, ask the user for what only they can give:
+
+1. **A domain** whose DNS they control, with records pointing to the server as [Install the server](https://automaton.monster/docs/install-server) lists them (DNS only, no proxy).
+2. **An email for certificate notices.** It is passed as `--email` and goes to Let's Encrypt, which issues the HTTPS certificates. Do not invent one.
+3. **Who creates the first administrator.** By default, install with `--quiet`, then give the user the address `https://studio.<domain>/install` and tell them the token is in `/etc/automaton/secrets/setup-token` on the server; they open the page and choose their own password, so it never passes through you. Only if the user asks you to create the account, follow [First administrator without a browser](https://automaton.monster/docs/first-admin#without-a-browser-ssh-or-an-ai-agent) and never print the password.
+
 ## Starting an Automaton app
 
 If you are in an empty directory and the user asks you to build an Automaton app:

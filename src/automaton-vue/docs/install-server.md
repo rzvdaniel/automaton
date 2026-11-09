@@ -15,7 +15,7 @@ Measured on 6 November 2026 on Hetzner CX23 servers (2 vCPU, 4 GB RAM, about €
 
 - An x86_64 Linux server with systemd, sudo access, outbound internet, at least 2 GB of RAM and 10 GiB of free disk space. Ubuntu and Debian 12 are supported (Ubuntu 22.04, Ubuntu 24.04 and Debian 12 have been tested); the installer adds Docker itself there. On other distributions, [install Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/) first (not tested).
 - `curl` and `python3` (3.8 or newer; Debian 12's 3.11.2 works). `jq` is needed only for the headless snippets in [first administrator](./first-admin) and [CLI login](./automaton-cli#log-in-without-a-browser): `sudo apt-get install -y jq` (not preinstalled on Debian).
-- A domain you can edit DNS for, and an email for certificate notices.
+- A domain you can edit DNS for, and an email for certificate notices (passed as `--email`; Let's Encrypt uses it for the HTTPS certificates). If an AI agent installs for you, it should ask you for both, and leave creating the first administrator to you by default, so your password never passes through the agent.
 - Inbound TCP ports 80 and 443 (HTTPS) and 5671 (TLS Runner broker). Keep the `api` hostname directly reachable on 5671.
 - DNS records pointing to the server's public IP, set to DNS only (no proxy). Pick one of:
 
