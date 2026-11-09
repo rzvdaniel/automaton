@@ -40,8 +40,14 @@ internal static class ApiApplicationPipelineExtensions
         app.MapControllers();
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
+        app.MapApiNotFound();
         app.MapFallbackToPage("/_Host");
     }
+
+    /// <summary>Any unmatched /api request, for every method, answers 404 with a JSON problem body instead of the Studio page.</summary>
+    internal static void MapApiNotFound(this IEndpointRouteBuilder routes) =>
+        routes.MapFallback("/api/{**path}", () =>
+            Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not found", detail: "No API endpoint matches this request."));
 
     /// <summary>The /health body: the release tag (server-vX.Y.Z) when the server knows it, nothing else.</summary>
     internal static object HealthResponse(string? installedVersion)
