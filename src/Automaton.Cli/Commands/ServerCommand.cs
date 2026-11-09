@@ -23,7 +23,7 @@ internal static class ServerCommand
     {
         var version = new Option<string?>("--version", "Release to install: latest (default), server-vX.Y.Z or X.Y.Z");
         var wait = new Option<bool>("--wait", "Wait for the update to finish, then verify /health and the installed version");
-        var timeout = new Option<int>("--timeout", () => 1800, "Seconds to wait with --wait");
+        var timeout = new Option<int>("--timeout", () => 1800, "Seconds to wait with --wait or --runners");
         var downgrade = new Option<bool>("--allow-downgrade", "Allow installing a release older than the installed one");
         var runners = new Option<bool>("--runners", "Wait for the update, then list every Runner and upgrade those on an old image");
         var json = new Option<bool>("--json", "Print the result as JSON");
@@ -75,7 +75,7 @@ internal static class ServerCommand
             (asJson ? Console.Error : Console.Out).WriteLine($"Runner {name}: {outcome.Message}");
             results.Add(new { id, name, upgraded = outcome.Success, state = outcome.State, outcome.Message });
         }
-        if (asJson && results.Count > 0) CliJson.Write(new { runners = results });
+        if (asJson && all.Any(runner => runner.Old)) CliJson.Write(new { runners = results });
         return success;
     }
 
