@@ -9,7 +9,7 @@ An app is a folder with `automaton.json` and source in any language. This page s
 
 ## Prerequisites
 
-An app folder from [Create your first app](./getting-started).
+An app folder from [Your first app](./getting-started).
 
 ## Static site
 

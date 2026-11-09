@@ -9,7 +9,7 @@ This page covers how an app gets credentials (secrets) and platform access (perm
 
 ## Prerequisites
 
-An app folder linked to an app on your server ([Create your first app](./getting-started)).
+An app folder linked to an app on your server ([Your first app](./getting-started)).
 
 ## Give an app a secret
 
