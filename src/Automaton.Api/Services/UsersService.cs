@@ -431,6 +431,9 @@ public class UsersService
         if (user == null)
             throw new InvalidOperationException($"User with userId {userId} not found!");
         
+        if (await OneTimePasswordLink.IsExpiredAsync(_userManager, user, token, DateTimeOffset.UtcNow))
+            throw new InvalidResetLinkException("expired");
+
         var result = await _userManager.ResetPasswordAsync(user, token, password);
 
         if (!result.Succeeded)
@@ -446,9 +449,12 @@ public class UsersService
         }
 
         // The token arrived by email, so using it proves the address (invited users start unconfirmed).
-        if (!user.EmailConfirmed)
+        await OneTimePasswordLink.ClearAsync(_userManager, user);
+        // Choosing the password through the link is the change an administrator-set password asked for.
+        if (!user.EmailConfirmed || user.MustChangePassword)
         {
             user.EmailConfirmed = true;
+            user.MustChangePassword = false;
             await _userManager.UpdateAsync(user);
         }
     }

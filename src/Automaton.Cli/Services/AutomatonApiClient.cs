@@ -224,6 +224,21 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(response);
     }
 
+    /// <summary>Asks the server for a one-time password link for an administrator; the setup token is the proof of root on the server.</summary>
+    internal async Task<(string Url, DateTimeOffset ExpiresAt)> CreatePasswordLinkAsync(string email, string setupToken, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/install/password-link")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new { email }, JsonOptions), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Add("X-Automaton-Setup-Token", setupToken);
+        using var response = await _http.SendAsync(request, ct);
+        await EnsureSuccessAsync(response);
+        var body = await ReadJsonAsync(response, ct);
+        return (body.GetProperty("url").GetString() ?? throw new InvalidOperationException("The server returned no link."),
+            body.GetProperty("expiresAt").GetDateTimeOffset());
+    }
+
     /// <summary>The API's /health status ("ok") and, on servers that report it, the release (server-vX.Y.Z).</summary>
     internal async Task<(string Status, string? Version)> GetHealthReportAsync(CancellationToken ct = default)
     {

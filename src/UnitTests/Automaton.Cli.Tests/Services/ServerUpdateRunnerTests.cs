@@ -195,8 +195,23 @@ public class ServerUpdateRunnerTests
         var result = command.Parse("update --version 0.2.0 --wait --timeout 60 --json");
 
         Assert.That(result.Errors, Is.Empty);
-        Assert.That(command.Subcommands.Select(child => child.Name), Is.EquivalentTo(new[] { "update", "update-status", "status", "backup", "backup-status" }));
+        Assert.That(command.Subcommands.Select(child => child.Name), Is.EquivalentTo(new[] { "update", "update-status", "status", "backup", "backup-status", "password-link" }));
+        Assert.That(command.Parse("password-link --email admin@example.com --config-dir /etc/automaton").Errors, Is.Empty);
+        Assert.That(command.Parse("password-link").Errors, Is.Not.Empty, "the email is required");
         Assert.That(command.Parse("update-status --json").Errors, Is.Empty);
+    }
+
+    [Test]
+    public void PasswordLinkFindsTheServerFromInstallationJson()
+    {
+        var directory = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            Assert.That(ServerCommand.InstalledApiUrl(directory), Is.Null);
+            File.WriteAllText(Path.Combine(directory, "installation.json"), "{\"domain\":\"example.com\",\"email\":\"a@b.co\"}");
+            Assert.That(ServerCommand.InstalledApiUrl(directory), Is.EqualTo("https://api.example.com"));
+        }
+        finally { Directory.Delete(directory, true); }
     }
 
     private static async Task<ServerUpdateOutcome> RunAsync(FakeServer server, string version, bool wait, TimeSpan? timeout = null, bool allowDowngrade = false)

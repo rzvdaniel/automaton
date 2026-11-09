@@ -294,7 +294,12 @@ if [[ -n "$traefik_before" && "$traefik_before" == "$("${compose[@]}" ps -q trae
 fi
 # Validate actual public HTTPS/API routing as well as container health.
 verify_https
-if $quiet; then
+# Once the first administrator exists the file holds a new value that only root should use: never print it.
+setup_complete=$(curl --silent --max-time 15 "https://api.$domain/api/install/status" 2>/dev/null \
+    | python3 -c 'import json,sys; print("yes" if json.load(sys.stdin).get("installationComplete") else "no")' 2>/dev/null || echo unknown)
+if [[ "$setup_complete" == yes ]]; then
+    printf '\nHTTPS certificates are ready. The first administrator already exists, so no setup link is printed. Create a one-time password link with: sudo automaton server password-link --email <admin email>\n'
+elif [[ "$setup_complete" == unknown ]] || $quiet; then
     printf '\nHTTPS certificates are ready. The setup link is not printed (--quiet). Open https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
 else
     setup_token=$(tr -d '\r\n' < "$config_dir/secrets/setup-token")
