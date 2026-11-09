@@ -53,6 +53,10 @@ curl -fsS https://api.example.com/health
 
 Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-vX.Y.Z"}` where the version is the release you installed (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
 
+## Set up email
+
+A fresh server cannot send email, so password reset emails and email invitations reach nobody until you set it up (people can still be created with a password). Studio shows system administrators a notice until email is configured. Sign in as a system administrator, open **Settings**, find **Outgoing email** on the server section, and enter the SMTP host, port, TLS setting, account, password and sender address from your mail provider. Select **Save SMTP settings**, then **Check connection**; the notice disappears once the settings are saved. A successful check proves login to the mail server, not that a message reaches an inbox, so use **Send test email** to a real address.
+
 ## Common errors
 
 - **DNS check fails.** The installer lists the names that do not resolve to this server. Fix the records, wait for DNS, rerun the same command. Proxied (orange cloud) records break certificates and the Runner broker.

@@ -40,7 +40,15 @@ public class InstallController(InstallService installService, IConfiguration con
             await db.Users.CountAsync(token),
             await db.WebApps.CountAsync(token),
             await db.Runners.CountAsync(token),
-            backups.LastSuccessAt));
+            backups.LastSuccessAt,
+            await IsEmailConfiguredAsync(token)));
+    }
+
+    /// <summary>Settings that cannot be read (a key-ring problem) mean no email can be sent either.</summary>
+    private async Task<bool> IsEmailConfiguredAsync(CancellationToken token)
+    {
+        try { return (await smtpSettings.GetSummaryAsync(token)).Configured; }
+        catch (SmtpSettingsUnreadableException) { return false; }
     }
 
     [HttpPost("checks")]

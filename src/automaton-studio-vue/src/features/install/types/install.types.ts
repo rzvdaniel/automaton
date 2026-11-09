@@ -52,6 +52,16 @@ export interface SmtpSettingsSummary {
   verifiedAt: string | null
 }
 
+/** GET /api/install/summary (system administrators). `emailConfigured` is absent on servers older than this field. */
+export interface InstallationSummary {
+  version: string | null
+  users: number
+  apps: number
+  runners: number
+  lastBackupAt: string | null
+  emailConfigured?: boolean | null
+}
+
 export interface SmtpSettingsUpdate {
   emailHost: string
   emailPort: number
