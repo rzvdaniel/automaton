@@ -122,9 +122,17 @@ public class InstallController(InstallService installService, IConfiguration con
         try { await installService.Install(command, cancellationToken); }
         catch (InstallationSetupException error) { return BadRequest(new { message = error.Message }); }
         // The token the installer printed has done its one job; root keeps a new value in the same file.
-        if (!string.IsNullOrWhiteSpace(configuration["Bootstrap:TokenFile"]) && !await SetupTokenRotation.RotateAsync(db, configuration, cancellationToken))
-            HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger<InstallController>().LogWarning(
-                "Setup completed but the setup token file could not be replaced; the server will keep trying in the background.");
+        // The administrator exists now: a rotation problem (even a marker race with the background service) must not fail setup.
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(configuration["Bootstrap:TokenFile"]) && !await SetupTokenRotation.RotateAsync(db, configuration, CancellationToken.None))
+                HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger<InstallController>().LogWarning(
+                    "Setup completed but the setup token file could not be replaced; the server will keep trying in the background.");
+        }
+        catch (DbUpdateException)
+        {
+            // The background service wrote the marker first; the token is already replaced.
+        }
         return Ok();
     }
 
