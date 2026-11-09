@@ -36,6 +36,16 @@ The CLI asks you to confirm the Docker access. Add `--yes` for automation (requi
 
 You can also use Studio: **Runners → Install Machine Management Runner**.
 
+## For AI agents
+
+On the server host, in the shell used for the install, with the CLI signed in:
+
+```bash
+automaton runners install --local --yes --name main
+```
+
+Check: `automaton runners` lists `main` as connected or online (about 30 s).
+
 ## Verify it worked
 
 ```bash

@@ -9,7 +9,31 @@ An app is a folder with `automaton.json` and source in any language. This page s
 
 ## Prerequisites
 
-An app folder from [Your first app](./getting-started).
+A server with a Runner and a signed-in CLI ([Install with your AI agent](./install-with-ai)), or your administrator's API URL (see [Install and authenticate](./automaton-cli#install-and-authenticate)).
+
+## Create the app
+
+1. Check the CLI and the server.
+
+   ```bash
+   automaton whoami
+   automaton runners
+   ```
+
+   Check: your server is shown and a Runner is connected. `automaton: command not found` means `~/.dotnet/tools` is not on `PATH`. With several servers the new login stays a separate profile; see [several servers](./automaton-cli#several-servers).
+
+2. Create the app in an empty folder. `--template` is `node`, `python`, `dotnet` or `static`; omit it for an empty contract.
+
+   ```bash
+   mkdir my-app && cd my-app
+   automaton new "My App" --template node
+   ```
+
+   This writes `automaton.json`, `AGENTS.md` and `.automaton/agents/skills/automaton-app/SKILL.md`, and creates the app on the server. For an existing app use `automaton link <app-id>`; for missing guidance files use `automaton sync-ai`.
+
+3. Edit. Read `AGENTS.md` and `automaton.json` first. Keep data that must survive redeploys in the app's data directory (the template's `AGENTS.md` and `automaton.json` name the exact variable, `AUTOMATON_APP_DATA_DIR`). Other files are replaced on every deploy.
+
+4. Validate and deploy as described in [Deploy and publish an app](./deploy). `deploy` has no `--yes` flag, can print `Deploy complete` before the app is running, and you must wait for `Running` in `automaton apps` before you publish or open the address.
 
 ## Static site
 
@@ -52,5 +76,8 @@ Wait for `Succeeded` and verify the real behavior at the URL. See [Deploy and pu
 ## Common errors
 
 - **Build tools exist locally but not on the Runner.** Set `application.build.image` to an image that has them.
+- **`Template would overwrite files`.** Use an empty folder or omit `--template`.
+- **Login does nothing.** The server URL must be the API URL, not Studio.
+- **Deploy works, app not Running.** Read `automaton logs`; the app must listen on `AUTOMATON_PORT` and answer its health path.
 - **Port mismatch.** Listen on `AUTOMATON_PORT`, not a fixed port.
 - More: [Troubleshooting](./troubleshooting).

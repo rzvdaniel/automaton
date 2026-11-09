@@ -53,6 +53,8 @@ unset PASSWORD TOKEN
 wait; tail -n 3 "$OUT"; rm -f "$OUT"   # "Signed in as ..." once approved. If the code was refused, stop the wait with Ctrl+C or `kill %1`.
 ```
 
+An agent that just created the administrator skips the two `read` prompts: `EMAIL` and `PASSWORD` are already set in the same shell; it runs the script, then `unset`s them. Never print them.
+
 The code is letters, digits and a dash (for example `ABCD-1234`), so it needs no URL decoding. `200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. The `--device` output contains the approval code: do not share it. Codes expire after a few minutes, so approve soon after `login` prints it.
 
 **API key.** Create a key in Studio (**API Keys**) or with `POST /api/ApiKeys` (`{"name": "my-cli"}`, bearer token as above; the response `apiKey` is shown once). Then:

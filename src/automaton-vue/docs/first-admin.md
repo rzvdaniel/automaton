@@ -69,7 +69,19 @@ The full agent procedure is [Install with your AI agent](./install-with-ai). An 
 sudo "$(command -v automaton)" server password-link --email admin@example.com
 ```
 
-It prints a link to Studio's set-password page. The link works once and for 30 minutes. Opening it asks for a new password; the generated one stops working at that moment and you sign in with yours. If the link expires or is lost, run the command again: each new link voids the earlier ones. Only someone who can read `/etc/automaton/secrets/setup-token` (root) can create it, it needs no sign-in and no email (SMTP), and it works only for administrator accounts. The command finds the server from `/etc/automaton/installation.json`, so it works under `sudo` without the CLI's sign-in; use `--config-dir` if the configuration is elsewhere and `--server <api-url>` to name another server. Treat the link like a password until you have used it.
+Agent version of the snippet above (same shell as the install, `API` and `EMAIL` set as in [Install the server](./install-server#for-ai-agents)):
+
+```bash
+PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '
+=')
+jq -n --arg name "Administrator" --arg email "$EMAIL" --arg password "$PASSWORD"    '{name: $name, email: $email, password: $password}' |
+  curl -s -w '
+HTTP %{http_code}
+' -X POST "$API/api/install"     -H @<(printf 'X-Automaton-Setup-Token: %s
+' "$(cat /etc/automaton/secrets/setup-token)")     -H 'Content-Type: application/json' --data-binary @-
+```
+
+Check: the output ends with `HTTP 200`. Keep `PASSWORD` for the CLI sign-in, then `unset` it. Run the link command last, after any app you were asked to build, so the 30-minute link is fresh when the user sees it. As a non-root user, use `sudo`. Show the printed link in your final message, together with `https://studio.<domain>`. The command prints a link to Studio's set-password page. The link works once and for 30 minutes. Opening it asks for a new password; the generated one stops working at that moment and you sign in with yours. If the link expires or is lost, run the command again: each new link voids the earlier ones. Only someone who can read `/etc/automaton/secrets/setup-token` (root) can create it, it needs no sign-in and no email (SMTP), and it works only for administrator accounts. The command finds the server from `/etc/automaton/installation.json`, so it works under `sudo` without the CLI's sign-in; use `--config-dir` if the configuration is elsewhere and `--server <api-url>` to name another server. Treat the link like a password until you have used it.
 
 ## Verify it worked
 
@@ -78,6 +90,8 @@ Studio opens after sign-in and **Admin → Installation** shows **Check installa
 ## Common errors
 
 - **Token rejected.** Use the current value from `/etc/automaton/secrets/setup-token`. After setup is complete the printed token no longer works; the file holds a new value for root.
+- **Setup returns 409.** The administrator already exists. Run `server password-link` to give the user a link.
+- **Link rejected or rate limited.** Creating and using links is limited to 5 per hour per IP; wait and run the command again.
 - **Password refused.** Use 12 or more characters with all four character kinds.
 
 Next: [add a Runner](./deploy-runner).

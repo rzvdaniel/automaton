@@ -5,7 +5,7 @@ description: Fixes for apps that do not start after deploy, failing requests, lo
 
 # Troubleshooting
 
-Common problems and how to fix them. For install problems see [Install with your AI agent](./install-with-ai#common-problems) and [Install the server](./install-server#common-errors).
+Common problems and how to fix them. For install problems see [Install with your AI agent](./install-with-ai) and [Install the server](./install-server#common-errors).
 
 ---
 
