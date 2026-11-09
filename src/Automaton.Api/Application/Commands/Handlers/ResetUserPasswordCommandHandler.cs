@@ -72,7 +72,16 @@ namespace Automaton.Api.Application.Commands.Handlers
                     }
                 };
 
-                await EmailService.Send(userDetails, CancellationToken.None);
+                // The password is already changed; a confirmation that cannot be sent (no email configured, SMTP down)
+                // must not turn the reset into an error.
+                try
+                {
+                    await EmailService.Send(userDetails, CancellationToken.None);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Logger.LogWarning(ex, "The password was reset but the confirmation email was not sent (is email configured?).");
+                }
             }
             catch (Exception ex) when (ex is InvalidResetLinkException or PasswordChangeRejectedException)
             {

@@ -142,6 +142,32 @@ public sealed class AdminUserProvisioningServiceTests
     }
 
     [Test]
+    public async Task ResetSucceedsAndTheNewPasswordWorksWhenEmailIsNotConfigured()
+    {
+        var fixture = await Fixture.CreateAsync(emailThrows: true);
+        var invited = await fixture.Service.InviteAsync(new AdminInviteUserRequest("person@example.com", "Person"), "Admin", false, default);
+        var user = await fixture.Users.FindByIdAsync(invited.UserId.ToString());
+        var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(await LinkTokenAsync(fixture, user!)));
+
+        await fixture.ResetHandler().Handle(new ResetUserPasswordCommand("person@example.com", "Fresh-Pass-123", code), default);
+
+        user = await fixture.Users.FindByIdAsync(invited.UserId.ToString());
+        Assert.That(await fixture.Users.CheckPasswordAsync(user!, "Fresh-Pass-123"), Is.True);
+    }
+
+    [Test]
+    public async Task RecentActivityIsSkippedForAnAnonymousRequest()
+    {
+        var db = AppAuthorizationTestData.CreateDbContext();
+        var anonymous = new UserContextService(new FixedHttpContextAccessor { HttpContext = new DefaultHttpContext() });
+        var service = new RecentActivityService(db, anonymous);
+
+        await service.LogActivityAsync(Automaton.Core.Enums.ActivityType.FlowCreated, "Flow");
+
+        Assert.That(await db.RecentActivities.CountAsync(), Is.Zero);
+    }
+
+    [Test]
     public async Task ResetWithAWeakPasswordIsRejectedWithTheRuleMessages()
     {
         var fixture = await Fixture.CreateAsync();
@@ -504,7 +530,7 @@ public sealed class AdminUserProvisioningServiceTests
             NullLogger<ResetUserPasswordCommandHandler>.Instance, new EphemeralDataProtectionProvider(),
             Options.Create(new DataProtectionTokenProviderOptions()));
 
-        public static async Task<Fixture> CreateAsync(bool emailWorks = true)
+        public static async Task<Fixture> CreateAsync(bool emailWorks = true, bool emailThrows = false)
         {
             var db = AppAuthorizationTestData.CreateDbContext();
             db.Roles.Add(new ApplicationRole { Id = Guid.NewGuid(), Name = UserRole.Administrator, NormalizedName = UserRole.Administrator.ToUpperInvariant() });
@@ -538,7 +564,7 @@ public sealed class AdminUserProvisioningServiceTests
             var configuration = new ConfigurationService(new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["AppConfig:WebsiteUrl"] = "https://studio.example.com" })
                 .Build());
-            var email = new RecordingEmailService(emailWorks);
+            var email = new RecordingEmailService(emailWorks, emailThrows);
             return new Fixture
             {
                 Db = db, Users = users, UsersService = usersService, Email = email,
@@ -548,12 +574,13 @@ public sealed class AdminUserProvisioningServiceTests
         }
     }
 
-    private sealed class RecordingEmailService(bool works) : IEmailService
+    private sealed class RecordingEmailService(bool works, bool throws = false) : IEmailService
     {
         public List<EmailData> Sent { get; } = [];
 
         public Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)
         {
+            if (throws) throw new InvalidOperationException("Email is not configured.");
             if (works) Sent.Add(emailDetails);
             return Task.FromResult(works);
         }
