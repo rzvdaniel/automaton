@@ -2,7 +2,10 @@ using System.Security.Claims;
 using Automaton.Api.Application.Commands;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
@@ -120,6 +123,41 @@ public class InstallController(InstallService installService, IConfiguration con
         catch (InstallationSetupException error) { return BadRequest(new { message = error.Message }); }
         return Ok();
     }
+
+    /// <summary>
+    /// A one-time link to set the password of an administrator, for the person who has root on the server: the
+    /// request must carry the server's setup token (a root-only file in the secrets folder), so an account or API
+    /// key alone cannot make it. Run on the server by <c>automaton server password-link</c>.
+    /// </summary>
+    [HttpPost("password-link")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthResetPassword)]
+    public async Task<IActionResult> CreatePasswordLink(PasswordLinkRequest request,
+        [FromServices] UserManager<ApplicationUser> userManager,
+        [FromServices] ConfigurationService configurationService, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(configuration["Bootstrap:Token"]) || !HasSetupAccess())
+            return StatusCode(403, new { message = "A valid server setup token is required." });
+        var user = string.IsNullOrWhiteSpace(request.Email) ? null : await userManager.FindByEmailAsync(request.Email.Trim());
+        if (user is null || user.IsDeleted || !await IsAdministratorAsync(userManager, user))
+            return NotFound(new { message = "No administrator has that email address." });
+
+        var (url, expiresAt) = await OneTimePasswordLink.CreateAsync(userManager, user, configurationService.WebsiteUrl, DateTimeOffset.UtcNow);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.PasswordLinkCreated,
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.User,
+            EntityId = user.Id,
+            TargetUserId = user.Id,
+            Message = "A one-time password link was created on the server.",
+            Metadata = new { ExpiresAt = expiresAt }
+        }, token);
+        return Ok(new PasswordLinkResponse(url, expiresAt));
+    }
+
+    private static async Task<bool> IsAdministratorAsync(UserManager<ApplicationUser> userManager, ApplicationUser user)
+        => await userManager.IsInRoleAsync(user, UserRole.SystemAdministrator) || await userManager.IsInRoleAsync(user, UserRole.Administrator);
 
     private bool HasSetupAccess()
         => InstallationSetupAccess.IsAllowed(configuration, environment,

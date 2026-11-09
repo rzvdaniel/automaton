@@ -8,7 +8,7 @@ Before you run the installer, ask the user for what only they can give:
 
 1. **A domain** whose DNS they control, with records pointing to the server as [Install the server](https://automaton.monster/docs/install-server) lists them (DNS only, no proxy).
 2. **An email for certificate notices.** It is passed as `--email` and goes to Let's Encrypt, which issues the HTTPS certificates. Do not invent one.
-3. **Who creates the first administrator.** By default, install with `--quiet`, then give the user the address `https://studio.<domain>/install` and tell them the token is in `/etc/automaton/secrets/setup-token` on the server; they open the page and choose their own password, so it never passes through you. Only if the user asks you to create the account, follow [First administrator without a browser](https://automaton.monster/docs/first-admin#without-a-browser-ssh-or-an-ai-agent) and never print the password.
+3. **The first administrator, with a password you never see.** Deploying needs a signed-in CLI, so create the administrator yourself as [First administrator without a browser](https://automaton.monster/docs/first-admin#without-a-browser-ssh-or-an-ai-agent) describes, with a password generated into a shell variable that you never print, read back or write to a file. Install with `--quiet`, sign in the CLI, deploy the app, and end your last message with a one-time link for the user: run `sudo "$(command -v automaton)" server password-link --email <admin-email>` on the server and show its output. The link works once for 30 minutes; the user opens it, chooses their own password and the generated one stops working. If it expires, run the command again. Ask the user which email to use for the administrator.
 
 ## Starting an Automaton app
 

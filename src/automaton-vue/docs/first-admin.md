@@ -25,7 +25,7 @@ A server installed with [Install the server](./install-server) (`/health` return
 
 **The email you type in step 3 is the administrator's sign-in.** Nothing on the server stores it for you. `/etc/automaton/installation.json` holds only the certificate email, which Let's Encrypt uses for expiry notices; it is not an account and signing in with it gives 401. If you forgot which email you used, check the confirmation you saved or ask whoever ran the setup; an AI agent must ask the person, not guess.
 
-SMTP is not needed to start: the first administrator's email is confirmed by this setup flow. The token stops working once setup is complete and the setup page does not reopen.
+SMTP is not needed to start: the first administrator's email is confirmed by this setup flow. The setup page does not reopen once setup is complete.
 
 ## Without a browser (SSH or an AI agent)
 
@@ -39,8 +39,8 @@ read -rsp "Password (12+ characters, upper, lower, number, symbol): " PASSWORD; 
 # No terminal (an AI agent or a script)? Read it from a file only you can read instead:
 #   PASSWORD=$(< /root/admin-password); (create it with: umask 077; read -rs p; printf %s "$p" > /root/admin-password)
 # or from standard input: IFS= read -r PASSWORD
-# An agent can generate a compliant password straight into a mode-600 file (never echoed):
-#   (umask 077; { printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n='; } > /root/admin-password)
+# An agent generates a compliant password into the variable, never echoed and never in a file:
+#   PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n=')   # then see "When an AI agent sets up the server"
 
 # 1. Optional: ask whether setup is open and whether a token is required.
 curl -s "$API/api/install/status"
@@ -55,11 +55,21 @@ jq -n --arg name "$NAME" --arg email "$EMAIL" --arg password "$PASSWORD" \
 unset PASSWORD
 ```
 
-`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token stops working once setup is complete.
+`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. After setup is complete the token no longer creates accounts; it only lets root create [one-time password links](#when-an-ai-agent-sets-up-the-server-for-you).
 
 `EMAIL` and `PASSWORD` in the snippet are the sign-in you are creating now: the email you chose, not the certificate email. Keep both: the CLI sign-in below asks for them again. Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
 
-The password never goes on the command line: `jq --arg` receives it from the shell variable, and the file in the comment above is mode 0600. Delete it afterwards.
+The password never goes on the command line: `jq --arg` receives it from the shell variable. If you keep it in a file, make it mode 0600 and delete it afterwards.
+
+## When an AI agent sets up the server for you
+
+An agent needs a signed-in CLI to deploy, so it creates the administrator itself, but you still choose the password. The agent creates the account with a password it generates and never prints or writes to a file (for example `PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n=')` in the snippet above, used in the same shell, then `unset`), signs in its CLI, deploys, and ends with a one-time link for you:
+
+```bash
+sudo "$(command -v automaton)" server password-link --email admin@example.com
+```
+
+It prints a link to Studio's set-password page. The link works once and for 30 minutes. Opening it asks for a new password; the generated one stops working at that moment and you sign in with yours. If the link expires or is lost, run the command again: each new link voids the earlier ones. Only someone who can read `/etc/automaton/secrets/setup-token` (root) can create it, it needs no sign-in and no email (SMTP), and it works only for administrator accounts. Use `--config-dir` if the server's configuration is not in `/etc/automaton` and `--server <api-url>` if the CLI is not signed in. Treat the link like a password until you have used it.
 
 ## Verify it worked
 
@@ -67,7 +77,7 @@ Studio opens after sign-in and **Admin → Installation** shows **Check installa
 
 ## Common errors
 
-- **Token rejected.** Use the current value from `/etc/automaton/secrets/setup-token`. After setup is complete the token no longer works.
+- **Token rejected.** Use the current value from `/etc/automaton/secrets/setup-token`. After setup is complete it creates no more accounts.
 - **Password refused.** Use 12 or more characters with all four character kinds.
 
 Next: [add a Runner](./deploy-runner).

@@ -16,6 +16,7 @@ internal static class ServerCommand
         command.AddCommand(BuildStatus(config));
         command.AddCommand(BuildBackup(config));
         command.AddCommand(BuildBackupStatus(config));
+        command.AddCommand(BuildPasswordLink(config));
         return command;
     }
 
@@ -116,6 +117,50 @@ internal static class ServerCommand
             else Console.WriteLine(message);
             return true;
         }, json));
+        return command;
+    }
+
+    /// <summary>
+    /// Run on the server as root: the setup token file under the config directory (root-only) proves it. Needs no
+    /// sign-in, so an agent can end an install with a link for the person to set their own password.
+    /// </summary>
+    private static Command BuildPasswordLink(ConfigService config)
+    {
+        var email = new Option<string>("--email", "Email address of the administrator") { IsRequired = true };
+        var configDir = new Option<string>("--config-dir", () => "/etc/automaton", "Server configuration directory holding secrets/setup-token");
+        var server = new Option<string?>("--server", "API URL of the server (default: the server you are logged in to)");
+        var json = new Option<bool>("--json", "Print the result as JSON");
+        var command = new Command("password-link", "Create a one-time link, valid for 30 minutes, where an administrator sets their own password (run on the server as root)")
+            { email, configDir, server, json };
+        command.SetHandler(async context =>
+        {
+            var asJson = context.ParseResult.GetValueForOption(json);
+            try
+            {
+                var tokenPath = Path.Combine(context.ParseResult.GetValueForOption(configDir)!, "secrets", "setup-token");
+                if (!File.Exists(tokenPath))
+                    throw new InvalidOperationException($"Cannot read {tokenPath}. Run this on the server as root (sudo), or pass --config-dir.");
+                var setupToken = (await File.ReadAllTextAsync(tokenPath, context.GetCancellationToken())).Trim();
+                var url = context.ParseResult.GetValueForOption(server)
+                    ?? config.ResolveCredentials(directory: Directory.GetCurrentDirectory()).server;
+                if (string.IsNullOrWhiteSpace(url))
+                    throw new InvalidOperationException("Pass --server with the API URL, or run automaton login first.");
+                using var client = new AutomatonApiClient(url);
+                var (link, expiresAt) = await client.CreatePasswordLinkAsync(context.ParseResult.GetValueForOption(email)!, setupToken, context.GetCancellationToken());
+                if (asJson) CliJson.Write(new { success = true, url = link, expiresAt });
+                else
+                {
+                    Console.WriteLine(link);
+                    Console.Error.WriteLine($"Valid once, until {expiresAt.ToUniversalTime():u}. Open it to choose a password; run this command again for a new link.");
+                }
+            }
+            catch (Exception exception)
+            {
+                if (asJson) CliJson.Write(new { success = false, error = exception.Message });
+                else Console.Error.WriteLine(exception.Message);
+                context.ExitCode = 1;
+            }
+        });
         return command;
     }
 
