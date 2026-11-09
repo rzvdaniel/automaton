@@ -40,18 +40,27 @@ public sealed class AppPauseService(
         var userId = user.GetUserId();
         var app = await db.WebApps.FirstOrDefaultAsync(item => item.Id == appId && item.DeletionClaimId == null, ct)
             ?? throw new KeyNotFoundException("App not found");
-        if (!administrator && !await authorization.CanUpdateAppAsync(appId, userId, ct))
-            throw new UnauthorizedAccessException("You do not have permission to pause or resume this app.");
+        if (!administrator)
+        {
+            // An app the person cannot see is "not found", like for deploy; one they can see but not deploy is refused.
+            if (!await authorization.CanAccessAppAsync(appId, userId, ct)) throw new KeyNotFoundException("App not found");
+            if (!await authorization.CanUpdateAppAsync(appId, userId, ct))
+                throw new UnauthorizedAccessException("You do not have permission to pause or resume this app.");
+        }
 
         var warnings = new List<string>();
-        var changed = 0;
-        if (app.IsPaused != pause)
+        var stateChanged = app.IsPaused != pause;
+        if (stateChanged)
         {
             app.IsPaused = pause;
             app.PausedAt = pause ? DateTime.UtcNow : null;
             app.Updated = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
-            changed = pause ? await PauseSchedulesAsync(appId, ct) : await ResumeSchedulesAsync(appId, userId, warnings, ct);
+        }
+        // Schedules are handled on every call, so repeating a call finishes anything an earlier call left undone.
+        var changed = pause ? await PauseSchedulesAsync(appId, ct) : await ResumeSchedulesAsync(appId, userId, warnings, ct);
+        if (stateChanged)
+        {
             await auditEvents.WriteAsync(new AuditEventWriteRequest
             {
                 Action = AuditActions.Changed,
@@ -111,7 +120,7 @@ public sealed class AppPauseService(
             }
             catch (Exception error) when (error is InvalidOperationException or KeyNotFoundException)
             {
-                // It stays marked, so enabling it later by hand or resuming again can still restore it.
+                // It stays marked, so calling resume again retries it.
                 warnings.Add($"Schedule '{item.Name}' could not be turned on again: {error.Message}");
             }
         }

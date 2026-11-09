@@ -144,6 +144,57 @@ public sealed class AppPauseTests
     }
 
     [Test]
+    public async Task ASchedule_CreatedOrSavedOnWhilePaused_IsRefused_AndOneTurnedOffByHandStaysOffOnResume()
+    {
+        await using var h = new Harness();
+        var on = h.AddSchedule("nightly", enabled: true);
+        var service = h.ServiceFor(OwnerId);
+        var schedules = new ActionScheduleService(h.Db, new AllowAllResolver(), new StubAudit());
+        await service.PauseAsync(AppId, administrator: false, default);
+
+        var request = new SaveActionScheduleRequest
+        {
+            ApplicationId = AppId, ActionKey = "backup", Name = "nightly", ScheduleType = ActionScheduleTypes.Interval,
+            IntervalSeconds = 300, TimeZone = "Etc/UTC", ExecutionScope = ActionExecutionScopes.AppRunner,
+            ConcurrencyPolicy = ActionScheduleConcurrencyPolicies.SkipIfRunning, MisfirePolicy = ActionScheduleMisfirePolicies.Skip,
+            Enabled = true
+        };
+        Assert.That(async () => await schedules.CreateAsync(request, OwnerId, false, default), Throws.InvalidOperationException);
+        Assert.That(async () => await schedules.UpdateAsync(on.Id, request, OwnerId, false, default), Throws.InvalidOperationException);
+
+        // Saved off by hand while paused: resuming must respect that.
+        request.Enabled = false;
+        await schedules.UpdateAsync(on.Id, request, OwnerId, false, default);
+        await service.ResumeAsync(AppId, administrator: false, default);
+        Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.Enabled, Is.False);
+    }
+
+    [Test]
+    public async Task ResumingAgain_RetriesAScheduleThatCouldNotBeTurnedOn()
+    {
+        await using var h = new Harness();
+        var on = h.AddSchedule("nightly", enabled: true);
+        await h.ServiceFor(OwnerId).PauseAsync(AppId, administrator: false, default);
+        var plan = await h.Db.SubscriptionPlans.SingleAsync();
+        plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
+        {
+            ScheduledActions = new ScheduledActionsCapability { Enabled = false }
+        });
+        await h.Db.SaveChangesAsync();
+
+        var first = await h.ServiceFor(OwnerId).ResumeAsync(AppId, administrator: false, default);
+        Assert.That(first.Warnings, Has.Count.EqualTo(1));
+        Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.PausedByApp, Is.True);
+
+        plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities());
+        await h.Db.SaveChangesAsync();
+        var second = await h.ServiceFor(OwnerId).ResumeAsync(AppId, administrator: false, default);
+
+        Assert.That(second.SchedulesChanged, Is.EqualTo(1));
+        Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.Enabled, Is.True);
+    }
+
+    [Test]
     public async Task ASchedule_CannotBeTurnedOnWhilePaused()
     {
         await using var h = new Harness();
@@ -156,13 +207,13 @@ public sealed class AppPauseTests
     }
 
     [Test]
-    public async Task SomeoneWithoutDeployRights_IsRefused_AndNothingChanges()
+    public async Task SomeoneWhoCannotSeeTheApp_GetsNotFound_AndNothingChanges()
     {
         await using var h = new Harness();
         var on = h.AddSchedule("nightly", enabled: true);
 
         Assert.That(async () => await h.ServiceFor(Guid.NewGuid()).PauseAsync(AppId, administrator: false, default),
-            Throws.TypeOf<UnauthorizedAccessException>());
+            Throws.TypeOf<KeyNotFoundException>());
 
         Assert.That((await h.Db.WebApps.SingleAsync()).IsPaused, Is.False);
         Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.Enabled, Is.True);
