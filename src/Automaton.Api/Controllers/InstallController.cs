@@ -122,7 +122,9 @@ public class InstallController(InstallService installService, IConfiguration con
         try { await installService.Install(command, cancellationToken); }
         catch (InstallationSetupException error) { return BadRequest(new { message = error.Message }); }
         // The token the installer printed has done its one job; root keeps a new value in the same file.
-        InstallationSetupAccess.Rotate(configuration);
+        if (!string.IsNullOrWhiteSpace(configuration["Bootstrap:TokenFile"]) && !await SetupTokenRotation.RotateAsync(db, configuration, cancellationToken))
+            HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger<InstallController>().LogWarning(
+                "Setup completed but the setup token file could not be replaced; the server will keep trying in the background.");
         return Ok();
     }
 

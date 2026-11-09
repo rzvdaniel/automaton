@@ -201,6 +201,19 @@ public class ServerUpdateRunnerTests
         Assert.That(command.Parse("update-status --json").Errors, Is.Empty);
     }
 
+    [Test]
+    public void PasswordLinkFindsTheServerFromInstallationJson()
+    {
+        var directory = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            Assert.That(ServerCommand.InstalledApiUrl(directory), Is.Null);
+            File.WriteAllText(Path.Combine(directory, "installation.json"), "{\"domain\":\"example.com\",\"email\":\"a@b.co\"}");
+            Assert.That(ServerCommand.InstalledApiUrl(directory), Is.EqualTo("https://api.example.com"));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
     private static async Task<ServerUpdateOutcome> RunAsync(FakeServer server, string version, bool wait, TimeSpan? timeout = null, bool allowDowngrade = false)
     {
         using var http = new HttpClient(server) { BaseAddress = new Uri("https://api.example.test/") };

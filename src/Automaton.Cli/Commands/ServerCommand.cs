@@ -141,7 +141,9 @@ internal static class ServerCommand
                 if (!File.Exists(tokenPath))
                     throw new InvalidOperationException($"Cannot read {tokenPath}. Run this on the server as root (sudo), or pass --config-dir.");
                 var setupToken = (await File.ReadAllTextAsync(tokenPath, context.GetCancellationToken())).Trim();
+                // Under sudo the login of the person who installed is not found, so the server's own installation.json comes first.
                 var url = context.ParseResult.GetValueForOption(server)
+                    ?? InstalledApiUrl(context.ParseResult.GetValueForOption(configDir)!)
                     ?? config.ResolveCredentials(directory: Directory.GetCurrentDirectory()).server;
                 if (string.IsNullOrWhiteSpace(url))
                     throw new InvalidOperationException("Pass --server with the API URL, or run automaton login first.");
@@ -162,6 +164,23 @@ internal static class ServerCommand
             }
         });
         return command;
+    }
+
+    /// <summary>The API address of the server installed in this configuration directory (https://api.DOMAIN), if there is one.</summary>
+    internal static string? InstalledApiUrl(string configDir)
+    {
+        try
+        {
+            var path = Path.Combine(configDir, "installation.json");
+            if (!File.Exists(path)) return null;
+            using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            var domain = document.RootElement.TryGetProperty("domain", out var value) ? value.GetString() : null;
+            return string.IsNullOrWhiteSpace(domain) ? null : $"https://api.{domain}";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     private static Command BuildBackupStatus(ConfigService config)

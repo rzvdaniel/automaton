@@ -69,6 +69,31 @@ public sealed class SetupTokenFileTests
     }
 
     [Test]
+    public async Task AServerAlreadySetUpGetsANewTokenOnceAndAFreshOneIsLeftAlone()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "printed-token\n");
+            var configuration = FileConfiguration(path);
+            await using var db = Database();
+
+            Assert.That(await SetupTokenRotation.RotateIfSetupCompleteAsync(db, Service(db), configuration, default), Is.False, "setup not done yet");
+            Assert.That(File.ReadAllText(path), Is.EqualTo("printed-token\n"));
+
+            db.Settings.Add(new Setting { Key = "Installation.Complete", Value = "true" });
+            await db.SaveChangesAsync();
+            Assert.That(await SetupTokenRotation.RotateIfSetupCompleteAsync(db, Service(db), configuration, default), Is.True);
+            var rotated = File.ReadAllText(path);
+            Assert.That(rotated, Is.Not.EqualTo("printed-token\n"));
+
+            Assert.That(await SetupTokenRotation.RotateIfSetupCompleteAsync(db, Service(db), configuration, default), Is.True);
+            Assert.That(File.ReadAllText(path), Is.EqualTo(rotated), "a later restart does not rotate again");
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Test]
     public void AMissingOrUnwritableTokenFileNeverFallsBackToTheConfiguredToken()
     {
         var configuration = FileConfiguration(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
