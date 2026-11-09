@@ -5,19 +5,19 @@ description: Give an AI agent a server, a domain and an email. It installs Autom
 
 # Install with your AI agent
 
-An AI agent can take a fresh server to a working Automaton in 2-3 minutes. A person can run the same commands. Nothing else is needed.
+An AI agent can take a fresh server to a working Automaton in 2-3 minutes. A person can run the same commands.
 
 ## What you provide
 
 1. **A server you can reach by SSH as root.** x86_64 Ubuntu 24.04, Ubuntu 22.04 or Debian 12, at least 2 GB RAM (4 GB recommended) and 10 GiB free disk, with ports 80, 443 and 5671 open.
-2. **A domain with two DNS A records** pointing to the server's public IP, DNS only (no proxy, no orange cloud): `domain` and `*.domain`. Two records were enough in every test run.
+2. **A domain with two DNS A records** pointing to the server's public IP, DNS only (no proxy, no orange cloud): `domain` and `*.domain`. Two records were enough in every test run; if `apps.domain` itself does not resolve, add it too.
 3. **An email for Let's Encrypt.** It receives certificate notices and is not an account.
 
 The agent asks which email to use for the administrator. Default: the certificate email.
 
 ## What the AI does
 
-Run on the server as root. Use one shell for steps 4 to 6, because the generated password lives only in a shell variable. Never print, read back or write the password to a file. Do not paste the output of a step that contains a token or link into chat.
+Run on the server as root. Run steps 1-7 in one shell (or one script), because the generated password lives only in a shell variable and `PATH` is set in step 4. Never print, read back or write the password to a file. Do not paste the output of a step that contains a token or link into chat.
 
 Set the inputs once:
 
@@ -31,7 +31,7 @@ API=https://api.$DOMAIN
 1. **Install `jq`.** Fresh Ubuntu and Debian do not include it. Install it visibly and check it; a quiet install can fail without a message.
 
    ```bash
-   apt-get update && apt-get install -y jq curl python3
+   apt-get update && apt-get install -y jq curl python3 libicu-dev
    jq --version
    ```
 
@@ -70,9 +70,24 @@ API=https://api.$DOMAIN
 
    Check: `automaton --help` prints usage.
 
-5. **Sign the CLI in without a browser** with `automaton login --device --server "$API"`, then approve the printed request with the administrator's email and the password variable. Use the script in [Log in without a browser](./automaton-cli#log-in-without-a-browser) (it needs `EMAIL`, `PASSWORD` and `API` from above). Then `unset PASSWORD`.
+5. **Sign the CLI in without a browser.** Start the device login in the background, then approve it with the administrator's email and the generated password (still in the shell variable). Keep its output in a private file: it contains the approval code.
 
-   Check: `automaton whoami` shows `$API`. The approval call must return `200`.
+   ```bash
+   OUT=$(umask 077; mktemp)
+   automaton login --device --server "$API" > "$OUT" 2>&1 &
+   for _ in $(seq 20); do grep -q 'cli/authorize' "$OUT" && break; sleep 1; done
+   URL=$(grep -o 'https://[^ ]*cli/authorize?[^ ]*' "$OUT" | head -1)
+   REQUEST_ID=${URL#*requestId=}; REQUEST_ID=${REQUEST_ID%%&*}
+   USER_CODE=${URL#*code=}; USER_CODE=${USER_CODE%%&*}
+   TOKEN=$(jq -n --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}' |
+     curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
+   curl -s -o /dev/null -w '%{http_code}
+' -X POST "$API/api/cli-auth/requests/$REQUEST_ID/approve"      -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$(jq -n --arg c "$USER_CODE" '{userCode:$c}')"
+   unset PASSWORD TOKEN
+   wait; tail -n 3 "$OUT"; rm -f "$OUT"
+   ```
+
+   Check: the approval call prints `200` and the CLI prints "Signed in as ...". Approve within a few minutes. Details: [Log in without a browser](./automaton-cli#log-in-without-a-browser).
 
 6. **Add a Runner on the same host.**
 
@@ -82,15 +97,13 @@ API=https://api.$DOMAIN
 
    Check: `automaton runners` lists `main` as connected or online (about 30 s).
 
-7. **Hand over the one-time link.** Run it last, so the link is fresh.
+7. **Hand over the one-time link.** Run it last, after any app you were asked to build (see [Your first app](./getting-started)), so the 30-minute link is fresh when the user sees it.
 
    ```bash
    "$(command -v automaton)" server password-link --email "$EMAIL"
    ```
 
-   As a non-root user use `sudo "$(command -v automaton)" server password-link --email "$EMAIL"`. Show the printed link in your final message, together with `https://studio.$DOMAIN`. Check: the output is a link to Studio's set-password page.
-
-Then continue with [Your first app](./getting-started) if the user asked for an app.
+   As a non-root user use `sudo "$(command -v automaton)" server password-link --email "$EMAIL"`. Show the printed link in your final message, together with `https://studio.$DOMAIN`. Check: the output is a link to Studio's set-password page. If an app was requested, do [Your first app](./getting-started) before this step.
 
 ## What you get
 
