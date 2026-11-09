@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Automaton.Core.Models;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -8,12 +9,34 @@ public sealed class MachineApplicationStorageCleanup
 {
     private readonly Func<IReadOnlyList<string>, CancellationToken, Task<InfrastructureCommandResponse>> execute;
 
-    public MachineApplicationStorageCleanup(InfrastructureCommandService docker)
-        : this((arguments, token) => docker.ExecuteTypedDockerAsync(arguments, TimeSpan.FromMinutes(2), token)) { }
+    private readonly string helperImage;
+
+    public MachineApplicationStorageCleanup(InfrastructureCommandService docker, IOptions<MachineStaticServingOptions> options)
+        : this((arguments, token) => docker.ExecuteTypedDockerAsync(arguments, TimeSpan.FromMinutes(2), token), options.Value.Image) { }
 
     internal MachineApplicationStorageCleanup(
-        Func<IReadOnlyList<string>, CancellationToken, Task<InfrastructureCommandResponse>> execute)
-        => this.execute = execute;
+        Func<IReadOnlyList<string>, CancellationToken, Task<InfrastructureCommandResponse>> execute,
+        string helperImage = "nginx:alpine")
+    {
+        this.execute = execute;
+        this.helperImage = helperImage;
+    }
+
+    /// <summary>Empties a managed directory whose files the app's runtime user owns, using a short-lived helper container
+    /// (no network, all capabilities dropped except DAC_OVERRIDE). The directory itself is left for the Runner to remove.</summary>
+    public async Task EmptyDirectoryAsync(string path, CancellationToken token = default)
+    {
+        var emptied = await execute(["docker", "run", "--rm", "--network", "none", "--user", "0",
+            "--cap-drop", "ALL", "--cap-add", "DAC_OVERRIDE", "--security-opt", "no-new-privileges",
+            "--mount", $"type=bind,source={DockerContainerRuntime.MapHostPath(path)},target=/purge",
+            helperImage, "find", "/purge", "-mindepth", "1", "-delete"], token);
+        if (!emptied.Success)
+        {
+            var detail = (emptied.Error ?? "").Trim();
+            throw new InvalidOperationException("The Runner could not remove files the app's runtime user owns. App storage was preserved for retry."
+                + (detail.Length == 0 ? "" : $" Docker said: {detail[..Math.Min(detail.Length, 200)]}"));
+        }
+    }
 
     public async Task DeleteComposeVolumesAsync(Guid appId, CancellationToken token = default)
     {
