@@ -32,7 +32,10 @@ internal sealed class RunnerRuntimeNetworkPolicy
             if (await IsReadyAsync(port, health.Path, client, timeout.Token, cancellationToken)) return;
             if (!await DelayBeforeReadinessRetryAsync(timeout.Token, cancellationToken)) break;
         }
-        throw new TimeoutException($"Runtime container did not become ready on {runtimeHostAddress}:{port}.");
+        throw new TimeoutException($"Runtime container did not become ready on {runtimeHostAddress}:{port}. "
+            + "If the app answers but cannot find its pages or files, its runtime user probably cannot read them: "
+            + "the Runner gives deployed files to runtime.user (or the image user) with chown, which fails for "
+            + "images without chown or users it cannot resolve. Set runtime.user to a numeric UID the image can run as.");
     }
 
     public int AllocatePort(int requested)

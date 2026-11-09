@@ -308,14 +308,14 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         }
     }
 
-    // The app's runtime user is not the Runner user, and a container started without capabilities cannot override
-    // modes, so owner-only files (author umask 077) would be unreadable. Normalize like Docker COPY: 0644, or 0755
-    // when the author set the owner's executable bit.
+    // Only the owner and the Runner group may read deployed files. The Runner later hands them to the app runtime user
+    // (chown; the group stays the Runner group), so nothing is readable by other host users or other apps. 0640, or
+    // 0750 when the author set the owner executable bit; directories are 0750.
     private static void MakeReadableByRuntimeUser(string file)
     {
         if (OperatingSystem.IsWindows()) return;
         var executable = (File.GetUnixFileMode(file) & UnixFileMode.UserExecute) != 0;
-        File.SetUnixFileMode(file, ReadableFileMode | (executable ? ExecutableBits : UnixFileMode.None));
+        File.SetUnixFileMode(file, FileMode640 | (executable ? UnixFileMode.UserExecute | UnixFileMode.GroupExecute : UnixFileMode.None));
     }
 
     private static void CreateReadableDirectories(string root, string directory)
@@ -327,10 +327,11 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         {
             var next = missing.Pop();
             Directory.CreateDirectory(next);
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(next, ReadableFileMode | ExecutableBits);
+            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(next, DirectoryMode750);
         }
     }
 
-    private const UnixFileMode ReadableFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
-    private const UnixFileMode ExecutableBits = UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
+    private const UnixFileMode FileMode640 = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead;
+    private const UnixFileMode DirectoryMode750 = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+        | UnixFileMode.GroupRead | UnixFileMode.GroupExecute;
 }

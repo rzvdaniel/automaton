@@ -208,6 +208,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
     {
         var image = await ResolveImageAsync(request.Image, cancellationToken);
         var network = ResolveApplicationNetwork();
+        await GrantRuntimeUserAccessAsync(request, image.ResolvedReference, cancellationToken);
         var args = new List<string>
         {
             "create", "--name", request.Name,
@@ -262,6 +263,38 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         if (string.IsNullOrWhiteSpace(id))
             throw new InvalidOperationException("Docker did not return an application container ID.");
         return new DockerApplicationContainer(id, request.Name, image);
+    }
+
+    /// <summary>Gives the deployed files to the app's runtime user (the contract's numeric user, else the image's default
+    /// user, else root). The Runner unpacks them 0640/0750 for its own group, so only that user, the Runner (through the
+    /// group) and no one else can read them. Chown needs a short-lived helper with CAP_CHOWN because the Runner is not
+    /// root. Best effort: if the helper cannot run (for example an image without chown) the files stay readable only by
+    /// the Runner and a failed start is explained by the readiness error.</summary>
+    private async Task GrantRuntimeUserAccessAsync(
+        DockerApplicationContainerRequest request, string image, CancellationToken cancellationToken)
+    {
+        var owner = await ResolveRuntimeOwnerAsync(request.User, image, cancellationToken);
+        if (owner is null) return;
+        await ExecuteAsync(["run", "--rm", "--network", "none", "--user", "0",
+            "--cap-drop", "ALL", "--cap-add", "CHOWN", "--cap-add", "DAC_READ_SEARCH",
+            "--security-opt", "no-new-privileges",
+            "--mount", $"type=bind,source={MapHostPath(request.ArtifactRoot)},target=/automaton/app",
+            "--entrypoint", "chown", image, "-R", "-h", owner, "/automaton/app"],
+            TimeSpan.FromMinutes(2), cancellationToken, allowFailure: true);
+    }
+
+    private async Task<string?> ResolveRuntimeOwnerAsync(string? user, string image, CancellationToken cancellationToken)
+    {
+        if (user is null)
+        {
+            var inspected = await ExecuteAsync(["image", "inspect", "--format", "{{.Config.User}}", image],
+                TimeSpan.FromSeconds(30), cancellationToken, allowFailure: true);
+            if (inspected.ExitCode != 0) return null;
+            user = inspected.StandardOutput.Trim();
+        }
+        var owner = user.Split(':')[0];
+        if (owner.Length == 0 || owner == "root") return "0";
+        return System.Text.RegularExpressions.Regex.IsMatch(owner, "^[A-Za-z0-9_][A-Za-z0-9_.-]*$") ? owner : null;
     }
 
     public Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)

@@ -118,7 +118,7 @@ public sealed class DockerContainerRuntimeBoundaryTests
             8080, 18080, Path.GetTempPath(), new Dictionary<string, string>(), Guid.NewGuid(), Guid.NewGuid(),
             User: "1000:1000"));
 
-        var userArgumentIndex = arguments.IndexOf("--user");
+        var userArgumentIndex = arguments.LastIndexOf("--user");
         Assert.That(userArgumentIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(arguments[userArgumentIndex + 1], Is.EqualTo("1000:1000"));
     }
