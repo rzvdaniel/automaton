@@ -39,11 +39,18 @@ public class AccountController : BaseController
     public async Task<ActionResult<JsonWebToken>> LoginUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken)
     {
         var signInUserQuery = new SignInUserQuery(configurationService.RefreshTokenLifetime, signInUserCommand.Email, signInUserCommand.Password);
-        var jwt = await Mediator.Send(signInUserQuery, cancellationToken);
-        RefreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
-        jwt.RefreshToken = string.Empty;
+        try
+        {
+            var jwt = await Mediator.Send(signInUserQuery, cancellationToken);
+            RefreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
+            jwt.RefreshToken = string.Empty;
 
-        return Ok(jwt);
+            return Ok(jwt);
+        }
+        catch (InvalidCredentialsException error)
+        {
+            return Unauthorized(new { message = error.Message });
+        }
     }
 
     [HttpPut]

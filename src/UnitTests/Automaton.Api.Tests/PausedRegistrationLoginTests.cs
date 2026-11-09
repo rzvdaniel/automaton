@@ -23,9 +23,21 @@ public class PausedRegistrationLoginTests
         Assert.That(controller.Response.Headers.SetCookie.ToString(), Does.Contain(RefreshTokenCookieService.CookieName));
     }
 
-    private static (AccountController Controller, StubMediator Mediator) CreateController()
+    [Test]
+    public async Task LoginUser_WhenCredentialsAreWrong_Returns401WithMessage()
     {
-        var mediator = new StubMediator();
+        var (controller, _) = CreateController(new Automaton.Api.Services.InvalidCredentialsException());
+        var result = await controller.LoginUser(new SignInUserCommand("existing@example.com", "wrong"), CancellationToken.None);
+        var unauthorized = result.Result as UnauthorizedObjectResult;
+        Assert.That(unauthorized, Is.Not.Null);
+        Assert.That(unauthorized!.StatusCode, Is.EqualTo(401));
+        Assert.That(unauthorized.Value!.ToString(), Does.Contain("Wrong email or password."));
+        Assert.That(controller.Response.Headers.SetCookie.ToString(), Is.Empty);
+    }
+
+    private static (AccountController Controller, StubMediator Mediator) CreateController(Exception? failure = null)
+    {
+        var mediator = new StubMediator { Failure = failure };
         var services = new ServiceCollection().AddSingleton<IMediator>(mediator).BuildServiceProvider();
         var configuration = new ConfigurationService(new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["AppConfig:UserSignUp"] = "false" }).Build());
@@ -42,6 +54,7 @@ public class PausedRegistrationLoginTests
     private sealed class StubMediator : IMediator
     {
         public object? LastRequest { get; private set; }
+        public Exception? Failure { get; init; }
 
         public Task Publish(object notification, CancellationToken cancellationToken = default)
         {
@@ -59,6 +72,7 @@ public class PausedRegistrationLoginTests
         public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
         {
             LastRequest = request;
+            if (Failure is not null) throw Failure;
             if (typeof(TResponse) == typeof(Automaton.Api.Authentication.JsonWebToken))
                 return Task.FromResult((TResponse)(object)new Automaton.Api.Authentication.JsonWebToken
                 {
