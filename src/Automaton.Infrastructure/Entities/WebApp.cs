@@ -21,6 +21,10 @@ public class WebApp
     public string ApplicationContractJson { get; set; } =
         ApplicationContractSerialization.Serialize(ApplicationContractDefaults.Create());
     
+    /// <summary>The app is paused: its runtime is stopped, its schedules are off and its address answers "paused". Data, secrets and settings are kept.</summary>
+    public bool IsPaused { get; set; }
+    public DateTime? PausedAt { get; set; }
+
     // Publishing fields
     public bool IsPublished { get; set; }
 

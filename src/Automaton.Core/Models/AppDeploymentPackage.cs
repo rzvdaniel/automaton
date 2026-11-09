@@ -54,6 +54,15 @@ public sealed record CleanupAppDeploymentTargetResult(
 /// <summary>Starts an app's running runtime again from its deployed files, so it loads current secrets.</summary>
 public sealed record RestartAppRuntimeRequest(Guid AppId, Guid DeploymentTargetId);
 
+/// <summary>Stops an app's runtime without removing its files, secrets or data; the app stays paused until resumed.</summary>
+public sealed record PauseAppRuntimeRequest(Guid AppId, Guid DeploymentTargetId);
+
+/// <summary>Starts a paused app's runtime again from its deployed files.</summary>
+public sealed record ResumeAppRuntimeRequest(Guid AppId, Guid DeploymentTargetId);
+
+/// <summary><c>Changed</c> is false when the target had nothing to pause or resume.</summary>
+public sealed record PauseResumeAppRuntimeResult(Guid AppId, Guid DeploymentTargetId, bool Changed);
+
 /// <summary><c>Restarted</c> is false when the target had no running runtime that takes secrets.</summary>
 public sealed record RestartAppRuntimeResult(Guid AppId, Guid DeploymentTargetId, bool Restarted);
 

@@ -48,6 +48,8 @@ export interface App {
   summary: string
   description: string
   isPublished: boolean
+  /** Stopped on purpose: schedules off, address shows a paused page. */
+  isPaused?: boolean
   canLaunchPublicly?: boolean
   isForkable: boolean
   publicUrl?: string
@@ -167,6 +169,7 @@ export interface AppListItem {
   thumbnailUrl?: string | null
   tags: string[]
   isPublished: boolean
+  isPaused?: boolean
   canLaunchPublicly?: boolean
   publicUrl?: string | null
   updatedAtUtc: string
@@ -608,6 +611,15 @@ export interface SharedPerson {
   userId: string
   email: string
   displayName: string
+}
+
+/** The answer to pausing or resuming an app. */
+export interface AppPauseState {
+  appId: string
+  paused: boolean
+  pausedAt?: string | null
+  schedulesChanged: number
+  warnings: string[]
 }
 
 export interface AppSharing {

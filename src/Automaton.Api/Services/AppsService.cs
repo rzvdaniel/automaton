@@ -164,6 +164,7 @@ public class AppsService
             Summary = entity.Summary,
             Description = entity.Description,
             IsPublished = entity.IsPublished,
+            IsPaused = entity.IsPaused,
             IsForkable = entity.IsForkable,
             PublicUrl = entity.PublicUrl,
             PublishedAt = entity.PublishedAt,

@@ -82,6 +82,8 @@ public sealed class ActionScheduleService
         var schedule = await FindAuthorizedAsync(id, userId, administrator, ct);
         if (enabled)
         {
+            if (await db.WebApps.AnyAsync(app => app.Id == schedule.ApplicationId && app.IsPaused, ct))
+                throw new InvalidOperationException("The app is paused. Resume it to turn its schedules on.");
             var validationUserId = schedule.OwnerUserId ?? userId;
             var capability = await GetCapabilityAsync(validationUserId, administrator: false, ct);
             if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");

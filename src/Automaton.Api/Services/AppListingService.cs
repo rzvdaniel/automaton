@@ -55,6 +55,7 @@ internal sealed class AppListingService(
                 ThumbnailUrl = app.ThumbnailUrl,
                 Tags = app.Tags,
                 IsPublished = app.IsPublished,
+                IsPaused = app.IsPaused,
                 PublicUrl = app.PublicUrl,
                 Updated = app.Updated,
                 ProjectId = app.ProjectId,
@@ -106,6 +107,7 @@ internal sealed class AppListingService(
             ThumbnailUrl = row.ThumbnailUrl,
             Tags = AppTagNormalizer.Normalize(row.Tags),
             IsPublished = row.IsPublished,
+            IsPaused = row.IsPaused,
             PublicUrl = row.PublicUrl,
             CanLaunchPublicly = row.CanLaunchPublicly,
             UpdatedAtUtc = row.Updated,
@@ -167,6 +169,7 @@ internal sealed class AppListingService(
         public string? ThumbnailUrl { get; init; }
         public string? Tags { get; init; }
         public bool IsPublished { get; init; }
+        public bool IsPaused { get; init; }
         public string? PublicUrl { get; init; }
         public DateTime Updated { get; init; }
         public Guid? ProjectId { get; init; }

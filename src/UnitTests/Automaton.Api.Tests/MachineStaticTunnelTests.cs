@@ -66,6 +66,24 @@ public sealed class MachineStaticTunnelTests
         });
     }
 
+    [Test]
+    public async Task ForwardAsync_AnswersThePausedPageWithoutReachingTheRunner()
+    {
+        await using var fixture = await StaticSiteFixture.CreateAsync();
+        await fixture.ForwardAsync();
+        var dispatchedRequest = fixture.LastRequest;
+        await fixture.PauseAsync();
+
+        var response = await fixture.ForwardAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+            Assert.That(System.Text.Encoding.UTF8.GetString(response.BodyBytes!), Does.Contain("This app is paused"));
+            Assert.That(fixture.LastRequest, Is.SameAs(dispatchedRequest));
+        });
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task ForwardAsync_PreservesRuntimeGatewayForDynamicAndComposeApps(bool compose)
@@ -175,6 +193,12 @@ public sealed class MachineStaticTunnelTests
             var app = db.WebApps.Local.Single(item => item.Id == appId);
             app.IsPublished = false;
             app.RuntimeVisibility = AppRuntimeVisibilities.Private;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task PauseAsync()
+        {
+            db.WebApps.Local.Single(app => app.Id == appId).IsPaused = true;
             await db.SaveChangesAsync();
         }
 

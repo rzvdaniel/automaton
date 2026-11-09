@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import AppFilterBar from '../components/AppFilterBar.vue'
@@ -67,6 +68,22 @@ const goToCatalog = () => router.push({ name: 'apps-catalog' })
 const showNewApp = ref(false)
 const newApp = () => { showNewApp.value = true }
 
+const toast = useToast()
+const pausing = ref<string | null>(null)
+
+/** Pauses or resumes one app; the row shows the new state when the server has answered. */
+async function togglePaused(id: string, name: string, paused: boolean) {
+  pausing.value = id
+  try {
+    await appsStore.setAppPaused(id, paused)
+    toast.add({ severity: 'success', summary: paused ? 'Paused' : 'Resumed', detail: `"${name}" is ${paused ? 'paused' : 'running again'}`, life: 3000 })
+  } catch (err: unknown) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err instanceof Error ? err.message : 'Could not change the app', life: 5000 })
+  } finally {
+    pausing.value = null
+  }
+}
+
 const handleRetry = async () => {
   appsStore.clearError()
   try {
@@ -125,7 +142,20 @@ const handleRetry = async () => {
             :line="appDescription(app)"
             :image-url="app.thumbnailUrl"
             :state="appState(app)"
-          />
+          >
+            <template #action>
+              <Button
+                :label="app.isPaused ? 'Resume' : 'Pause'"
+                :icon="app.isPaused ? 'pi pi-play' : 'pi pi-pause'"
+                size="small"
+                severity="secondary"
+                outlined
+                :loading="pausing === app.id"
+                :aria-label="`${app.isPaused ? 'Resume' : 'Pause'} ${app.name}`"
+                @click="togglePaused(app.id, app.name, !app.isPaused)"
+              />
+            </template>
+          </AppRow>
         </div>
 
         <div v-else-if="appsStore.hasApps" class="apps-card apps-empty">

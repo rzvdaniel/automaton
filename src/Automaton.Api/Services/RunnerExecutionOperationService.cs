@@ -158,7 +158,7 @@ public sealed class RunnerExecutionOperationService(
             // They must leave that queue's single consumer free to run its nested operations.
             || request.Action is not null && request.Action.Kind is not
                 ("execute" or "cleanup-app-resources" or "cleanup-target-resources" or "cleanup-app" or "cleanup-target"
-                or AppRuntimeRestarter.CommandKind);
+                or AppRuntimeRestarter.CommandKind or AppPauseService.PauseCommandKind or AppPauseService.ResumeCommandKind);
 
     public async Task<RunnerExecutionResult> WaitAsync(Guid operationId, CancellationToken token)
     {

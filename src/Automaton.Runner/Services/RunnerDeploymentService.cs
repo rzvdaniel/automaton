@@ -113,6 +113,24 @@ public class RunnerDeploymentService
         finally { gate.Release(); }
     }
 
+    /// <summary>Stops a runtime without removing its files, under the same per-target gate as deployments.</summary>
+    public async Task<bool> PauseRuntimeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var gate = deploymentGates.GetOrAdd((appId, deploymentTargetId), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try { return await runtimeProcessManager.PauseAsync(appId, deploymentTargetId, cancellationToken); }
+        finally { gate.Release(); }
+    }
+
+    /// <summary>Starts a paused runtime again under the same per-target gate as deployments.</summary>
+    public async Task<bool> ResumeRuntimeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var gate = deploymentGates.GetOrAdd((appId, deploymentTargetId), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try { return await runtimeProcessManager.ResumeAsync(appId, deploymentTargetId, cancellationToken); }
+        finally { gate.Release(); }
+    }
+
     public async Task CleanupTargetAsync(
         Guid appId,
         Guid deploymentTargetId,

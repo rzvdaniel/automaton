@@ -55,6 +55,7 @@ export function nextRunLabel(app: AppListItem, now = new Date()): string {
 }
 
 export function isStopped(app: AppListItem): boolean {
+  if (app.isPaused) return true
   if (app.actionsOnly) return false
   const environment = app.liveEnvironment
   if (!environment) return app.runner?.connectivityStatus !== 'Online'
@@ -63,6 +64,7 @@ export function isStopped(app: AppListItem): boolean {
 
 /** The list data has no schedule, so an action shows when it last ran. */
 export function appState(app: AppListItem): AppState {
+  if (app.isPaused) return { label: 'paused', tone: 'stopped' }
   if (app.actionsOnly) {
     const run = app.lastActionRun
     if (!run) return { label: 'no runs yet', tone: 'stopped' }

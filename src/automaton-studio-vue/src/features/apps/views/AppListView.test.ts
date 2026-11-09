@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppListItem } from '../types/apps.types'
@@ -30,7 +31,7 @@ async function mountView(apps: AppListItem[]) {
   setActivePinia(createPinia())
   const store = useAppsStore()
   store.fetchApps = vi.fn(async () => { store.listApps = apps })
-  const wrapper = mount(AppListView, { global: { plugins: [PrimeVue] } })
+  const wrapper = mount(AppListView, { global: { plugins: [PrimeVue, ToastService] } })
   await flushPromises()
   return wrapper
 }
@@ -90,6 +91,23 @@ describe('AppListView', () => {
     expect(wrapper.find('section[aria-label="Shared with you"]').text()).toContain('Shared Tool')
     const row = wrapper.find('section .app-row')
     expect(row.element.tagName).toBe('BUTTON')
+  })
+
+  it('pauses and resumes an app from its row and shows the Paused state', async () => {
+    const wrapper = await mountView([item({ id: 'a', name: 'Notes' }), item({ id: 'p', name: 'Backup', isPaused: true })])
+    const store = useAppsStore()
+    store.setAppPaused = vi.fn(async () => undefined)
+    const rowsText = wrapper.findAll('.apps-card .app-row').map((row) => row.text())
+    expect(rowsText[0]).toContain('live')
+    expect(rowsText[0]).toContain('Pause')
+    expect(rowsText[1]).toContain('paused')
+    expect(rowsText[1]).toContain('Resume')
+
+    await wrapper.find('button[aria-label="Pause Notes"]').trigger('click')
+    await wrapper.find('button[aria-label="Resume Backup"]').trigger('click')
+
+    expect(store.setAppPaused).toHaveBeenNthCalledWith(1, 'a', true)
+    expect(store.setAppPaused).toHaveBeenNthCalledWith(2, 'p', false)
   })
 
   it('shows a friendly empty state with both buttons when there are no apps', async () => {

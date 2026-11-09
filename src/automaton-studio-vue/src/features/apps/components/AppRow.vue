@@ -27,6 +27,7 @@ defineEmits<{ open: [] }>()
         <slot name="meta" />
       </span>
       <slot name="tag" />
+      <span v-if="state" class="app-row__state" :class="`app-row__state--${state.tone}`">{{ state.label }}</span>
     </component>
     <slot name="action" />
   </div>

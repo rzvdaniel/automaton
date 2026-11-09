@@ -303,6 +303,40 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         return true;
     }
 
+    /// <summary>
+    /// Stops the app's containers and records the runtime as paused. The deployed files and storage stay, and a
+    /// paused runtime is not started again when the Runner restarts.
+    /// </summary>
+    public async Task<bool> PauseAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        if (metadata is null || metadata.State == RuntimeReadinessState.Paused
+            || !RunnerRuntimeMetadataPolicy.IsOciContainer(metadata) || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+            return false;
+        await StopAsync(appId, deploymentTargetId);
+        var paused = metadataStore.Clone(metadata);
+        paused.Candidate = null;
+        paused.State = RuntimeReadinessState.Paused;
+        paused.ContainerId = null;
+        paused.ContainerName = null;
+        paused.ComposeProjectId = null;
+        paused.ComposeCandidateId = null;
+        paused.EffectivePort = null;
+        await metadataStore.WriteAsync(paused, CancellationToken.None);
+        return true;
+    }
+
+    /// <summary>Starts a paused runtime from the files it was deployed with, through the normal start and readiness path.</summary>
+    public async Task<bool> ResumeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        if (metadata is not { State: RuntimeReadinessState.Paused } || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+            return false;
+        await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
+            cancellationToken, metadata.ArtifactRoot, metadata.CandidateId);
+        return true;
+    }
+
     private async Task<RunnerRuntimeDeploymentMetadata?> ReadExistingMetadataAsync(
         string metadataPath,
         CancellationToken cancellationToken)
