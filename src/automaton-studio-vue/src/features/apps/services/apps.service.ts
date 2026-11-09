@@ -24,9 +24,7 @@ import type {
   MyTeam,
   SharingAudience,
   ExportAppResponse,
-  LinkedStepInfo,
   FileNode,
-  CreateAppStepRequest,
   ApplicationContract,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
@@ -566,23 +564,7 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}/screenshots/${screenshotId}`)
   }
 
-  /**
-   * Get linked steps for an app
-   * GET /api/apps/{id}/steps
-   */
-  async getLinkedSteps(id: string): Promise<LinkedStepInfo[]> {
-    const { data } = await apiClient.get<LinkedStepInfo[]>(`/api/apps/${id}/steps`)
-    return data
-  }
 
-  /**
-   * Get available steps that can be linked to an app
-   * GET /api/apps/{id}/steps/available
-   */
-  async getAvailableSteps(id: string): Promise<LinkedStepInfo[]> {
-    const { data } = await apiClient.get<LinkedStepInfo[]>(`/api/apps/${id}/steps/available`)
-    return data
-  }
 
   /**
    * Build file tree from flat list of file paths
@@ -648,72 +630,10 @@ class AppsService {
     return this.sortFileNodes(root)
   }
 
-  /**
-   * Create a step and link it to the app
-   * POST /api/apps/{appId}/steps/create
-   */
-  async createStepForApp(appId: string, request: CreateAppStepRequest): Promise<LinkedStepInfo> {
-    const { data } = await apiClient.post<LinkedStepInfo>(
-      `/api/apps/${appId}/steps/create`,
-      request,
-    )
-    return data
-  }
 
-  /**
-   * Link an existing step to an app
-   * POST /api/apps/{appId}/steps/{stepId}/link
-   */
-  async linkStep(appId: string, stepId: string): Promise<void> {
-    await apiClient.post(`/api/apps/${appId}/steps/${stepId}/link`)
-  }
 
-  /**
-   * Unlink a step from an app
-   * DELETE /api/apps/{appId}/steps/{stepId}
-   */
-  async unlinkStep(appId: string, stepId: string): Promise<void> {
-    await apiClient.delete(`/api/apps/${appId}/steps/${stepId}`)
-  }
 
-  /**
-   * Get step code for editing
-   * GET /api/customsteps/{stepId}
-   */
-  async getStepCode(stepId: string): Promise<{ code: string; language: string }> {
-    const { data } = await apiClient.get<{ definition: { code: string }; language: string }>(
-      `/api/customsteps/${stepId}`,
-    )
-    return {
-      code: data.definition?.code || '',
-      language: data.language || 'python',
-    }
-  }
 
-  /**
-   * Update step code
-   * PUT /api/customsteps/{stepId}
-   */
-  async updateStepCode(stepId: string, code: string): Promise<void> {
-    // First get the step to preserve other fields
-    const { data: step } = await apiClient.get<{
-      id: string
-      name: string
-      displayName: string
-      description: string
-      language: string
-      definition: { code: string }
-    }>(`/api/customsteps/${stepId}`)
-
-    // Update only the code
-    await apiClient.put(`/api/customsteps/${stepId}`, {
-      ...step,
-      definition: {
-        ...step.definition,
-        code,
-      },
-    })
-  }
 
   /**
    * Generate slug from app name
