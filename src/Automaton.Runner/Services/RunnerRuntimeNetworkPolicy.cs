@@ -34,8 +34,8 @@ internal sealed class RunnerRuntimeNetworkPolicy
         }
         throw new TimeoutException($"Runtime container did not become ready on {runtimeHostAddress}:{port}. "
             + "If the app answers but cannot find its pages or files, its runtime user probably cannot read them: "
-            + "the Runner gives deployed files to runtime.user (or the image user) with chown, which fails for "
-            + "images without chown or users it cannot resolve. Set runtime.user to a numeric UID the image can run as.");
+            + "the Runner gives deployed files to runtime.user (or the image user) with chown, which is skipped for "
+            + "images whose default user is a name. Set runtime.user to a numeric UID the image can run as.");
     }
 
     public int AllocatePort(int requested)

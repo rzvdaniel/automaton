@@ -34,7 +34,7 @@ public sealed class RunnerPackageFileModeTests
             Mode(staging, "bin/start.sh", Is.EqualTo((UnixFileMode)0b111_101_000));
             Mode(staging, "world/open.txt", Is.EqualTo((UnixFileMode)0b111_101_000));
             foreach (var directory in new[] { "bin", "private", "world" })
-                Mode(staging, directory, Is.EqualTo((UnixFileMode)0b111_101_000));
+                Mode(staging, directory, Is.EqualTo((UnixFileMode)0b111_111_000));
         }
         finally { Directory.Delete(root, true); }
     }
@@ -65,6 +65,7 @@ public sealed class RunnerPackageFileModeTests
             8080, 18080, Path.GetTempPath(), new Dictionary<string, string>(), Guid.NewGuid(), Guid.NewGuid(), User: "33:33"));
 
         var chown = calls.Single(call => call.Contains("chown"));
+        Assert.That(chown.Any(a => a.StartsWith("runtime:1")), Is.False, "the helper must not run the app image");
         Assert.That(chown, Does.Contain("CHOWN"));
         Assert.That(chown, Does.Not.Contain("DAC_OVERRIDE"));
         Assert.That(chown, Does.Contain("--network").And.Contain("none"));

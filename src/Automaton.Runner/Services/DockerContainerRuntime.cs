@@ -265,11 +265,12 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         return new DockerApplicationContainer(id, request.Name, image);
     }
 
-    /// <summary>Gives the deployed files to the app's runtime user (the contract's numeric user, else the image's default
+    /// <summary>Gives the deployed files to the app's runtime user (the contract numeric user, else the image numeric default
     /// user, else root). The Runner unpacks them 0640/0750 for its own group, so only that user, the Runner (through the
     /// group) and no one else can read them. Chown needs a short-lived helper with CAP_CHOWN because the Runner is not
-    /// root. Best effort: if the helper cannot run (for example an image without chown) the files stay readable only by
-    /// the Runner and a failed start is explained by the readiness error.</summary>
+    /// root. The helper uses the trusted helper image, never the app image (app code must not get capabilities on the
+    /// host mount), so only numeric users are supported; a named image user is skipped and a failed start is explained
+    /// by the readiness error.</summary>
     private async Task GrantRuntimeUserAccessAsync(
         DockerApplicationContainerRequest request, string image, CancellationToken cancellationToken)
     {
@@ -279,9 +280,11 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
             "--cap-drop", "ALL", "--cap-add", "CHOWN", "--cap-add", "DAC_READ_SEARCH",
             "--security-opt", "no-new-privileges",
             "--mount", $"type=bind,source={MapHostPath(request.ArtifactRoot)},target=/automaton/app",
-            "--entrypoint", "chown", image, "-R", "-h", owner, "/automaton/app"],
+            "--entrypoint", "chown", HelperImage, "-R", "-h", owner, "/automaton/app"],
             TimeSpan.FromMinutes(2), cancellationToken, allowFailure: true);
     }
+
+    private const string HelperImage = "nginx:alpine";
 
     private async Task<string?> ResolveRuntimeOwnerAsync(string? user, string image, CancellationToken cancellationToken)
     {
@@ -294,7 +297,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         }
         var owner = user.Split(':')[0];
         if (owner.Length == 0 || owner == "root") return "0";
-        return System.Text.RegularExpressions.Regex.IsMatch(owner, "^[A-Za-z0-9_][A-Za-z0-9_.-]*$") ? owner : null;
+        return uint.TryParse(owner, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out _) ? owner : null;
     }
 
     public Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)

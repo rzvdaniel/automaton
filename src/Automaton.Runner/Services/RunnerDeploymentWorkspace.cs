@@ -119,7 +119,6 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
 
     public static int CopyDirectory(string sourceRoot, string destinationRoot)
     {
-        Directory.CreateDirectory(destinationRoot);
         var files = Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories);
         foreach (var sourceFile in files)
         {
@@ -285,6 +284,7 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
     public static void ExtractPackageSafely(string packagePath, string destinationRoot)
     {
         using var archive = ZipFile.OpenRead(packagePath);
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(destinationRoot, DirectoryMode770);
         if (archive.Entries.Count > MaximumArchiveEntries)
             throw new InvalidOperationException($"Deployment package exceeds the {MaximumArchiveEntries} entry limit.");
         long totalBytes = 0;
@@ -310,7 +310,7 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
 
     // Only the owner and the Runner group may read deployed files. The Runner later hands them to the app runtime user
     // (chown; the group stays the Runner group), so nothing is readable by other host users or other apps. 0640, or
-    // 0750 when the author set the owner executable bit; directories are 0750.
+    // 0750 when the author set the owner executable bit; directories are 0770 so the Runner, through its group, can still delete them after the chown.
     private static void MakeReadableByRuntimeUser(string file)
     {
         if (OperatingSystem.IsWindows()) return;
@@ -327,11 +327,11 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         {
             var next = missing.Pop();
             Directory.CreateDirectory(next);
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(next, DirectoryMode750);
+            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(next, DirectoryMode770);
         }
     }
 
     private const UnixFileMode FileMode640 = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead;
-    private const UnixFileMode DirectoryMode750 = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-        | UnixFileMode.GroupRead | UnixFileMode.GroupExecute;
+    private const UnixFileMode DirectoryMode770 = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+        | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute;
 }

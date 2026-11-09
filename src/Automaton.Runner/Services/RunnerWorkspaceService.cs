@@ -81,6 +81,7 @@ public class RunnerWorkspaceService
     internal static void CopyRuntimeArtifact(string source, string destination)
     {
         Directory.CreateDirectory(destination);
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(destination, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute);
         foreach (var entry in new DirectoryInfo(source).EnumerateFileSystemInfos())
         {
             var target = Path.Combine(destination, entry.Name);
