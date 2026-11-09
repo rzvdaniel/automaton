@@ -49,6 +49,23 @@ public sealed class RunnerWholeAppCleanupTests
         Assert.That(await File.ReadAllTextAsync(marker), Is.EqualTo("preserve"));
     }
 
+    [Test]
+    public async Task EmptyDirectory_RunsAnIsolatedHelperAndReportsFailure()
+    {
+        IReadOnlyList<string>? seen = null;
+        var cleanup = new MachineApplicationStorageCleanup((args, _) =>
+        {
+            seen = args;
+            return Task.FromResult(new InfrastructureCommandResponse { Success = args.Contains("find") });
+        }, "helper:image");
+        await cleanup.EmptyDirectoryAsync(Path.Combine(root, "data"));
+        Assert.That(seen, Does.Contain("none").And.Contain("--cap-drop").And.Contain("helper:image"));
+        Assert.That(seen!.Contains("/purge"), Is.True);
+        Assert.That(string.Join(' ', seen!), Does.Contain("--user 0").And.Contain("find /purge -mindepth 1 -delete"));
+        var failing = new MachineApplicationStorageCleanup((_, _) => Task.FromResult(new InfrastructureCommandResponse { Success = false }));
+        Assert.ThrowsAsync<InvalidOperationException>(() => failing.EmptyDirectoryAsync(root));
+    }
+
     private static MachineApplicationStorageCleanup CreateStorageCleanup(bool fail)
         => new((_, _) => Task.FromResult(new InfrastructureCommandResponse { Success = !fail }));
 

@@ -128,6 +128,18 @@ public class RunnerDeploymentService
     {
         await runtimeProcessManager.StopAsync(appId, deploymentTargetId);
         await storageCleanup.DeleteComposeVolumesAsync(appId);
+        try { DeleteApplicationFiles(appId, deploymentTargetId); }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException)
+        {
+            // The app's runtime user (for example root or UID 33) may own files the Runner user cannot remove.
+            foreach (var root in runnerWorkspaceService.GetApplicationCleanupRoots(appId, deploymentTargetId))
+                await storageCleanup.EmptyDirectoryAsync(root);
+            DeleteApplicationFiles(appId, deploymentTargetId);
+        }
+    }
+
+    private void DeleteApplicationFiles(Guid appId, Guid deploymentTargetId)
+    {
         runnerWorkspaceService.DeleteApplicationTarget(appId, deploymentTargetId);
         runnerWorkspaceService.DeleteApplicationStorage(appId);
     }
