@@ -25,7 +25,7 @@ BOARDS = (1, 2, 3)
 
 
 def gh(*args, stdin=None):
-    done = subprocess.run(["gh", *args], capture_output=True, text=True, input=stdin)
+    done = subprocess.run(["gh", *args], capture_output=True, text=True, encoding="utf-8", input=stdin)
     if done.returncode != 0:
         raise RuntimeError(f"gh {' '.join(args[:3])} failed: {done.stderr.strip()[:200]}")
     return done.stdout
@@ -48,7 +48,11 @@ def references(body, number, main_repo=None, qualified_only=False):
     """True when body says Refs/Part of #N. In another repo (qualified_only) it must name main_repo#N."""
     repo = re.escape(main_repo) if main_repo else r"[\w.-]+/[\w.-]+"
     prefix = rf"(?:{repo})" if qualified_only else rf"(?:{repo})?"
-    return re.search(rf"\b(?:Refs|Part of)\s+{prefix}#{number}\b", body or "", re.I) is not None
+    item = rf"{prefix}#\d+"
+    for run in re.finditer(rf"\b(?:Refs|Part of)\s+{item}(?:\s*(?:,|&|and)\s*{item})*", body or "", re.I):
+        if re.search(rf"{prefix}#{number}\b", run.group(0), re.I):
+            return True
+    return False
 
 
 def decide(number, labels, prs, ctx):

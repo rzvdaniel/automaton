@@ -69,6 +69,14 @@ class Helpers(unittest.TestCase):
         self.assertFalse(cri.references("Refs #123", 12))
         self.assertFalse(cri.references("mentions #12", 12))
 
+    def test_references_lists(self):
+        self.assertTrue(cri.references("Refs #920, #921", 921))
+        self.assertTrue(cri.references("Refs #920, #921", 920))
+        self.assertTrue(cri.references("Part of #1, #2 and #3", 3))
+        self.assertFalse(cri.references("Refs #920, #921", 92))
+        self.assertFalse(cri.references("Refs #920. Also #921", 921))
+        self.assertTrue(cri.references("Refs o/main#1, o/main#2", 2, "o/main", True))
+
 
 if __name__ == "__main__":
     unittest.main()
