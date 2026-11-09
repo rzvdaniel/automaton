@@ -49,7 +49,7 @@ def references(body, number, main_repo=None, qualified_only=False):
     repo = re.escape(main_repo) if main_repo else r"[\w.-]+/[\w.-]+"
     prefix = rf"(?:{repo})" if qualified_only else rf"(?:{repo})?"
     item = rf"{prefix}#\d+"
-    for run in re.finditer(rf"\b(?:Refs|Part of)\s+{item}(?:\s*(?:,|&|and)\s*{item})*", body or "", re.I):
+    for run in re.finditer(rf"\b(?:Refs|Part of)\s+{item}(?:\s*(?:,\s*(?:and\s+|&\s*)?|and\s+|&\s*){item})*", body or "", re.I):
         if re.search(rf"{prefix}#{number}\b", run.group(0), re.I):
             return True
     return False
