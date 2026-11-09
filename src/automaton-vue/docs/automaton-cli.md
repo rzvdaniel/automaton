@@ -33,17 +33,24 @@ automaton login --server https://api.your-domain.com
 
 On a server over SSH, or for an AI agent, use one of these. Neither needs a browser on the machine that runs the CLI.
 
-**Device approval.** Run `automaton login --device --server https://api.your-domain.com`. It prints an approval URL and a code, and waits. Approve it from any signed-in session: open the URL in a browser on another device, or approve it from a terminal with an administrator or user token:
+**Device approval.** Run `automaton login --device --server https://api.your-domain.com`. It prints an approval URL and a code, and waits, so run it in the background and keep its output in a private file (it contains the code). Approve it from any signed-in session: open the URL in a browser on another device, or approve it from a terminal with an administrator or user token. The email and password are the account's own sign-in; for the first administrator that is the email chosen at [setup](./first-admin).
 
 ```bash
 API=https://api.your-domain.com
-# URL printed by the CLI: .../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
+umask 077; OUT=$(mktemp)   # private file for the --device output
+automaton login --device --server "$API" > "$OUT" 2>&1 &
+sleep 5
+# The output has a line: https://studio.../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
+URL=$(grep -o 'https://[^ ]*cli/authorize?[^ ]*' "$OUT" | head -1)
+REQUEST_ID=${URL#*requestId=}; REQUEST_ID=${REQUEST_ID%%&*}
+USER_CODE=${URL#*code=}; USER_CODE=${USER_CODE%%&*}
 read -rp "Email: " EMAIL; read -rsp "Password: " PASSWORD; echo   # no terminal: PASSWORD=$(< /root/admin-password), a 0600 file; needs jq
 TOKEN=$(jq -n --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}' |
   curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
 curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/REQUEST_ID/approve" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"userCode":"USER_CODE"}'
 unset PASSWORD TOKEN
+wait; tail -n 3 "$OUT"; rm -f "$OUT"   # "Signed in as ..." once approved
 ```
 
 `200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. The `--device` output contains the approval code: do not share it. Codes expire after a few minutes, so approve soon after `login` prints it.

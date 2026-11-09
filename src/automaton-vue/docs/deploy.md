@@ -37,7 +37,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
    automaton publish --yes --slug my-app
    ```
 
-   The *private address* is the `app-<id>.apps...` URL that `automaton status` shows. It needs about a minute for its certificate. A static site (`--template static`) has no process behind it, so that URL answers `503` until you publish; after `automaton publish` the public URL answers.
+   The *private address* is the `app-<id>.apps...` URL that `automaton status` shows. It needs about a minute for its certificate, and it needs sign-in: an anonymous `curl` gets `401` until the app is published, so check a private app in a signed-in browser. A static site (`--template static`) has no process behind it, so that URL answers `503` until you publish; after `automaton publish` the public URL answers.
 
    `automaton deploy --publish` deploys and publishes in one step.
 
