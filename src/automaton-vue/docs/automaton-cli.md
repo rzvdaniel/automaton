@@ -37,9 +37,9 @@ On a server over SSH, or for an AI agent, use one of these. Neither needs a brow
 
 ```bash
 API=https://api.your-domain.com
-umask 077; OUT=$(mktemp)   # private file for the --device output
+OUT=$(umask 077; mktemp)   # private file (mode 600) for the --device output
 automaton login --device --server "$API" > "$OUT" 2>&1 &
-sleep 5
+for _ in $(seq 20); do grep -q 'cli/authorize' "$OUT" && break; sleep 1; done   # wait for the URL
 # The output has a line: https://studio.../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
 URL=$(grep -o 'https://[^ ]*cli/authorize?[^ ]*' "$OUT" | head -1)
 REQUEST_ID=${URL#*requestId=}; REQUEST_ID=${REQUEST_ID%%&*}
@@ -47,13 +47,13 @@ USER_CODE=${URL#*code=}; USER_CODE=${USER_CODE%%&*}
 read -rp "Email: " EMAIL; read -rsp "Password: " PASSWORD; echo   # no terminal: PASSWORD=$(< /root/admin-password), a 0600 file; needs jq
 TOKEN=$(jq -n --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}' |
   curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/REQUEST_ID/approve" \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"userCode":"USER_CODE"}'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/$REQUEST_ID/approve" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$(jq -n --arg c "$USER_CODE" '{userCode:$c}')"
 unset PASSWORD TOKEN
-wait; tail -n 3 "$OUT"; rm -f "$OUT"   # "Signed in as ..." once approved
+wait; tail -n 3 "$OUT"; rm -f "$OUT"   # "Signed in as ..." once approved. If the code was refused, stop the wait with Ctrl+C or `kill %1`.
 ```
 
-`200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. The `--device` output contains the approval code: do not share it. Codes expire after a few minutes, so approve soon after `login` prints it.
+The code is letters, digits and a dash (for example `ABCD-1234`), so it needs no URL decoding. `200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. The `--device` output contains the approval code: do not share it. Codes expire after a few minutes, so approve soon after `login` prints it.
 
 **API key.** Create a key in Studio (**API Keys**) or with `POST /api/ApiKeys` (`{"name": "my-cli"}`, bearer token as above; the response `apiKey` is shown once). Then:
 
