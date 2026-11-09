@@ -5,6 +5,7 @@ using Automaton.Api.Application.Commands.Handlers;
 using Automaton.Api.Authentication;
 using Automaton.Api.Middleware;
 using Automaton.Api.Constants;
+using Automaton.Api.Controllers;
 using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -141,6 +142,32 @@ public sealed class AdminUserProvisioningServiceTests
     }
 
     [Test]
+    public async Task ResetSucceedsAndTheNewPasswordWorksWhenEmailIsNotConfigured()
+    {
+        var fixture = await Fixture.CreateAsync(emailThrows: true);
+        var invited = await fixture.Service.InviteAsync(new AdminInviteUserRequest("person@example.com", "Person"), "Admin", false, default);
+        var user = await fixture.Users.FindByIdAsync(invited.UserId.ToString());
+        var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(await LinkTokenAsync(fixture, user!)));
+
+        await fixture.ResetHandler().Handle(new ResetUserPasswordCommand("person@example.com", "Fresh-Pass-123", code), default);
+
+        user = await fixture.Users.FindByIdAsync(invited.UserId.ToString());
+        Assert.That(await fixture.Users.CheckPasswordAsync(user!, "Fresh-Pass-123"), Is.True);
+    }
+
+    [Test]
+    public async Task RecentActivityIsSkippedForAnAnonymousRequest()
+    {
+        var db = AppAuthorizationTestData.CreateDbContext();
+        var anonymous = new UserContextService(new FixedHttpContextAccessor { HttpContext = new DefaultHttpContext() });
+        var service = new RecentActivityService(db, anonymous);
+
+        await service.LogActivityAsync(Automaton.Core.Enums.ActivityType.FlowCreated, "Flow");
+
+        Assert.That(await db.RecentActivities.CountAsync(), Is.Zero);
+    }
+
+    [Test]
     public async Task ResetWithAWeakPasswordIsRejectedWithTheRuleMessages()
     {
         var fixture = await Fixture.CreateAsync();
@@ -155,6 +182,132 @@ public sealed class AdminUserProvisioningServiceTests
         Assert.That(ex!.Message, Does.Contain("at least 8"));
         var user = await fixture.Users.FindByIdAsync(invited.UserId.ToString());
         Assert.That(await fixture.Users.HasPasswordAsync(user!), Is.False);
+    }
+
+    private static async Task<(ApplicationUser Admin, string Token)> AdminWithLinkAsync(Fixture fixture, DateTimeOffset? now = null)
+    {
+        var created = await fixture.Service.CreateAsync(new AdminCreateUserRequest("owner@example.com", Password: "Generated-Pass-1", Administrator: true), true, default);
+        var admin = (await fixture.Users.FindByIdAsync(created.UserId.ToString()))!;
+        return (admin, await LinkTokenAsync(fixture, admin, now));
+    }
+
+    private static async Task<string> LinkTokenAsync(Fixture fixture, ApplicationUser admin, DateTimeOffset? now = null)
+    {
+        var (url, _) = await OneTimePasswordLink.CreateAsync(fixture.Users, admin, "https://studio.example.com", now ?? DateTimeOffset.UtcNow);
+        return Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode((string)QueryHelpers.ParseQuery(new Uri(url).Query)["code"]!));
+    }
+
+    [Test]
+    public async Task PasswordLinkSetsTheOwnPasswordOnceAndTheGeneratedOneStopsWorking()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var (admin, token) = await AdminWithLinkAsync(fixture);
+        Assert.That(await fixture.Users.CheckPasswordAsync(admin, "Generated-Pass-1"), Is.True);
+
+        await fixture.UsersService.ResetPasswordAsync(admin.Id, token, "Own-Pass-456");
+
+        admin = (await fixture.Users.FindByIdAsync(admin.Id.ToString()))!;
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await fixture.Users.CheckPasswordAsync(admin, "Own-Pass-456"), Is.True);
+            Assert.That(await fixture.Users.CheckPasswordAsync(admin, "Generated-Pass-1"), Is.False);
+            Assert.That(admin.MustChangePassword, Is.False, "the link was the password change");
+        });
+        Assert.ThrowsAsync<InvalidResetLinkException>(() => fixture.UsersService.ResetPasswordAsync(admin.Id, token, "Again-Pass-789"),
+            "the link works only once");
+    }
+
+    [Test]
+    public async Task PasswordLinkExpiresAfterThirtyMinutes()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var (admin, token) = await AdminWithLinkAsync(fixture, DateTimeOffset.UtcNow - TimeSpan.FromMinutes(31));
+
+        var ex = Assert.ThrowsAsync<InvalidResetLinkException>(() => fixture.UsersService.ResetPasswordAsync(admin.Id, token, "Own-Pass-456"));
+
+        Assert.That(ex!.Reason, Is.EqualTo("expired"));
+        Assert.That(await fixture.Users.CheckPasswordAsync(admin, "Generated-Pass-1"), Is.True, "nothing changed");
+    }
+
+    [Test]
+    public async Task PasswordLinkWithAWrongTokenIsRejected()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var (admin, _) = await AdminWithLinkAsync(fixture);
+
+        Assert.ThrowsAsync<InvalidResetLinkException>(() => fixture.UsersService.ResetPasswordAsync(admin.Id, "not-the-token", "Own-Pass-456"));
+
+        Assert.That(await fixture.Users.CheckPasswordAsync(admin, "Generated-Pass-1"), Is.True);
+    }
+
+    [Test]
+    public async Task ANewPasswordLinkVoidsTheEarlierOne()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var (admin, first) = await AdminWithLinkAsync(fixture);
+        var second = await LinkTokenAsync(fixture, admin);
+
+        Assert.ThrowsAsync<InvalidResetLinkException>(() => fixture.UsersService.ResetPasswordAsync(admin.Id, first, "Own-Pass-456"));
+        await fixture.UsersService.ResetPasswordAsync(admin.Id, second, "Own-Pass-456");
+    }
+
+    [Test]
+    public async Task OnlyARequestWithTheSetupTokenGetsALinkAndOnlyForAnAdministrator()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var (admin, _) = await AdminWithLinkAsync(fixture);
+        await fixture.Service.CreateAsync(new AdminCreateUserRequest("plain@example.com", Password: "Plain-Pass-123"), false, default);
+        InstallController Controller(string? token)
+        {
+            var controller = new InstallController(null!, new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["Bootstrap:Token"] = "server-token" }).Build(),
+                new InstallationTestFixture.SetupEnvironment(), fixture.Db, null!, fixture.Audit)
+            { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+            if (token is not null) controller.Request.Headers[InstallationSetupAccess.HeaderName] = token;
+            return controller;
+        }
+
+        Task<IActionResult> Ask(string? token, string email) => Controller(token).CreatePasswordLink(
+            new PasswordLinkRequest(email), fixture.Users, fixture.Configuration, default);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That((await Ask(null, "owner@example.com") as ObjectResult)!.StatusCode, Is.EqualTo(403));
+            Assert.That((await Ask("wrong", "owner@example.com") as ObjectResult)!.StatusCode, Is.EqualTo(403));
+            Assert.That(await Ask("server-token", "plain@example.com"), Is.InstanceOf<NotFoundObjectResult>(), "not an administrator");
+            Assert.That(await Ask("server-token", "nobody@example.com"), Is.InstanceOf<NotFoundObjectResult>());
+            var ok = (await Ask("server-token", admin.Email!) as OkObjectResult)!.Value as PasswordLinkResponse;
+            Assert.That(ok!.Url, Does.StartWith("https://studio.example.com/reset-password?"));
+            Assert.That(await fixture.Db.AuditEvents.CountAsync(e => e.EventType == AuditEventTypes.OneTimeLinkCreated), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task PasswordLinkAcceptsTheRotatedFileValueAndNotThePrintedToken()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var (admin, _) = await AdminWithLinkAsync(fixture);
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "printed-token\n");
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Bootstrap:TokenFile"] = path, ["Bootstrap:Token"] = "printed-token" }).Build();
+            InstallationSetupAccess.Rotate(configuration);
+            var current = File.ReadAllText(path).Trim();
+
+            async Task<IActionResult> Ask(string token)
+            {
+                var controller = new InstallController(null!, configuration, new InstallationTestFixture.SetupEnvironment(), fixture.Db, null!, fixture.Audit)
+                { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+                controller.Request.Headers[InstallationSetupAccess.HeaderName] = token;
+                return await controller.CreatePasswordLink(new PasswordLinkRequest(admin.Email), fixture.Users, fixture.Configuration, default);
+            }
+
+            Assert.That((await Ask("printed-token") as ObjectResult)!.StatusCode, Is.EqualTo(403));
+            Assert.That(await Ask(current), Is.InstanceOf<OkObjectResult>());
+        }
+        finally { File.Delete(path); }
     }
 
     private static ObjectResult FilterResult(Exception exception)
@@ -377,7 +530,7 @@ public sealed class AdminUserProvisioningServiceTests
             NullLogger<ResetUserPasswordCommandHandler>.Instance, new EphemeralDataProtectionProvider(),
             Options.Create(new DataProtectionTokenProviderOptions()));
 
-        public static async Task<Fixture> CreateAsync(bool emailWorks = true)
+        public static async Task<Fixture> CreateAsync(bool emailWorks = true, bool emailThrows = false)
         {
             var db = AppAuthorizationTestData.CreateDbContext();
             db.Roles.Add(new ApplicationRole { Id = Guid.NewGuid(), Name = UserRole.Administrator, NormalizedName = UserRole.Administrator.ToUpperInvariant() });
@@ -411,7 +564,7 @@ public sealed class AdminUserProvisioningServiceTests
             var configuration = new ConfigurationService(new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["AppConfig:WebsiteUrl"] = "https://studio.example.com" })
                 .Build());
-            var email = new RecordingEmailService(emailWorks);
+            var email = new RecordingEmailService(emailWorks, emailThrows);
             return new Fixture
             {
                 Db = db, Users = users, UsersService = usersService, Email = email,
@@ -421,12 +574,13 @@ public sealed class AdminUserProvisioningServiceTests
         }
     }
 
-    private sealed class RecordingEmailService(bool works) : IEmailService
+    private sealed class RecordingEmailService(bool works, bool throws = false) : IEmailService
     {
         public List<EmailData> Sent { get; } = [];
 
         public Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)
         {
+            if (throws) throw new InvalidOperationException("Email is not configured.");
             if (works) Sent.Add(emailDetails);
             return Task.FromResult(works);
         }

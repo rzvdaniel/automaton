@@ -513,6 +513,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppCatalogService>();
         services.AddScoped<AppCatalogInstallService>();
         services.AddHostedService<EssentialCatalogBootstrapService>();
+        services.AddHostedService<SetupTokenRotationService>();
         services.AddScoped<AppMutationService>();
         services.AddScoped<AppMutationAuditService>();
         services.AddScoped<AppDeletionService>();

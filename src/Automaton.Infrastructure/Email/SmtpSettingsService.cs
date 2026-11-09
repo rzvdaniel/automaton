@@ -17,7 +17,12 @@ public sealed record SmtpSettingsUpdate(string EmailHost, int EmailPort, bool Em
 public sealed record SmtpTestEmailRequest(string Recipient);
 
 public sealed record SmtpSettingsSummary(string Source, string EmailHost, int EmailPort, bool EmailUseSsl,
-    string EmailAccount, string FromEmail, string SupportEmail, bool PasswordSet, DateTimeOffset? VerifiedAt);
+    string EmailAccount, string FromEmail, string SupportEmail, bool PasswordSet, DateTimeOffset? VerifiedAt)
+{
+    /// <summary>Enough is saved to try sending; it does not mean a message was delivered.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool Configured => PasswordSet && !string.IsNullOrWhiteSpace(EmailHost) && EmailPort > 0 && !string.IsNullOrWhiteSpace(EmailAccount);
+}
 
 public sealed record EffectiveSmtpSettings(EmailConfig Config, bool Managed);
 

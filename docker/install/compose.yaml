@@ -49,8 +49,14 @@ services:
   api:
     <<: *app
     image: ${API_IMAGE:?}
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      # The setup token lives in this root-only file; the API replaces its content when first-admin setup completes.
+      Bootstrap__TokenFile: /app/setup-token
     volumes:
       - ${CONFIG_DIR:?}/appsettings.Production.json:/app/appsettings.Production.json:ro
+      - ${CONFIG_DIR:?}/secrets/setup-token:/app/setup-token
       - api-data:/app/AppData
       - api-keys:/app/data-protection-keys
       - ${CONFIG_DIR:?}/dynamic:/app/AppData/traefik-dynamic

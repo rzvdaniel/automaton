@@ -13,6 +13,7 @@ A live deployment requires an explicit user request. Use the versioned installer
 1. Check the Git working tree and preserve unrelated changes. Keep Git network operations under the deployment user; never copy Git credentials to root.
 2. Validate affected code and scripts, merge the reviewed change, and publish a versioned bundle through `.github/workflows/server-release.yml`. Its `cli` input (default `auto`) also publishes the CLI to NuGet when `src/Automaton.Cli` or `src/Automaton.Core` changed since the previous release, so users never get a CLI older than the server's `automaton.json` contract; check that the started **Pack CLI and Runner** run succeeds.
 3. Inspect migrations and existing data before applying a release. Preserve configured signing/encryption keys, credentials, Data Protection keys and persistent volumes.
+3a. If the release changes the installer, the CLI login/deploy/update/backup commands or the install, first-admin or deploy docs, run the new-user check (section below) on the test server before updating production. Skip it for releases that touch none of those.
 4. Run the installation's `update.sh` (default `/opt/automaton-server/update.sh`). It verifies the release checksum, backs up configuration/database/key material and updates the application images. Never use the fresh installer to overwrite an existing configuration.
 5. Adopted installations can retain a reviewed `compose.override.yaml`; the updater must apply and back up the same override for the installed and candidate release. Do not silently upgrade their pinned database/broker versions.
 6. Verify container state, origin and public API/Studio/app routes, installation status and the certificate-validated Runner broker connection. Verify requested application behavior separately from deployment health.
@@ -20,6 +21,20 @@ A live deployment requires an explicit user request. Use the versioned installer
 8. Report the installed release, updated services, verification results and any unavailable check. The marketing website remains separate from the standalone server bundle.
 
 The updater's protected recovery directory is the rollback record. Image rollback after a migration may be unsafe; assess the database before restoring an earlier manifest. Retain backups unless the user explicitly authorizes their removal. Never delete live volumes as deployment cleanup.
+
+## New-user check
+
+Why: tests run by agents that know the repo hide the gaps a newcomer hits (unclear docs, a login that only works one way). A fresh session that sees only the public website finds them.
+
+How: start a headless task on the test server with the second account (Sonnet 5.5, low effort) from an EMPTY folder, with no repo, AGENTS.md or project instructions, on a freshly rebuilt server (rebuild only when the installer changed). Prompt, kept this short on purpose:
+
+```
+I have a Debian server: `ssh <server>`, domain <domain>, email <email> for certificate notices.
+Install Automaton on it (https://automaton.monster) and deploy a small web app of your choice to it.
+Tell me the app's address when done, and write ./report.md about what was easy and where you got stuck.
+```
+
+Result: read `report.md`, open an issue for every gap (write-issue skill), fix them, then update production. A run that cannot finish blocks the production update. Run it also once per major launch step (for example a new supported OS). Do not add checklists or timing tables to this prompt; that is the separate measured pass of #561.
 
 ## Runner image release authority
 

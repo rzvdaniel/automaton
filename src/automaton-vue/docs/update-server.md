@@ -10,7 +10,7 @@ This page updates the API, Worker, Studio and app store of your server to a newe
 ## Prerequisites
 
 - You are a system administrator, and the CLI is signed in to the server: `automaton login --server https://api.example.com`.
-- A server installed with the current installer. Older servers get the update trigger the first time `update.sh` runs over SSH (see the fallback below).
+- A server installed with the current installer. An older one needs the SSH fallback below once.
 - Servers still on MySQL cannot take this update; move them first with the [migration guide](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/migrate-to-postgresql.md).
 
 ## Steps
@@ -25,7 +25,11 @@ This page updates the API, Worker, Studio and app store of your server to a newe
 
 2. In Studio instead: **Admin → Installation → Update** (the **Update to the latest release** button).
 
-3. Check the last run any time.
+3. Upgrade the Runners. A server update does not change installed Runners; each keeps its old image until upgraded. From the CLI, `automaton server update --runners` waits for the update, names every Runner with its state and upgrades the ones on an old image (with only `--wait`, it lists them with the command to upgrade each; `automaton runners upgrade RUNNER --wait` needs a Developer API key).
+
+   In Studio, open **Runners**: a Runner on an old image shows **Update available**; select **Upgrade → Upgrade now**, and Studio says whether it reconnected or rolled back. An offline Runner, or one busy with a deploy or an Action, cannot upgrade; retry when idle, or use **Run it manually** (shown there) for a Runner too old to upgrade itself.
+
+4. Check the last run any time.
 
    ```bash
    automaton server update-status

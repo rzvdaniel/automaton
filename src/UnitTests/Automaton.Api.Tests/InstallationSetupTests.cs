@@ -36,6 +36,83 @@ public sealed class InstallationSetupTests
 }
 
 [TestFixture]
+public sealed class SetupTokenFileTests
+{
+    private static IConfiguration FileConfiguration(string path) => new ConfigurationBuilder().AddInMemoryCollection(
+        new Dictionary<string, string?> { ["Bootstrap:TokenFile"] = path, ["Bootstrap:Token"] = "printed-token" }).Build();
+
+    [Test]
+    public void RotationReplacesThePrintedTokenAndTheFileValueIsTheOnlyOneAccepted()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "printed-token\n");
+            var configuration = FileConfiguration(path);
+            var environment = new SetupEnvironment();
+            Assert.That(InstallationSetupAccess.IsAllowed(configuration, environment, "printed-token"), Is.True);
+
+            Assert.That(InstallationSetupAccess.Rotate(configuration), Is.True);
+
+            var fresh = File.ReadAllText(path);
+            Assert.Multiple(() =>
+            {
+                Assert.That(fresh, Has.Length.EqualTo(65));
+                Assert.That(fresh, Does.EndWith("\n"));
+                Assert.That(fresh.Trim(), Is.Not.EqualTo("printed-token"));
+                Assert.That(InstallationSetupAccess.IsAllowed(configuration, environment, "printed-token"), Is.False,
+                    "the token from the installer output (also still in the settings file) stops working");
+                Assert.That(InstallationSetupAccess.IsAllowed(configuration, environment, fresh.Trim()), Is.True);
+            });
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Test]
+    public async Task AServerAlreadySetUpGetsANewTokenOnceAndAFreshOneIsLeftAlone()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "printed-token\n");
+            var configuration = FileConfiguration(path);
+            await using var db = Database();
+
+            Assert.That(await SetupTokenRotation.RotateIfSetupCompleteAsync(db, Service(db), configuration, default), Is.False, "setup not done yet");
+            Assert.That(File.ReadAllText(path), Is.EqualTo("printed-token\n"));
+
+            db.Settings.Add(new Setting { Key = "Installation.Complete", Value = "true" });
+            await db.SaveChangesAsync();
+            Assert.That(await SetupTokenRotation.RotateIfSetupCompleteAsync(db, Service(db), configuration, default), Is.True);
+            var rotated = File.ReadAllText(path);
+            Assert.That(rotated, Is.Not.EqualTo("printed-token\n"));
+
+            Assert.That(await SetupTokenRotation.RotateIfSetupCompleteAsync(db, Service(db), configuration, default), Is.True);
+            Assert.That(File.ReadAllText(path), Is.EqualTo(rotated), "a later restart does not rotate again");
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Test]
+    public void AMissingOrUnwritableTokenFileNeverFallsBackToTheConfiguredToken()
+    {
+        var configuration = FileConfiguration(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
+
+        Assert.That(InstallationSetupAccess.Rotate(configuration), Is.False);
+        Assert.That(InstallationSetupAccess.IsAllowed(configuration, new SetupEnvironment { EnvironmentName = "Development" }, "printed-token"), Is.False);
+    }
+
+    [Test]
+    public void WithoutATokenFileRotationDoesNothingAndTheConfiguredTokenStaysValid()
+    {
+        var configuration = Configuration("server-token");
+
+        Assert.That(InstallationSetupAccess.Rotate(configuration), Is.False);
+        Assert.That(InstallationSetupAccess.IsAllowed(configuration, new SetupEnvironment(), "server-token"), Is.True);
+    }
+}
+
+[TestFixture]
 public sealed class InstallationCompletionTests
 {
     [Test]
@@ -83,10 +160,38 @@ public sealed class InstallationEndpointTests
         db.Users.Add(new ApplicationUser { Id = Guid.NewGuid(), UserName = "operator", PublicUsername = "operator" });
         await db.SaveChangesAsync();
 
-        var result = await Controller(db).GetSummary(CancellationToken.None);
+        var result = await SummaryController(db, new Automaton.Api.Config.EmailConfig()).GetSummary(CancellationToken.None);
 
         Assert.That(((OkObjectResult)result.Result!).Value,
-            Is.EqualTo(new Automaton.Core.Models.InstallationSummary(null, 1, 0, 0, null)));
+            Is.EqualTo(new Automaton.Core.Models.InstallationSummary(null, 1, 0, 0, null, false)));
+    }
+
+    private static InstallController SummaryController(ApplicationDbContext db, Automaton.Api.Config.EmailConfig file)
+        => new(Service(db), Configuration("server-token"), new SetupEnvironment(), db, SmtpTestFixture.Service(db, null, file), null!);
+
+    [Test]
+    public async Task SummaryReportsWhetherEmailIsConfigured()
+    {
+        await using var db = Database();
+        var configured = new Automaton.Api.Config.EmailConfig { EmailHost = "smtp.example.test", EmailPort = 587, EmailAccount = "account", EmailPassword = "secret" };
+        var noPassword = new Automaton.Api.Config.EmailConfig { EmailHost = "smtp.example.test", EmailPort = 587, EmailAccount = "account" };
+
+        async Task<bool?> Reported(Automaton.Api.Config.EmailConfig file)
+            => ((Automaton.Core.Models.InstallationSummary)((OkObjectResult)(await SummaryController(db, file).GetSummary(CancellationToken.None)).Result!).Value!).EmailConfigured;
+
+        Assert.That(await Reported(configured), Is.True);
+        Assert.That(await Reported(new Automaton.Api.Config.EmailConfig()), Is.False, "a fresh install has no EmailConfig");
+        Assert.That(await Reported(noPassword), Is.False);
+    }
+
+    [Test]
+    public void OnlySystemAdministratorsCanReadTheSummary()
+    {
+        var authorize = typeof(InstallController).GetMethod(nameof(InstallController.GetSummary))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().Single();
+
+        Assert.That(authorize.Roles, Is.EqualTo(UserRole.SystemAdministrator));
     }
 
     [Test]

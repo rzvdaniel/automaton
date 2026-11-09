@@ -461,7 +461,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         return $"{root}/{string.Join('/', parts)}";
     }
 
-    private static string MapHostPath(string path)
+    internal static string MapHostPath(string path)
     {
         var fullPath = Path.GetFullPath(path);
         if (!File.Exists("/.dockerenv"))

@@ -47,6 +47,12 @@ namespace Automaton.Api.Services
             string? description = null,
             CancellationToken cancellationToken = default)
         {
+            // Anonymous requests have no user to attribute the activity to (the foreign key would reject it).
+            if (userId == Guid.Empty)
+            {
+                return;
+            }
+
             try
             {
                 var activity = new Entities.RecentActivity

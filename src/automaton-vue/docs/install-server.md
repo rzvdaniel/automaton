@@ -5,24 +5,19 @@ description: Install Automaton (Studio, API, app store, PostgreSQL, RabbitMQ, Tr
 
 # Install the server
 
-This page installs your own Automaton server on one x86_64 Linux machine. For measured time, cost and memory from fresh-server runs, see [Automaton by the numbers](./numbers). Next steps: [create the first administrator](./first-admin), then [add a Runner](./deploy-runner). Installing over SSH with no browser works too: [first administrator without a browser](./first-admin#without-a-browser-ssh-or-an-ai-agent).
+This page installs your own Automaton server on one x86_64 Linux machine. **Want an AI agent to do everything, from install to a link for your password? Use [Install with your AI agent](./install-with-ai).** This page is the reference for the installer. Next steps: [create the first administrator](./first-admin), then [add a Runner](./deploy-runner).
 
-Already have a team server? Ask its administrator for the API URL and go to [Create your first app](./getting-started).
+Already have a team server? Ask its administrator for the API URL and go to [Your first app](./getting-started).
 
-Measured on 6 November 2026 on Hetzner CX23 servers (2 vCPU, 4 GB RAM, about €6.64 per month): the installer took 118 seconds on Ubuntu 22.04 and about 90 seconds on Debian 12. The Runner installation took 31–32 seconds; memory use after installation was about 1.0 GB. The Ubuntu run updated server 0.2.21 to 0.2.22 in 32 seconds; the Debian run updated 0.2.28 to 0.2.29 in 26 seconds. These are observations from the [fresh-server runs](https://github.com/rzvdaniel/automaton/issues/561), not guaranteed times or minimum requirements. A full pass after the latest fixes is still pending.
+Measured times, memory and cost are in [Automaton by the numbers](./numbers): about 94 seconds for the installer on Debian 12, 2-3 minutes from the first command to a working server on Ubuntu 24.04. These are observations, not guarantees or minimum requirements.
 
 ## Prerequisites
 
 - An x86_64 Linux server with systemd, sudo access, outbound internet, at least 2 GB of RAM and 10 GiB of free disk space. Ubuntu and Debian 12 are supported (Ubuntu 22.04, Ubuntu 24.04 and Debian 12 have been tested); the installer adds Docker itself there. On other distributions, [install Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/) first (not tested).
-- `curl` and `python3` (3.8 or newer; Debian 12's 3.11.2 works). `jq` is needed only for the headless snippets in [first administrator](./first-admin) and [CLI login](./automaton-cli#log-in-without-a-browser): `sudo apt-get install -y jq` (not preinstalled on Debian).
-- A domain you can edit DNS for, and an email for certificate notices.
+- `curl` and `python3` (3.8 or newer). `jq` is needed only for the headless snippets in [first administrator](./first-admin) and [CLI login](./automaton-cli#log-in-without-a-browser); fresh Ubuntu and Debian lack it: `sudo apt-get install -y jq`.
+- A domain you can edit DNS for, and an email for certificate notices (passed as `--email`; Let's Encrypt uses it for the HTTPS certificates; it is not an account).
 - Inbound TCP ports 80 and 443 (HTTPS) and 5671 (TLS Runner broker). Keep the `api` hostname directly reachable on 5671.
-- DNS records pointing to the server's public IP, set to DNS only (no proxy). Pick one of:
-
-  | Setup | Records |
-  |---|---|
-  | Two wildcards (shortest) | `*.example.com` and `*.apps.example.com`, plus an explicit `apps.example.com` if it does not resolve |
-  | One record per name | `api`, `studio`, `store`, `apps` and `*.apps` under `example.com` |
+- DNS A records pointing to the server's public IP, set to DNS only (no proxy). Two records are enough: `example.com` and `*.example.com`. Alternatively one record per name: `api`, `studio`, `store`, `apps` and `*.apps` under `example.com`.
 
 Private-only, offline and ARM installs are not supported.
 
@@ -53,11 +48,15 @@ curl -fsS https://api.example.com/health
 
 Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-vX.Y.Z"}` where the version is the release you installed (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
 
+## Set up email
+
+A fresh server cannot send email, so password reset emails and email invitations reach nobody until you set it up (people can still be created with a password). Studio shows system administrators a notice until email is configured. Sign in as a system administrator, open **Settings**, find **Outgoing email** on the server section, and enter the SMTP host, port, TLS setting, account, password and sender address from your mail provider. Select **Save SMTP settings**, then **Check connection**; the notice disappears once the settings are saved. A successful check proves login to the mail server, not that a message reaches an inbox, so use **Send test email** to a real address.
+
 ## Common errors
 
 - **DNS check fails.** The installer lists the names that do not resolve to this server. Fix the records, wait for DNS, rerun the same command. Proxied (orange cloud) records break certificates and the Runner broker.
 - **Port in use or different installation found.** The installer refuses to take over. Free the port or use a clean server.
-- **Certificate not issued.** Port 80 must be reachable from the internet.
+- **Certificate not issued.** Port 80 must be reachable from the internet. If the installer reports a Let's Encrypt `429 rateLimited` error, the same host names have used their weekly limit (five certificates in seven days; repeated installs on one domain use it up). Wait until the retry time it prints or use other host names, then rerun the same command: if HTTPS is not answering it restarts Traefik so the certificates are requested again.
 - **Retrying.** Rerun the same command with the same domain and email; generated credentials are kept. Never run `docker compose down -v`: it deletes data.
 
 For custom paths, protected settings, adopted installs and recovery, see the [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md). To update or restore later: [Update the server](./update-server), [Back up and restore](./backup-restore).

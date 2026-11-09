@@ -1,63 +1,60 @@
 ---
-title: Create your first app
-description: Install the CLI, sign in to your server, create an app from a template and hand it to a coding agent or edit it yourself.
+title: Your first app
+description: Create an app from a template, edit it, validate, deploy, wait for Running, publish it and open its address.
 ---
 
-# Create your first app
+# Your first app
 
-This page installs the CLI, signs in and creates an app folder with `automaton.json` and agent guidance. Then [deploy it](./deploy).
-
-## Prerequisites
-
-- A server and a Runner ([install](./install-server), [Runner](./deploy-runner)), or an API URL from your administrator.
-- The .NET 10 SDK or later on your computer (for the NuGet tool only). Ubuntu 22.04 and Debian 12 have no .NET 10 package in apt: install it per user with the commands in [Install and authenticate](./automaton-cli#install-and-authenticate).
+This page takes you from a signed-in CLI to a published app. You need a server with a Runner and a signed-in CLI: [Install with your AI agent](./install-with-ai) does all three, or use your administrator's API URL and see [Install and authenticate](./automaton-cli#install-and-authenticate). For all deploy options see [Deploy and publish an app](./deploy).
 
 ## Steps
 
-1. Install the CLI.
+1. Check the CLI and the server.
 
    ```bash
-   dotnet tool install -g Automaton.Cli
-   automaton --help
+   automaton whoami
+   automaton runners
    ```
 
-2. Sign in to your server and approve the request in Studio. Do not paste keys into AI chat. For unattended use set `AUTOMATON_API_KEY` in the process environment.
+   Check: your server is shown and a Runner is connected. `automaton: command not found` means `~/.dotnet/tools` is not on `PATH`. Several servers: the new login stays a separate profile; see [several servers](./automaton-cli#several-servers).
 
-   ```bash
-   automaton login --server https://api.example.com
-   ```
-
-   On a server without a browser (SSH, an AI agent) use `automaton login --device --server https://api.example.com`. It prints an approval URL and a code, then waits; approve it from a signed-in session or with the terminal snippet in [Log in without a browser](./automaton-cli#log-in-without-a-browser). The `--device` output contains the code: do not share it.
-
-   Several servers: add `--profile NAME`, list with `automaton profiles`, switch with `automaton profiles use NAME` or the `AUTOMATON_PROFILE` environment variable. See [CLI reference](./automaton-cli#several-servers).
-
-3. Create the app in an empty folder. `--template` writes a runnable starter: `node`, `python`, `dotnet` or `static`. Omit it for an empty contract.
+2. Create the app in an empty folder. `--template` is `node`, `python`, `dotnet` or `static`; omit it for an empty contract.
 
    ```bash
    mkdir my-app && cd my-app
    automaton new "My App" --template node
    ```
 
-   This writes `automaton.json`, `AGENTS.md` and `.automaton/agents/skills/automaton-app/SKILL.md`, and creates the app on your server.
+   This writes `automaton.json`, `AGENTS.md` and `.automaton/agents/skills/automaton-app/SKILL.md`, and creates the app on the server. An existing app: `automaton link <app-id>`; missing guidance files: `automaton sync-ai`.
 
-4. Build the app. With a coding agent, give it a plain request such as `Build [APP IDEA] as an Automaton app and deploy it`. It reads `AGENTS.md`, which points to the same guidance as <https://automaton.monster/llms.txt>. Without an agent, edit the source and [`automaton.json`](./automaton-json) yourself.
+3. Edit. Read `AGENTS.md` and `automaton.json` first. Keep data that must survive redeploys in the app's data directory (the template's `AGENTS.md` and `automaton.json` name the exact variable, `AUTOMATON_APP_DATA_DIR`). Other files are replaced on every deploy. See [Build an Automaton app](./build-an-automaton-app) and the [automaton.json reference](./automaton-json).
 
-5. Check the contract.
+4. Validate and deploy.
 
    ```bash
    automaton validate
+   automaton deploy
    ```
 
-## Verify it worked
+   `deploy` has no `--yes` flag; `--yes` after `deploy` is read as an environment name. It can print `Deploy complete` before the app is running.
 
-`automaton whoami` shows your server, `automaton apps` lists the new app, and `automaton validate` reports no errors.
+5. Wait for `Running`. Repeat until the Status column says `Running`; read `automaton logs` if it does not.
 
-For an app that already exists on the server use `automaton link <app-id>`. `automaton sync-ai` restores the local guidance files if they are missing.
+   ```bash
+   automaton apps
+   ```
+
+6. Publish, if the user asked for it, then open the address. `--yes` skips the prompt.
+
+   ```bash
+   automaton publish --yes --slug my-app
+   ```
+
+   Open `https://my-app.apps.<domain>`. Check the real behavior, not only the status. A private (unpublished) app's address answers `401` to an anonymous request; open it in a signed-in browser.
 
 ## Common errors
 
-- **`automaton: command not found`.** Add `~/.dotnet/tools` to `PATH`.
-- **Login does nothing.** Approve the login in your own Studio; the URL must be the API URL, not the Studio or project website URL.
-- **Template would overwrite files.** Use an empty folder or omit `--template`.
-
-Next: [Deploy and publish an app](./deploy).
+- **`Template would overwrite files`.** Use an empty folder or omit `--template`.
+- **Login does nothing.** The server URL must be the API URL, not Studio.
+- **Deploy works, app not Running.** `automaton logs`; the app must listen on `AUTOMATON_PORT` and answer its health path.
+- More: [Troubleshooting](./troubleshooting), [Deploy and publish an app](./deploy).

@@ -146,6 +146,11 @@ public sealed class AdminUserProvisioningService(
         ApplicationUser user, string websiteUrl)
     {
         var rawToken = await userManager.GeneratePasswordResetTokenAsync(user);
+        return BuildPasswordSetupUrl(user, rawToken, websiteUrl);
+    }
+
+    internal static string BuildPasswordSetupUrl(ApplicationUser user, string rawToken, string websiteUrl)
+    {
         var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawToken));
         var address = user.Email ?? throw new InvalidOperationException("A user email is required to create a password setup link.");
         return QueryHelpers.AddQueryString($"{websiteUrl.TrimEnd('/')}/reset-password",

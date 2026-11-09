@@ -40,11 +40,9 @@ public static class InstallationReadiness
         try
         {
             var smtp = await smtpSettings.GetSummaryAsync(token);
-            var configured = smtp.PasswordSet && !string.IsNullOrWhiteSpace(smtp.EmailHost)
-                && smtp.EmailPort > 0 && !string.IsNullOrWhiteSpace(smtp.EmailAccount);
             if (smtp.VerifiedAt.HasValue)
                 return new("SMTP", "verified", "SMTP authentication succeeded for these saved settings; delivery has not been tested.");
-            if (!configured)
+            if (!smtp.Configured)
                 return new("SMTP", "unverified", "Configure SMTP later for invitations and password recovery.");
             return new("SMTP", "configured", "SMTP settings are present; authentication and delivery have not been tested.");
         }
