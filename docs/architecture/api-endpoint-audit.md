@@ -8,7 +8,7 @@ the install scripts and the docs. Studio pages were removed in #831; this lists 
 | Controller | Endpoints |
 |---|---|
 | `AppsStepsController` | `api/apps/{id}/steps` (link, create, list) |
-| `AiStepConversationController`, `AiConversationController`, `AiUtilityController` | `api/ai/step/conversation`, AI conversation and name generation |
+| `AiStepConversationController`, `AiUtilityController`, `AiConversationController` (empty file) | `api/ai/step/conversation`, name generation |
 | `AiApiKeysController` | `api/AiApiKeys` |
 | `AdminAiProvidersController`, `AdminAiModelsController`, `AdminAiProviderKeysController`, `AdminAiSettingsController`, `AdminAiGuidanceController` | `api/admin/ai-providers`, `api/admin/ai-guidance` |
 | `BillingController`, `AccountSubscriptionController`, `AdminSubscriptionPlansController` | `api/billing`, `api/Account` subscription, `api/admin/subscription-plans` |

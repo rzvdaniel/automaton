@@ -2,7 +2,7 @@
 
 Subscription plans let the owner of a self-hosted Automaton server set limits and capabilities for the people they open the server to: their team, their customers or their own users. If you run Automaton only for yourself, you do not need plans. Automaton does not ship preset plans or prices; you define your own.
 
-The Studio page and the `api/admin/subscription-plans` endpoint were removed (#831, #843); plans are no longer managed from Studio or the API. The text below describes the plan model that remains in the database.
+The Studio page and the `api/admin/subscription-plans` endpoint were removed (#831, #843); plans are no longer managed from Studio or the API. The text below describes the plan model that remains in the database. Until a replacement exists, plans can only be created or assigned by editing the database directly; billing checkout and the portal were removed too, so nothing starts a subscription (the Stripe webhook stays).
 
 ## What a plan holds
 
