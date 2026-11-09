@@ -36,6 +36,58 @@ public sealed class InstallationSetupTests
 }
 
 [TestFixture]
+public sealed class SetupTokenFileTests
+{
+    private static IConfiguration FileConfiguration(string path) => new ConfigurationBuilder().AddInMemoryCollection(
+        new Dictionary<string, string?> { ["Bootstrap:TokenFile"] = path, ["Bootstrap:Token"] = "printed-token" }).Build();
+
+    [Test]
+    public void RotationReplacesThePrintedTokenAndTheFileValueIsTheOnlyOneAccepted()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "printed-token\n");
+            var configuration = FileConfiguration(path);
+            var environment = new SetupEnvironment();
+            Assert.That(InstallationSetupAccess.IsAllowed(configuration, environment, "printed-token"), Is.True);
+
+            Assert.That(InstallationSetupAccess.Rotate(configuration), Is.True);
+
+            var fresh = File.ReadAllText(path);
+            Assert.Multiple(() =>
+            {
+                Assert.That(fresh, Has.Length.EqualTo(65));
+                Assert.That(fresh, Does.EndWith("\n"));
+                Assert.That(fresh.Trim(), Is.Not.EqualTo("printed-token"));
+                Assert.That(InstallationSetupAccess.IsAllowed(configuration, environment, "printed-token"), Is.False,
+                    "the token from the installer output (also still in the settings file) stops working");
+                Assert.That(InstallationSetupAccess.IsAllowed(configuration, environment, fresh.Trim()), Is.True);
+            });
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Test]
+    public void AMissingOrUnwritableTokenFileNeverFallsBackToTheConfiguredToken()
+    {
+        var configuration = FileConfiguration(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
+
+        Assert.That(InstallationSetupAccess.Rotate(configuration), Is.False);
+        Assert.That(InstallationSetupAccess.IsAllowed(configuration, new SetupEnvironment { EnvironmentName = "Development" }, "printed-token"), Is.False);
+    }
+
+    [Test]
+    public void WithoutATokenFileRotationDoesNothingAndTheConfiguredTokenStaysValid()
+    {
+        var configuration = Configuration("server-token");
+
+        Assert.That(InstallationSetupAccess.Rotate(configuration), Is.False);
+        Assert.That(InstallationSetupAccess.IsAllowed(configuration, new SetupEnvironment(), "server-token"), Is.True);
+    }
+}
+
+[TestFixture]
 public sealed class InstallationCompletionTests
 {
     [Test]

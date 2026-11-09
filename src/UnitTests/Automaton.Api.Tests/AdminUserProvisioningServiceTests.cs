@@ -256,6 +256,34 @@ public sealed class AdminUserProvisioningServiceTests
         });
     }
 
+    [Test]
+    public async Task PasswordLinkAcceptsTheRotatedFileValueAndNotThePrintedToken()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var (admin, _) = await AdminWithLinkAsync(fixture);
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "printed-token\n");
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Bootstrap:TokenFile"] = path, ["Bootstrap:Token"] = "printed-token" }).Build();
+            InstallationSetupAccess.Rotate(configuration);
+            var current = File.ReadAllText(path).Trim();
+
+            async Task<IActionResult> Ask(string token)
+            {
+                var controller = new InstallController(null!, configuration, new InstallationTestFixture.SetupEnvironment(), fixture.Db, null!, fixture.Audit)
+                { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+                controller.Request.Headers[InstallationSetupAccess.HeaderName] = token;
+                return await controller.CreatePasswordLink(new PasswordLinkRequest(admin.Email), fixture.Users, fixture.Configuration, default);
+            }
+
+            Assert.That((await Ask("printed-token") as ObjectResult)!.StatusCode, Is.EqualTo(403));
+            Assert.That(await Ask(current), Is.InstanceOf<OkObjectResult>());
+        }
+        finally { File.Delete(path); }
+    }
+
     private static ObjectResult FilterResult(Exception exception)
     {
         var context = new Microsoft.AspNetCore.Mvc.Filters.ExceptionContext(

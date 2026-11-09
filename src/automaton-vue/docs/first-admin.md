@@ -55,7 +55,7 @@ jq -n --arg name "$NAME" --arg email "$EMAIL" --arg password "$PASSWORD" \
 unset PASSWORD
 ```
 
-`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. After setup is complete the token no longer creates accounts; it only lets root create [one-time password links](#when-an-ai-agent-sets-up-the-server-for-you).
+`POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token the installer printed is single-purpose: when setup completes the server replaces the content of `/etc/automaton/secrets/setup-token` with a new random value that is never printed, so the printed one stops working. Re-running the installer or the updater does not print or reset it. The new value is what lets root create [one-time password links](#when-an-ai-agent-sets-up-the-server-for-you). A server installed before this change keeps its token until it is updated and set up again.
 
 `EMAIL` and `PASSWORD` in the snippet are the sign-in you are creating now: the email you chose, not the certificate email. Keep both: the CLI sign-in below asks for them again. Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
 
@@ -77,7 +77,7 @@ Studio opens after sign-in and **Admin → Installation** shows **Check installa
 
 ## Common errors
 
-- **Token rejected.** Use the current value from `/etc/automaton/secrets/setup-token`. After setup is complete it creates no more accounts.
+- **Token rejected.** Use the current value from `/etc/automaton/secrets/setup-token`. After setup is complete the printed token no longer works; the file holds a new value for root.
 - **Password refused.** Use 12 or more characters with all four character kinds.
 
 Next: [add a Runner](./deploy-runner).

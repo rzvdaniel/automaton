@@ -30,7 +30,7 @@ public class InstallController(InstallService installService, IConfiguration con
             GitHubEnabled = !string.IsNullOrWhiteSpace(configuration["GitHub:ClientId"])
                 && !string.IsNullOrWhiteSpace(configuration["GitHub:ClientSecret"]),
             UserSignUp = configuration.GetValue<bool>("AppConfig:UserSignUp"),
-            SetupTokenRequired = !environment.IsDevelopment() || !string.IsNullOrWhiteSpace(configuration["Bootstrap:Token"])
+            SetupTokenRequired = !environment.IsDevelopment() || !string.IsNullOrWhiteSpace(InstallationSetupAccess.ExpectedToken(configuration))
         });
 
     [HttpGet("summary")]
@@ -121,6 +121,8 @@ public class InstallController(InstallService installService, IConfiguration con
         if (!HasSetupAccess()) return StatusCode(403, new { message = "A valid server setup token is required." });
         try { await installService.Install(command, cancellationToken); }
         catch (InstallationSetupException error) { return BadRequest(new { message = error.Message }); }
+        // The token the installer printed has done its one job; root keeps a new value in the same file.
+        InstallationSetupAccess.Rotate(configuration);
         return Ok();
     }
 
@@ -136,7 +138,7 @@ public class InstallController(InstallService installService, IConfiguration con
         [FromServices] UserManager<ApplicationUser> userManager,
         [FromServices] ConfigurationService configurationService, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(configuration["Bootstrap:Token"]) || !HasSetupAccess())
+        if (string.IsNullOrWhiteSpace(InstallationSetupAccess.ExpectedToken(configuration)) || !HasSetupAccess())
             return StatusCode(403, new { message = "A valid server setup token is required." });
         var user = string.IsNullOrWhiteSpace(request.Email) ? null : await userManager.FindByEmailAsync(request.Email.Trim());
         if (user is null || user.IsDeleted || !await IsAdministratorAsync(userManager, user))
