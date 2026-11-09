@@ -20,6 +20,7 @@ public sealed record SmtpSettingsSummary(string Source, string EmailHost, int Em
     string EmailAccount, string FromEmail, string SupportEmail, bool PasswordSet, DateTimeOffset? VerifiedAt)
 {
     /// <summary>Enough is saved to try sending; it does not mean a message was delivered.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool Configured => PasswordSet && !string.IsNullOrWhiteSpace(EmailHost) && EmailPort > 0 && !string.IsNullOrWhiteSpace(EmailAccount);
 }
 

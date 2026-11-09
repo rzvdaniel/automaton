@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import EmailNotConfiguredNotice from './EmailNotConfiguredNotice.vue'
@@ -7,6 +8,8 @@ import { installService } from '../services/install.service'
 
 const auth = vi.hoisted(() => ({ value: { isAuthenticated: true, user: { roles: ['SysAdmin'] as string[] } } }))
 vi.mock('@/features/auth/stores/auth.store', () => ({ useAuthStore: () => auth.value }))
+const route = reactive({ fullPath: '/' })
+vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('../services/install.service', () => ({ installService: { getSummary: vi.fn() } }))
 
 const RouterLinkStub = { props: ['to'], template: '<a :data-to="to"><slot /></a>' }
@@ -32,11 +35,26 @@ describe('EmailNotConfiguredNotice', () => {
 
   it('shows nothing once email is configured, or when an older server does not say', async () => {
     summary(true)
-    expect(mountNotice().find('[data-testid=email-not-configured]').exists()).toBe(false)
+    const configured = mountNotice()
+    await flushPromises()
+    expect(configured.find('[data-testid=email-not-configured]').exists()).toBe(false)
     summary(undefined)
     const older = mountNotice()
     await flushPromises()
     expect(older.find('[data-testid=email-not-configured]').exists()).toBe(false)
+  })
+
+  it('goes away on the next page change after email has been saved', async () => {
+    summary(false)
+    const wrapper = mountNotice()
+    await flushPromises()
+    expect(wrapper.find('[data-testid=email-not-configured]').exists()).toBe(true)
+
+    summary(true)
+    route.fullPath = '/settings'
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid=email-not-configured]').exists()).toBe(false)
   })
 
   it('shows nothing to other users and does not ask the server', async () => {
