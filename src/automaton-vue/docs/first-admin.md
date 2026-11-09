@@ -23,6 +23,8 @@ A server installed with [Install the server](./install-server) (`/health` return
 3. Select **Check installation**, then enter your name, email and a password of at least 12 characters with uppercase, lowercase, a number and a symbol.
 4. Sign in with that account.
 
+**The email you type in step 3 is the administrator's sign-in.** Nothing on the server stores it for you. `/etc/automaton/installation.json` holds only the certificate email, which Let's Encrypt uses for expiry notices; it is not an account and signing in with it gives 401. If you forgot which email you used, check the confirmation you saved or ask whoever ran the setup; an AI agent must ask the person, not guess.
+
 SMTP is not needed to start: the first administrator's email is confirmed by this setup flow. The token stops working once setup is complete and the setup page does not reopen.
 
 ## Without a browser (SSH or an AI agent)
@@ -55,7 +57,7 @@ unset PASSWORD
 
 `POST /api/install` takes `name`, `email` and `password` and returns 200 when the account exists. A wrong or missing token returns 403 ("A valid server setup token is required."); a password that is too weak returns 400 with the reason; 409 means setup was already completed. `POST /api/install/checks` (same header) runs the installation checks that Studio shows after the first sign-in. The token stops working once setup is complete.
 
-Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
+`EMAIL` and `PASSWORD` in the snippet are the sign-in you are creating now: the email you chose, not the certificate email. Keep both: the CLI sign-in below asks for them again. Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
 
 The password never goes on the command line: `jq --arg` receives it from the shell variable, and the file in the comment above is mode 0600. Delete it afterwards.
 
