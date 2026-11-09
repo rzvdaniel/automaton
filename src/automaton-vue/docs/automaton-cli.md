@@ -62,7 +62,7 @@ an AI conversation.
 
 ## Install a Runner
 
-`automaton runners upgrade RUNNER [--wait]` upgrades an online Runner to the server's current image (non-zero exit if it rolled back); `automaton server update --wait [--runners]` lists, or with `--runners` upgrades, Runners left on an old image. `automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. Steps, options and errors: [Add a Runner](./deploy-runner).
+`automaton runners upgrade RUNNER [--wait]` upgrades an online Runner to the server's current image (non-zero exit if it rolled back); `automaton server update --runners` (it implies `--wait`) names every Runner with its state (current or on an old image) and upgrades the old ones; `--wait` alone only lists them with the upgrade command. `automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. Steps, options and errors: [Add a Runner](./deploy-runner).
 
 ## Several servers
 
