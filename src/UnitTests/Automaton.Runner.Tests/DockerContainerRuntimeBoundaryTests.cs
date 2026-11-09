@@ -124,6 +124,33 @@ public sealed class DockerContainerRuntimeBoundaryTests
     }
 
     [Test]
+    public async Task ApplicationReceivesApiUrlButNotOtherAutomatonSecrets()
+    {
+        var arguments = new List<string>();
+        var runtime = new DockerContainerRuntime((args, _, _, _) =>
+        {
+            arguments.AddRange(args);
+            if (args.Contains("pull"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "", ""));
+            if (args.Contains("image"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "runtime:1@sha256:" + new string('a', 64), ""));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "container-1", ""));
+        });
+
+        await runtime.CreateApplicationAsync(new DockerApplicationContainerRequest(
+            "app", "runtime:1", Path.GetTempPath(), ".", new ApplicationCommandSpec { Executable = "server" },
+            8080, 18080, Path.GetTempPath(), new Dictionary<string, string>(), Guid.NewGuid(), Guid.NewGuid(),
+            Secrets: new Dictionary<string, string>
+            {
+                ["AUTOMATON_API_URL"] = "https://api.example.test",
+                ["AUTOMATON_PORT"] = "1"
+            }));
+
+        Assert.That(arguments, Does.Contain("AUTOMATON_API_URL=https://api.example.test"));
+        Assert.That(arguments, Does.Not.Contain("AUTOMATON_PORT=1"));
+    }
+
+    [Test]
     public async Task ApplicationPublishUsesConfiguredAddress()
     {
         var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
