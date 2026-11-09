@@ -9,9 +9,9 @@ These figures describe specific tests, not guarantees or a capacity benchmark. T
 
 | Measure | Result and scope | Source |
 | --- | --- | --- |
-| Server install | 118 seconds on Ubuntu 22.04; about 90 seconds on Debian 12, on separate Hetzner CX23 servers | [Fresh-server run notes](https://github.com/rzvdaniel/automaton/issues/561) |
+| Server install | 118 seconds on Ubuntu 22.04; about 90 seconds on Debian 12, on separate Hetzner CX23 servers. A run on Debian 12 by someone who used only the public docs, on 9 November 2026 (server 0.2.82) took 94 seconds for the installer and about 3 minutes from the first command to a working sign-in | [Fresh-server run notes](https://github.com/rzvdaniel/automaton/issues/561) |
 | Server size and price | CX23, 2 vCPU and 4 GB RAM, about €6.64 per month at the time of the run; domain and other services are extra | [Fresh-server run notes](https://github.com/rzvdaniel/automaton/issues/561) |
-| Memory after install | About 1.0 GB on the measured servers; this was not a load test | [Fresh-server run notes](https://github.com/rzvdaniel/automaton/issues/561) |
+| Disk and memory after install | About 1.0 GB of memory on the early runs and 1.1 GB on the 9 November run (server 0.2.82). The 9 November run used 4.1 GB of a 38 GB disk after install and 7.4 GB after adding a Runner and one catalog app; this was not a load test | [Fresh-server run notes](https://github.com/rzvdaniel/automaton/issues/561) |
 | Runner install | 31 seconds on Ubuntu 22.04; 32 seconds on Debian 12 | [Fresh-server run notes](https://github.com/rzvdaniel/automaton/issues/561), [Debian Runner check](https://github.com/rzvdaniel/automaton/issues/720) |
 | Server update | `automaton server update --wait` took 32 seconds from 0.2.21 to 0.2.22 on Ubuntu and 26 seconds from 0.2.28 to 0.2.29 on Debian | [Fresh-server run notes](https://github.com/rzvdaniel/automaton/issues/561), [Debian updater check](https://github.com/rzvdaniel/automaton/issues/719) |
 | Clean-server restore | Restore script completed in 13 seconds on a new Ubuntu 24.04 CX23 after the off-site archive had been downloaded and decrypted; transfer and setup time are excluded | [Restore drill](https://github.com/rzvdaniel/automaton/issues/524) |
