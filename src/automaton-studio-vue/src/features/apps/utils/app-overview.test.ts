@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accessLabel, appKindOf, describeSchedule, formatWhen, getAppHealth, statusSentence, type StatusInput } from './app-overview'
+import { accessLabel, appOriginLabel, appKindOf, describeSchedule, formatWhen, getAppHealth, statusSentence, type StatusInput } from './app-overview'
 import type { AppOperationalSummary } from './app-operational-summary'
 
 const now = new Date('2026-11-08T12:00:00Z')
@@ -80,5 +80,17 @@ describe('access label', () => {
   it('names who can open the app', () => {
     expect(['internet', 'people', 'server', 'me'].map((audience) => accessLabel(audience as never)))
       .toEqual(['Public', 'People I choose', 'Everyone on this server', 'Only you'])
+  })
+})
+
+describe('appOriginLabel', () => {
+  const base = { developmentMode: 'local', runtimeSource: 'cli-deploy' } as const
+  it('names the repository, folder and commit of a catalog install', () => {
+    expect(appOriginLabel({ ...base, installedFromRepo: 'acme/apps', installedFromFolder: 'backup', installedFromCommit: '0123456789abcdef' })).toBe('Installed from acme/apps/backup @ 0123456')
+  })
+  it('falls back to fork, CLI and Studio wording', () => {
+    expect(appOriginLabel({ ...base, forkedFromAppName: 'Todo' })).toBe('From the catalog · Todo')
+    expect(appOriginLabel(base)).toBe('Deployed with the CLI')
+    expect(appOriginLabel({ developmentMode: 'studio', runtimeSource: 'studio' })).toBe('Built in Studio')
   })
 })

@@ -90,6 +90,10 @@ export interface App {
   forkedFromAuthorUserId?: string | null
   forkedFromAppName?: string | null
   forkedFromAuthorName?: string | null
+  /** Set for apps installed from a public GitHub repository (a catalog entry or a pasted URL). */
+  installedFromRepo?: string | null
+  installedFromFolder?: string | null
+  installedFromCommit?: string | null
   developmentMode: AppDevelopmentMode
   sourceAvailable: boolean
   runtimeSource: AppRuntimeSource

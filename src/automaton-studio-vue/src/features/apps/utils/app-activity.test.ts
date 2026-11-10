@@ -51,3 +51,10 @@ describe('app activity', () => {
     expect(formatActivityTime(new Date(2026, 10, 1, 9, 12).toISOString(), now)).not.toMatch(/today|yesterday/)
   })
 })
+
+describe('settings in the activity list', () => {
+  it('calls a declared setting a setting and anything else a secret', () => {
+    const merged = buildActivity([], [], [secret({ name: 'S3_BUCKET', userName: 'Ann' }), secret({ name: 'S3_KEY', userName: 'Ann' })], [], ['S3_BUCKET'])
+    expect(merged.map((item) => item.text).sort()).toEqual(['Secret S3_KEY set by Ann', 'Setting S3_BUCKET set by Ann'])
+  })
+})

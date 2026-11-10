@@ -147,3 +147,14 @@ function toolSentence(input: StatusInput, now: Date): Segment[] {
   if (next) parts.push({ text: ' Next run ' }, { text: formatWhen(next, now), strong: true }, { text: '.' })
   return parts
 }
+
+/** Where an app came from, in words: its catalog or Git repository, a fork, the CLI or Studio. */
+export function appOriginLabel(app: Pick<App, 'forkedFromAppName' | 'installedFromRepo' | 'installedFromFolder' | 'installedFromCommit' | 'developmentMode' | 'runtimeSource'>): string {
+  if (app.installedFromRepo) {
+    const folder = app.installedFromFolder ? `/${app.installedFromFolder}` : ''
+    const commit = app.installedFromCommit ? ` @ ${app.installedFromCommit.slice(0, 7)}` : ''
+    return `Installed from ${app.installedFromRepo}${folder}${commit}`
+  }
+  if (app.forkedFromAppName) return `From the catalog · ${app.forkedFromAppName}`
+  return app.developmentMode === 'local' || app.runtimeSource !== 'studio' ? 'Deployed with the CLI' : 'Built in Studio'
+}

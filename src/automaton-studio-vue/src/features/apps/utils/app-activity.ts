@@ -33,6 +33,7 @@ export function buildActivity(
   events: ReadonlyArray<ApplicationEvent>,
   secrets: ReadonlyArray<SecretAuditEntry>,
   deploys: ReadonlyArray<ActivityItem> = [],
+  settingNames: ReadonlyArray<string> = [],
 ): ActivityItem[] {
   const items: ActivityItem[] = []
   for (const run of runs) {
@@ -59,7 +60,7 @@ export function buildActivity(
       kind: 'change',
       tone: 'none',
       subject: '',
-      text: describeSecretChange(entry),
+      text: describeSecretChange(entry, settingNames),
       at: entry.createdAtUtc,
     })
   })
@@ -68,11 +69,13 @@ export function buildActivity(
   return [...items, ...deploys.filter((deploy) => !logged.some((event) => near(event.createdAtUtc, deploy.at)))].sort((a, b) => b.at.localeCompare(a.at))
 }
 
-function describeSecretChange(entry: SecretAuditEntry): string {
+/** Settings are stored like secrets, but people see them as settings. */
+function describeSecretChange(entry: SecretAuditEntry, settingNames: ReadonlyArray<string>): string {
   const by = entry.userName ? ` by ${entry.userName}` : ''
   if (!entry.name) return `${entry.message}${by}`
-  if (entry.eventType === 'SecretDeleted') return `Secret ${entry.name} removed${by}`
-  return `Secret ${entry.name} ${(entry.version ?? 1) > 1 ? 'replaced' : 'set'}${by}`
+  const noun = settingNames.includes(entry.name) ? 'Setting' : 'Secret'
+  if (entry.eventType === 'SecretDeleted') return `${noun} ${entry.name} removed${by}`
+  return `${noun} ${entry.name} ${(entry.version ?? 1) > 1 ? 'replaced' : 'set'}${by}`
 }
 
 /** Deploys the event log did not record: the target remembers its last attempt and last success. */

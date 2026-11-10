@@ -60,6 +60,10 @@ public class AppModel
     public Guid? ForkedFromAuthorUserId { get; set; }
     public string? ForkedFromAppName { get; set; }
     public string? ForkedFromAuthorName { get; set; }
+    /// <summary>Public GitHub repository, folder and commit the app was installed from (catalog or pasted URL).</summary>
+    public string? InstalledFromRepo { get; set; }
+    public string? InstalledFromFolder { get; set; }
+    public string? InstalledFromCommit { get; set; }
     public string DevelopmentMode { get; set; } = Constants.AppDevelopmentModes.Studio;
     public bool SourceAvailable { get; set; } = true;
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
