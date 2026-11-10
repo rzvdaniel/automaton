@@ -46,7 +46,7 @@ internal sealed class AppListingService(
     private Task<List<AppListQueryRow>> LoadRowsAsync(
         Guid? projectId,
         CancellationToken cancellationToken)
-        => authorizationService.GetAppsQueryByContext(projectId)
+        => authorizationService.GetListedAppsQuery(projectId)
             .AsNoTracking()
             .Select(app => new AppListQueryRow
             {

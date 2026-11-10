@@ -48,7 +48,14 @@ public static class ActionCommand
             using var document = JsonDocument.Parse(inputJson);
             var (server, apiKey, appId) = Resolve(config);
             using var client = new AutomatonApiClient(server, apiKey);
-            var execution = await client.RunAppActionAsync(appId, actionKey, document.RootElement.Clone());
+            JsonElement execution;
+            try { execution = await client.RunAppActionAsync(appId, actionKey, document.RootElement.Clone()); }
+            catch (HttpRequestException exception)
+            {
+                Console.Error.WriteLine($"Error: {ApiErrorText(exception.Message)}");
+                Environment.ExitCode = 1;
+                return;
+            }
             var executionId = execution.GetProperty("id").GetGuid();
             var status = execution.GetProperty("status").GetString() ?? "Dispatching";
             while (!IsTerminal(status))
@@ -70,6 +77,23 @@ public static class ActionCommand
             }
         }, key, input);
         return command;
+    }
+
+    /// <summary>Turns "API error 409 Conflict: {problem json}" into the problem's title, or the text as it is.</summary>
+    internal static string ApiErrorText(string message)
+    {
+        var start = message.IndexOf('{');
+        if (start < 0) return message;
+        try
+        {
+            using var body = JsonDocument.Parse(message[start..]);
+            foreach (var name in new[] { "title", "message", "detail" })
+                if (body.RootElement.ValueKind == JsonValueKind.Object
+                    && body.RootElement.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String)
+                    return value.GetString()!;
+        }
+        catch (JsonException) { }
+        return message;
     }
 
     private static Command BuildArtifact(ConfigService config, bool result)

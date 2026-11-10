@@ -4,8 +4,8 @@ Read-only browser checks of a deployed Studio, run against the test server after
 skill, `verify.md`). They sign in once as the system administrator and once as a regular user, open the main pages,
 and save a screenshot of each page in `smoke-results/`. They never create or change anything.
 
-What they cover: the Apps start page; Admin → Users and the Add user dialog; Admin → Apps and, when an app exists, its
-Permissions tab; Admin → Installation scrolling; dark theme; a direct load of `/apikeys` (#540); a regular user
+What they cover: the Apps start page; Admin → Users (now People) and the Create with password dialog; Admin → Apps and, when an app exists, its
+Permissions tab; Admin → Installation (now Settings → Server settings); dark theme; a direct load of `/apikeys` (#540); a regular user
 refused from Admin; no horizontal scroll at phone width.
 
 ## Run
