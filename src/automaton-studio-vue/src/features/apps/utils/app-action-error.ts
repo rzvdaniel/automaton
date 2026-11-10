@@ -9,7 +9,7 @@ export function appActionErrorMessage(failure: unknown, fallback: string): strin
   const message = error?.response?.data?.message
   if (message) return message
   if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT') {
-    return 'Studio stopped waiting for the app after 3 minutes. It may still be starting; reload the page to see its state.'
+    return `Studio stopped waiting for the app after ${APP_ACTION_TIMEOUT_MS / 60000} minutes. It may still be starting; reload the page to see its state.`
   }
   return fallback
 }
