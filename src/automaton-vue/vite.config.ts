@@ -322,6 +322,7 @@ export default defineConfig({
       },
     },
   },
+  ssgOptions: { dirStyle: 'nested' },
   build: {
     outDir: 'dist',
     sourcemap: true,
