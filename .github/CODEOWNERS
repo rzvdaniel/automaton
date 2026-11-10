@@ -1,0 +1,15 @@
+# Paths where a change always needs the owner's approval before merge (the "high" tier in
+# .agents/skills/pr-review/SKILL.md). .agents/tools/merge-gate.py reads this file, so keep each pattern a rooted
+# folder (ending in /) or a rooted file. Loosen or extend this list only in a pull request the owner approves.
+
+/.github/workflows/                                            @rzvdaniel
+/.github/CODEOWNERS                                            @rzvdaniel
+/src/Automaton.Identity/                                       @rzvdaniel
+/src/Automaton.Api/Authentication/                             @rzvdaniel
+/src/Automaton.Api/Authorization/                              @rzvdaniel
+/src/Automaton.Api/Controllers/AccountController.cs            @rzvdaniel
+/src/Automaton.Api/Controllers/ApiKeysController.cs            @rzvdaniel
+/src/Automaton.Api/Controllers/CliAuthorizationController.cs   @rzvdaniel
+/docker/install/                                               @rzvdaniel
+/scripts/install-automaton.sh                                  @rzvdaniel
+/scripts/update-automaton.sh                                   @rzvdaniel

@@ -1,40 +1,85 @@
 ---
 name: pr-review
-description: Use when reviewing a pull request, your own or another agent's (Claude, Codex or a person), and before merging any PR.
+description: Use when reviewing a pull request, your own or another agent's or a person's, and before merging any PR. Covers the risk tier, the review and security pass, how findings are posted and answered, and the merge gate.
 ---
 
 # PR review
 
-Every PR gets an independent review before merge, docs-only PRs too. The reviewer is a fresh agent with no stake in
-the change. What to give it and look for is in
-[the implement-issue review checklist](../automaton-implement-issue/review.md).
+The question is not "did someone read it" but "what could go wrong with this change, and which check catches it".
+The change sets how much review it gets, not its author.
 
-## Post the result where the author will see it
+## Risk tier
 
-Post the outcome as a formal GitHub review, not a conversation comment. Agents and merge checks read the review
-state, and a plain comment is easy to miss:
+| Tier | The change | Before merge |
+| --- | --- | --- |
+| Low | Only documentation that does not steer agents (`docs/`, `*.md` outside `.agents/`, `AGENTS.md`, `CLAUDE.md`, `REVIEW.md`) | Green CI. The author re-reads the diff against the code it describes. |
+| Medium | Everything else | Green CI and one independent review. |
+| High | Touches a path in [`.github/CODEOWNERS`](../../../.github/CODEOWNERS), or the reviewer finds that it drops or rewrites data, lets more people do something, changes how people sign in, or touches production | Green CI, the review, a separate security pass, and the owner's approval (PR label `owner-approved`). |
+
+The reviewer may raise the tier, never lower it. An agent's approval never stands in for the owner's.
+
+## Review
+
+The reviewer is a fresh agent that did not write the change and starts with none of the author's context. Give it the
+issue number and its "Done when", the PR number, [`REVIEW.md`](../../../REVIEW.md) and the area skills that apply. It
+reads the diff against the code around it, not the diff alone, and asks whether the change does what the issue asks,
+fits the system and breaks anything.
+
+**Security pass.** A second fresh agent that looks only for security problems (in Claude Code: `/security-review`).
+Required for the high tier. Also run it for a medium change that adds or changes an endpoint, a permission check,
+secret handling, a file path or shell command built from input, or anything an app or anonymous visitor can reach.
+
+**Confirm before posting.** For each Important finding, reproduce it (a failing test, a command and its output) or
+have a second agent try to refute it. Drop what cannot be confirmed. A wrong finding costs a commit and another
+round.
+
+## Post the result
+
+Post a formal GitHub review, not a conversation comment; the merge gate reads the review:
 
 ```bash
-gh pr review <N> --request-changes --body-file review.md   # findings above low severity
-gh pr review <N> --comment --body-file review.md           # only low findings
-gh pr review <N> --approve --body "Independent review: no findings above low."
+gh pr review <N> --request-changes --body-file review.md   # any Important finding
+gh pr review <N> --approve --body-file review.md           # none
+gh pr review <N> --comment --body-file review.md           # your own PR: GitHub refuses the two above
 ```
 
-GitHub does not let you approve or request changes on your own PR. Use `--comment` there and start the body with the
-verdict (`CHANGES NEEDED` or `APPROVE`).
+The body starts like this, then lists the findings in the `REVIEW.md` format:
 
-Rank findings high, medium, low. Give each one a file, a line and a concrete failure case. Say what the reviewer did
-not check, for example "the scripts were not run".
+```markdown
+APPROVE            (or CHANGES NEEDED)
+Tier: medium - ordinary Studio change
+Important: 0, Nit: 2, Pre-existing: 1
+Security: checked who can call the new endpoint / not needed, no reachable surface
+Not checked: the update script was not run
+```
 
-## Before merging
+## Answer and re-review
 
-- Read **all** reviews and conversation comments on the PR, including ones that arrived after your own review
-  started. One that is newer than the last commit, or one that requests changes, blocks the merge until it is
-  answered.
-- The reviewer checks the tests and the diff before merge. The `proof` artifact comes after merge: release, update the
-  test server, verify as real users, then attach it to the issue and label the issue `verified` (left open until it is
-  live on production) or `verification-failed` (implement-issue steps 7-8). A failing proof means fix forward with a
-  follow-up PR (revert only if the fix is not quick).
-- The checks on the final commit pass, and the last review found nothing above low.
-- If a PR was merged with open findings, say so on the PR, fix them in a follow-up PR with its own review, and hold
-  any release that would ship the problem until the follow-up is merged.
+- The author answers every Important finding: a fix, or a reply saying why it is wrong or intended.
+- A re-review covers only the commits pushed since the last one and does not repeat earlier findings. Any new commit
+  needs it: the review must cover the final commit.
+- After two rounds, stop. More rounds mostly find old bugs or mean the approach is wrong. Write what is left on the
+  PR, label the issue `agent:blocked`, and take other work.
+
+## Merge gate
+
+```bash
+python3 .agents/tools/merge-gate.py <N>
+```
+
+It checks from GitHub that CI is green on the final commit, the last review approves that commit, a high-tier change
+has its security pass and the owner's approval, and the description says how the change was verified and how to
+revert it. Merge only on `MERGE GATE: PASS`, and paste the output in a PR comment. Read its warnings (no test in the
+diff, comments newer than the last commit) and act on them.
+
+Squash-merge and delete the branch. Then watch the `main` run for your merge commit: two PRs that pass alone can
+break together. A red `main` is fixed before anything else merges.
+
+If a PR was merged with open findings, say so on the PR, fix them in a follow-up PR with its own review, and hold any
+release that would ship the problem.
+
+## When something gets past review
+
+When a check after release fails, or production shows a bug, ask which step should have caught it and fix that step
+in the same follow-up PR: a regression test first, else a line in `REVIEW.md`, an analyzer rule, or a sentence in the
+skill that was unclear.

@@ -1,7 +1,7 @@
 # Studio smoke checks
 
-Read-only browser checks of a deployed Studio, run against the test server after each update (`automaton-implement-issue`
-skill, `verify.md`). They sign in once as the system administrator and once as a regular user, open the main pages,
+Read-only browser checks of a deployed Studio, run against the test server after each update (`automaton-verify-release`
+skill). They sign in once as the system administrator and once as a regular user, open the main pages,
 and save a screenshot of each page in `smoke-results/`. They never create or change anything.
 
 What they cover: the Apps start page; Admin → Users (now People) and the Create with password dialog; Admin → Apps and, when an app exists, its

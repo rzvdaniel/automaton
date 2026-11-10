@@ -1,100 +1,61 @@
 ---
 name: automaton-implement-issue
-description: Use when implementing a feature or fixing a bug in Automaton from start to finish - issue, branch, tests, PR, review, merge, release, test-server upgrade and end-to-end verification as real users, with as few owner interruptions as possible.
+description: Use when implementing a feature or fixing a bug in Automaton from the issue to a merged pull request - claim, branch, tests, evidence, PR, review, merge - and then handing over to (or running) the release check, with as few owner interruptions as possible.
 license: Apache-2.0
 ---
 
 # Automaton implement issue
 
-One agent takes a feature or bug from request to verified on the test server. Read the area skills that
-`AGENTS.md` lists for the code you touch; this skill is only the delivery loop around them. Open the detail file for
-a step when you reach it.
+One agent takes one issue from request to a merged pull request, then delivers it or hands it to the verifier. Read
+the area skills that `AGENTS.md` lists for the code you touch; this skill is only the loop around them.
 
 ## Ground rules
 
-- Work items live in GitHub issues on the project board named in `.agents/environment.md`, with
-  Status, Priority and Plan fields.
-- Ask the owner only for product decisions and for the changes listed under step 6. Decide everything else yourself
-  and report it.
-- Before asking the owner, check whether running something would answer it (behaviour, output, timing, layout). If
-  so, run it and decide from the result. Ask only real product or preference questions.
-- Self sign-up is disabled on purpose. Never re-enable it, insert users into the database or bypass the invite flow.
-- Test only on the test server. Production is changed only when the owner asked for it in the task; then follow
-  `verify.md` → Production.
-- Never print, commit or post credentials, tokens, API keys or generated passwords.
+- **Decide, do not wait.** Ask the owner only for product decisions and for high-tier changes
+  ([PR review](../pr-review/SKILL.md)). If running something would answer the question (behaviour, output, timing,
+  layout), run it and decide from the result.
+- **When you do need the owner, do not stop.** Post the question on the issue with the options and the one you would
+  pick, label the issue `agent:blocked`, and continue with everything that does not depend on the answer. If nothing
+  is left, take the next issue.
+- **Never end your turn on a wait.** Wait for CI and releases in the foreground (`gh pr checks <N> --watch`,
+  `gh run watch`). A turn that ends while a background job runs leaves the task idle until someone notices.
+- **Others work beside you.** Use your own worktree and branch. Touch only the files your issue needs. Do not upgrade
+  the test server or cut a release while an orchestrator is running a batch.
+- The sign-up, server, secrets and production rules in `AGENTS.md` apply at every step.
 
 ## Steps
 
-Before starting, create a to-do item for each of steps 1–8, naming its detail file where it has one. Tick them off
-as you go; the task is not done until step 8 is.
+Create a to-do item for each step and tick them off.
 
-1. **Issue.** Find the issue. If there is none, create it first ([write-issue skill](../automaton-write-issue/SKILL.md)). If no task was given at all, take the
-   open Todo item with the highest priority on the board and say which one you took. Read its parent and blockers, restate
-   the done criteria, and set the board Status to In Progress.
-2. **Build.** Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio),
-   then commit a failing test before the fix; afterwards the original reproduction must pass.
-   Follow `AGENTS.md`, the maintainability skill (keep it simple, guardrails) and the area skills. Add tests for new behaviour, including who gets 200, 403 and 404.
-3. **Test locally.** Run the affected test projects and, for Studio changes, `npx vue-tsc --noEmit -p tsconfig.app.json`
-   in `src/automaton-studio-vue`. `main` is green, so every failure is yours to fix. Never skip or delete a failing
-   test to get green unless the test itself is wrong, and say so in the PR.
-4. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes and wait for CI. An empty check list means the run has not started; it is not
-   a pass.
-5. **Review.** Get an independent review from a subagent (`review.md`). At most two rounds.
-6. **Merge.** Run the merge gate (below), then squash-merge and delete the branch. Ask the owner first only for:
-   - database migrations that drop or rewrite data;
-   - changes that let more people do something (widening access), or change how people sign in;
-   - anything that touches production;
-   - anything the owner said to hold.
-7. **Deliver and verify.** Release, upgrade the test server and verify as real users (`verify.md`). Several small,
-   independent changes may share one release; risky ones (Runner, migrations, install or update scripts) go alone.
-   Real-server testing happens here, after merge. If a check fails, fix forward: a small follow-up PR (same review and
-   CI), a new release and a re-check. Revert instead only when the fix is not quick or the failure blocks other work on
-   the test server. Production is updated only after the proof passes, and only when the owner asks.
-8. **Close out.** Done means live on production. Attach the `proof` artifact to the issue and set its label
-   (`verified`, `verified-partial` or `verification-failed`, see Labels below and `verify.md`), comment the end-to-end results (pass or fail per check) and every
-   administrator action on the PR, and link that comment from the issue. Leave the issue open with board Status In
-   Progress: `is:open label:verified` is what the next production update ships. When the owner updates production,
-   whoever updates it checks production, runs the close gate, adds `live` and closes each issue in that release with a
-   comment naming the version, which sets the board Status to Done. Remove the `e2e-` items you created (`verify.md`),
-   open issues for gaps you found (write-issue skill), and tell the owner what is left for them, with links. If testing showed the docs are wrong,
-   or the issue completes a roadmap step, fix the docs or the status in `docs/roadmap/README.md` in a small follow-up
-   PR.
-
-## Gates
-
-Check each item from GitHub itself (`gh pr view`, `gh pr checks`, `gh api .../issues/N/artifacts`), not from memory,
-and paste the result into your handoff. A missing item stops the step; fix it or report it as a gap. The Flow check
-app (#693) automates this list once it exists.
-
-**Merge gate** (step 6):
-- a formal review (`gh pr review`) from an independent reviewer, covering the final commit; if you pushed fixes after
-  it, the reviewer saw them (a second round) or they only touch text the review asked for;
-- the last review found nothing above low severity;
-- the PR diff contains the tests the PR claims (`gh pr diff --name-only`);
-- CI passed on the final commit.
-
-**Close gate** (production update, step 8):
-- the merge gate held;
-- the issue has a `proof` artifact naming the release and how it was checked;
-- the label is `verified` (a `verified-partial` issue closes only when the owner accepts the gap, said in a comment);
-- the production version contains the merge commit.
-
-## Labels
-
-- `verified`: every "Done when" check passed end to end on the test server, with a proof artifact.
-- `verified-partial`: only unit tests or part of the checks ran; the proof says what is missing and why.
-- `verification-failed`: a check failed; fix forward.
-- `live`: set by whoever updates production, just before closing.
+1. **Claim.** Find the issue, or create it first ([write-issue skill](../automaton-write-issue/SKILL.md)). With no
+   task given, take the highest-priority open issue labelled `agent:ready` that is not `agent:in-progress`. Add
+   `agent:in-progress`, set the board Status to In Progress, and comment your branch name; skip an issue another
+   agent already claimed. Read its parent and blockers and restate its "Done when".
+2. **Build.** Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio)
+   and commit a failing test before the fix. Add tests for new behaviour, including who gets 200, 403 and 404.
+3. **Show it works.** Run the affected test projects and, for Studio, `npx vue-tsc --noEmit -p tsconfig.app.json` in
+   `src/automaton-studio-vue`. `main` is green, so every failure is yours; never skip or delete a failing test unless
+   the test itself is wrong, and say so in the PR. Keep the evidence for the PR: the commands and what came back, for
+   a bug the test that failed before and passes now, for a UI change a screenshot of this branch running locally.
+   "Done" without output is a claim, not evidence.
+4. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes, including the "Check after
+   release" list. Start step 5 while CI runs. An empty check list means the run has not started; it is not a pass.
+5. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
+   applies, at most two rounds. For a high-tier change, add the `agent:human-review` label and ask the owner now, not
+   after the review, so the two waits overlap.
+6. **Merge.** Run `python3 .agents/tools/merge-gate.py <N>`; on PASS squash-merge, delete the branch and watch the
+   `main` run for your commit. Also hold anything the owner said to hold.
+7. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).
+   - *Working alone:* release, upgrade the test server, run your "Check after release" list as real users, attach
+     the proof and label the issue.
+   - *In a batch* (the orchestrator said so): stop after the merge. The verifier runs your list on the batch release.
+     Your handoff says the PR is merged and waiting for the batch check.
+8. **Hand off.** Remove `agent:in-progress` when the issue is labelled `verified` or handed to the verifier. Open
+   issues for gaps you found. If the issue completes a roadmap step or testing showed the docs are wrong, fix
+   `docs/roadmap/README.md` or the docs in a small follow-up PR.
 
 ## Handoff
 
-A short list: what changed, tests, the release and test-server version, whether the `e2e-` items were removed, and
-anything waiting for the owner. For each end-to-end check, give what was run and what came back (status code,
-command output or screenshot path). Mark anything you did not check as "not checked", with the reason.
-Do not keep an issue open for checks you can run yourself on the test server (browser, Studio buttons, screenshots).
-Only something that truly needs the owner stays, as its own issue linked from the handoff.
-
-Proof cost: viewing an image costs about 1,500 tokens and stays in your context. So:
-- Use text proofs (status code, response body, page text) for functional checks. Use screenshots only for visual changes (website, Studio, app design).
-- Capture the viewport, not the full page, unless the whole page's layout is the point.
-- Look at each screenshot once to confirm it shows the right thing, then post it. Reviewers and the orchestrator do not reopen it unless something looks wrong.
+A short list: what changed, the PR, the merge-gate output, tests run and their counts, the release and proof (or
+"waiting for the batch check"), and anything waiting for the owner, with links. Mark what you did not check as "not
+checked", with the reason. Do not leave an issue open for a check you can run yourself.

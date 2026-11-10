@@ -1,6 +1,6 @@
 ---
 name: automaton-write-pr
-description: Use whenever you open a pull request in Automaton or automaton-apps, from any flow, so every PR says what changed, how it was verified, what could break, and never closes its issue before production.
+description: Use whenever you open a pull request in Automaton or automaton-apps, from any flow, so every PR says what changed, how it was verified, how to revert it, what to check after release, and never closes its issue before production.
 license: Apache-2.0
 ---
 
@@ -12,23 +12,13 @@ What the change does for people, in the imperative: "Let app owners delete apps 
 
 ## Body
 
-```markdown
-Refs #<issue>.
+Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_template.md) and pass it with
+`gh pr create --body-file`. The merge gate refuses a PR without "How verified", "Risk" and "How to revert".
 
-- **<behaviour>:** what changed and why, one line each.
-- **Docs:** which Admin or architecture docs were updated, or why none were needed.
-- **Tests:** what was added, and what ran (project names, pass counts).
-
-**How verified:** end-to-end on the test server (link the proof) / unit tests only (why) / not yet (after release).
-**Risk:** what could break and how to roll back, in one line.
-
-**Not in this PR:** anything from the issue left for later, with the follow-up issue number.
-```
-
-For Studio or website changes, add a screenshot (push it to the `pr-screenshots` branch and link it).
-
-"How verified" usually says "not yet" when the PR opens, because test-server checks run after merge. Update it in a
-comment when the proof is attached.
+- **How verified** is evidence, not a claim: the commands and what came back. For a bug, name the test that failed
+  before the fix. For a Studio or website change, link a screenshot (push it to the `pr-screenshots` branch).
+- **Check after release** is what the verifier will run on the test server, written so an agent that never saw your
+  work can follow it: who signs in, what they do, what they see. It comes from the issue's "Done when".
 
 Never write `Closes #N` or `Fixes #N`: an issue closes only when its change is live on production. Use
 `Part of #N` when the PR delivers only part of the issue.

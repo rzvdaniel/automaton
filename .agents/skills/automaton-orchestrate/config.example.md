@@ -8,10 +8,11 @@ secrets here: name where each secret lives.
 - Default branch and its protection (who may push directly, who needs a pull request).
 
 ## Agents
-For each agent (a headless Claude on a server, Codex, a Desktop session, subagents):
+For each agent (a headless agent on a server, a Desktop session, subagents):
 - Name, where it runs, which account or plan it uses (and its usage limits).
 - **How to start a task** (exact command), where its log is, how to see whether it is alive and when it last worked.
-- Model and effort settings to use; what kind of work it takes; what it must never touch.
+- Model and effort settings to use; what kind of work it takes (its lane); what it must never touch.
+- How many agents may run at once, and after how many quiet minutes an agent counts as stalled (and the command that watches for it).
 - How tasks are queued behind a running one.
 
 ## Environments
