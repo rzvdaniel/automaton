@@ -79,6 +79,10 @@ afterwards watch the `main` run for the commit. Everything else goes through a P
 
 ## Merge gate
 
+Known limit: when every agent uses the owner's GitHub login, the gate cannot tell the author from the reviewer, or
+who added `owner-approved`. Independence comes from the reviewer being a fresh agent; only add `owner-approved`
+when the owner said so for that PR.
+
 ```bash
 python3 .agents/tools/merge-gate.py <N>
 ```
