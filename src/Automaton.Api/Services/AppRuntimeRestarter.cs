@@ -54,6 +54,7 @@ public sealed class AppRuntimeRestarter(
             {
                 // The permission change is already saved; a copy that misses the restart gets it at its next start.
                 logger.LogWarning(error, "Could not queue a runtime restart for app {AppId} target {TargetId}.", appId, target.Id);
+                if (wait) failures.Add("The Runner could not be told to restart the app. Try again when the Runner is online.");
             }
         }
         if (failures.Count > 0) throw new RuntimeCommandFailedException(string.Join(" ", failures.Distinct()));
