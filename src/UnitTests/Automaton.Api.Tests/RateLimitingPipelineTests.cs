@@ -76,6 +76,39 @@ public class RateLimitingPipelineTests
     }
 
     [Test]
+    public async Task ProxySignInCheckForAnAppStaticFile_UsesTheAssetBucket_ButOtherChecksKeepTheGeneralLimit()
+    {
+        using var host = await CreateHostAsync(configureOptions: options =>
+        {
+            options.GlobalAnonymous = new RateLimitPolicyOptions(3, 60);
+            options.AppStaticAssets = new RateLimitPolicyOptions(50, 60);
+        });
+        var client = host.GetTestClient();
+
+        for (var i = 0; i < 20; i++)
+        {
+            using var asset = new HttpRequestMessage(HttpMethod.Get, "/internal/runtime/auth");
+            asset.Headers.Add("X-Forwarded-Method", "GET");
+            asset.Headers.Add("X-Forwarded-Uri", $"/assets/chunk-{i}.js?v=1");
+            Assert.That((await client.SendAsync(asset)).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"asset {i}");
+        }
+
+        var other = new List<HttpStatusCode>();
+        for (var i = 0; i < 5; i++)
+        {
+            using var page = new HttpRequestMessage(HttpMethod.Get, "/internal/runtime/auth");
+            page.Headers.Add("X-Forwarded-Uri", "/api/items.json");
+            other.Add((await client.SendAsync(page)).StatusCode);
+        }
+        Assert.That(other, Has.Some.EqualTo((HttpStatusCode)429));
+
+        using var post = new HttpRequestMessage(HttpMethod.Get, "/internal/runtime/auth");
+        post.Headers.Add("X-Forwarded-Method", "POST");
+        post.Headers.Add("X-Forwarded-Uri", "/upload.js");
+        Assert.That((await client.SendAsync(post)).StatusCode, Is.EqualTo((HttpStatusCode)429));
+    }
+
+    [Test]
     public async Task GlobalAuthenticatedRateLimiter_Returns429AfterConfiguredLimitPerUser()
     {
         using var host = await CreateHostAsync(configureOptions: options =>
