@@ -36,9 +36,10 @@ file path or shell command built from input, or anything an app or anonymous vis
 its output); otherwise say what would confirm it and how sure you are. Drop guesses. A wrong finding costs a commit and
 another round.
 
-**Keep it cheap.** The reviewer reads the diff and the files it touches, not the whole repository. A small model is
-enough for a small diff. A re-review after Nit-only fixes is not needed; the gate still wants the review to cover the
-final commit, so say "Nits fixed, no new code" in a short `--comment` review on that commit.
+**Keep it cheap.** The reviewer reads the diff and the files it touches, not the whole repository. Reviews and
+security passes run on Opus 5.5; a Nit-only re-check or a docs-only diff can use Sonnet 5.5. A re-review after Nit-only fixes is not needed; the gate still wants the last review to cover
+the final commit, so post a short review on it with the same first lines as before (verdict, `Tier:`, and `Security:`
+when the change needed one) plus "Nits fixed, no new code". A tier a reviewer raised stays raised.
 
 ## Post the result
 
@@ -71,7 +72,8 @@ Not checked: the update script was not run
 ## Straight to `main`
 
 Low-tier changes (documentation for people) may be pushed to `main` without a PR. So may agent guidance (`AGENTS.md`,
-skills, templates) when the owner asks for it in the session. Before pushing, run `node scripts/check-doc-links.mjs`
+skills, templates) when the owner asks for it in the session, except paths in the high-tier list of
+[`.github/CODEOWNERS`](../../../.github/CODEOWNERS) (the review rules themselves): those always go through a PR. Before pushing, run `node scripts/check-doc-links.mjs`
 and, for agent guidance, `dotnet test src/UnitTests/Automaton.Api.Tests --filter RepositoryAgentGuidanceTests`;
 afterwards watch the `main` run for the commit. Everything else goes through a PR and the gate.
 

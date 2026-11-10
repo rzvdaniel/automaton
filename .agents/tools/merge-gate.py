@@ -86,14 +86,17 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     paths = pr["paths"]
     labels = {item["name"] for item in pr.get("labels", [])}
     # Only people with write access review; on a public repository anyone can post a review that says APPROVE.
-    reviews = sorted((item for item in pr.get("reviews", []) if item.get("authorAssociation") in TRUSTED),
+    reviews = sorted((item for item in pr.get("reviews", [])
+                      if item.get("authorAssociation") in TRUSTED and item.get("state") != "DISMISSED"),
                      key=lambda item: item.get("submittedAt") or "")
     review = read_review(reviews[-1]) if reviews else None
 
+    # A tier a reviewer raised stays raised: a later, shorter review cannot lower it.
     tier = path_tier(paths, patterns)
-    if review and review["tier"] == "high":
+    raised = {read_review(item)["tier"] for item in reviews}
+    if "high" in raised:
         tier = "high"
-    elif review and review["tier"] == "medium" and tier == "low":
+    elif "medium" in raised and tier == "low":
         tier = "medium"
 
     checks = pr.get("statusCheckRollup", [])
@@ -127,7 +130,8 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
                     else ("FAIL", "owner", f"a high-risk change needs the owner's approval (label {OWNER_LABEL})"))
 
     body = pr.get("body") or ""
-    missing = [part for part in ("How verified", "Risk", "How to revert") if part.lower() not in body.lower()]
+    missing = [part for part in ("How verified", "Risk", "How to revert")
+               if not re.search(r"^\W*" + part + r"\W*:", body, re.I | re.M)]
     if CLOSING.search(body):
         rows.append(("FAIL", "description", "says Closes/Fixes #N; an issue closes only when it is live"))
     elif missing:
@@ -172,8 +176,10 @@ def main() -> int:
         owners = gh("api", f"repos/{slug}/contents/.github/CODEOWNERS?ref={pr['baseRefName']}",
                     "-H", "Accept: application/vnd.github.raw")
     except subprocess.CalledProcessError:
-        local = ROOT / ".github" / "CODEOWNERS"
-        owners = local.read_text(encoding="utf-8") if local.exists() else ""
+        # Fail closed: without the base branch's list every path would look medium.
+        print(f"FAIL  tier: could not read .github/CODEOWNERS from {pr['baseRefName']}")
+        print(f"MERGE GATE: FAIL (tier unknown, PR {args[0]})")
+        return 1
     tier, rows = check(pr, owner_patterns(owners), security_patterns(owners))
     for result, name, detail in rows:
         print(f"{result}  {name}: {detail}")

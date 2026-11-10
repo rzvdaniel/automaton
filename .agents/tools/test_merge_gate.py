@@ -66,6 +66,17 @@ class Gate(unittest.TestCase):
         reviews = [review("APPROVE", at="2026-01-01T00:00:00Z"), review("", state="CHANGES_REQUESTED", at="2026-01-02T00:00:00Z")]
         self.assertEqual(failed(gate.check(pr(["src/a.cs"], reviews), PATTERNS)), ["review"])
 
+    def test_a_later_short_review_does_not_lower_the_tier(self):
+        first = review("APPROVE\nTier: high - drops a column\nSecurity: ok", at="2026-01-01T00:00:00Z")
+        later = review("APPROVE\nTier: medium\nNits fixed, no new code", at="2026-01-02T00:00:00Z")
+        tier, rows = gate.check(pr(["src/a.cs"], [first, later], labels=["owner-approved"]), PATTERNS)
+        self.assertEqual(tier, "high")
+        self.assertEqual(failed((tier, rows)), ["security"])
+
+    def test_dismissed_review_does_not_count(self):
+        gone = dict(review("APPROVE"), state="DISMISSED")
+        self.assertEqual(failed(gate.check(pr(["src/a.cs"], [gone]), PATTERNS)), ["review"])
+
     def test_reviewer_can_raise_the_tier(self):
         tier, rows = gate.check(pr(["src/a.cs"], [review("APPROVE\nTier: high - drops a column")]), PATTERNS)
         self.assertEqual(tier, "high")
