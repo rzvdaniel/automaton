@@ -102,7 +102,7 @@ public sealed class DistributedPlatformArchitectureTests
 
         var actual = XDocument.Load(projectPath)
             .Descendants("ProjectReference")
-            .Select(reference => Path.GetFileNameWithoutExtension(reference.Attribute("Include")?.Value))
+            .Select(reference => Path.GetFileNameWithoutExtension(reference.Attribute("Include")?.Value?.Replace('\\', '/')))
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
