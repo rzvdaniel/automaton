@@ -21,7 +21,7 @@ public sealed class ApplicationDeploymentService
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly AppDeploymentTargetStateService deploymentTargetStateService;
     private readonly DeploymentPackageFinalizationService packageFinalizationService;
-    private readonly AppPauseService? pauseService;
+    private readonly AppPauseService pauseService;
     private readonly Serilog.ILogger logger;
 
     public ApplicationDeploymentService(
@@ -31,7 +31,7 @@ public sealed class ApplicationDeploymentService
         IAppDeploymentTargetResolver deploymentTargetResolver,
         AppDeploymentTargetStateService deploymentTargetStateService,
         DeploymentPackageFinalizationService packageFinalizationService,
-        AppPauseService? pauseService = null)
+        AppPauseService pauseService)
     {
         this.pauseService = pauseService;
         this.packageRunnerService = packageRunnerService;
@@ -139,7 +139,7 @@ public sealed class ApplicationDeploymentService
                     deploymentOperationId: deploymentOperationId,
                     executionAttemptId: executionAttemptId);
                 targetStateFinalized = true;
-                pausedNote = pauseService is null ? null : await pauseService.KeepPausedAfterDeployAsync(
+                pausedNote = await pauseService.KeepPausedAfterDeployAsync(
                     appId, target.Id, runner.Id, ownerId, CancellationToken.None);
             }
 

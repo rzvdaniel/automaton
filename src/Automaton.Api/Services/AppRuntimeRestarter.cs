@@ -54,5 +54,13 @@ public sealed class AppRuntimeRestarter(
                 && (target.Status == DeploymentTargetStatus.Running || target.Status == DeploymentTargetStatus.Deploying) && !target.CleanupPending)
             .Select(target => new RunningTarget(target.Id, target.ExecutionRunnerId!.Value));
 
+    /// <summary>Running targets plus those whose last deploy failed but may still have a runtime on the Runner.</summary>
+    internal static IQueryable<RunningTarget> PausableTargets(ApplicationDbContext db, Guid appId)
+        => db.AppDeploymentTargets
+            .Where(target => target.WebAppId == appId && target.ExecutionRunnerId != null && !target.CleanupPending
+                && (target.Status == DeploymentTargetStatus.Running || target.Status == DeploymentTargetStatus.Deploying
+                    || target.Status == DeploymentTargetStatus.Failed))
+            .Select(target => new RunningTarget(target.Id, target.ExecutionRunnerId!.Value));
+
     internal sealed record RunningTarget(Guid Id, Guid RunnerId);
 }

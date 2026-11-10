@@ -332,8 +332,22 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
         if (metadata is not { State: RuntimeReadinessState.Paused } || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
-        await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
-            cancellationToken, metadata.ArtifactRoot, metadata.CandidateId);
+        // A fresh candidate identity, like a restart: brokered hosts name (and reuse) containers by it.
+        var candidateId = Guid.NewGuid();
+        var artifact = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, deploymentTargetId, candidateId);
+        try
+        {
+            RunnerWorkspaceService.CopyRuntimeArtifact(metadata.ArtifactRoot!, artifact);
+            await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
+                cancellationToken, artifact, candidateId);
+        }
+        catch
+        {
+            var warnings = new List<string>();
+            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(
+                workspace.GetAppRuntimeCandidateDirectory(appId, deploymentTargetId, candidateId), warnings);
+            throw;
+        }
         return true;
     }
 

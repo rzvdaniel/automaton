@@ -123,10 +123,11 @@ export const useAppsStore = defineStore('apps', () => {
   }
 
   /** Pauses or resumes an app and shows the new state in the list. */
-  async function setAppPaused(id: string, paused: boolean): Promise<void> {
+  async function setAppPaused(id: string, paused: boolean): Promise<string[]> {
     try {
       const state = await appsService.setPaused(id, paused)
       listApps.value = listApps.value.map((app) => (app.id === id ? { ...app, isPaused: state.paused } : app))
+      return state.warnings ?? []
     } catch (err: unknown) {
       throw new Error(getErrorMessage(err))
     }

@@ -73,12 +73,16 @@ public static class PauseCommand
         return command;
     }
 
-    /// <summary>Resumes the linked app before a deploy, for <c>automaton deploy --resume</c>.</summary>
-    internal static async Task ResumeLinkedAsync(ConfigService config, string? environmentName, CancellationToken cancellationToken)
+    /// <summary>Resumes the linked app after a deploy, for <c>automaton deploy --resume</c>. False when the project is not linked.</summary>
+    internal static async Task<bool> ResumeLinkedAsync(ConfigService config, string? environmentName, CancellationToken cancellationToken)
     {
+        var directory = Directory.GetCurrentDirectory();
+        var project = config.TryLoadProjectConfig(directory);
+        if (project is null || string.IsNullOrWhiteSpace(config.ResolveContext(project, directory, environmentName).AppId)) return false;
         var appId = ResolveLinkedAppId(config, out var server, out var apiKey, environmentName);
         using var client = new AutomatonApiClient(server, apiKey);
         await client.SetAppPausedAsync(appId, paused: false, cancellationToken);
+        return true;
     }
 
     private static string ResolveLinkedAppId(ConfigService config, out string server, out string apiKey, string? environmentName = null)

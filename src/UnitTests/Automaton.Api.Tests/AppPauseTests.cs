@@ -144,7 +144,7 @@ public sealed class AppPauseTests
     }
 
     [Test]
-    public async Task ASchedule_CreatedOrSavedOnWhilePaused_IsRefused_AndOneTurnedOffByHandStaysOffOnResume()
+    public async Task ASchedule_CreatedOrSavedOnWhilePaused_IsRefused()
     {
         await using var h = new Harness();
         var on = h.AddSchedule("nightly", enabled: true);
@@ -161,12 +161,6 @@ public sealed class AppPauseTests
         };
         Assert.That(async () => await schedules.CreateAsync(request, OwnerId, false, default), Throws.InvalidOperationException);
         Assert.That(async () => await schedules.UpdateAsync(on.Id, request, OwnerId, false, default), Throws.InvalidOperationException);
-
-        // Saved off by hand while paused: resuming must respect that.
-        request.Enabled = false;
-        await schedules.UpdateAsync(on.Id, request, OwnerId, false, default);
-        await service.ResumeAsync(AppId, administrator: false, default);
-        Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.Enabled, Is.False);
     }
 
     [Test]
@@ -192,6 +186,51 @@ public sealed class AppPauseTests
 
         Assert.That(second.SchedulesChanged, Is.EqualTo(1));
         Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.Enabled, Is.True);
+    }
+
+    [Test]
+    public async Task Pause_AlsoTellsATargetWhoseLastDeployFailed()
+    {
+        await using var h = new Harness();
+        h.AddRunningTarget().Status = DeploymentTargetStatus.Failed;
+        await h.Db.SaveChangesAsync();
+
+        await h.ServiceFor(OwnerId).PauseAsync(AppId, administrator: false, default);
+
+        Assert.That(h.Queue.Sent.Select(item => item.Command.Kind), Is.EqualTo(new[] { AppPauseService.PauseCommandKind }));
+    }
+
+    [Test]
+    public async Task ASaveThatLeavesAScheduleOffWhilePaused_KeepsItMarkedForResume()
+    {
+        await using var h = new Harness();
+        var on = h.AddSchedule("nightly", enabled: true);
+        var service = h.ServiceFor(OwnerId);
+        await service.PauseAsync(AppId, administrator: false, default);
+        var schedules = new ActionScheduleService(h.Db, new AllowAllResolver(), new StubAudit());
+        var request = new SaveActionScheduleRequest
+        {
+            ApplicationId = AppId, ActionKey = "backup", Name = "renamed", ScheduleType = ActionScheduleTypes.Interval,
+            IntervalSeconds = 300, TimeZone = "Etc/UTC", ExecutionScope = ActionExecutionScopes.AppRunner,
+            ConcurrencyPolicy = ActionScheduleConcurrencyPolicies.SkipIfRunning, MisfirePolicy = ActionScheduleMisfirePolicies.Skip,
+            Enabled = false
+        };
+        Assert.That(async () => await schedules.UpdateAsync(on.Id, request, OwnerId, false, default), Throws.Nothing);
+        // A save that keeps it off is the same as the pause left it; only a deliberate turn-off clears the mark.
+        Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.PausedByApp, Is.True);
+    }
+
+    [Test]
+    public async Task KeepPausedAfterDeploy_NeverThrows_AndWarnsWhenTheRunnerCannotBeTold()
+    {
+        await using var h = new Harness();
+        var service = h.ServiceFor(OwnerId);
+        await service.PauseAsync(AppId, administrator: false, default);
+        h.Queue.Fail = true;
+
+        var note = await service.KeepPausedAfterDeployAsync(AppId, Guid.NewGuid(), h.RunnerId, OwnerId, default);
+
+        Assert.That(note, Does.Contain("may be running"));
     }
 
     [Test]

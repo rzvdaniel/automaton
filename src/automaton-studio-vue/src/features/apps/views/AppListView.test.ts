@@ -9,6 +9,8 @@ import AppListView from './AppListView.vue'
 import { useAppsStore } from '../stores/apps.store'
 
 const push = vi.fn()
+const toastAdd = vi.hoisted(() => vi.fn())
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   useRoute: () => ({ meta: {} }),
@@ -24,7 +26,7 @@ vi.mock('../components/CatalogPanel.vue', () => ({ default: { template: '<div />
 const live = { name: 'Live', status: 'Running', isHostedRunner: false, runnerOnline: true, genericRuntimeDeployed: true, routePath: '/' }
 const item = (over: Partial<AppListItem>): AppListItem => ({
   id: 'x', name: 'X', summary: '', description: '', tags: [], isPublished: true, updatedAtUtc: '2026-01-01T00:00:00Z',
-  canDelete: true, runtime: { genericRuntimeDeployed: true }, liveEnvironment: live, ...over,
+  canDelete: true, canUpdate: true, runtime: { genericRuntimeDeployed: true }, liveEnvironment: live, ...over,
 })
 
 async function mountView(apps: AppListItem[]) {
@@ -108,6 +110,21 @@ describe('AppListView', () => {
 
     expect(store.setAppPaused).toHaveBeenNthCalledWith(1, 'a', true)
     expect(store.setAppPaused).toHaveBeenNthCalledWith(2, 'p', false)
+  })
+
+  it('shows a warning toast instead of success when pausing returns warnings', async () => {
+    const wrapper = await mountView([item({ id: 'a', name: 'Notes' })])
+    const store = useAppsStore()
+    store.setAppPaused = vi.fn(async () => ['The Runner could not be told to stop the app.'])
+    await wrapper.find('button[aria-label="Pause Notes"]').trigger('click')
+    await flushPromises()
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warn', summary: 'Paused with warnings' }))
+    expect(toastAdd).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }))
+  })
+
+  it('hides Pause and Resume when the person cannot update the app', async () => {
+    const wrapper = await mountView([item({ id: 'a', name: 'Notes', canUpdate: false })])
+    expect(wrapper.find('button[aria-label="Pause Notes"]').exists()).toBe(false)
   })
 
   it('shows a friendly empty state with both buttons when there are no apps', async () => {

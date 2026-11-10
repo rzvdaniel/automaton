@@ -174,6 +174,8 @@ export interface AppListItem {
   publicUrl?: string | null
   updatedAtUtc: string
   canDelete: boolean
+  /** May deploy, pause and resume the app. */
+  canUpdate?: boolean
   runner?: { id: string; name: string; purpose: string; connectivityStatus: 'None' | 'Online' | 'Offline' } | null
   liveEnvironment?: {
     name: string

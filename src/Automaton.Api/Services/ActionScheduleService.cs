@@ -153,10 +153,11 @@ public sealed class ActionScheduleService
         schedule.ExecutionScope = request.ExecutionScope;
         ActionSchedulePolicy.ApplyTimingFields(schedule, request);
         schedule.TimeZone = request.TimeZone;
+        var wasEnabled = schedule.Enabled;
         schedule.Enabled = request.Enabled;
         if (schedule.Enabled) await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
-        // Saved by hand: the person's choice wins over what pausing remembered.
-        schedule.PausedByApp = false;
+        // Only turning it off by hand clears what pausing remembered; other saves keep it.
+        if (wasEnabled && !request.Enabled) schedule.PausedByApp = false;
         schedule.ConcurrencyPolicy = request.ConcurrencyPolicy;
         schedule.MisfirePolicy = request.MisfirePolicy;
         schedule.InputJson = inputJson;

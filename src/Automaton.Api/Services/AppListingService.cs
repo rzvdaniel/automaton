@@ -21,7 +21,9 @@ internal sealed class AppListingService(
     {
         var now = DateTime.UtcNow;
         var rows = await LoadRowsAsync(projectId, cancellationToken);
-        var items = rows.Select(row => MapRow(row, now)).ToArray();
+        var items = new AppListItemDto[rows.Count];
+        for (var index = 0; index < rows.Count; index++)
+            items[index] = MapRow(rows[index], now, await authorizationService.CanUpdateAppAsync(rows[index].Id, cancellationToken));
         // Only Action-only apps show their last and next run, so look them up for those apps alone.
         for (var index = 0; index < items.Length; index++)
         {
@@ -97,7 +99,7 @@ internal sealed class AppListingService(
             })
             .ToListAsync(cancellationToken);
 
-    private static AppListItemDto MapRow(AppListQueryRow row, DateTime now)
+    private static AppListItemDto MapRow(AppListQueryRow row, DateTime now, bool canUpdate)
         => new()
         {
             Id = row.Id,
@@ -112,6 +114,7 @@ internal sealed class AppListingService(
             CanLaunchPublicly = row.CanLaunchPublicly,
             UpdatedAtUtc = row.Updated,
             CanDelete = !row.ProjectId.HasValue,
+            CanUpdate = canUpdate,
             Runner = row.Runner == null ? null : MapRunner(row.Runner, now),
             LiveEnvironment = row.LiveTarget == null ? null : MapLiveTarget(row.Id, row.LiveTarget, now),
             ActionsOnly = IsActionsOnly(row.ContractJson),

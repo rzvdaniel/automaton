@@ -47,7 +47,7 @@ public static class DeployCommand
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
         var environmentOption = new Option<string?>("--env", "Use a local project linkage/credential profile from ./.automaton/environments/<name>.json");
 
-        var resumeOption = new Option<bool>("--resume", "Resume the app first if it is paused (a deploy otherwise keeps a paused app paused)");
+        var resumeOption = new Option<bool>("--resume", "Resume the app after a successful deploy (a deploy otherwise keeps a paused app paused)");
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
@@ -66,21 +66,6 @@ public static class DeployCommand
 
         cmd.SetHandler(async context =>
         {
-            if (context.ParseResult.GetValueForOption(resumeOption))
-            {
-                try
-                {
-                    await PauseCommand.ResumeLinkedAsync(
-                        config, context.ParseResult.GetValueForOption(environmentOption), context.GetCancellationToken());
-                }
-                catch (Exception exception)
-                {
-                    if (context.ParseResult.GetValueForOption(jsonOption)) CliJson.Write(new { success = false, error = exception.Message });
-                    else AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(exception.Message)}");
-                    context.ExitCode = 1;
-                    return;
-                }
-            }
             await DeployCommandHandler.HandleAsync(
                 config,
                 context,
@@ -94,6 +79,21 @@ public static class DeployCommand
                 openOption,
                 nonInteractiveOption,
                 environmentOption);
+            // A paused app stays paused through a deploy, so it is resumed only once the deploy succeeded.
+            if (context.ParseResult.GetValueForOption(resumeOption) && context.ExitCode == 0)
+            {
+                try
+                {
+                    await PauseCommand.ResumeLinkedAsync(
+                        config, context.ParseResult.GetValueForOption(environmentOption), context.GetCancellationToken());
+                }
+                catch (Exception exception)
+                {
+                    if (context.ParseResult.GetValueForOption(jsonOption)) CliJson.Write(new { success = false, error = exception.Message });
+                    else AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(exception.Message)}");
+                    context.ExitCode = 1;
+                }
+            }
         });
         return cmd;
     }

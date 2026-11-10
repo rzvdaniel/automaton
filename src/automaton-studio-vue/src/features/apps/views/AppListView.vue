@@ -75,7 +75,11 @@ const pausing = ref<string | null>(null)
 async function togglePaused(id: string, name: string, paused: boolean) {
   pausing.value = id
   try {
-    await appsStore.setAppPaused(id, paused)
+    const warnings = await appsStore.setAppPaused(id, paused)
+    if (warnings.length > 0) {
+      toast.add({ severity: 'warn', summary: paused ? 'Paused with warnings' : 'Resumed with warnings', detail: warnings.join(' '), life: 8000 })
+      return
+    }
     toast.add({ severity: 'success', summary: paused ? 'Paused' : 'Resumed', detail: `"${name}" is ${paused ? 'paused' : 'running again'}`, life: 3000 })
   } catch (err: unknown) {
     toast.add({ severity: 'error', summary: 'Error', detail: err instanceof Error ? err.message : 'Could not change the app', life: 5000 })
@@ -145,6 +149,7 @@ const handleRetry = async () => {
           >
             <template #action>
               <Button
+                v-if="app.canUpdate"
                 :label="app.isPaused ? 'Resume' : 'Pause'"
                 :icon="app.isPaused ? 'pi pi-play' : 'pi pi-pause'"
                 size="small"

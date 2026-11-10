@@ -118,9 +118,11 @@ public sealed class AppPauseService(
                 await db.SaveChangesAsync(ct);
                 count++;
             }
-            catch (Exception error) when (error is InvalidOperationException or KeyNotFoundException)
+            catch (Exception error) when (error is not OperationCanceledException)
             {
-                // It stays marked, so calling resume again retries it.
+                // It stays off and marked, so calling resume again retries it; the rest of the resume carries on.
+                foreach (var entry in db.ChangeTracker.Entries<ActionSchedule>().Where(entry => entry.Entity.Id == item.Id).ToList())
+                    entry.State = EntityState.Detached;
                 warnings.Add($"Schedule '{item.Name}' could not be turned on again: {error.Message}");
             }
         }
@@ -133,11 +135,22 @@ public sealed class AppPauseService(
     /// </summary>
     public async Task<string?> KeepPausedAfterDeployAsync(Guid appId, Guid targetId, Guid runnerId, Guid userId, CancellationToken ct)
     {
+        try { return await KeepPausedCoreAsync(appId, targetId, runnerId, userId, ct); }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            logger.LogWarning(error, "Could not keep paused app {AppId} stopped after a deploy.", appId);
+            return "The app is paused, but it could not be checked after the deploy, so the new version may be running. Pause the app again to retry.";
+        }
+    }
+
+    private async Task<string?> KeepPausedCoreAsync(Guid appId, Guid targetId, Guid runnerId, Guid userId, CancellationToken ct)
+    {
         if (!await db.WebApps.AnyAsync(app => app.Id == appId && app.IsPaused, ct)) return null;
         try { await QueueCommandAsync(appId, targetId, runnerId, userId, pause: true, ct); }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             logger.LogWarning(error, "Could not queue a runtime pause after deploying paused app {AppId}.", appId);
+            return "The app is paused, but the Runner could not be told to stop the new version, so it may be running. Pause the app again to retry.";
         }
         return "The app is paused, so the new version is deployed but stays stopped. Resume it with 'automaton resume' (or deploy with --resume).";
     }
@@ -152,7 +165,7 @@ public sealed class AppPauseService(
 
     private async Task QueueRuntimeCommandsAsync(Guid appId, Guid userId, bool pause, List<string> warnings, CancellationToken ct)
     {
-        foreach (var target in await AppRuntimeRestarter.RunningTargets(db, appId).ToListAsync(ct))
+        foreach (var target in await AppRuntimeRestarter.PausableTargets(db, appId).ToListAsync(ct))
         {
             try
             {
