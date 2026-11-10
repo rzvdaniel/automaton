@@ -4,12 +4,29 @@
 
 /.github/workflows/                                            @rzvdaniel
 /.github/CODEOWNERS                                            @rzvdaniel
+# The review rules themselves
+/REVIEW.md                                                     @rzvdaniel
+/.agents/skills/pr-review/                                     @rzvdaniel
+/.agents/tools/merge-gate.py                                   @rzvdaniel
+# Sign-in, tokens, authorization, secrets
 /src/Automaton.Identity/                                       @rzvdaniel
 /src/Automaton.Api/Authentication/                             @rzvdaniel
 /src/Automaton.Api/Authorization/                              @rzvdaniel
 /src/Automaton.Api/Controllers/AccountController.cs            @rzvdaniel
 /src/Automaton.Api/Controllers/ApiKeysController.cs            @rzvdaniel
 /src/Automaton.Api/Controllers/CliAuthorizationController.cs   @rzvdaniel
+/src/Automaton.Api/Controllers/TokenController.cs              @rzvdaniel
+/src/Automaton.Api/Controllers/GitHubAuthController.cs         @rzvdaniel
+/src/Automaton.Api/Controllers/AppSecretsController.cs         @rzvdaniel
+/src/Automaton.Api/Controllers/RunnerRuntimeSecretsController.cs @rzvdaniel
+/src/Automaton.Api/Controllers/RunnerEnrollmentsController.cs  @rzvdaniel
+/src/Automaton.Api/Services/AuthTokenService.cs                @rzvdaniel
+/src/Automaton.Api/Services/AdminAuthorizationService.cs       @rzvdaniel
+/src/Automaton.Api/Services/AppSecretService.cs                @rzvdaniel
+/src/Automaton.Api/Services/ExecutionSecretGrantService.cs     @rzvdaniel
+/src/Automaton.Api/Services/DataProtectionSecretProtector.cs   @rzvdaniel
+# Scripts that people run as root or pipe into a shell
+/scripts/cli/                                                  @rzvdaniel
 /docker/install/                                               @rzvdaniel
 /scripts/install-automaton.sh                                  @rzvdaniel
 /scripts/update-automaton.sh                                   @rzvdaniel

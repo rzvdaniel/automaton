@@ -15,8 +15,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_LABEL = "owner-approved"
-# A change is low risk when every file is documentation that does not steer agents.
-AGENT_DOCS = ("AGENTS.md", "CLAUDE.md", "REVIEW.md")
+# A change is low risk when every file is documentation for people: Markdown in these places and nothing else.
+# Skills, AGENTS.md, templates and the guidance shipped to users' agents steer agents, so they are never low.
+PEOPLE_DOCS = ("docs/", "src/Automaton.Api/Documentation/Admin/")
+TRUSTED = {"OWNER", "MEMBER", "COLLABORATOR"}
 CLOSING = re.compile(r"\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+", re.I)
 GREEN = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 
@@ -36,9 +38,7 @@ def matches(path: str, pattern: str) -> bool:
 
 
 def is_low(path: str) -> bool:
-    if path in AGENT_DOCS or path.startswith(".agents/"):
-        return False
-    return path.endswith(".md") or path.startswith("docs/")
+    return path.endswith(".md") and (path == "README.md" or path.startswith(PEOPLE_DOCS))
 
 
 def path_tier(paths: list[str], patterns: list[str]) -> str:
@@ -71,9 +71,11 @@ def check(pr: dict, patterns: list[str]) -> tuple[str, list[tuple[str, str, str]
     """Return the tier and (result, name, detail) rows; result is PASS, FAIL or WARN."""
     rows = []
     head = pr["headRefOid"]
-    paths = [item["path"] for item in pr.get("files", [])]
+    paths = pr["paths"]
     labels = {item["name"] for item in pr.get("labels", [])}
-    reviews = sorted(pr.get("reviews", []), key=lambda item: item.get("submittedAt") or "")
+    # Only people with write access review; on a public repository anyone can post a review that says APPROVE.
+    reviews = sorted((item for item in pr.get("reviews", []) if item.get("authorAssociation") in TRUSTED),
+                     key=lambda item: item.get("submittedAt") or "")
     review = read_review(reviews[-1]) if reviews else None
 
     tier = path_tier(paths, patterns)
@@ -131,6 +133,10 @@ def check(pr: dict, patterns: list[str]) -> tuple[str, list[tuple[str, str, str]
     return tier, rows
 
 
+def gh(*args: str) -> str:
+    return subprocess.run(["gh", *args], check=True, capture_output=True, text=True, encoding="utf-8").stdout
+
+
 def main() -> int:
     args = sys.argv[1:]
     repo = []
@@ -140,12 +146,21 @@ def main() -> int:
     if len(args) != 1:
         print(__doc__)
         return 2
-    fields = "headRefOid,body,labels,files,reviews,statusCheckRollup,comments,commits"
-    out = subprocess.run(["gh", "pr", "view", args[0], "--json", fields, *repo],
-                         check=True, capture_output=True, text=True, encoding="utf-8").stdout
-    codeowners = ROOT / ".github" / "CODEOWNERS"
-    patterns = owner_patterns(codeowners.read_text(encoding="utf-8")) if codeowners.exists() else []
-    tier, rows = check(json.loads(out), patterns)
+    fields = "number,headRefOid,baseRefName,body,labels,reviews,statusCheckRollup,comments,commits"
+    pr = json.loads(gh("pr", "view", args[0], "--json", fields, *repo))
+    slug = repo[1] if repo else "{owner}/{repo}"
+    # Every changed file, with the old path of a rename: a file moved out of a protected folder still counts.
+    files = gh("api", "--paginate", f"repos/{slug}/pulls/{pr['number']}/files?per_page=100",
+               "-q", ".[] | .filename, (.previous_filename // empty)")
+    pr["paths"] = files.splitlines()
+    # The owner's paths come from the base branch, so a pull request cannot shorten its own list.
+    try:
+        owners = gh("api", f"repos/{slug}/contents/.github/CODEOWNERS?ref={pr['baseRefName']}",
+                    "-H", "Accept: application/vnd.github.raw")
+    except subprocess.CalledProcessError:
+        local = ROOT / ".github" / "CODEOWNERS"
+        owners = local.read_text(encoding="utf-8") if local.exists() else ""
+    tier, rows = check(pr, owner_patterns(owners))
     for result, name, detail in rows:
         print(f"{result}  {name}: {detail}")
     failed = any(result == "FAIL" for result, _, _ in rows)

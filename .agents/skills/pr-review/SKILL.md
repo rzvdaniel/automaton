@@ -12,11 +12,13 @@ The change sets how much review it gets, not its author.
 
 | Tier | The change | Before merge |
 | --- | --- | --- |
-| Low | Only documentation that does not steer agents (`docs/`, `*.md` outside `.agents/`, `AGENTS.md`, `CLAUDE.md`, `REVIEW.md`) | Green CI. The author re-reads the diff against the code it describes. |
+| Low | Only documentation for people: Markdown under `docs/`, the Admin docs, the root `README.md`. Skills, `AGENTS.md`, templates and guidance shipped to users' agents steer agents and are medium. | Green CI. The author re-reads the diff against the code it describes. |
 | Medium | Everything else | Green CI and one independent review. |
 | High | Touches a path in [`.github/CODEOWNERS`](../../../.github/CODEOWNERS), or the reviewer finds that it drops or rewrites data, lets more people do something, changes how people sign in, or touches production | Green CI, the review, a separate security pass, and the owner's approval (PR label `owner-approved`). |
 
-The reviewer may raise the tier, never lower it. An agent's approval never stands in for the owner's.
+The reviewer may raise the tier, never lower it. An agent's approval never stands in for the owner's: only the owner
+adds `owner-approved`, or tells an agent in the session to add it for that PR. `agent:human-review` on the issue means
+"waiting for the owner"; it is not the approval.
 
 ## Review
 
@@ -67,7 +69,8 @@ Not checked: the update script was not run
 python3 .agents/tools/merge-gate.py <N>
 ```
 
-It checks from GitHub that CI is green on the final commit, the last review approves that commit, a high-tier change
+It checks from GitHub that CI is green on the final commit, the last review (from an account with write access;
+a later review replaces an earlier one) approves that commit, a high-tier change
 has its security pass and the owner's approval, and the description says how the change was verified and how to
 revert it. Merge only on `MERGE GATE: PASS`, and paste the output in a PR comment. Read its warnings (no test in the
 diff, comments newer than the last commit) and act on them.

@@ -10,11 +10,12 @@ GREEN = [{"name": "tests", "conclusion": "SUCCESS"}]
 
 
 def review(body, commit="abc", state="COMMENTED", at="2026-01-01T00:00:00Z"):
-    return {"body": body, "state": state, "commit": {"oid": commit}, "submittedAt": at}
+    return {"body": body, "state": state, "commit": {"oid": commit}, "submittedAt": at,
+            "authorAssociation": "OWNER"}
 
 
 def pr(paths, reviews=(), labels=(), body=BODY, checks=GREEN):
-    return {"headRefOid": "abc", "body": body, "files": [{"path": p} for p in paths], "reviews": list(reviews),
+    return {"headRefOid": "abc", "body": body, "paths": list(paths), "reviews": list(reviews),
             "labels": [{"name": n} for n in labels], "statusCheckRollup": checks, "comments": [], "commits": []}
 
 
@@ -34,7 +35,9 @@ class Tier(unittest.TestCase):
         self.assertEqual(gate.path_tier(["docs/roadmap/README.md", "src/Automaton.Api/Documentation/Admin/apps.md"], PATTERNS), "low")
 
     def test_agent_guidance_and_code_are_medium(self):
-        for path in ("AGENTS.md", ".agents/skills/pr-review/SKILL.md", "src/Automaton.Api/Program.cs", "scripts/host-storage.sh"):
+        for path in ("AGENTS.md", ".agents/skills/pr-review/SKILL.md", ".claude/skills/a/SKILL.md", "docs/x.sh",
+                     ".github/pull_request_template.md", "shared/ai-guidance/seed/cli/project-files/AGENTS.md",
+                     "src/Automaton.Api/Program.cs", "scripts/host-storage.sh"):
             self.assertEqual(gate.path_tier(["README.md", path], PATTERNS), "medium", path)
 
 
@@ -48,6 +51,12 @@ class Gate(unittest.TestCase):
         self.assertEqual(failed(gate.check(pr(code, [review("APPROVE", commit="old")]), PATTERNS)), ["review"])
         self.assertEqual(failed(gate.check(pr(code, [review("CHANGES NEEDED\n...")]), PATTERNS)), ["review"])
         self.assertEqual(failed(gate.check(pr(code, [review("**APPROVE**\n\nTier: medium")]), PATTERNS)), [])
+
+    def test_review_from_an_outsider_does_not_count(self):
+        outsider = dict(review("APPROVE\nSecurity: fine", at="2026-01-03T00:00:00Z"), authorAssociation="NONE")
+        self.assertEqual(failed(gate.check(pr(["src/a.cs"], [outsider]), PATTERNS)), ["review"])
+        changes = review("CHANGES NEEDED", at="2026-01-02T00:00:00Z")
+        self.assertEqual(failed(gate.check(pr(["src/a.cs"], [changes, outsider]), PATTERNS)), ["review"])
 
     def test_latest_review_wins(self):
         reviews = [review("APPROVE", at="2026-01-01T00:00:00Z"), review("", state="CHANGES_REQUESTED", at="2026-01-02T00:00:00Z")]
