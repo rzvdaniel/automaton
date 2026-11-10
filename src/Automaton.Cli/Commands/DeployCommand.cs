@@ -293,6 +293,7 @@ public static class DeployCommand
                     ? "[yellow bold]Deploy complete with warnings.[/]"
                     : "[green bold]Deploy complete.[/]");
             }
+            WriteWarnings(result, rich: true);
             WriteStaticSiteNote(result, rich: true);
         }
     }
@@ -497,7 +498,18 @@ public static class DeployCommand
             {
                 Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
             }
+            WriteWarnings(result, rich: false);
             WriteStaticSiteNote(result, rich: false);
+        }
+    }
+
+    private static void WriteWarnings(DeployResult result, bool rich)
+    {
+        foreach (var check in result.Checks.Where(check => !check.Success && check.IsWarning))
+        {
+            var text = $"{check.Name}: {check.Message}";
+            if (rich) AnsiConsole.MarkupLine($" - [yellow]{Markup.Escape(text)}[/]");
+            else Console.WriteLine($" - {text}");
         }
     }
 
