@@ -42,6 +42,7 @@
     "vitepress": "^1.6.3",
     "vue-tsc": "^2.2.10"
   },
+  "//overrides": "minimatch below 11.0.1 has a denial-of-service advisory (GHSA-g3hv-75wg-m249); force the patched major.",
   "overrides": {
     "vite": "$vite",
     "minimatch@>=7 <11": "^11.0.1"
