@@ -280,6 +280,8 @@ internal static class ApiAuthorizationRegistration
                 AppPermissionAuthenticationOptions.BackupsReadPolicy, AppPermissionApproval.BackupsRead);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.ServerReadPolicy, AppPermissionApproval.ServerRead);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.NotifyEmailPolicy, AppPermissionApproval.NotifyEmail);
 
             // Project-based authorization policies
             options.AddPolicy("ProjectAdmin", policy =>
@@ -320,6 +322,7 @@ internal static class ApiMessagingRegistration
         services.AddScoped<AppSecretService>();
         services.AddScoped<IAppRuntimeRestarter, AppRuntimeRestarter>();
         services.AddScoped<AppPermissionService>();
+        services.AddScoped<NotifyEmailService>();
         services.AddScoped<AdminAppDirectoryService>();
         services.AddScoped<AdminUserProvisioningService>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();

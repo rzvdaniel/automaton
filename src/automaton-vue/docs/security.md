@@ -35,7 +35,7 @@ Containers are a process boundary, not a virtual machine. On a shared machine th
 
 ## App permissions
 
-An app that needs platform access declares permissions in `automaton.json` (for example `backups:read` or the read-only `server:read`). Nothing is granted until a system administrator approves the request in Studio; the platform then issues a scoped key and stores it as an app secret. The API rejects calls outside the approved permissions, and revoking the approval stops the next call.
+An app that needs platform access declares permissions in `automaton.json` (for example `backups:read` the read-only `server:read` or `notify:email`, which only emails the server's own users and an administrator-managed allowed list). Nothing is granted until a system administrator approves the request in Studio; the platform then issues a scoped key and stores it as an app secret. The API rejects calls outside the approved permissions, and revoking the approval stops the next call.
 
 ## Audit log
 
