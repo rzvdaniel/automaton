@@ -35,6 +35,19 @@ public class OpenPathsContractTests
     }
 
     [Test]
+    public void PublicAccess_IsOptionalAndSurvivesASerializationRoundTrip()
+    {
+        var plain = ApplicationContractDefaults.Create();
+        Assert.That(ApplicationContractSerialization.Deserialize(ApplicationContractSerialization.Serialize(plain)).PublicAccess, Is.Null);
+
+        plain.PublicAccess = new ApplicationPublicAccessDeclaration { Level = "recommended", Reason = "Sites send page views here." };
+        var again = ApplicationContractSerialization.Deserialize(ApplicationContractSerialization.Serialize(plain));
+
+        Assert.That(again.PublicAccess!.Level, Is.EqualTo("recommended"));
+        Assert.That(again.PublicAccess.Reason, Is.EqualTo("Sites send page views here."));
+    }
+
+    [Test]
     public void Validate_ReportsBadAndDuplicateOpenPaths()
     {
         var contract = ApplicationContractDefaults.Create();

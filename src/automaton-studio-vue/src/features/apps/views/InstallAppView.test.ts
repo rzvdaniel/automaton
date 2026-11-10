@@ -60,6 +60,7 @@ describe('InstallAppView', () => {
     const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="public-access-notice"]').exists()).toBe(false)
     const install = () => wrapper.findAll('button').find((b) => b.text().includes('Install'))!
     expect(install().attributes('disabled')).toBeDefined() // secret still missing
     await wrapper.find('#secret-S3_SECRET_ACCESS_KEY').setValue('shh')
