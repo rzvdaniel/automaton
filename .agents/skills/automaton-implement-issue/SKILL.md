@@ -33,7 +33,7 @@ as you go; the task is not done until step 8 is.
    the done criteria, and set the board Status to In Progress.
 2. **Build.** Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio),
    then commit a failing test before the fix; afterwards the original reproduction must pass.
-   Follow `AGENTS.md` (keep it simple, maintainability guardrails) and the area skills. Add tests for new behaviour, including who gets 200, 403 and 404.
+   Follow `AGENTS.md`, the maintainability skill (keep it simple, guardrails) and the area skills. Add tests for new behaviour, including who gets 200, 403 and 404.
 3. **Test locally.** Run the affected test projects and, for Studio changes, `npx vue-tsc --noEmit -p tsconfig.app.json`
    in `src/automaton-studio-vue`. `main` is green, so every failure is yours to fix. Never skip or delete a failing
    test to get green unless the test itself is wrong, and say so in the PR.

@@ -717,6 +717,17 @@ When uncertain:
 # Browser check before a Studio PR is ready
 
 Look at every page the change touches in a real browser before asking for review: light and dark themes and phone
-width (390 px, no horizontal scroll). Use `agent-browser` on the test server (`AGENTS.md`), or build this branch
+width (390 px, no horizontal scroll). Use `agent-browser` on the test server (see "Browser automation" below), or build this branch
 against the test API when the change is not deployed yet. Attach the screenshots to the PR. After the release, the
 Studio smoke checks (`src/automaton-studio-vue/smoke/README.md`) cover the main pages.
+
+## Browser automation
+
+Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
+
+Core workflow:
+
+1. `agent-browser open <url>` - Navigate to page
+2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
+3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
+4. Re-snapshot after page changes

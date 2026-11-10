@@ -1,8 +1,6 @@
 # AGENTS.md
 
-This file is the platform contract for coding agents working in the Automaton repository.
-
-Automaton is an AI-first platform for building, deploying, publishing, and running web apps. Keep changes focused, preserve existing behavior outside the task, and add regression coverage when practical.
+The contract for coding agents working in the Automaton repository. Automaton is an AI-first platform for building, deploying, publishing and running web apps. Keep changes focused, preserve behavior outside the task, and add regression coverage when practical.
 
 This is not the `AGENTS.md` the CLI generates inside an app folder. For hosted-app work, follow that app's generated guidance.
 
@@ -12,89 +10,41 @@ Read the matching skill before changing the related area:
 
 | If the task touches… | Read |
 | --- | --- |
-| Method complexity, class coupling, service responsibilities, or type ownership | [Maintainability](.agents/skills/maintainability/SKILL.md) |
-| App source/runtime, `source/` / `live/`, serving, archives, forks, or remixes | [Generic runtime](.agents/skills/generic-runtime/SKILL.md) |
-| Runtime placement, Infrastructure Runners, deployments, workers/messaging, persistent storage, scheduling, runtime routing, distributed state, or infrastructure providers | [Distributed platform architecture](.agents/skills/distributed-platform-architecture/SKILL.md) |
-| Production scripts, Compose, Traefik, certificates, health checks, blue-green, or rollback | [Production deployment](.agents/skills/production-deployment/SKILL.md) |
-| Fresh production installation, setup configuration, secrets, or bootstrap | [Production installation setup](.agents/skills/production-installation-setup/SKILL.md) |
+| Code structure: complexity, coupling, service responsibilities, type ownership, keeping changes small, analyzer builds | [Maintainability](.agents/skills/maintainability/SKILL.md) |
+| App source/runtime, `source/` / `live/`, serving, archives, forks, remixes, runtime boundaries | [Generic runtime](.agents/skills/generic-runtime/SKILL.md) |
+| Runtime placement, Runners, deployments, workers/messaging, storage, scheduling, routing, distributed state, infrastructure providers | [Distributed platform architecture](.agents/skills/distributed-platform-architecture/SKILL.md) |
+| Production scripts, Compose, Traefik, certificates, health checks, blue-green, rollback, production updates | [Production deployment](.agents/skills/production-deployment/SKILL.md) |
+| Fresh production installation, setup configuration, secrets, bootstrap | [Production installation setup](.agents/skills/production-installation-setup/SKILL.md) |
 | Docker disk space on a production host | [Production Docker maintenance](.agents/skills/production-docker-maintenance/SKILL.md) |
 | Administrator-visible Studio or API behavior and its documentation | [Admin docs](.agents/skills/admin-docs/SKILL.md) |
-| Roadmaps, architecture guides, or other repository documentation | [Documentation maintenance](.agents/skills/documentation-maintenance/SKILL.md) |
-| User-facing Studio UI, theme tokens, or visual verification | [Studio design](.agents/skills/studio-design/SKILL.md) |
-| Reviewing any pull request, or merging one | [PR review](.agents/skills/pr-review/SKILL.md) |
-| Only when the owner makes you the orchestrator of the agents (plan, delegate to the server Claude and Codex, verify proofs, update production, close issues) | [Automaton orchestrate](.agents/skills/automaton-orchestrate/SKILL.md) |
+| Roadmaps, architecture guides, other repository documentation | [Documentation maintenance](.agents/skills/documentation-maintenance/SKILL.md) |
+| User-facing Studio UI, theme tokens, visual verification, browser automation | [Studio design](.agents/skills/studio-design/SKILL.md) |
+| Reviewing or merging any pull request | [PR review](.agents/skills/pr-review/SKILL.md) |
 | Creating any GitHub issue | [Write issue](.agents/skills/automaton-write-issue/SKILL.md) |
 | Opening any pull request | [Write PR](.agents/skills/automaton-write-pr/SKILL.md) |
-| Only when the owner starts it with `/automaton-implement-issue` (or asks for it by name): an issue end to end, from issue and PR through review, merge, release, test-server upgrade and verification as real users | [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) |
+| Implementing an issue end to end (issue, PR, review, merge, release, test-server verification), when the owner or orchestrator asks for it | [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) |
+| Only when the owner makes you the orchestrator of the agents | [Automaton orchestrate](.agents/skills/automaton-orchestrate/SKILL.md) |
 
-The skills listed above are the repository contract. Other folders under `.agents/skills/` are developer-local. Do not add, expand, or commit local skills unless the task names that work.
-
-## Browser Automation
-
-Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
-
-Core workflow:
-
-1. `agent-browser open <url>` - Navigate to page
-2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
-3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
-4. Re-snapshot after page changes
-
-## Agent orchestration
-
-Repository coding agents follow this file and the matching repository skills directly. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`. The [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) skill is a checklist for one agent, not orchestration machinery.
-
-## Git workflow
-
-Work in a branch. When several agents work on the same machine at once, give each its own Git worktree (for example `git worktree add ../automaton-<issue> -b <branch> origin/main`) so they do not switch branches under each other, and remove it after the branch is merged. Create worktrees next to the checkout (`../automaton-<issue>`), never inside it: a worktree inside the repository shows up as untracked files for every other agent. The one exception is `.claude/worktrees/`, which Claude Code manages and Git ignores. Check `git status` before switching branches and preserve uncommitted changes.
+These skills are the repository contract. Other folders under `.agents/skills/` are developer-local; do not add or commit skills, agent loops, role prompts or orchestration machinery unless the task names that work.
 
 ## Operating rules
 
-These apply to every agent (Claude, Codex or others) working for the owner.
-
-- **Servers.** Test only on the test server (`runner-01.automaton.monster`). Touch production (`automaton.monster`) only when the owner asks or approves. Agents on the test server run as the `agent` user, not root; root work goes to the owner or the orchestrator.
-- **Sign-up.** Self sign-up is disabled on purpose. Never re-enable it, insert users into the database, or bypass the invite flow; users come only from an administrator's invite or creation.
-- **Ask first** before merging migrations that drop or rewrite data, changes that widen access or change sign-in, releases, or anything touching production.
-- **Test credentials** live in `~/.config/automaton-test/accounts.env` on the test server (and the owner's PC). Never print, commit or post them. Read values literally (the file can have CRLF line endings and values with `$`); never `source` it.
-- **Issues and the board.** Issue titles say what the work does, without plan or step numbers. Each issue belongs under a parent issue (its plan) and on the [roadmap board](https://github.com/users/rzvdaniel/projects/1) with Status, Priority and Plan set. Changing a single-select field's options through the API clears that field on every item: save all values first and set them again afterwards.
-- **One agent per issue.** Comment on an issue (or label it `agent:in-progress`) before starting, and don't pick up an issue another agent is working on. Each agent uses its own branches and worktree.
-- **Attribution.** All agents use the owner's GitHub login. End commit messages and PR descriptions with a line naming the agent, for example `Co-Authored-By: Codex <noreply@openai.com>` or the Claude equivalent.
-- **Remote sessions.** How to reach the test-server agents from the Claude and Codex apps: [docs/agents/remote-sessions.md](docs/agents/remote-sessions.md).
-- **Finish what you start, or leave it clearly open:** report what was verified, what wasn't, and post anything a later agent needs on the issue, not only in your conversation.
+- **Servers.** Test only on the test server (`runner-01.automaton.monster`); agents there run as the `agent` user, not root. Touch production (`automaton.monster`) only when the owner asks or has pre-approved it (releases and production updates of verified work). Always ask before deleting data, volumes, backups or the database, migrations that drop or rewrite data, and changes that widen access or change sign-in.
+- **Sign-up** is disabled on purpose. Never re-enable it, insert users into the database, or bypass the invite flow.
+- **Secrets.** Never print, log, commit or post credentials, tokens, API keys or connection strings. Test credentials are in `~/.config/automaton-test/accounts.env` on the test server: read values literally (CRLF, values may contain `$`), never `source` it.
+- **Issues and the board.** Issue titles say what the work does. Each issue has a parent issue and is on the [roadmap board](https://github.com/users/rzvdaniel/projects/1) with Status, Priority and Plan. Changing a single-select field's options through the API clears it on every item: save the values first and set them again afterwards.
+- **Git.** Work on a branch (docs-only changes may go straight to `main` when the owner says so). Check `git status` before switching branches and keep the main folder on `main` between tasks.
+- **Attribution.** Agents use the owner's GitHub login and end commit messages and PR descriptions with a line naming the agent.
+- **Finish what you start, or leave it clearly open:** report what was verified and what wasn't, and post anything a later agent needs on the issue.
 
 ## Core rules
 
-- Do not edit unrelated code, generated output, runtime state, secrets, `.env` files, local databases, or build artifacts.
-- Do not edit `AgentRuns/`, `runner-data/`, `.local-dev/`, `.local-runtime/`, or `.prod-runtime/`.
-- Do not rename public concepts, routes, or APIs unless the task requires it.
-- Do not hardcode deployment-specific domains, ports, filesystem roots, limits, or infrastructure names. Use configured values and existing options.
-- Keep controllers and UI components focused. Keep API access in service modules and use typed models.
-- Use async APIs and cancellation tokens where the surrounding code does.
-- Never log or commit credentials, access tokens, API keys, connection strings, or raw secrets.
-- Run the smallest relevant verification after each change. Report unavailable checks exactly.
-
-## Keep implementation simple
-
-- Before substantial work, briefly state the required outcome and what completes the task. Reuse the existing task or roadmap; do not create another plan or report by default.
-- Choose the smallest complete change through existing code paths. Add an abstraction, interface, service, configuration option, or lifecycle state only when a concrete requirement or actual consumers justify it.
-- Do not build speculative provider support, frameworks, compatibility layers, or future milestones. Prioritize a working user flow over disconnected preparation slices.
-- Address concrete security and correctness failures with the simplest effective boundary. Preserve isolation, authorization, data integrity, and recovery guarantees; simplicity does not justify weakening them.
-- Keep validation proportional to the change: run required builds and focused tests of changed behavior and identified failure cases. Broaden or repeat checks only for a specific unresolved concern. Record unavailable checks and agreed deferred acceptance accurately without creating additional gates.
-- Before handoff, review the diff for unnecessary helpers, configuration, documentation, and indirection introduced by the change, and remove what the task does not need.
-- If scope grows substantially, explain the concrete reason and simplest viable approach. Do not silently turn a bounded fix into a redesign or add approval stages for routine implementation choices.
-- When writing implementation prompts, describe the outcome, constraints, concrete failure, and acceptance evidence. Let the implementing agent choose the smallest safe solution; prescribe architecture only when an established contract or verified need requires it. Distinguish required fixes from optional improvements in reviews.
-
-## Maintainability guardrails
-
-- Before extending a service, identify the feature and responsibility that own the new behavior. Keep application services focused on coordinating use cases; place cohesive business decisions and invariants in their owning object or policy.
-- Do not add unrelated DTOs, options, or general utilities to a service file or a shared `Services` folder. Keep supporting types with the feature that owns them; share a helper only when real consumers need the same semantics.
-- Prefer composition and clear contracts. Add an interface for an actual boundary or variation point, not automatically for every class. Pure functions and data-only transport models are appropriate when they fit.
-- Treat .NET analyzer findings as review input, including CA1502 complexity and CA1501 inheritance. CA1502 is a build error and methods should stay below cyclomatic complexity 15. Keep classes cohesive around their responsibilities; split them when responsibilities belong to distinct concerns, not just to reduce class size or type coupling. Do not hide complexity by splitting one algorithm into meaningless helpers.
-- Triage analyzer output in this order: build errors; security and correctness warnings affecting changed behavior; complexity and coupling in changed symbols; other warnings. Review high-risk findings even when their rule is not yet a build error. The rule choices are documented in `docs/archive/architecture/analyzer-priority-baseline.md`.
-- When changing a large service, check its responsibilities and dependency list, then make the smallest cohesive improvement within the task's scope. Preserve behavior, public contracts, cancellation, query semantics, transactions, and concurrency guarantees.
-- For C# changes, build the affected project with `dotnet build <affected-project.csproj> -c Debug --no-incremental -v minimal` before editing and save its analyzer diagnostics for the files and symbols you will touch. Run it again after editing and resolve the relevant build errors. Before handoff, run `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal`; this solution includes every tracked C# project under `src/`, including tests and fixtures. Incremental builds may omit diagnostics from skipped projects, so use `--no-incremental` when checking analyzer output.
-- Resolve analyzer errors in changed code. The all-project build currently reports historical complexity debt too; make progress on those findings in scoped, behavior-preserving batches. If unrelated historical findings block a focused build, identify them explicitly rather than suppressing them. If a justified exception remains, explain the finding, reason, and scope in the handoff.
-- Run affected tests and review the diff after the analyzer check. Report the before/after findings relevant to the change and any unavailable check. Do not weaken analyzer settings, change thresholds, or add suppressions merely to complete a task.
+- Do not edit unrelated code, generated output, runtime state, secrets, `.env` files, local databases, build artifacts, `AgentRuns/`, `runner-data/`, `.local-dev/`, `.local-runtime/` or `.prod-runtime/`.
+- Do not rename public concepts, routes or APIs unless the task requires it.
+- Do not hardcode deployment-specific domains, ports, filesystem roots, limits or infrastructure names.
+- Choose the smallest complete change through existing code paths; no speculative abstractions or future stages (details in the maintainability skill).
+- Implemented code, tests and Admin docs are current behavior. Keep the relevant guide under `docs/architecture/` up to date when architecture, state ownership, message flow or runtime boundaries change.
+- Run the smallest relevant check after each change (`bash -n` for shell scripts, type-check for Studio, the affected .NET project or test filter). Report checks you could not run exactly.
 
 ## Product surfaces
 
@@ -104,39 +54,9 @@ These apply to every agent (Claude, Codex or others) working for the owner.
 - Worker: `src/Automaton.Worker/`
 - CLI: `src/Automaton.Cli/`
 - Runner: `src/Automaton.Runner/`
-- Shared infrastructure and identity: `src/Automaton.Infrastructure/` and `src/Automaton.Identity/`
+- Shared infrastructure and identity: `src/Automaton.Infrastructure/`, `src/Automaton.Identity/`
 - Admin documentation: `src/Automaton.Api/Documentation/Admin/`
 - Production and local scripts: `scripts/`
 - Tests: `src/UnitTests/`
 
-Local repository setup is the README quickstart. Do not invent Compose files, ports, or domains.
-
-Implemented code, tests, and Admin docs are current behavior. Files under `docs/architecture/` are inventories and plans. Do not implement a later stage unless the task names it.
-
-Architecture guides under `docs/architecture/` describe the implemented system; keep the relevant guide up to date in the same change whenever architecture, state ownership, message flow, runtime boundaries, or operational guarantees change.
-
-## Platform invariants
-
-- Do not introduce language-, framework-, frontend-, or backend-specific assumptions into generic runtime boundaries.
-- Legacy role-specific paths and controller behavior are compatibility surfaces only. Do not extend them into new generic-runtime architecture.
-- Public serving must stay within the intended application runtime boundary and must not expose secrets, logs, runtime state, durable private data, or other unintended files.
-
-For `source/` vs `live/`, forks, remixes, the application contract, and deployment success rules, read the generic-runtime skill.
-
-When a change affects administrator-visible Studio or API behavior, follow the admin-docs skill in the same change. If no documentation change is needed, explain why in the handoff.
-
-## Verification
-
-Prefer the affected project, test filter, or script. The commands below are examples, not a mandatory checklist:
-
-```text
-dotnet test
-dotnet build -c Release
-cd src/automaton-studio-vue && npm run type-check && npm run build
-cd src/automaton-vue && npm run build
-git diff --check
-```
-
-For production shell changes, run `bash -n` on every touched script. For Studio UI, follow the studio-design visual checklist in addition to type-check.
-
-For production operations, follow the preflight, release, update, and verification workflow in the production deployment skill. Do not deploy or change production data without an explicit request. When production work is requested, agents also do the administrator settings themselves and keep people informed, as the [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) skill describes.
+Local setup is the README quickstart. Do not invent Compose files, ports or domains. Remote sessions with the test-server agents: [docs/agents/remote-sessions.md](docs/agents/remote-sessions.md).

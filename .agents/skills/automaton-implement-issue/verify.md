@@ -73,7 +73,7 @@ Against the test server API, the CLI and Studio, check:
 - each role boundary: a regular user and a stranger are refused, a plain Admin versus a SysAdmin;
 - the error messages a person will see.
 
-Check pages in a browser yourself with `agent-browser` (see `AGENTS.md`; on the test server `/home/agent/ab-login.sh`
+Check pages in a browser yourself with `agent-browser` (see the studio-design skill, "Browser automation"; on the test server `/home/agent/ab-login.sh`
 and `ab-shot.sh` log in and take screenshots), following the studio-design visual checklist. When the change is a Studio
 action (a button, a form), do it by clicking in Studio with `agent-browser`, not through the API. Record what passed
 and what you could not check.
