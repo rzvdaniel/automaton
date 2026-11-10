@@ -105,6 +105,32 @@ public sealed class RunnerWholeAppCleanupTests
         Assert.ThrowsAsync<InvalidOperationException>(() => failing.EmptyDirectoryAsync(root));
     }
 
+    [Test]
+    public async Task EmptyDirectory_OnAContainerizedRunnerMountsItsOwnWorkspaceVolume_AndOnlyEmptiesThePathUnderIt()
+    {
+        var calls = new List<IReadOnlyList<string>>();
+        var cleanup = new MachineApplicationStorageCleanup((args, _) =>
+        {
+            calls.Add(args);
+            return Task.FromResult(new InfrastructureCommandResponse
+            {
+                Success = true,
+                Output = args[1] == "inspect"
+                    ? """[{"Type":"bind","Name":"","Destination":"/var/run/docker.sock"},{"Type":"volume","Name":"ws-volume","Destination":"/automaton/storage"}]"""
+                    : ""
+            });
+        }, "helper:image", useWorkspaceVolume: true, ownContainer: "runner-container");
+
+        await cleanup.EmptyDirectoryAsync("/automaton/storage/workspace/data/app-1");
+
+        Assert.That(calls[0], Is.EqualTo(new[] { "docker", "inspect", "--format", "{{json .Mounts}}", "runner-container" }));
+        var run = string.Join(' ', calls[1]);
+        Assert.That(run, Does.Contain("type=volume,source=ws-volume,target=/automaton/storage").And.Contain("--user 0")
+            .And.Contain("find /automaton/storage/workspace/data/app-1 -mindepth 1 -delete").And.Contain("--network none"));
+        Assert.ThrowsAsync<InvalidOperationException>(() => cleanup.EmptyDirectoryAsync("/etc"));
+        Assert.That(calls.Count(call => call.Contains("find")), Is.EqualTo(1));
+    }
+
     private static MachineApplicationStorageCleanup CreateStorageCleanup(bool fail)
         => new((_, _) => Task.FromResult(new InfrastructureCommandResponse { Success = !fail }));
 
