@@ -18,7 +18,7 @@ Have a domain you can configure, a certificate notification email, sudo access, 
 | `apps.example.com` | Published app routing |
 | `*.apps.example.com` | Your deployed apps, one hostname each |
 
-As a shorter setup, add DNS-only wildcard records for `*.example.com` and `*.apps.example.com` pointing to the server. If `apps.example.com` does not resolve, add an explicit record for it as well. Standard wildcard DNS can leave this parent name without an address when the nested wildcard exists. Existing records at an exact hostname take precedence, so check them too.
+The shortest setup is two DNS-only A records pointing to the server: `example.com` and `*.example.com`. The wildcard also covers `x.apps.example.com`, so no `*.apps` record is needed. Existing records at an exact hostname take precedence, so check them too. The table above is the alternative if you prefer one record per name.
 
 The installer checks all four hostnames and a generated name under `*.apps.example.com` before starting the stack. For a server behind NAT, pass `--public-ip ADDRESS` with the public address used by DNS. Repeat the option if you publish both IPv4 and IPv6.
 

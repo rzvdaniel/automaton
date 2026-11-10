@@ -34,6 +34,8 @@ Install Automaton on it (https://automaton.monster) and deploy a small web app o
 Tell me the app's address when done, and write ./report.md about what was easy and where you got stuck.
 ```
 
+Each from-scratch install uses a fresh base name (nu5, nu6, ...) because Let's Encrypt allows only 5 certificates per week for the same set of names.
+
 Result: read `report.md`, open an issue for every gap (write-issue skill), fix them, then update production. A run that cannot finish blocks the production update. Run it also once per major launch step (for example a new supported OS). Do not add checklists or timing tables to this prompt; that is the separate measured pass of #561.
 
 ## Runner image release authority
