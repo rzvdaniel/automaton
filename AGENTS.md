@@ -25,7 +25,7 @@ Read the matching skill before changing the related area:
 | Implementing an issue end to end (issue, PR, review, merge, release, test-server verification), when the owner or orchestrator asks for it | [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) |
 | Only when the owner makes you the orchestrator of the agents | [Automaton orchestrate](.agents/skills/automaton-orchestrate/SKILL.md) |
 
-These skills are the repository contract. Other folders under `.agents/skills/` are developer-local; do not add or commit skills, agent loops, role prompts or orchestration machinery unless the task names that work.
+These skills are the repository contract. Other folders under `.agents/skills/` are developer-local; do not add or commit skills unless the task names that work. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state or metrics harnesses under `.agents/` or `AgentRuns/`.
 
 ## Operating rules
 
