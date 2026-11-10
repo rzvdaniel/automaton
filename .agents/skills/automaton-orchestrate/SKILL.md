@@ -58,7 +58,7 @@ It does **not** write product code (exception: skills, docs and small chores the
   implementing issues; Opus 5.5 for reviews and security passes, where a missed bug costs more than the tokens, and
   for design or hard bugs. Give each agent a brief with the issue numbers,
   file areas and the facts you already know, so it does not rediscover them. Build- and test-heavy work goes where
-  the configuration says there is capacity (a server agent, one task at a time on a small test server).
+  the configuration says there is capacity (for example, a server agent that takes one task at a time).
 - **Failures feed back.** When the release check fails, the fix-forward PR also fixes the step that should have
   caught it (a test, a line in `REVIEW.md`, a clearer skill).
 
