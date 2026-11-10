@@ -1,5 +1,7 @@
 # Automaton CLI NuGet Publishing and Installation
 
+The NuGet tool is the .NET path. New users should use the standalone binaries and `scripts/cli/install.sh` or `install.ps1`, which each server release attaches (`cli-binaries` job in `server-release.yml`).
+
 ## 1. Build and publish packages with GitHub Actions
 
 [Pack CLI and Runner](../../.github/workflows/nuget.yml) replaces the retired

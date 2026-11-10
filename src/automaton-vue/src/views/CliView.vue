@@ -4,7 +4,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 
-const installCommand = 'dotnet tool install -g Automaton.Cli'
+const installCommand = 'curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh'
 const loginCommand = 'automaton login --server https://api.your-domain.com'
 const setupCommand = 'automaton new "My App"'
 const deployCommand = 'automaton deploy'
@@ -74,7 +74,7 @@ async function copyCode(key: string, code: string) {
             </div>
 
             <p class="secondary-note">
-              The NuGet CLI requires the .NET 10 SDK or later. The server installer does not require a
+              The standalone CLI needs no .NET; only the NuGet tool requires the .NET 10 SDK or later. The server installer does not require a
               separate .NET installation.
             </p>
           </div>
@@ -132,8 +132,8 @@ async function copyCode(key: string, code: string) {
             <article class="step">
               <div class="step-number">1</div>
               <h3>Install the CLI</h3>
-              <p>Use the .NET global tool to add Automaton commands to your local workflow.</p>
-              <div class="step-snippet">dotnet tool install -g Automaton.Cli</div>
+              <p>Download one standalone file, no .NET needed. On Windows use the PowerShell script, or the .NET tool if you have the SDK.</p>
+              <div class="step-snippet">{{ installCommand }}</div>
             </article>
             <article class="step">
               <div class="step-number">2</div>

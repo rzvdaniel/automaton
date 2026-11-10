@@ -205,7 +205,55 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
         run: |
-          gh release create "server-v$VERSION" --target "$GITHUB_SHA" --title "Automaton Server $VERSION" --generate-notes automaton-server.tar.gz automaton-server.tar.gz.sha256 scripts/install-automaton.sh scripts/update-automaton.sh
+          gh release create "server-v$VERSION" --target "$GITHUB_SHA" --title "Automaton Server $VERSION" --generate-notes automaton-server.tar.gz automaton-server.tar.gz.sha256 scripts/install-automaton.sh scripts/update-automaton.sh scripts/cli/install.sh scripts/cli/install.ps1
+
+  # Standalone CLI binaries (self-contained, no .NET needed), attached to the release the bundle job created.
+  # Each one is built on its own platform and must answer --help and --version before it is uploaded.
+  cli-binaries:
+    needs: bundle
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-24.04, ext: '' }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, ext: '' }
+          - { rid: osx-arm64, os: macos-14, ext: '' }
+          - { rid: osx-x64, os: macos-15-intel, ext: '' }
+          - { rid: win-x64, os: windows-2025, ext: '.exe' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish and smoke test
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          RID: ${{ matrix.rid }}
+          EXT: ${{ matrix.ext }}
+        run: |
+          set -euo pipefail
+          dotnet publish src/Automaton.Cli/Automaton.Cli.csproj -c Release -r "$RID" --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version="$VERSION" -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.0 -o publish
+          mkdir dist
+          cp "publish/automaton$EXT" "dist/automaton-$RID$EXT"
+          # The binary is self-contained, so it must run without the .NET SDK or runtime.
+          export DOTNET_ROOT=/nonexistent DOTNET_ROOT_X64=/nonexistent
+          "./dist/automaton-$RID$EXT" --help
+          out=$("./dist/automaton-$RID$EXT" --version)
+          echo "$out"
+          grep -q "^Version: $VERSION" <<< "$out"
+          cd dist
+          if command -v sha256sum >/dev/null; then sha256sum "automaton-$RID$EXT" > "automaton-$RID$EXT.sha256"; else shasum -a 256 "automaton-$RID$EXT" > "automaton-$RID$EXT.sha256"; fi
+      - name: Attach to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: gh release upload "server-v$VERSION" dist/* --clobber
 
   # Keeps the CLI on NuGet in step with the server: a server release that changes the CLI or the
   # automaton.json contract (Automaton.Core) also publishes the CLI. It starts nuget.yml rather than

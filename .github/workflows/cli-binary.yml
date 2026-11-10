@@ -1,0 +1,28 @@
+name: CLI standalone binary
+on:
+  pull_request:
+    paths:
+      - src/Automaton.Cli/**
+      - src/Automaton.Core/**
+      - src/Automaton.AiGuidance/**
+      - scripts/cli/**
+      - .github/workflows/cli-binary.yml
+permissions:
+  contents: read
+jobs:
+  binary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install script syntax
+        run: sh -n scripts/cli/install.sh
+      - name: Publish a self-contained single file and run it
+        run: |
+          set -euo pipefail
+          dotnet publish src/Automaton.Cli/Automaton.Cli.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=1.2.3 -o publish
+          env -i PATH="/usr/bin:/bin" HOME="$RUNNER_TEMP" ./publish/automaton --help
+          env -i PATH="/usr/bin:/bin" HOME="$RUNNER_TEMP" ./publish/automaton --version | grep -q '^Version: 1.2.3'
