@@ -60,6 +60,8 @@ public sealed class AppActionExecutionService
             var existing = await db.AppModuleExecutions.SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == occurrenceId, cancellationToken);
             if (existing != null) return existing;
         }
+        if (await db.WebApps.AnyAsync(app => app.Id == appId && app.IsPaused, cancellationToken))
+            throw new InvalidOperationException("The app is paused, so its Actions cannot run. Resume the app first.");
         AppActionManifestParser.ValidateKey(actionKey);
         var resolved = await ResolveActionTargetAsync(appId, actionKey, userId, cancellationToken);
         return await CreateAndDispatchAsync(

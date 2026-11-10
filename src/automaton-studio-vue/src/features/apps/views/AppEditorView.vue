@@ -340,6 +340,7 @@ async function handleSharingChanged() {
           :sharing="sharing"
           @navigate="handleNavigation"
           @share="showShareDialog = true"
+          @paused-changed="editorStore.refreshApp(appId)"
         />
         <AppActivity
           v-else-if="activeView === 'activity'"

@@ -25,6 +25,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "read-result" => execution.ReadResult(command.Read<ReadAppModuleExecutionArtifactRequest>()),
             "prepare-module" => await deployment.PrepareModuleAsync(command.Read<PrepareAppActionModuleRequest>(), token),
             "restart-runtime" => await RestartAsync(command.Read<RestartAppRuntimeRequest>(), token),
+            "pause-runtime" => await PauseAsync(command.Read<PauseAppRuntimeRequest>(), token),
+            "resume-runtime" => await ResumeAsync(command.Read<ResumeAppRuntimeRequest>(), token),
             "cleanup-target" or "cleanup-target-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = false }),
             "cleanup-app" or "cleanup-app-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = true }),
             "upgrade-runner" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable."))
@@ -46,6 +48,12 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
     private async Task<RestartAppRuntimeResult> RestartAsync(RestartAppRuntimeRequest request, CancellationToken token)
         => new(request.AppId, request.DeploymentTargetId,
             await runtime.RestartRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
+    private async Task<PauseResumeAppRuntimeResult> PauseAsync(PauseAppRuntimeRequest request, CancellationToken token)
+        => new(request.AppId, request.DeploymentTargetId,
+            await runtime.PauseRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
+    private async Task<PauseResumeAppRuntimeResult> ResumeAsync(ResumeAppRuntimeRequest request, CancellationToken token)
+        => new(request.AppId, request.DeploymentTargetId,
+            await runtime.ResumeRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
     private async Task<CleanupAppDeploymentTargetResult> CleanupAsync(CleanupAppDeploymentTargetRequest request)
     {
         if (request.DeleteApplicationStorage && storageCleanup is null)

@@ -82,6 +82,7 @@ public sealed class ActionScheduleService
         var schedule = await FindAuthorizedAsync(id, userId, administrator, ct);
         if (enabled)
         {
+            await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
             var validationUserId = schedule.OwnerUserId ?? userId;
             var capability = await GetCapabilityAsync(validationUserId, administrator: false, ct);
             if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
@@ -91,6 +92,8 @@ public sealed class ActionScheduleService
         }
         else
         {
+            // Turned off by hand: resuming a paused app must not turn it back on.
+            schedule.PausedByApp = false;
             schedule.NextRunAtUtc = null;
             await db.ActionScheduleOccurrences
                 .Where(x => x.ScheduleId == schedule.Id
@@ -116,8 +119,15 @@ public sealed class ActionScheduleService
         await AuditAsync(schedule, AuditEventTypes.ActionScheduleDeleted, "delete", "Action schedule deleted", ct);
     }
 
+    private async Task EnsureAppNotPausedAsync(Guid applicationId, CancellationToken ct)
+    {
+        if (await db.WebApps.AnyAsync(app => app.Id == applicationId && app.IsPaused, ct))
+            throw new InvalidOperationException("The app is paused. Resume it to turn its schedules on.");
+    }
+
     public async Task ValidateForDispatchAsync(ActionSchedule schedule, CancellationToken ct)
     {
+        await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
         if (schedule.OwnerType == ActionScheduleOwnerTypes.System
             || schedule.ApplicationId == InfrastructureAppTrust.PlatformAppId)
             throw new InvalidOperationException("Legacy System Application schedules are retired.");
@@ -143,7 +153,11 @@ public sealed class ActionScheduleService
         schedule.ExecutionScope = request.ExecutionScope;
         ActionSchedulePolicy.ApplyTimingFields(schedule, request);
         schedule.TimeZone = request.TimeZone;
+        var wasEnabled = schedule.Enabled;
         schedule.Enabled = request.Enabled;
+        if (schedule.Enabled) await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
+        // Only turning it off by hand clears what pausing remembered; other saves keep it.
+        if (wasEnabled && !request.Enabled) schedule.PausedByApp = false;
         schedule.ConcurrencyPolicy = request.ConcurrencyPolicy;
         schedule.MisfirePolicy = request.MisfirePolicy;
         schedule.InputJson = inputJson;

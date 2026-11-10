@@ -30,7 +30,7 @@ const props = defineProps<{
   privateAddress: string
   sharing: AppSharing | null
 }>()
-const emit = defineEmits<{ navigate: [view: AppViewKey]; share: [] }>()
+const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-changed': [] }>()
 const toast = useToast()
 
 const secretNames = ref<string[] | null>(null)
@@ -50,6 +50,22 @@ watch(() => props.app.id, async (id) => {
 
 /** Only people who can change the app change who opens it. */
 const canShare = computed(() => props.app.canUpdate !== false)
+
+const pauseBusy = ref(false)
+/** Pauses or resumes the app, then asks the page to reload it. */
+async function togglePaused() {
+  const pause = !props.app.isPaused
+  pauseBusy.value = true
+  try {
+    const state = await appsService.setPaused(props.app.id, pause)
+    toast.add({ severity: state.warnings.length > 0 ? 'warn' : 'success', summary: pause ? 'Paused' : 'Resumed', detail: state.warnings[0] ?? (pause ? 'The app is paused.' : 'The app is running again.'), life: 4000 })
+    emit('paused-changed')
+  } catch (err: unknown) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err instanceof Error ? err.message : 'Could not change the app', life: 5000 })
+  } finally {
+    pauseBusy.value = false
+  }
+}
 const kind = computed(() => appKindOf(props.app))
 const liveTarget = computed(() => getLiveTarget([...props.targets]))
 const host = computed(() => (props.address ? new URL(props.address).host : ''))
@@ -116,6 +132,23 @@ const source = computed(() => {
           <template v-else>{{ part.text }}</template>
         </template>
       </p>
+    </section>
+
+    <section v-if="app.isPaused || canShare" class="card" aria-label="Pause" data-testid="pause-card">
+      <div class="row">
+        <span v-if="app.isPaused"><span class="pill pill--bad">Paused</span> <span class="hint">· stopped, its schedules are off and its address shows a paused page</span></span>
+        <span v-else class="hint">Pause stops the app and its schedules. Its data, secrets, settings and address are kept.</span>
+        <Button
+          v-if="canShare"
+          :label="app.isPaused ? 'Resume' : 'Pause'"
+          :icon="app.isPaused ? 'pi pi-play' : 'pi pi-pause'"
+          size="small"
+          severity="secondary"
+          outlined
+          :loading="pauseBusy"
+          @click="togglePaused"
+        />
+      </div>
     </section>
 
     <section v-if="privateAddress && kind !== 'tool'" class="card" aria-labelledby="addresses-title" data-testid="addresses">

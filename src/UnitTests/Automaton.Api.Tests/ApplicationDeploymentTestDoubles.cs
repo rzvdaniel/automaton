@@ -262,7 +262,16 @@ internal static class DeploymentFixtureServiceFactory
                 state.Db,
                 storage,
                 new ConnectedFlowArtifactService(storage, null!, new PackageManagedArtifactsCommands()),
-                routeService));
+                routeService),
+            new AppPauseService(
+                state.Db, null!, null!, new NoopRuntimeCommandQueue(), null!, null!,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<AppPauseService>.Instance));
+
+    private sealed class NoopRuntimeCommandQueue : IAppRuntimeCommandQueue
+    {
+        public Task QueueAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
 
     internal static AppFileStorageService CreateStorage(ApplicationDbContext db, TestWebHostEnvironment environment)
     {

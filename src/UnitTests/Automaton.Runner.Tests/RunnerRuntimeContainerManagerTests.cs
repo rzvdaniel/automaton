@@ -88,6 +88,48 @@ public sealed class RunnerRuntimeContainerManagerTests
         await manager.StopAsync(CancellationToken.None);
     }
 
+    [Test]
+    public async Task PauseStopsTheContainerKeepsItsFilesAndIsNotRestartedWithTheRunner_ResumeStartsItAgain()
+    {
+        var fake = new FakeContainerRuntime();
+        var (manager, workspace, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing runs yet.");
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing is paused yet.");
+        await manager.ApplyAsync(appId, targetId, Contract(19031));
+        var running = await ReadMetadataAsync(workspace, appId, targetId);
+        await File.WriteAllTextAsync(Path.Combine(running.ArtifactRoot!, "app.txt"), "deployed");
+
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.True);
+        var paused = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(paused.State, Is.EqualTo(RuntimeReadinessState.Paused));
+            Assert.That(fake.StoppedContainers, Does.Contain("container-1"));
+            Assert.That(File.ReadAllText(Path.Combine(paused.ArtifactRoot!, "app.txt")), Is.EqualTo("deployed"));
+        });
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.False, "Pausing again changes nothing.");
+
+        // A Runner restart must leave a paused app stopped.
+        var startsBefore = fake.StartCalls;
+        var restarted = new RunnerRuntimeContainerManager(workspace, new RunnerRuntimeRegistry(), fake,
+            NullLogger<RunnerRuntimeContainerManager>.Instance);
+        await restarted.StartAsync(CancellationToken.None);
+        Assert.That(fake.StartCalls, Is.EqualTo(startsBefore));
+        await restarted.StopAsync(CancellationToken.None);
+
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True);
+        var resumed = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(resumed.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(resumed.ContainerId, Is.EqualTo("container-2"));
+            Assert.That(fake.StartCalls, Is.EqualTo(startsBefore + 1));
+            Assert.That(File.ReadAllText(Path.Combine(resumed.ArtifactRoot!, "app.txt")), Is.EqualTo("deployed"));
+        });
+        await manager.StopAsync(CancellationToken.None);
+    }
+
     private sealed class ChangingSecretSource : IRuntimeSecretSource
     {
         public string Value { get; set; } = string.Empty;

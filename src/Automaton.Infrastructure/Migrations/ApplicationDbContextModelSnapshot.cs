@@ -157,6 +157,9 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("PausedByApp")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("RunAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -4168,6 +4171,9 @@ namespace Automaton.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsPaused")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsProfileFeatured")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -4214,6 +4220,9 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("citext");
+
+                    b.Property<DateTime?>("PausedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");

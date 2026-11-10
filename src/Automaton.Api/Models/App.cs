@@ -13,6 +13,8 @@ public class AppModel
     public string Description { get; set; } = string.Empty;
     [JsonRequired]
     public bool IsPublished { get; set; }
+    /// <summary>Read-only here: change it with POST /api/apps/{id}/pause and /resume.</summary>
+    public bool IsPaused { get; set; }
     [JsonRequired]
     public bool IsForkable { get; set; }
     public string? PublicUrl { get; set; }

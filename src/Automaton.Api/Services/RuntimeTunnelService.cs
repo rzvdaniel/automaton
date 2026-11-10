@@ -73,6 +73,9 @@ public sealed class RuntimeTunnelService(
             return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status404NotFound, "The deployed app target was not found."));
         }
 
+        if (target.WebApp.IsPaused)
+            return new ResolvedTunnelTarget(null, false, PausedPage());
+
         var isHostedRunner = await dbContext.HostedRunners.AnyAsync(hostedRunner =>
             hostedRunner.RunnerId == runner.Id,
             cancellationToken);
@@ -111,6 +114,26 @@ public sealed class RuntimeTunnelService(
 
         return new ResolvedTunnelTarget(runner, UsesMachineStaticSite(target, runner, request.Host.Host), null);
     }
+
+    private const string PausedHtml =
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+        "<title>This app is paused</title><style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#333}" +
+        "main{text-align:center;padding:1rem}h1{font-size:1.5rem}p{color:#666}</style></head>" +
+        "<body><main><h1>This app is paused</h1><p>Its owner has paused it. Please come back later.</p></main></body></html>";
+
+    /// <summary>The short page a paused app's address answers with (503); nothing of the app is reached.</summary>
+    internal static TunnelResponse PausedPage() => new()
+    {
+        StatusCode = StatusCodes.Status503ServiceUnavailable,
+        Error = "This app is paused.",
+        BodyBytes = System.Text.Encoding.UTF8.GetBytes(PausedHtml),
+        HeaderValues = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Content-Type"] = ["text/html; charset=utf-8"],
+            ["Cache-Control"] = ["no-store"],
+            ["Retry-After"] = ["3600"]
+        }
+    };
 
     private static TunnelResponse Failure(int statusCode, string error) => new()
     {

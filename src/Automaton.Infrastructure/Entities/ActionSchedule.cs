@@ -63,6 +63,8 @@ public sealed class ActionSchedule
     public string? CronExpression { get; set; }
     public string TimeZone { get; set; } = "Etc/UTC";
     public bool Enabled { get; set; } = true;
+    /// <summary>Was enabled when its app was paused, so resuming the app turns it on again.</summary>
+    public bool PausedByApp { get; set; }
     public DateTime? NextRunAtUtc { get; set; }
     public DateTime? LastTriggeredAtUtc { get; set; }
     public Guid? LastExecutionId { get; set; }

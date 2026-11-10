@@ -21,6 +21,7 @@ public sealed class ApplicationDeploymentService
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly AppDeploymentTargetStateService deploymentTargetStateService;
     private readonly DeploymentPackageFinalizationService packageFinalizationService;
+    private readonly AppPauseService pauseService;
     private readonly Serilog.ILogger logger;
 
     public ApplicationDeploymentService(
@@ -29,8 +30,10 @@ public sealed class ApplicationDeploymentService
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
         AppDeploymentTargetStateService deploymentTargetStateService,
-        DeploymentPackageFinalizationService packageFinalizationService)
+        DeploymentPackageFinalizationService packageFinalizationService,
+        AppPauseService pauseService)
     {
+        this.pauseService = pauseService;
         this.packageRunnerService = packageRunnerService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
@@ -76,6 +79,7 @@ public sealed class ApplicationDeploymentService
         await packageFinalizationService.PersistSecretDeclarationsAsync(appId, packageApplication, cancellationToken);
         var targetStateFinalized = false;
         var pendingRouteApplied = false;
+        string? pausedNote = null;
 
         try
         {
@@ -135,6 +139,8 @@ public sealed class ApplicationDeploymentService
                     deploymentOperationId: deploymentOperationId,
                     executionAttemptId: executionAttemptId);
                 targetStateFinalized = true;
+                pausedNote = await pauseService.KeepPausedAfterDeployAsync(
+                    appId, target.Id, runner.Id, ownerId, CancellationToken.None);
             }
 
             return new DeployPackageResponse
@@ -146,7 +152,7 @@ public sealed class ApplicationDeploymentService
                 SourceFilesDeployed = result.SourceFilesDeployed,
                 RuntimeFilesDeployed = result.RuntimeFilesDeployed,
                 SnapshotPath = result.SnapshotPath,
-                Message = result.Message,
+                Message = pausedNote is null ? result.Message : $"{result.Message} {pausedNote}".Trim(),
                 Logs = result.Logs,
                 Actions = result.Actions
             };

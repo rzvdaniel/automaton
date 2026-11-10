@@ -84,6 +84,20 @@ automaton delete --yes
 
 This permanently deletes the linked remote app, its runtime and its data. Without a linked folder (for example a catalog-installed app), use `automaton apps delete <name-or-id> --yes`; it deletes any app you may delete.
 
+## Pause and resume an app
+
+Pause an app to stop it without deleting it, for example while a service it depends on is gone.
+
+```bash
+automaton pause                  # the linked app; or: automaton apps pause <app>
+automaton resume                 # or: automaton apps resume <app>
+automaton deploy --resume        # resume first, then deploy
+```
+
+Pausing stops the app on its Runner, switches off its schedules and makes its public address answer 503 with a short "This app is paused" page. Its settings, secrets, data, publication and address are kept. Resuming starts it again and turns back on the schedules that were on before the pause. `automaton apps` shows `Paused` as the status. In Studio use **Pause** / **Resume** in the Apps list or on the app's Overview.
+
+A deploy while the app is paused uploads the new version but keeps the app stopped and says so; use `--resume` (or resume first) to start it. You need the same rights as for deploying the app; others get 403. An API key works too: `POST /api/apps/{id}/pause` and `POST /api/apps/{id}/resume`.
+
 ## Common errors
 
 - **No Runner available.** Deploy can upload but cannot start the app. Add or start a Runner, then deploy again.

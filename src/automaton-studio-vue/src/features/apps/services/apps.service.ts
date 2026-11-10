@@ -21,6 +21,7 @@ import type {
   AppScreenshot,
   PublishAppRequest,
   AppSharing,
+  AppPauseState,
   MyTeam,
   SharingAudience,
   ExportAppResponse,
@@ -207,6 +208,11 @@ class AppsService {
    */
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/apps/${id}`)
+  }
+
+  /** Pause (stop, schedules off, paused page) or resume an app. POST /api/apps/{id}/pause and /resume */
+  async setPaused(id: string, paused: boolean): Promise<AppPauseState> {
+    return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`)).data
   }
 
   /** Who can open the app. GET /api/apps/{id}/sharing */

@@ -12,6 +12,8 @@ internal static class InventoryCommands
         var command = Build(config, "apps", "List apps in your personal workspace", WriteAppsAsync);
         command.AddCommand(BuildShow(config));
         command.AddCommand(BuildDelete(config));
+        command.AddCommand(PauseCommand.BuildForApps(config, paused: true));
+        command.AddCommand(PauseCommand.BuildForApps(config, paused: false));
         return command;
     }
 
@@ -140,7 +142,7 @@ internal static class InventoryCommands
             app.Id,
             app.Name,
             runner = app.Runner?.Name,
-            status = app.LiveEnvironment?.Status ?? "Unassigned",
+            status = app.IsPaused ? "Paused" : app.LiveEnvironment?.Status ?? "Unassigned",
             publicUrl = app.CanLaunchPublicly && !string.IsNullOrWhiteSpace(app.PublicUrl)
                 ? CliAppUrlBuilder.BuildPublishedUrl(server, app.PublicUrl)
                 : null

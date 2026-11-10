@@ -75,6 +75,15 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(resp);
     }
 
+    /// <summary>Pauses (POST /api/apps/{id}/pause) or resumes (POST /api/apps/{id}/resume) an app.</summary>
+    public async Task<JsonElement> SetAppPausedAsync(string appId, bool paused, CancellationToken ct = default)
+    {
+        using var resp = await _http.PostAsync(
+            $"api/apps/{Uri.EscapeDataString(appId)}/{(paused ? "pause" : "resume")}", content: null, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task<JsonElement> GetAppByIdOrSlugAsync(string identifier, CancellationToken ct = default)
     {
         var value = identifier.Trim();

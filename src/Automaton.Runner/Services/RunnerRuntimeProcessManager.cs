@@ -25,6 +25,14 @@ public interface IAppRuntimeProcessManager
     /// </summary>
     Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
         => Task.FromResult(false);
+
+    /// <summary>Stops a running runtime but keeps its deployed files, so it can be resumed. False when nothing was running.</summary>
+    Task<bool> PauseAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+        => Task.FromResult(false);
+
+    /// <summary>Starts a paused runtime again from its deployed files. False when it was not paused.</summary>
+    Task<bool> ResumeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+        => Task.FromResult(false);
 }
 
 public sealed class RuntimeApplyResult
@@ -738,6 +746,8 @@ public static class RuntimeReadinessState
     public const string Ready = "ready";
     public const string Stopped = "stopped";
     public const string Failed = "failed";
+    /// <summary>Stopped on purpose by the app owner; files and settings are kept and it is not restarted with the Runner.</summary>
+    public const string Paused = "paused";
 }
 
 public sealed class RunnerRuntimeDeploymentMetadata

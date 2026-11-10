@@ -21,7 +21,9 @@ internal sealed class AppListingService(
     {
         var now = DateTime.UtcNow;
         var rows = await LoadRowsAsync(projectId, cancellationToken);
-        var items = rows.Select(row => MapRow(row, now)).ToArray();
+        var items = new AppListItemDto[rows.Count];
+        for (var index = 0; index < rows.Count; index++)
+            items[index] = MapRow(rows[index], now, await authorizationService.CanUpdateAppAsync(rows[index].Id, cancellationToken));
         // Only Action-only apps show their last and next run, so look them up for those apps alone.
         for (var index = 0; index < items.Length; index++)
         {
@@ -55,6 +57,7 @@ internal sealed class AppListingService(
                 ThumbnailUrl = app.ThumbnailUrl,
                 Tags = app.Tags,
                 IsPublished = app.IsPublished,
+                IsPaused = app.IsPaused,
                 PublicUrl = app.PublicUrl,
                 Updated = app.Updated,
                 ProjectId = app.ProjectId,
@@ -96,7 +99,7 @@ internal sealed class AppListingService(
             })
             .ToListAsync(cancellationToken);
 
-    private static AppListItemDto MapRow(AppListQueryRow row, DateTime now)
+    private static AppListItemDto MapRow(AppListQueryRow row, DateTime now, bool canUpdate)
         => new()
         {
             Id = row.Id,
@@ -106,10 +109,12 @@ internal sealed class AppListingService(
             ThumbnailUrl = row.ThumbnailUrl,
             Tags = AppTagNormalizer.Normalize(row.Tags),
             IsPublished = row.IsPublished,
+            IsPaused = row.IsPaused,
             PublicUrl = row.PublicUrl,
             CanLaunchPublicly = row.CanLaunchPublicly,
             UpdatedAtUtc = row.Updated,
             CanDelete = !row.ProjectId.HasValue,
+            CanUpdate = canUpdate,
             Runner = row.Runner == null ? null : MapRunner(row.Runner, now),
             LiveEnvironment = row.LiveTarget == null ? null : MapLiveTarget(row.Id, row.LiveTarget, now),
             ActionsOnly = IsActionsOnly(row.ContractJson),
@@ -167,6 +172,7 @@ internal sealed class AppListingService(
         public string? ThumbnailUrl { get; init; }
         public string? Tags { get; init; }
         public bool IsPublished { get; init; }
+        public bool IsPaused { get; init; }
         public string? PublicUrl { get; init; }
         public DateTime Updated { get; init; }
         public Guid? ProjectId { get; init; }
