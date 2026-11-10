@@ -35,6 +35,7 @@ public sealed class AppRuntimeRestarter(
     {
         var targets = await RunningTargets(db, appId).ToListAsync(token);
         var queued = 0;
+        var failures = new List<string>();
         foreach (var target in targets)
         {
             try
@@ -45,9 +46,9 @@ public sealed class AppRuntimeRestarter(
                 else await operations.QueueAsync(target.RunnerId, user.GetUserId(), request, token);
                 queued++;
             }
-            catch (RuntimeCommandFailedException) when (wait)
+            catch (RuntimeCommandFailedException error) when (wait)
             {
-                throw;
+                failures.Add(error.Message);
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
@@ -55,6 +56,7 @@ public sealed class AppRuntimeRestarter(
                 logger.LogWarning(error, "Could not queue a runtime restart for app {AppId} target {TargetId}.", appId, target.Id);
             }
         }
+        if (failures.Count > 0) throw new RuntimeCommandFailedException(string.Join(" ", failures.Distinct()));
         return queued;
     }
 

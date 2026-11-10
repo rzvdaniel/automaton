@@ -386,6 +386,7 @@ public sealed class AppPauseTests
         h.Queue.RunnerError = "Invalid setting: DISK_FREE_WARN_PERCENT";
         var error = Assert.ThrowsAsync<RuntimeCommandFailedException>(() => service.ResumeAsync(AppId, administrator: false, default));
         Assert.That(error!.Message, Does.Contain("DISK_FREE_WARN_PERCENT"));
+        Assert.That((await h.Db.WebApps.SingleAsync()).IsPaused, Is.True, "a failed resume leaves the app paused");
 
         h.Queue.RunnerError = null;
         var resumed = await service.ResumeAsync(AppId, administrator: false, default);

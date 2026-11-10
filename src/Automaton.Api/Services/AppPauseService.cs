@@ -49,6 +49,8 @@ public sealed class AppPauseService(
         }
 
         var warnings = new List<string>();
+        // A resume starts the runtime first: when the Runner cannot, nothing changes and the app stays paused.
+        if (!pause) await QueueRuntimeCommandsAsync(appId, userId, pause: false, warnings, ct);
         var stateChanged = app.IsPaused != pause;
         if (stateChanged)
         {
@@ -74,7 +76,7 @@ public sealed class AppPauseService(
             });
         }
         // Repeating the call also repeats the Runner command, so a Runner that missed it catches up.
-        await QueueRuntimeCommandsAsync(appId, userId, pause, warnings, ct);
+        if (pause) await QueueRuntimeCommandsAsync(appId, userId, pause, warnings, ct);
         return new AppPauseState(appId, app.IsPaused, app.PausedAt, changed, warnings);
     }
 
@@ -165,6 +167,7 @@ public sealed class AppPauseService(
 
     private async Task QueueRuntimeCommandsAsync(Guid appId, Guid userId, bool pause, List<string> warnings, CancellationToken ct)
     {
+        var failures = new List<string>();
         foreach (var target in await AppRuntimeRestarter.PausableTargets(db, appId).ToListAsync(ct))
         {
             try
@@ -174,18 +177,19 @@ public sealed class AppPauseService(
                 else await operations.RunAsync(target.RunnerId, userId,
                     AppActionCommand.Create(ResumeCommandKind, new ResumeAppRuntimeRequest(appId, target.Id)), ct);
             }
-            catch (RuntimeCommandFailedException)
+            catch (RuntimeCommandFailedException error)
             {
-                throw;
+                failures.Add(error.Message);
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
                 logger.LogWarning(error, "Could not queue a runtime {Command} for app {AppId} target {TargetId}.",
                     pause ? "pause" : "resume", appId, target.Id);
-                if (!pause) throw new RuntimeCommandFailedException("The Runner could not be told to start the app, so it is still stopped. Try again when the Runner is online.");
-                warnings.Add("The Runner could not be told to stop the app. Its address still answers as running.");
+                if (!pause) failures.Add("The Runner could not be told to start the app. Try again when the Runner is online.");
+                else warnings.Add("The Runner could not be told to stop the app. Its address still answers as running.");
             }
         }
+        if (failures.Count > 0) throw new RuntimeCommandFailedException(string.Join(" ", failures.Distinct()));
     }
 }
 
