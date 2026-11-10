@@ -20,7 +20,7 @@ A server with a Runner and a signed-in CLI ([Install with your AI agent](./insta
    automaton runners
    ```
 
-   Check: your server is shown and a Runner is connected. `automaton: command not found` means its folder is not on `PATH` (`~/.local/bin` from the install script, `%LOCALAPPDATA%\Automatonin` on Windows, `~/.dotnet/tools` for the NuGet tool). With several servers the new login stays a separate profile; see [several servers](./automaton-cli#several-servers).
+   Check: your server is shown and a Runner is connected. `automaton: command not found` means its folder is not on `PATH` (`~/.local/bin` from the install script, `%LOCALAPPDATA%\Automatonbin` on Windows, `~/.dotnet/tools` for the NuGet tool). With several servers the new login stays a separate profile; see [several servers](./automaton-cli#several-servers).
 
 2. Create the app in an empty folder. `--template` is `node`, `python`, `dotnet` or `static`; omit it for an empty contract.
 
