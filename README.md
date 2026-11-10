@@ -1,73 +1,66 @@
+<div align="center">
+
+<img src="docs/images/logo.svg" width="64" height="64" alt="Automaton logo">
+
 # Automaton
 
-**The home for every app your AI builds, on servers you own.** Automaton is an open-source platform for building, running and sharing web apps and automations. Your AI agent can set it up and deploy apps; you choose where they and their data live. [See the product](https://automaton.monster/product) and [what people build with it](https://automaton.monster/use-cases).
+**The home for every app your AI builds. On servers you own.**
 
-An AI can put one app on a bare server. Automaton handles the work around many apps: an HTTPS address and access settings for each one, your own app store, secrets, health-checked deployments, nightly backups and server updates. [See how setup works](https://automaton.monster/how-setup-works).
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/rzvdaniel/automaton?label=release)](https://github.com/rzvdaniel/automaton/releases)
+[![Tests](https://github.com/rzvdaniel/automaton/actions/workflows/tests.yml/badge.svg)](https://github.com/rzvdaniel/automaton/actions/workflows/tests.yml)
+[![CLI on NuGet](https://img.shields.io/nuget/v/Automaton.Cli?label=CLI)](https://www.nuget.org/packages/Automaton.Cli)
 
-The [catalog](https://automaton.monster/catalog) lets you install apps from GitHub repositories, including a catalog your team maintains. An app declares how to build and run in `automaton.json`; your agent can follow the generated app guide to validate and deploy it. [Ask your AI to get started](https://automaton.monster/get-started), or follow the commands below.
+[Website](https://automaton.monster) · [Docs](https://automaton.monster/docs/) · [Live apps](https://store.automaton.monster) · [Catalog](https://automaton.monster/catalog)
 
-## Who it is for
+<img src="docs/images/studio-catalog.png" width="800" alt="Automaton Studio: the app catalog, with apps you can install in one click">
 
-**Fits** if you:
-- build many small apps, tools or automations, often with an AI coding agent;
-- want them on servers you control, at a cost set by the servers you rent;
-- are comfortable owning a Linux server (updates, backups, being on call).
+</div>
 
-**Does not fit** if you need:
-- autoscaling or multi-region failover;
-- a hosted service to sign up for, or hosting for untrusted users.
+Your AI can put one app on a server. **Automaton runs all of them**: sign-in, sharing, an app store, a catalog for your team, secrets, backups and safe updates. Your data stays where you decide, and the cost is the server you rent.
 
-> **Early access.** The app lifecycle runs on our own production server. A restore from an off-site archive onto a clean second server has been proven. Nightly backups stay on the server by default; copy them and the backup key to encrypted off-site storage for recovery. Fresh-server installs took 118 seconds on Ubuntu 22.04 and about 90 seconds on Debian 12 (Hetzner CX23; [measurements](https://github.com/rzvdaniel/automaton/issues/561)). See [limitations](https://automaton.monster/docs/limitations), [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you) and the [FAQ](https://automaton.monster/docs/faq).
+## Why Automaton
 
-## Quickstart
+- **Built for AI agents.** Your agent installs the server and builds, deploys and publishes apps, in your name and with your approval.
+- **Private by default.** Nothing is public until you share it, with your team or with everyone.
+- **HTTPS out of the box.** Every app gets its own address, with Let's Encrypt certificates requested and renewed for you.
+- **A catalog of ready apps.** Analytics, monitoring, bookmarks and backups, installed in one click, or install any app straight from a GitHub repository.
+- **Runs any stack.** An app is any language or framework that runs in a container, described in one `automaton.json`.
+- **No lock-in.** Your server, your data, your domain. Open source under Apache 2.0.
 
-1. **Install the server** on an x86_64 Linux server with a domain ([install-server](https://automaton.monster/docs/install-server)). DNS only: two A records (`your-domain.com` and `*.your-domain.com`) or five named records (`api`, `studio`, `store`, `apps`, `*.apps`). Open TCP 80, 443 and 5671. Review the script before running it if you like (`less install-automaton.sh`).
+## Get started
 
-   ```bash
-   curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh && sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com
-   ```
+**With your AI agent.** Give it a Linux server, a domain and an email, and point it to [Install with your AI agent](https://automaton.monster/docs/install-with-ai). It installs Automaton and hands you a one-time link to choose your password.
 
-2. **Create the first administrator** by opening the one-time setup link the installer prints ([first-admin](https://automaton.monster/docs/first-admin)).
+**By hand.** Point `your-domain.com` and `*.your-domain.com` to the server (DNS only), open ports 80, 443 and 5671, then:
 
-3. **Install the CLI and log in** (needs the .NET 10 SDK; [automaton-cli](https://automaton.monster/docs/automaton-cli)):
+```bash
+curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
+sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com
+```
 
-   ```bash
-   dotnet tool install -g Automaton.Cli
-   automaton login --server https://api.your-domain.com
-   ```
+Then [create the administrator](https://automaton.monster/docs/first-admin), [add a Runner](https://automaton.monster/docs/deploy-runner) and [deploy your first app](https://automaton.monster/docs/getting-started).
 
-   If you already use the CLI with another server, add `--profile NAME` to `login` (and to later commands) so this server gets its own profile and your existing login is not overwritten.
+In our tests, the installer finished in about 2 minutes, and an AI agent went from an empty server to a live app in about 6 ([measurements](https://github.com/rzvdaniel/automaton/issues/561)).
 
-4. **Add a Runner**, which hosts your apps ([deploy-runner](https://automaton.monster/docs/deploy-runner)). Run on the server with `--local`, or from anywhere with `--ssh user@host`:
+<div align="center">
+<img src="docs/images/website-home.png" width="800" alt="The Automaton website: your AI agent, Studio, the app store, team-only apps and public links around your own server">
+</div>
 
-   ```bash
-   automaton runners install --name main --local
-   ```
+## Is it for you?
 
-5. **Deploy your first app** ([getting-started](https://automaton.monster/docs/getting-started), [deploy](https://automaton.monster/docs/deploy)):
+It fits if you build many small apps, tools or automations, often with an AI agent, and want them on servers you control. It does not fit if you need autoscaling, multi-region failover or a hosted service to sign up for.
 
-   ```bash
-   automaton new "My App" --template node
-   automaton validate
-   automaton deploy
-   automaton publish --yes --slug my-app
-   ```
-
-6. **Update the server** later ([update-server](https://automaton.monster/docs/update-server)):
-
-   ```bash
-   automaton server update --wait
-   ```
-
-Stuck? See [troubleshooting](https://automaton.monster/docs/troubleshooting).
+> **Early access.** Automaton runs our own production server and is ready to use, but it is still growing. Read the [limitations](https://automaton.monster/docs/limitations) and [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you) before you rely on it.
 
 ## For AI agents
 
-- Start with [llms.txt](https://automaton.monster/llms.txt), or [llms-full.txt](https://automaton.monster/llms-full.txt) for all the docs in one file.
-- In an app folder, read the generated `AGENTS.md` and `automaton.json` ([reference](https://automaton.monster/docs/automaton-json)), then validate, deploy and verify the real app.
-- Safety: never put credentials in chat. Self sign-up is disabled; users come from an administrator. See [secrets and permissions](https://automaton.monster/docs/secrets-and-permissions) and [security](https://automaton.monster/docs/security).
-- Working on this repository: read [AGENTS.md](AGENTS.md).
+Start with [llms.txt](https://automaton.monster/llms.txt). In an app folder, read the generated `AGENTS.md` and `automaton.json` ([reference](https://automaton.monster/docs/automaton-json)). Working on this repository: read [AGENTS.md](AGENTS.md).
 
-## Links
+## Contributing
 
-[Website](https://automaton.monster) · [Docs](https://automaton.monster/docs/) · [Example apps](https://github.com/rzvdaniel/automaton-apps) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [License (Apache 2.0)](LICENSE)
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and report security problems as [SECURITY.md](SECURITY.md) describes.
+
+## License
+
+[Apache 2.0](LICENSE)
