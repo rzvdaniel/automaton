@@ -54,7 +54,7 @@ jobs:
       - name: Record checksums and source
         run: |
           sha256sum packages/*.nupkg > packages/checksums.txt
-          printf '%s\n' "$GITHUB_SHA" > packages/source-revision.txt
+          git rev-parse HEAD > packages/source-revision.txt
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.project }}-packages
