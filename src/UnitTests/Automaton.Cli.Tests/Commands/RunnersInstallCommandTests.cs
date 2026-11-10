@@ -68,6 +68,30 @@ public class RunnersInstallCommandTests
     }
 
     [Test]
+    public void LocalInstallerFailureWithoutSudoProblemOmitsTheSshHint()
+    {
+        if (OperatingSystem.IsWindows()) Assert.Ignore("Requires a POSIX shell script as a fake sudo.");
+        var directory = Path.Combine(Path.GetTempPath(), "automaton-cli-sudo2-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var oldPath = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            var script = Path.Combine(directory, "sudo");
+            File.WriteAllText(script, "#!/bin/sh\ncat > /dev/null\necho 'disk full' >&2\nexit 1\n");
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + oldPath);
+            var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await RunnersInstallCommand.ExecuteAsync("echo install", null, 30, CancellationToken.None));
+            Assert.That(error!.Message, Does.Contain("disk full").And.Not.Contain("--ssh user@host"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", oldPath);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public void SshInstallerReceivesSecretOnlyOnStdinAndRedactsFailure()
     {
         if (OperatingSystem.IsWindows()) Assert.Ignore("Requires a POSIX shell script as a fake ssh.");

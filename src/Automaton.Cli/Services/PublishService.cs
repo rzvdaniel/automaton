@@ -38,12 +38,10 @@ public sealed class PublishService
 
             if (FindEmptyAppProblem(app, directory) is { } emptyApp)
             {
-                var failedDeploy = await FindLastDeployErrorAsync(client, context.AppId, cancellationToken);
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false,
-                    failedDeploy is null ? emptyApp : $"the last deploy failed: {failedDeploy}"));
-                nextSteps.Add(failedDeploy is null
-                    ? EmptyAppHint
-                    : "Fix the deploy error, run automaton deploy until it succeeds, then publish");
+                var (message, hints) = await DescribeEmptyAppAsync(
+                    emptyApp, () => FindLastDeployErrorAsync(client, context.AppId, cancellationToken));
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, message));
+                foreach (var hint in hints) nextSteps.Add(hint);
                 return new PublishResult
                 {
                     Success = false,
@@ -90,9 +88,26 @@ public sealed class PublishService
 
     private static async Task<string?> FindLastDeployErrorAsync(
         AutomatonApiClient client, string appId, CancellationToken cancellationToken)
+        => PickDeployError(await client.ListDeploymentTargetsAsync(appId, cancellationToken));
+
+    /// <summary>The default (Live) target is the one publish uses, so its error wins over other targets' errors.</summary>
+    internal static string? PickDeployError(IEnumerable<DeploymentTargetInfo> targets)
     {
-        var targets = await client.ListDeploymentTargetsAsync(appId, cancellationToken);
-        return targets.Select(target => target.LastDeploymentError).FirstOrDefault(error => !string.IsNullOrWhiteSpace(error));
+        var list = targets.ToList();
+        return list.Where(t => t.IsDefault).Concat(list.Where(t => !t.IsDefault))
+            .Select(t => t.LastDeploymentError).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+    }
+
+    /// <summary>The deploy lookup is best-effort: any failure falls back to the empty-app message alone.</summary>
+    internal static async Task<(string Message, string[] Hints)> DescribeEmptyAppAsync(
+        string emptyApp, Func<Task<string?>> findDeployError)
+    {
+        string? failedDeploy = null;
+        try { failedDeploy = await findDeployError(); }
+        catch (Exception) { /* keep the empty-app message */ }
+        if (failedDeploy is null) return (emptyApp, [EmptyAppHint]);
+        return ($"{emptyApp}; the last deploy also failed: {failedDeploy}",
+            [EmptyAppHint, "Fix the deploy error, run automaton deploy until it succeeds, then publish"]);
     }
 
     private PublishContextResolution ResolvePublishContext(

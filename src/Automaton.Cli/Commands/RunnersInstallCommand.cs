@@ -150,8 +150,11 @@ public static class RunnersInstallCommand
                 var token = Regex.Match(command, "AUTOMATON_ENROLLMENT_TOKEN=['\"]?([^'\" ]+)").Groups[1].Value;
                 if (token.Length > 0) output = output.Replace(token, "[redacted]", StringComparison.Ordinal);
                 var lastLines = string.Join('\n', output.Split('\n').TakeLast(8));
-                var localHint = ssh is null
-                    ? " --local installs on this machine (it needs sudo here). For a remote server, use --ssh user@host."
+                var needsSudoHint = ssh is null && (output.Contains("sudo:", StringComparison.Ordinal)
+                    || output.Contains("a terminal is required", StringComparison.OrdinalIgnoreCase)
+                    || output.Contains("password is required", StringComparison.OrdinalIgnoreCase));
+                var localHint = needsSudoHint
+                    ? "\n--local installs on this machine (it needs sudo here). For a remote server, use --ssh user@host."
                     : string.Empty;
                 throw new InvalidOperationException($"Installer exited {process.ExitCode}: {lastLines}{localHint}");
             }
