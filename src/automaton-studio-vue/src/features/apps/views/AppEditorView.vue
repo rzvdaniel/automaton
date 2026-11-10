@@ -350,6 +350,7 @@ async function handleSharingChanged() {
           :live-logs="runtimeLogs"
           :refresh-key="activityRefresh"
           :deploy-target="kind === 'tool' ? null : liveTarget"
+          :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
         />
         <AppSettingsPage
           v-else

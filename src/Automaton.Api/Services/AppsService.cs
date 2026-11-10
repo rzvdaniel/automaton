@@ -213,7 +213,10 @@ public class AppsService
             ForkedFromAppId = entity.ForkedFromAppId,
             ForkedFromAuthorUserId = entity.ForkedFromAuthorUserId,
             ForkedFromAppName = entity.ForkedFromAppName,
-            ForkedFromAuthorName = entity.ForkedFromAuthorName
+            ForkedFromAuthorName = entity.ForkedFromAuthorName,
+            InstalledFromRepo = entity.InstalledFromRepo,
+            InstalledFromFolder = entity.InstalledFromFolder,
+            InstalledFromCommit = entity.InstalledFromCommit
         };
     }
 

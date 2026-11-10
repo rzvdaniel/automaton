@@ -21,6 +21,8 @@ const props = defineProps<{
   liveLogs: ReadonlyArray<ConsoleEntry>
   refreshKey?: number
   deployTarget?: AppDeploymentTarget | null
+  /** Names of the app's declared settings, which are saved like secrets but are not secrets. */
+  settingNames?: ReadonlyArray<string>
 }>()
 
 const events = ref<ApplicationEvent[]>([])
@@ -52,7 +54,7 @@ async function load() {
 
 watch(() => [props.appId, props.refreshKey], load, { immediate: true })
 
-const all = computed(() => buildActivity(props.executions, events.value, secretHistory.value, deployActivity(props.deployTarget ?? null)))
+const all = computed(() => buildActivity(props.executions, events.value, secretHistory.value, deployActivity(props.deployTarget ?? null), props.settingNames ?? []))
 const visible = computed(() => filterActivity(all.value, filter.value))
 const problemCount = computed(() => filterActivity(all.value, 'problems').length)
 const hasRuns = computed(() => props.executions.length > 0)

@@ -9,6 +9,7 @@ import type { AppViewKey } from '../app-navigation'
 import {
   appKindOf,
   audienceLabel,
+  appOriginLabel,
   describeSchedule,
   statusSentence,
   type Segment,
@@ -93,7 +94,10 @@ const declaredSecrets = computed(() => props.app.application?.secrets ?? [])
 const missingSecrets = computed(() => secretNames.value === null
   ? 0
   : declaredSecrets.value.filter((item) => !secretNames.value!.includes(item.name)).length)
-const secretCount = computed(() => Math.max(declaredSecrets.value.length, secretNames.value?.length ?? 0))
+const settingNames = computed(() => (props.app.application?.settings ?? []).map((item) => item.name))
+/** Settings are saved like secrets, so saved names that are declared settings do not count as secrets. */
+const secretCount = computed(() => Math.max(declaredSecrets.value.length, (secretNames.value ?? []).filter((name) => !settingNames.value.includes(name)).length))
+const settingCount = computed(() => settingNames.value.length)
 const dataDirectory = computed(() => props.app.application?.storage?.dataDirectory ?? '')
 const pageUrl = (path: string) => new URL(path, props.address).toString()
 
@@ -114,12 +118,7 @@ const whoValue = computed(() => kind.value === 'api' && props.sharing?.audience 
 
 const source = computed(() => {
   const runner = liveTarget.value?.runner?.name
-  const origin = props.app.forkedFromAppName
-    ? `From the catalog · ${props.app.forkedFromAppName}`
-    : props.app.developmentMode === 'local' || props.app.runtimeSource !== 'studio'
-      ? 'Deployed with the CLI'
-      : 'Built in Studio'
-  return { origin, runner }
+  return { origin: appOriginLabel(props.app), runner }
 })
 </script>
 
@@ -206,11 +205,15 @@ const source = computed(() => {
             <i class="pi pi-chevron-right chevron" aria-hidden="true"></i>
           </span>
         </button>
+        <button v-if="settingCount > 0" type="button" class="row row--link" data-testid="setting-count" @click="emit('navigate', 'settings')">
+          <span>{{ settingCount }} {{ settingCount === 1 ? 'setting' : 'settings' }}</span>
+          <i class="pi pi-chevron-right chevron" aria-hidden="true"></i>
+        </button>
         <div v-for="item in permissions" :key="item.permission" class="row">
           <span>{{ item.permission }}</span>
           <span class="pill" :class="item.approved ? 'pill--ok' : 'pill--bad'">{{ item.approved ? 'approved' : 'waiting for approval' }}</span>
         </div>
-        <p v-if="kind === 'tool' && secretCount === 0 && permissions.length === 0" class="hint">Nothing to set up.</p>
+        <p v-if="kind === 'tool' && secretCount === 0 && permissions.length === 0 && settingCount === 0" class="hint">Nothing to set up.</p>
         <div v-if="kind !== 'tool'" class="row">
           <span>{{ whoLabel }}<br><span class="hint">{{ whoValue }}</span></span>
           <Button v-if="canShare" label="Change" size="small" severity="secondary" outlined @click="emit('share')" />
