@@ -3,6 +3,7 @@
  * Connects to ASP.NET backend apps endpoints
  */
 import apiClient from '@/shared/services/api/axios-instance'
+import { APP_ACTION_TIMEOUT_MS } from '../utils/app-action-error'
 import type {
   InstallSource,
   CatalogQuery,
@@ -212,12 +213,12 @@ class AppsService {
 
   /** Pause (stop, schedules off, paused page) or resume an app. POST /api/apps/{id}/pause and /resume */
   async setPaused(id: string, paused: boolean): Promise<AppPauseState> {
-    return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`)).data
+    return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })).data
   }
 
   /** Restart the running app so it loads changed settings and secrets. POST /api/apps/{id}/restart; 409 while paused. */
   async restart(id: string): Promise<{ restarted: number }> {
-    return (await apiClient.post<{ restarted: number }>(`/api/apps/${id}/restart`)).data
+    return (await apiClient.post<{ restarted: number }>(`/api/apps/${id}/restart`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })).data
   }
 
   /** Who can open the app. GET /api/apps/{id}/sharing */

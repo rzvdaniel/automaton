@@ -34,3 +34,15 @@ describe('AppsService metadata settings', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/api/public/marketplace/categories')
   })
 })
+
+describe('AppsService long-running actions', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('gives restart and resume a longer timeout than the default', async () => {
+    apiClient.post.mockResolvedValue({ data: {} })
+    await appsService.restart('a')
+    await appsService.setPaused('a', false)
+    expect(apiClient.post).toHaveBeenNthCalledWith(1, '/api/apps/a/restart', undefined, { timeout: 180000 })
+    expect(apiClient.post).toHaveBeenNthCalledWith(2, '/api/apps/a/resume', undefined, { timeout: 180000 })
+  })
+})

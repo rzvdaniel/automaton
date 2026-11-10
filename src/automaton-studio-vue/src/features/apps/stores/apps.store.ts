@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
+import { appActionErrorMessage } from '../utils/app-action-error'
 import type { App, AppListItem, AppListFilters, PublishAppRequest } from '../types/apps.types'
 
 export const useAppsStore = defineStore('apps', () => {
@@ -129,7 +130,7 @@ export const useAppsStore = defineStore('apps', () => {
       listApps.value = listApps.value.map((app) => (app.id === id ? { ...app, isPaused: state.paused } : app))
       return state.warnings ?? []
     } catch (err: unknown) {
-      throw new Error(getErrorMessage(err))
+      throw new Error(appActionErrorMessage(err, getErrorMessage(err)))
     }
   }
 
