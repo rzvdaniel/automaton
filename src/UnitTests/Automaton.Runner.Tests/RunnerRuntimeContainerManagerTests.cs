@@ -155,6 +155,51 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task CrashingAppDeployFailureIncludesTheLastOutputLines()
+    {
+        var fake = new FakeContainerRuntime { StartReady = false, Logs = "starting\nKeyError: DATA_DIR is not set\n" };
+        var (manager, _, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+
+        var failure = Assert.ThrowsAsync<TimeoutException>(async () =>
+            await manager.ApplyAsync(appId, targetId, Contract(19021)));
+
+        Assert.That(failure!.Message, Does.Contain("did not become ready"));
+        Assert.That(failure.Message, Does.Contain("KeyError: DATA_DIR is not set"));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public void RedactValuesHidesSecretsInOutput()
+    {
+        var redacted = RunnerRuntimeContainerManager.RedactValues("db=hunter2 ok", ["hunter2", ""]);
+        Assert.That(redacted, Is.EqualTo("db=[REDACTED] ok"));
+    }
+
+    [Test]
+    public async Task CrashingAppWithoutOutputKeepsTheOriginalMessage()
+    {
+        var fake = new FakeContainerRuntime { StartReady = false };
+        var (manager, _, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+
+        var failure = Assert.ThrowsAsync<TimeoutException>(async () =>
+            await manager.ApplyAsync(appId, targetId, Contract(19022)));
+
+        Assert.That(failure!.Message, Does.Not.Contain("Last output"));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public void LastLinesKeepsOnlyTheTail()
+    {
+        var logs = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"line{i}"));
+        var tail = RunnerRuntimeContainerManager.LastLines(logs, 2, 2000).Split(Environment.NewLine);
+        Assert.That(tail, Is.EqualTo(new[] { "line29", "line30" }));
+        Assert.That(RunnerRuntimeContainerManager.LastLines(" ", 2, 2000), Is.Empty);
+    }
+
+    [Test]
     public async Task CandidateCleanupFailuresDoNotReplaceOriginalDeploymentFailure()
     {
         var fake = new FakeContainerRuntime { StartReady = false };
@@ -744,6 +789,7 @@ public sealed class RunnerRuntimeContainerManagerTests
         public List<string> StoppedContainers { get; } = [];
         public Exception? InspectFailure { get; set; }
         public Exception? GetLogsFailure { get; set; }
+        public string Logs { get; set; } = string.Empty;
         public Exception? StopFailure { get; set; }
 
         public Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default)
@@ -831,7 +877,7 @@ public sealed class RunnerRuntimeContainerManagerTests
         public Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
         {
             if (GetLogsFailure is not null) throw GetLogsFailure;
-            return Task.FromResult(string.Empty);
+            return Task.FromResult(Logs);
         }
     }
 }

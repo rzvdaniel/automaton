@@ -480,7 +480,13 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
         catch (Exception deploymentError)
         {
-            await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError);
+            var output = await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError);
+            if (output.Length > 0)
+            {
+                var message = $"{deploymentError.Message} Last output of the app:{Environment.NewLine}{output}";
+                if (deploymentError is TimeoutException) throw new TimeoutException(message, deploymentError);
+                if (deploymentError is InvalidOperationException) throw new InvalidOperationException(message, deploymentError);
+            }
             throw;
         }
     }
@@ -551,13 +557,13 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
     }
 
-    private async Task RestoreFailedCandidateAsync(
+    private async Task<string> RestoreFailedCandidateAsync(
         RuntimeApplyAttempt attempt,
         RunnerRuntimeDeploymentMetadata? previous,
         DockerApplicationContainer? started,
         Exception deploymentError)
     {
-        await LogFailedCandidateAsync(attempt, started);
+        var output = await LogFailedCandidateAsync(attempt, started);
         var cleanupWarnings = new List<string>();
         var cleaned = attempt.Candidate.ComposeCandidateId is Guid composeCandidateId
             ? await TryRemoveComposeProjectAsync(composeCandidateId, attempt.AppId, attempt.TargetId,
@@ -576,20 +582,41 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 "Could not restore managed runtime metadata after deployment failure for {AppId}/{TargetId}.",
                 attempt.AppId, attempt.TargetId);
         }
+        return output;
     }
 
-    private async Task LogFailedCandidateAsync(RuntimeApplyAttempt attempt, DockerApplicationContainer? started)
+    /// <summary>Logs the failed container's output and returns its last lines for the deploy error.</summary>
+    private async Task<string> LogFailedCandidateAsync(RuntimeApplyAttempt attempt, DockerApplicationContainer? started)
     {
-        if (started is null) return;
+        if (started is null) return string.Empty;
         try
         {
             var logs = await GetLogsAsync(attempt.AppId, attempt.TargetId, started.Id, CancellationToken.None);
             logger.LogWarning("Managed application container {ContainerId} failed before promotion. Logs: {Logs}", started.Id, logs);
+            var secrets = secretSource is null ? null
+                : await secretSource.GetAsync(attempt.AppId, attempt.TargetId, CancellationToken.None);
+            return LastLines(RedactValues(logs, secrets?.Values), 20, 2000);
         }
         catch (Exception cleanupError)
         {
             logger.LogWarning(cleanupError, "Could not collect logs for failed managed runtime container {ContainerId}.", started.Id);
+            return string.Empty;
         }
+    }
+
+    internal static string RedactValues(string logs, IEnumerable<string>? secrets)
+    {
+        foreach (var secret in secrets ?? [])
+            if (secret.Length > 0) logs = logs.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
+        return logs;
+    }
+
+    internal static string LastLines(string? logs, int maxLines, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(logs)) return string.Empty;
+        var tail = string.Join(Environment.NewLine,
+            logs.Split('\n').Select(line => line.TrimEnd('\r')).Where(line => line.Length > 0).TakeLast(maxLines));
+        return tail.Length > maxChars ? tail[^maxChars..] : tail;
     }
 
     private async Task RestoreMetadataAfterFailureAsync(
