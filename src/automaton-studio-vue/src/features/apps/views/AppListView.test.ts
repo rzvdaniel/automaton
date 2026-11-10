@@ -98,7 +98,7 @@ describe('AppListView', () => {
   it('pauses and resumes an app from its row and shows the Paused state', async () => {
     const wrapper = await mountView([item({ id: 'a', name: 'Notes' }), item({ id: 'p', name: 'Backup', isPaused: true })])
     const store = useAppsStore()
-    store.setAppPaused = vi.fn(async () => undefined)
+    store.setAppPaused = vi.fn(async (): Promise<string[]> => [])
     const rowsText = wrapper.findAll('.apps-card .app-row').map((row) => row.text())
     expect(rowsText[0]).toContain('live')
     expect(rowsText[0]).toContain('Pause')
@@ -116,6 +116,7 @@ describe('AppListView', () => {
     const wrapper = await mountView([item({ id: 'a', name: 'Notes' })])
     const store = useAppsStore()
     store.setAppPaused = vi.fn(async () => ['The Runner could not be told to stop the app.'])
+    toastAdd.mockClear()
     await wrapper.find('button[aria-label="Pause Notes"]').trigger('click')
     await flushPromises()
     expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warn', summary: 'Paused with warnings' }))
