@@ -70,6 +70,7 @@ layout, build system, or application architecture.
 | `application.pages` | Optional key paths of a web app, up to 10 entries such as `{ "path": "/", "label": "Home" }` (path starts with `/`, label up to 40 characters). |
 | `application.openApi` | Optional path of an API app's OpenAPI document, such as `/openapi.json`. Studio lists the endpoints from it and shows the API reference button. |
 | `application.openPaths` | Optional paths of the private address that answer without Automaton sign-in, for webhooks and callbacks. See below. |
+| `application.publicAccess` | Optional hint `{ "level": "required" or "recommended", "reason": "..." }` for an app that outside callers reach (check-in URLs, a tracking script). New apps are private, so the install page shows it before installing and says to share the app with anyone with the link. It changes nothing by itself. |
 
 The Runner supplies the effective port in `AUTOMATON_PORT` and the durable data
 path in `AUTOMATON_APP_DATA_DIR`. Every runtime and Action also gets

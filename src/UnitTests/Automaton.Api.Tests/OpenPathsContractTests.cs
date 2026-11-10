@@ -22,6 +22,18 @@ public class OpenPathsContractTests
     public void IsValidOpenPath_AcceptsOnlyPlainPathsWithOptionalTrailingStar(string path, bool expected)
         => Assert.That(ApplicationContractValidator.IsValidOpenPath(path), Is.EqualTo(expected));
 
+    [TestCase("required", "Jobs check in from outside.", 0)]
+    [TestCase("recommended", "A tracking script is loaded from other sites.", 0)]
+    [TestCase("always", "Reason.", 1)]
+    [TestCase("required", " ", 1)]
+    public void Validate_ChecksThePublicAccessHint(string level, string reason, int errorCount)
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.PublicAccess = new ApplicationPublicAccessDeclaration { Level = level, Reason = reason };
+
+        Assert.That(ApplicationContractValidator.Validate(contract).Count(error => error.StartsWith("publicAccess")), Is.EqualTo(errorCount));
+    }
+
     [Test]
     public void Validate_ReportsBadAndDuplicateOpenPaths()
     {

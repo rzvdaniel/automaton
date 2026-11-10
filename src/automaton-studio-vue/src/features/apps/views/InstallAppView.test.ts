@@ -23,6 +23,27 @@ vi.mock('@/features/admin/services/adminAppsService', () => ({ adminAppsService:
 window.matchMedia ??= (() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })) as never
 
 describe('InstallAppView', () => {
+  it('says before installing that the app needs public access and which paths are open, and lets optional secrets stay empty', async () => {
+    vi.mocked(appsService.getInstallSource).mockResolvedValue({
+      id: 'src-1', name: 'Heartbeat', creatorDisplayName: 'Me',
+      application: {
+        publicAccess: { level: 'required', reason: 'Your jobs check in from outside.' },
+        openPaths: ['/ping/*'],
+        secrets: [{ name: 'WEBHOOK_URL', optional: true }],
+      },
+    })
+    const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
+    await flushPromises()
+
+    const notice = wrapper.get('[data-testid="public-access-notice"]').text()
+    expect(notice).toContain('Needs public access.')
+    expect(notice).toContain('Your jobs check in from outside.')
+    expect(notice).toContain('/ping/*')
+    expect(wrapper.text()).toContain('(optional)')
+    const install = wrapper.findAll('button').find((b) => b.text().includes('Install'))!
+    expect(install.attributes('disabled')).toBeUndefined()
+  })
+
   it('installs with settings, secrets, approval and a schedule, in order', async () => {
     vi.mocked(appsService.getInstallSource).mockResolvedValue({
       id: 'src-1', name: 'Off-site Backup', creatorDisplayName: 'Me',
