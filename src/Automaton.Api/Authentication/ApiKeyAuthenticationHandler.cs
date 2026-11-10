@@ -20,6 +20,7 @@ public class ApiKeyAuthenticationSchemeOptions : AuthenticationSchemeOptions
 
 public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationSchemeOptions>
 {
+    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache cache;
     private readonly ApiKeyService apiKeyService;
     private readonly ApplicationDbContext dbContext;
     private readonly UserManager<ApplicationUser> userManager;
@@ -30,8 +31,10 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         UrlEncoder encoder,
         ApiKeyService apiKeyService,
         ApplicationDbContext dbContext,
-        UserManager<ApplicationUser> userManager) : base(options, logger, encoder)
+        UserManager<ApplicationUser> userManager,
+        Microsoft.Extensions.Caching.Memory.IMemoryCache cache) : base(options, logger, encoder)
     {
+        this.cache = cache;
         this.apiKeyService = apiKeyService;
         this.dbContext = dbContext;
         this.userManager = userManager;
@@ -73,6 +76,8 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             return AuthenticateResult.Fail("Invalid API key");
         }
 
+        // Lets the rate limiter, which runs before authentication, recognise a key that has been checked.
+        Automaton.Api.Security.RateLimitedApiKeys.Remember(cache, apiKey);
         var (userId, user) = await LoadApiKeyUserAsync(apiKeyEntity.Id);
         if (userId == Guid.Empty)
         {

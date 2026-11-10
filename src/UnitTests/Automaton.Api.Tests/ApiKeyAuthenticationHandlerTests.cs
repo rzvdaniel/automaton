@@ -121,7 +121,8 @@ public sealed class ApiKeyAuthenticationHandlerTests
                 UrlEncoder.Default,
                 apiKeyService,
                 db,
-                services.GetRequiredService<UserManager<ApplicationUser>>());
+                services.GetRequiredService<UserManager<ApplicationUser>>(),
+                new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
 
             await handler.InitializeAsync(
                 new AuthenticationScheme(ApiKeyAuthenticationSchemeOptions.DefaultScheme, null, handler.GetType()),

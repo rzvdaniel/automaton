@@ -46,7 +46,7 @@ public class RateLimitingPipelineTests
     }
 
     [Test]
-    public async Task RunnerApiCalls_HaveTheirOwnBucket_SoTheyAreNotRefusedByOrDoNotUseUpOtherTraffic()
+    public async Task RunnerApiCalls_WithAnAcceptedKeyHaveTheirOwnBucket_ButAnyOtherKeyValueDoesNot()
     {
         using var host = await CreateHostAsync(configureOptions: options =>
         {
@@ -54,21 +54,22 @@ public class RateLimitingPipelineTests
             options.RunnerApi = new RateLimitPolicyOptions(50, 60);
         });
         var client = host.GetTestClient();
-
-        // A Runner polling an operation result many times is not limited at the anonymous limit.
-        for (var i = 0; i < 20; i++)
+        Task<HttpResponseMessage> Poll(string key)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/host-container-executions/x/result");
-            request.Headers.Add("X-API-Key", "k");
-            Assert.That((await client.SendAsync(request)).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"poll {i}");
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/host-container-executions/x/result");
+            request.Headers.Add("X-API-Key", key);
+            return client.SendAsync(request);
         }
 
-        // It did not use up the anonymous allowance, and the same path without a key keeps the normal limit.
-        var codes = new List<HttpStatusCode>();
-        for (var i = 0; i < 4; i++) codes.Add((await client.GetAsync("/test-auth/global-anonymous")).StatusCode);
-        Assert.That(codes.Take(3), Has.All.EqualTo(HttpStatusCode.OK));
-        Assert.That(codes[3], Is.EqualTo((HttpStatusCode)429));
-        Assert.That((await client.GetAsync("/api/host-container-executions/x/result")).StatusCode, Is.EqualTo((HttpStatusCode)429));
+        // A header value nobody accepted keeps the normal limit, so it cannot be used to guess keys faster.
+        var unknown = new List<HttpStatusCode>();
+        for (var i = 0; i < 6; i++) unknown.Add((await Poll("not-a-real-key")).StatusCode);
+        Assert.That(unknown, Has.Some.EqualTo((HttpStatusCode)429));
+
+        // A key that authentication has accepted: a Runner polling many times is not limited at the anonymous limit.
+        RateLimitedApiKeys.Remember(host.Services.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), "runner-key");
+        for (var i = 0; i < 20; i++)
+            Assert.That((await Poll("runner-key")).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"poll {i}");
     }
 
     [Test]
