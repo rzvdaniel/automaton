@@ -27,13 +27,14 @@ test.describe('as the system administrator', () => {
     await shot(page, 'admin-apps-start')
   })
 
-  test('Admin → Users lists users and opens Add user', async () => {
+  test('Admin → Users opens People, lists members and opens Create with password', async () => {
     await goTo(page, '/admin/users')
-    await expect(heading(page, 'Users')).toBeVisible()
-    // At least one user row below the header; the table's "No users found" placeholder is also a row.
-    await expect(page.getByRole('row').filter({ hasNot: page.getByText(/No users found/) }).nth(1)).toBeVisible()
-    await page.getByRole('button', { name: 'Add user' }).click()
-    await page.getByText('Create with password').click()
+    await expect(page).toHaveURL(/\/people/)
+    await expect(heading(page, 'People')).toBeVisible()
+    await expect(heading(page, 'Members')).toBeVisible()
+    // At least one member row (the signed-in administrator).
+    await expect(page.locator('.studio-row').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Create with password' }).click()
     await expect(page.getByText('Must choose a new password at first sign-in')).toBeVisible()
     await shot(page, 'admin-add-user')
     await page.keyboard.press('Escape')
@@ -52,19 +53,20 @@ test.describe('as the system administrator', () => {
     } else skipped('Permissions tab: the server has no apps')
   })
 
-  test('Admin → Installation scrolls to its last section', async () => {
+  test('Admin → Installation opens Settings and scrolls to Server settings', async () => {
     await goTo(page, '/admin/installation')
-    const nextSteps = page.getByText('Next steps', { exact: true })
-    await nextSteps.scrollIntoViewIfNeeded()
-    await expect(nextSteps).toBeInViewport()
+    await expect(page).toHaveURL(/\/settings/)
+    const serverSettings = heading(page, 'Server settings')
+    await serverSettings.scrollIntoViewIfNeeded()
+    await expect(serverSettings).toBeInViewport()
     await shot(page, 'admin-installation')
   })
 
-  test('phone width has no horizontal scroll on Apps and Installation', async () => {
+  test('phone width has no horizontal scroll on Apps and Settings', async () => {
     const original = page.viewportSize()
     await page.setViewportSize({ width: 390, height: 844 })
     try {
-      for (const path of ['/apps', '/admin/installation']) {
+      for (const path of ['/apps', '/settings']) {
         await goTo(page, path)
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
         expect(overflow, path).toBeLessThanOrEqual(1)

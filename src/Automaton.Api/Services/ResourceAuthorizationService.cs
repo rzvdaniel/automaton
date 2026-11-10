@@ -668,6 +668,21 @@ public class ResourceAuthorizationService
         return GetAppsQueryByContext(projectId, UserId);
     }
 
+    /// <summary>
+    /// Apps for the Apps list. In a project this is the project's apps. Without one it is the person's own apps plus
+    /// project apps they may update (their own, or as a project Admin or Developer), so they can manage those from the list.
+    /// </summary>
+    public IQueryable<WebApp> GetListedAppsQuery(Guid? projectId)
+    {
+        if (projectId != null) return GetAppsQueryByContext(projectId, UserId);
+        var userId = UserId;
+        return dbContext.WebApps.Where(a =>
+            a.WebAppUsers.Any(u => u.UserId == userId) ||
+            a.ProjectApps.Any(pa => pa.Project != null && pa.Project.Members.Any(pm =>
+                pm.UserId == userId && pm.IsActive &&
+                (pm.Role == ProjectRole.ProjectAdmin || pm.Role == ProjectRole.Developer))));
+    }
+
     public IQueryable<WebApp> GetAppsQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)

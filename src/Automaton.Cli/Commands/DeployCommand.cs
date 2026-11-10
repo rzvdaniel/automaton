@@ -78,14 +78,17 @@ public static class DeployCommand
                 publishOption,
                 openOption,
                 nonInteractiveOption,
-                environmentOption);
+                environmentOption,
+                resumeOption);
             // A paused app stays paused through a deploy, so it is resumed only once the deploy succeeded.
             if (context.ParseResult.GetValueForOption(resumeOption) && context.ExitCode == 0)
             {
                 try
                 {
-                    await PauseCommand.ResumeLinkedAsync(
+                    var resumed = await PauseCommand.ResumeLinkedAsync(
                         config, context.ParseResult.GetValueForOption(environmentOption), context.GetCancellationToken());
+                    if (resumed && !context.ParseResult.GetValueForOption(jsonOption))
+                        AnsiConsole.MarkupLine("[green]The app is running again.[/]");
                 }
                 catch (Exception exception)
                 {

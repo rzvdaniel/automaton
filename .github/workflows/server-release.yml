@@ -100,6 +100,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -149,8 +150,15 @@ jobs:
               resolve RABBITMQ_IMAGE rabbitmq:4-management
               resolve TRAEFIK_IMAGE traefik:v3
             fi
-            # New Runners install the latest smoke-tested Runner image built from main.
-            resolve RUNNER_IMAGE ghcr.io/rzvdaniel/automaton-runner:latest
+            # New Runners install the Runner image built from this commit. That workflow only runs when Runner code
+            # changed, so with no run for this commit the unchanged :latest image is the right one.
+            runner_run=$(gh run list --workflow runner-image.yml --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            if [[ -n "$runner_run" ]]; then
+              gh run watch "$runner_run" --exit-status >&2                 || { echo "The Runner image workflow run $runner_run for $GITHUB_SHA did not succeed; rerun it, then rerun this release." >&2; exit 1; }
+              resolve RUNNER_IMAGE "ghcr.io/rzvdaniel/automaton-runner:sha-$GITHUB_SHA"
+            else
+              resolve RUNNER_IMAGE ghcr.io/rzvdaniel/automaton-runner:latest
+            fi
           } > automaton-server/release.env
       - uses: docker/login-action@v3
         with:

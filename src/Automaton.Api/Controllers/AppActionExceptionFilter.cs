@@ -12,6 +12,7 @@ public sealed class AppActionExceptionFilter : IExceptionFilter
         {
             KeyNotFoundException => StatusCodes.Status404NotFound,
             UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+            AppPausedException => StatusCodes.Status409Conflict,
             RunnerNotRespondingException => StatusCodes.Status503ServiceUnavailable,
             _ => 0
         };
