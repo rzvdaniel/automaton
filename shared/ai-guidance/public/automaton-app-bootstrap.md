@@ -4,8 +4,19 @@ Automaton is a self-hosted platform for building, deploying and publishing web a
 
 ## Start here
 
-1. **No server yet:** follow [Install with your AI agent](https://automaton.monster/docs/install-with-ai). Ask the user only for what they alone can give: root SSH access to an x86_64 Ubuntu 24.04/22.04 or Debian 12 server, a domain with two DNS A records (`domain` and `*.domain`, DNS only, no proxy), and an email for Let's Encrypt notices (also ask which email the administrator uses; default: the same). The page installs the server, creates the administrator with a password you never see, signs in the CLI, adds a Runner and ends with a one-time link the user opens to choose their own password. Show that link in your last message.
-2. **Server and signed-in CLI exist:** follow [Your first app](https://automaton.monster/docs/getting-started): `automaton new`, edit, `automaton validate`, `automaton deploy`, wait for `Running` in `automaton apps`, `automaton publish --yes --slug NAME`. A team server's API URL comes from its administrator; do not assume the public project website is the user's server.
+Every page below is one task with exact commands and a check after each step. Follow them in order and do not skip the checks.
+
+**Installing a server for the user.** Pages, in order: [Install the server](https://automaton.monster/docs/install-server) (section "For AI agents"), [Create the first administrator](https://automaton.monster/docs/first-admin), [Install and authenticate the CLI](https://automaton.monster/docs/automaton-cli), [Add a Runner](https://automaton.monster/docs/deploy-runner). Overview for the user: [Install with your AI agent](https://automaton.monster/docs/install-with-ai).
+
+- Ask the user for the server's SSH access, the domain and the certificate email (also which email the administrator uses).
+- Never print, read back or store the generated administrator password.
+- Finish with the one-time link from `server password-link` and show it in your last message.
+
+**Starting an Automaton app.** Pages, in order: [Build an Automaton app](https://automaton.monster/docs/build-an-automaton-app), [Deploy and publish an app](https://automaton.monster/docs/deploy). Overview for the user: [Your first app](https://automaton.monster/docs/getting-started).
+
+- Wait until the app is `Running` before reporting; `deploy` has no `--yes` flag.
+- Publish only if the user asked.
+- A team server's API URL comes from its administrator; do not assume the public project website is the user's server.
 
 ## Working in an app folder
 

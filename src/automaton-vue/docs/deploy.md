@@ -9,7 +9,7 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
 
 ## Prerequisites
 
-- An app folder with `automaton.json` ([Your first app](./getting-started)).
+- An app folder with `automaton.json` ([Build an Automaton app](./build-an-automaton-app); overview in [Your first app](./getting-started)).
 - At least one online Runner ([Add a Runner](./deploy-runner)).
 
 ## Steps
@@ -38,6 +38,8 @@ This page ships an app to a Runner and makes it public. Deploy and publish are s
    ```
 
    The *private address* is the `app-<id>.apps...` URL that `automaton status` shows. It needs about a minute for its certificate, and it needs sign-in: an anonymous `curl` gets `401`, so check a private app in a signed-in browser. A static site (`--template static`) has no process behind it, so that URL answers `503` until you publish; after `automaton publish` the public URL answers.
+
+   Open `https://my-app.apps.<domain>` once published and check the real behavior, not only the status.
 
    `automaton deploy --publish` deploys and publishes in one step.
 

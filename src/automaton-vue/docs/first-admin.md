@@ -63,13 +63,28 @@ The password never goes on the command line: `jq --arg` receives it from the she
 
 ## When an AI agent sets up the server for you
 
-The full agent procedure is [Install with your AI agent](./install-with-ai). An agent needs a signed-in CLI to deploy, so it creates the administrator itself with a password it generates and never prints or writes to a file (`PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n=')` in the snippet above, used in the same shell, then `unset`). It ends with a one-time link for you:
+The agent steps are in [Install the server](./install-server#for-ai-agents). An agent needs a signed-in CLI to deploy, so it creates the administrator itself with a password it generates and never prints or writes to a file, used in the same shell, then `unset`. In the same shell as the install, with `API` and `EMAIL` set:
 
 ```bash
-sudo "$(command -v automaton)" server password-link --email admin@example.com
+PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n=')
+jq -n --arg name "Administrator" --arg email "$EMAIL" --arg password "$PASSWORD" \
+   '{name: $name, email: $email, password: $password}' |
+  curl -s -w '\nHTTP %{http_code}\n' -X POST "$API/api/install" \
+    -H @<(printf 'X-Automaton-Setup-Token: %s\n' "$(cat /etc/automaton/secrets/setup-token)") \
+    -H 'Content-Type: application/json' --data-binary @-
 ```
 
-It prints a link to Studio's set-password page. The link works once and for 30 minutes. Opening it asks for a new password; the generated one stops working at that moment and you sign in with yours. If the link expires or is lost, run the command again: each new link voids the earlier ones. Only someone who can read `/etc/automaton/secrets/setup-token` (root) can create it, it needs no sign-in and no email (SMTP), and it works only for administrator accounts. The command finds the server from `/etc/automaton/installation.json`, so it works under `sudo` without the CLI's sign-in; use `--config-dir` if the configuration is elsewhere and `--server <api-url>` to name another server. Treat the link like a password until you have used it.
+Check: the output ends with `HTTP 200` (`403`, `400` and `409` are explained above). Keep `PASSWORD` for the [CLI sign-in](./automaton-cli#log-in-without-a-browser), then `unset` it.
+
+It ends with a one-time link for the user. Run this last, after any app you were asked to build, so the 30-minute link is fresh:
+
+```bash
+"$(command -v automaton)" server password-link --email "$EMAIL"
+```
+
+As a non-root user, prefix it with `sudo`. Show the printed link in your final message, together with `https://studio.<domain>`. It is a link to Studio's set-password page; if it is not, stop.
+
+The link works once and for 30 minutes. Opening it asks for a new password; the generated one stops working at that moment and the user signs in with theirs. If the link expires or is lost, run the command again: each new link voids the earlier ones. Only someone who can read `/etc/automaton/secrets/setup-token` (root) can create it, it needs no sign-in and no email (SMTP), and it works only for administrator accounts. The command finds the server from `/etc/automaton/installation.json`, so it works under `sudo` without the CLI's sign-in; use `--config-dir` if the configuration is elsewhere and `--server <api-url>` to name another server. Treat the link like a password until it has been used.
 
 ## Verify it worked
 
@@ -78,6 +93,8 @@ Studio opens after sign-in and **Admin → Installation** shows **Check installa
 ## Common errors
 
 - **Token rejected.** Use the current value from `/etc/automaton/secrets/setup-token`. After setup is complete the printed token no longer works; the file holds a new value for root.
+- **Setup returns 409.** The administrator already exists. Run `server password-link` to give the user a link.
+- **Link rejected or rate limited.** Creating and using links is limited to 5 per hour per IP; wait and run the command again.
 - **Password refused.** Use 12 or more characters with all four character kinds.
 
 Next: [add a Runner](./deploy-runner).
