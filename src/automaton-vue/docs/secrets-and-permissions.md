@@ -43,7 +43,10 @@ A system administrator approves it in Studio (the command prints the approval li
 With `notify:email` approved, the app can ask the server to email through the server's own SMTP (Admin > Settings); it never sees SMTP credentials. Call it with the app's key:
 
 ```bash
-curl -X POST "$AUTOMATON_API_URL/api/notify/email" -H "Authorization: Bearer $APP_AUTOMATON_API_KEY"   -H "Content-Type: application/json"   -d '{"to":["administrators"],"subject":"Disk almost full","text":"Only 2 GB left."}'
+curl -X POST "$AUTOMATON_API_URL/api/notify/email" \
+  -H "Authorization: Bearer $APP_AUTOMATON_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to":["administrators"],"subject":"Disk almost full","text":"Only 2 GB left."}'
 ```
 
 `to` takes `owner` (the app's owners), `administrators`, `project` (the members of the app's project) and addresses an administrator put on the server's allowed list (`PUT /api/admin/installation/notify-recipients`). Any other address gets 403; apps cannot email arbitrary addresses, so an app that needs that brings its own SMTP or uses a webhook. The subject is prefixed with `[app name]`, the text is plain text (up to 10,000 characters), and each recipient gets their own message. An app can send 10 emails per hour (429 with `Retry-After` beyond that). Answers: 200 `{"sent":n}`, 400 invalid request, 403 not approved or address not allowed, 404 no recipient resolved, 409 SMTP not configured. Every send and refusal appears in Admin > Audit Events (subject and counts, never the text).

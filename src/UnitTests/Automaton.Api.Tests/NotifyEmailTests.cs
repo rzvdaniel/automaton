@@ -159,6 +159,16 @@ public sealed class NotifyEmailTests
     }
 
     [Test]
+    public async Task LineBreaksInTheSubjectAreRemovedAndListsOrNamesAreNotAddresses()
+    {
+        await Service().SendAsync(appId, new(["owner"], "Hi\r\nBcc: x@example.test", "t"), default);
+        Assert.That(smtp.Subject, Is.EqualTo("[Server Console] Hi Bcc: x@example.test"));
+        foreach (var tricky in new[] { "owner,administrators", "Bob <owner@example.test>", "owner@example.test, admin@example.test" })
+            Assert.That(Assert.ThrowsAsync<NotifyEmailException>(() => Service().SendAsync(appId, Request(tricky), default))!.Failure,
+                Is.EqualTo(NotifyEmailFailure.NotAllowed), tricky);
+    }
+
+    [Test]
     public void AnUnknownAppGets404FromTheService()
         => Assert.ThrowsAsync<KeyNotFoundException>(() => Service().SendAsync(Guid.NewGuid(), Request("owner"), default));
 

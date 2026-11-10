@@ -35,6 +35,7 @@ public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsServ
     public const int MaxRecipientsPerSend = 25;
     public const int MaxSubjectLength = 150;
     public const int MaxTextLength = 10_000;
+    private static readonly object CounterLock = new();
     private static readonly TimeSpan Window = TimeSpan.FromHours(1);
 
     public async Task<NotifyEmailResult> SendAsync(Guid appId, NotifyEmailRequest request, CancellationToken token)
@@ -43,11 +44,11 @@ public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsServ
             .Select(item => new { item.Name, item.ProjectId }).SingleOrDefaultAsync(token)
             ?? throw new KeyNotFoundException("App not found.");
         var (targets, subject, text) = Validate(request);
+        Reserve(appId); // every valid-looking attempt counts, refused ones too, so a loop cannot flood the audit log
         var addresses = await ResolveAsync(appId, app.Name, app.ProjectId, targets, subject, token);
         var config = (await smtp.GetEffectiveAsync(token)).Config;
         if (!SmtpSettingsService.IsConfigured(config))
             throw new NotifyEmailException(NotifyEmailFailure.SmtpNotConfigured, new SmtpNotConfiguredException().Message);
-        Reserve(appId);
 
         var prefixed = $"[{app.Name.ReplaceLineEndings(" ").Trim()}] {subject}";
         try { await smtp.SendPlainAsync(addresses.ToList(), prefixed, text, token); }
@@ -56,7 +57,9 @@ public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsServ
             await AuditAsync(appId, app.Name, AuditEventTypes.AppEmailRefused, "Failure", subject, targets.Count, 0, "the SMTP server did not accept the message");
             throw;
         }
-        await AuditAsync(appId, app.Name, AuditEventTypes.AppEmailSent, "Success", subject, targets.Count, addresses.Count, null);
+        // The mail is out; a failing audit write must not tell the app it failed (it would retry and duplicate).
+        try { await AuditAsync(appId, app.Name, AuditEventTypes.AppEmailSent, "Success", subject, targets.Count, addresses.Count, null); }
+        catch (Exception) when (!token.IsCancellationRequested) { }
         return new(addresses.Count);
     }
 
@@ -147,13 +150,14 @@ public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsServ
 
     private void Reserve(Guid appId)
     {
-        var counter = memory.GetOrCreate($"notify-email:{appId}", entry =>
+        lock (CounterLock)
         {
-            entry.AbsoluteExpirationRelativeToNow = Window;
-            return new SendCounter();
-        })!;
-        lock (counter)
-        {
+            var key = $"notify-email:{appId}";
+            var counter = memory.GetOrCreate(key, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = Window;
+                return new SendCounter();
+            })!;
             if (++counter.Count > MaxSendsPerHour)
                 throw new NotifyEmailException(NotifyEmailFailure.RateLimited,
                     $"An app can send at most {MaxSendsPerHour} emails per hour.", (int)Window.TotalSeconds);
