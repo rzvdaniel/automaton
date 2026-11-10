@@ -12,7 +12,7 @@ a step when you reach it.
 
 ## Ground rules
 
-- Work items live in GitHub issues on the project board (https://github.com/users/rzvdaniel/projects/1), with
+- Work items live in GitHub issues on the project board named in `.agents/environment.md`, with
   Status, Priority and Plan fields.
 - Ask the owner only for product decisions and for the changes listed under step 6. Decide everything else yourself
   and report it.

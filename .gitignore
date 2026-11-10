@@ -125,3 +125,5 @@ AgentRuns/
 
 # Each installation keeps its own orchestrator configuration (servers, boards, decisions); see .agents/skills/automaton-orchestrate/config.example.md
 .agents/orchestrator.config.md
+# Each contributor names their own test server, production, boards and agents; see .agents/environment.example.md
+.agents/environment.md

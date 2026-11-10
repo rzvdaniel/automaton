@@ -58,14 +58,7 @@ Keep it short. Link related issues and PRs by number. No credentials, hostnames 
 
 ## Board
 
-Issues about the app catalog and its ecosystem (parent #729) live on their own board, https://github.com/users/rzvdaniel/projects/2 (Status and Priority only, no Plan): use `gh project item-add 2` and make the issue a sub-issue of #729. Launch work (articles, demo, video, accounts, launch checks; label `launch`, parent #560) lives on the Public launch board, https://github.com/users/rzvdaniel/projects/3 (Status, Priority and Who: Owner or Claude). Ideas and explorations that are not planned work (label `research`) go on the Research board, https://github.com/users/rzvdaniel/projects/5, and move to the roadmap board when decided. Security audit findings have their own board, https://github.com/users/rzvdaniel/projects/4. Everything else goes on the roadmap board below.
-
-Add the issue to the roadmap board and set the fields:
-
-```sh
-gh project item-add 1 --owner rzvdaniel --url <issue-url>
-```
-
-Then set Status (Todo, or In Progress if you start now), Priority (P1 next, P2 soon, P3 later) and Plan when one fits,
-with `gh project item-edit`. If it belongs under a parent issue, add it as a sub-issue
-(`gh api -X POST repos/rzvdaniel/automaton/issues/<parent>/sub_issues -F sub_issue_id=<issue id>`).
+If you maintain the project boards, put the issue on the right board with its fields and parent issue, as
+`.agents/environment.md` describes (boards, fields, parents per kind of work). Contributors without board access skip this: the
+maintainers place the issue. Add a sub-issue with
+`gh api -X POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<issue id>`.

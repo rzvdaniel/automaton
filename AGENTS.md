@@ -29,10 +29,11 @@ These skills are the repository contract. Other folders under `.agents/skills/` 
 
 ## Operating rules
 
-- **Servers.** Test only on the test server (`runner-01.automaton.monster`); agents there run as the `agent` user, not root. Touch production (`automaton.monster`) only when the owner asks or has pre-approved it (releases and production updates of verified work). Always ask before deleting data, volumes, backups or the database, migrations that drop or rewrite data, and changes that widen access or change sign-in.
+- **Your environment.** The test server, production, boards and agents of your setup are named in `.agents/environment.md` (copy `.agents/environment.example.md`; not committed). Without a test server, test locally with the README quickstart or on your own install.
+- **Servers.** Test only on the test server; agents there run as an unprivileged user, not root. Touch production only when the owner asks or has pre-approved it (releases and production updates of verified work). Always ask before deleting data, volumes, backups or the database, migrations that drop or rewrite data, and changes that widen access or change sign-in.
 - **Sign-up** is disabled on purpose. Never re-enable it, insert users into the database, or bypass the invite flow.
-- **Secrets.** Never print, log, commit or post credentials, tokens, API keys or connection strings. Test credentials are in `~/.config/automaton-test/accounts.env` on the test server: read values literally (CRLF, values may contain `$`), never `source` it.
-- **Issues and the board.** Issue titles say what the work does. Each issue has a parent issue and is on the [roadmap board](https://github.com/users/rzvdaniel/projects/1) with Status, Priority and Plan. Changing a single-select field's options through the API clears it on every item: save the values first and set them again afterwards.
+- **Secrets.** Never print, log, commit or post credentials, tokens, API keys or connection strings. Test credentials live where `.agents/environment.md` says: read values literally (CRLF, values may contain `$`), never `source` them.
+- **Issues and the board.** Issue titles say what the work does. Maintainers put each issue under a parent issue and on the project board (`.agents/environment.md`); contributors without board access just file the issue. Changing a single-select field's options through the API clears it on every item: save the values first and set them again afterwards.
 - **Git.** Work on a branch (docs-only changes may go straight to `main` when the owner says so). Check `git status` before switching branches and keep the main folder on `main` between tasks.
 - **Attribution.** Agents use the owner's GitHub login and end commit messages and PR descriptions with a line naming the agent.
 - **Finish what you start, or leave it clearly open:** report what was verified and what wasn't, and post anything a later agent needs on the issue.
@@ -59,4 +60,4 @@ These skills are the repository contract. Other folders under `.agents/skills/` 
 - Production and local scripts: `scripts/`
 - Tests: `src/UnitTests/`
 
-Local setup is the README quickstart. Do not invent Compose files, ports or domains. Remote sessions with the test-server agents: [docs/agents/remote-sessions.md](docs/agents/remote-sessions.md).
+Local setup is the README quickstart. Do not invent Compose files, ports or domains. 

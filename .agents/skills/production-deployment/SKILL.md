@@ -26,7 +26,7 @@ The updater's protected recovery directory is the rollback record. Image rollbac
 
 Why: tests run by agents that know the repo hide the gaps a newcomer hits (unclear docs, a login that only works one way). A fresh session that sees only the public website finds them.
 
-How: start a headless task on the test server with the second account (Sonnet 5.5, low effort) from an EMPTY folder, with no repo, AGENTS.md or project instructions, on a freshly rebuilt server (rebuild only when the installer changed). Prompt, kept this short on purpose:
+How: start a headless agent task (see `.agents/environment.md`, low effort) from an EMPTY folder, with no repo, AGENTS.md or project instructions, on a freshly rebuilt server (rebuild only when the installer changed). Prompt, kept this short on purpose:
 
 ```
 I have a Debian server: `ssh <server>`, domain <domain>, email <email> for certificate notices.

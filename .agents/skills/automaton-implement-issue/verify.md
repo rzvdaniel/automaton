@@ -2,9 +2,8 @@
 
 ## Where to test
 
-All end-to-end checks run on the test server: the machine Automaton-Runner-01, Studio at
-`studio.test.automaton.monster`. The exact URLs are in `accounts.env` below. An agent running on that machine is
-already on the test server. Never test on production, and never use a local stack in place of the end-to-end check.
+All end-to-end checks run on the test server named in `.agents/environment.md`; the exact URLs are in `accounts.env` below.
+An agent running on that machine is already on the test server. Never test on production, and never use a local stack in place of the end-to-end check.
 
 ## Release
 
@@ -21,8 +20,7 @@ the command Studio shows under **Runners → Upgrade runner**.
 
 ## Test accounts
 
-Credentials sit outside the repository in `~/.automaton-test/accounts.env` (on the test server
-`~/.config/automaton-test/accounts.env`, mode 600):
+Credentials sit outside the repository in an `accounts.env` file (mode 600) at the path `.agents/environment.md` names:
 
 | Key | Meaning |
 | --- | --- |
@@ -59,7 +57,7 @@ curl -s "localhost:8025/api/v1/search?query=to:e2e-x@example.test"
 curl -s -X DELETE localhost:8025/api/v1/messages           # empty the inbox
 ```
 
-From another machine use `ssh -L 8025:localhost:8025 automaton-runner-01`; the UI is then at `http://localhost:8025`.
+From another machine use `ssh -L 8025:localhost:8025 <test-server>`; the UI is then at `http://localhost:8025`.
 Quote the mail (subject, recipient, link) in the proof, but not one-time links or passwords. If the container is gone, recreate it:
 `docker run -d --name automaton-test-mailpit --restart unless-stopped --network automaton-server_default -p 127.0.0.1:8025:8025 -e MP_SMTP_AUTH_ACCEPT_ANY=1 -e MP_SMTP_AUTH_ALLOW_INSECURE=1 axllent/mailpit`,
 then in Admin → Settings → SMTP (or `PUT api/admin/installation/smtp`) set host `automaton-test-mailpit`, port 1025, SSL off,
@@ -73,8 +71,7 @@ Against the test server API, the CLI and Studio, check:
 - each role boundary: a regular user and a stranger are refused, a plain Admin versus a SysAdmin;
 - the error messages a person will see.
 
-Check pages in a browser yourself with `agent-browser` (see the studio-design skill, "Browser automation"; on the test server `/home/agent/ab-login.sh`
-and `ab-shot.sh` log in and take screenshots), following the studio-design visual checklist. When the change is a Studio
+Check pages in a browser yourself with `agent-browser` (see the studio-design skill, "Browser automation"; login and screenshot helpers, if your test server has them, are listed in `.agents/environment.md`), following the studio-design visual checklist. When the change is a Studio
 action (a button, a form), do it by clicking in Studio with `agent-browser`, not through the API. Record what passed
 and what you could not check.
 
