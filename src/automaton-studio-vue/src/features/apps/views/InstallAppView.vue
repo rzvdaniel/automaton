@@ -223,6 +223,10 @@ function openInstalledApp() {
         <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
         <div v-if="succeeded" class="flex flex-column gap-2">
           <p class="m-0">{{ name.trim() }} is installed and running on your server.</p>
+          <p v-if="manifest.publicAccess" class="m-0" data-testid="public-access-next">
+            {{ manifest.publicAccess.level === 'required' ? 'To work for outside callers, this app must be public.' : 'To work for outside callers, make this app public.' }}
+            Open the app, choose Change next to "Who can open it", then "Anyone on the internet".
+          </p>
           <ul v-if="scheduleSummary.length" class="m-0">
             <li v-for="line in scheduleSummary" :key="line">{{ line }}.</li>
           </ul>
@@ -253,6 +257,17 @@ function openInstalledApp() {
             />
             <small v-if="!runnerOptions.length" class="text-color-secondary">No Runner is available to you yet; connect one first.</small>
           </div>
+
+          <Message v-if="manifest.publicAccess || manifest.openPaths?.length" severity="info" :closable="false" data-testid="public-access-notice">
+            <p v-if="manifest.publicAccess" class="m-0">
+              <strong>{{ manifest.publicAccess.level === 'required' ? 'Needs public access.' : 'Works best with public access.' }}</strong>
+              {{ manifest.publicAccess.reason }}
+              New apps are private: only you and the people you share them with can open them, so callers without an Automaton sign-in get 401 unless the app is made public. After installing, open the app and choose Change next to "Who can open it", then "Anyone on the internet".
+            </p>
+            <p v-if="manifest.openPaths?.length" class="m-0">
+              These paths already answer without sign-in while the app is private, for outside calls: <code>{{ manifest.openPaths.join(', ') }}</code>. The rest of the app stays private.
+            </p>
+          </Message>
 
           <div class="install-fields">
             <section v-if="manifest.settings?.length" class="flex flex-column gap-2" aria-labelledby="install-settings">

@@ -43,6 +43,12 @@ public sealed class ApplicationContract
     /// </summary>
     public List<string> OpenPaths { get; set; } = [];
 
+    /// <summary>
+    /// Optional hint that the app receives calls from outside (check-in URLs, a tracking script) and so only works for
+    /// them once it is public. Apps are private by default; the install page shows this before installing.
+    /// </summary>
+    public ApplicationPublicAccessDeclaration? PublicAccess { get; set; }
+
     /// <summary>Plain (non-secret) values an installer chooses, delivered as environment variables like secrets.</summary>
     public List<ApplicationSettingDeclaration> Settings { get; set; } = [];
 
@@ -83,6 +89,22 @@ public sealed class ApplicationSecretDeclaration
 
     /// <summary>The app works without a value (it reads an empty or missing variable), so the installer may leave it empty.</summary>
     public bool Optional { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+/// <summary>Why and how strongly an app wants to be reachable without Automaton sign-in.</summary>
+public sealed class ApplicationPublicAccessDeclaration
+{
+    public const string Required = "required";
+    public const string Recommended = "recommended";
+
+    /// <summary><c>required</c> (the app does not work for its callers otherwise) or <c>recommended</c>.</summary>
+    public string Level { get; set; } = string.Empty;
+
+    /// <summary>One sentence for the installer: who calls the app from outside and why.</summary>
+    public string Reason { get; set; } = string.Empty;
 
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
@@ -338,6 +360,7 @@ public static class ApplicationContractValidator
         ValidateSecrets(contract.Secrets, errors);
         ValidatePermissions(contract.Permissions, errors);
         ValidateOpenPaths(contract.OpenPaths, errors);
+        ValidatePublicAccess(contract.PublicAccess, errors);
         ValidateSettings(contract.Settings, contract.Secrets, errors);
         ValidateSchedules(contract.Schedules, errors);
         ValidateDescriptors(contract, errors);
@@ -405,6 +428,15 @@ public static class ApplicationContractValidator
         // "/" and "/*" would open the whole app; a declared path names at least one folder or file.
         return body.Length > 1
             && body.All(c => c is '/' or '-' or '_' or '.' or '~' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'));
+    }
+
+    private static void ValidatePublicAccess(ApplicationPublicAccessDeclaration? access, ICollection<string> errors)
+    {
+        if (access is null) return;
+        if (access.Level is not (ApplicationPublicAccessDeclaration.Required or ApplicationPublicAccessDeclaration.Recommended))
+            errors.Add("publicAccess.level must be 'required' or 'recommended'");
+        if (string.IsNullOrWhiteSpace(access.Reason) || access.Reason.Length > 300)
+            errors.Add("publicAccess.reason is required and at most 300 characters");
     }
 
     private static void ValidateOpenPaths(List<string>? paths, ICollection<string> errors)

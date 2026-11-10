@@ -601,6 +601,8 @@ export interface CatalogResponse {
 }
 
 export interface InstallManifest {
+  publicAccess?: { level: 'required' | 'recommended'; reason: string } | null
+  openPaths?: string[]
   settings?: Array<{ name: string; description?: string | null; default?: string | null; required?: boolean }>
   secrets?: Array<{ name: string; description?: string | null; from?: string | null; optional?: boolean }>
   permissions?: string[]
