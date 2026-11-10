@@ -1,8 +1,8 @@
-# Paths where a change always needs the owner's approval before merge (the "high" tier in
-# .agents/skills/pr-review/SKILL.md). .agents/tools/merge-gate.py reads this file, so keep each pattern a rooted
-# folder (ending in /) or a rooted file. Loosen or extend this list only in a pull request the owner approves.
+# Two lists for .agents/tools/merge-gate.py (tiers in .agents/skills/pr-review/SKILL.md). Keep each pattern a rooted
+# folder (ending in /) or a rooted file. Loosen or extend either list only in a pull request the owner approves.
+#
+# High tier, above the "security pass" marker: the owner approves before merge (label owner-approved).
 
-/.github/workflows/                                            @rzvdaniel
 /.github/CODEOWNERS                                            @rzvdaniel
 # The review rules themselves
 /REVIEW.md                                                     @rzvdaniel
@@ -25,7 +25,10 @@
 /src/Automaton.Api/Services/AppSecretService.cs                @rzvdaniel
 /src/Automaton.Api/Services/ExecutionSecretGrantService.cs     @rzvdaniel
 /src/Automaton.Api/Services/DataProtectionSecretProtector.cs   @rzvdaniel
-# Scripts that people run as root or pipe into a shell
+# --- security pass ---
+# Below this marker: medium tier, but the review must include a security pass (a "Security:" section).
+# Release workflows and scripts that people run as root or pipe into a shell.
+/.github/workflows/                                            @rzvdaniel
 /scripts/cli/                                                  @rzvdaniel
 /docker/install/                                               @rzvdaniel
 /scripts/install-automaton.sh                                  @rzvdaniel

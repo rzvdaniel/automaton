@@ -4,7 +4,9 @@ spec = importlib.util.spec_from_file_location("gate", os.path.join(os.path.dirna
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
 
-PATTERNS = gate.owner_patterns("# comment\n/.github/workflows/ @o\n/scripts/update-automaton.sh @o  # why\n\n")
+OWNERS = "# comment\n/src/Automaton.Identity/ @o\n/scripts/update-automaton.sh @o  # why\n\n# --- security pass ---\n/.github/workflows/ @o\n"
+PATTERNS = gate.owner_patterns(OWNERS)
+SECURITY = gate.security_patterns(OWNERS)
 BODY = "Refs #1.\n**How verified:** x\n**Risk:** medium\n**How to revert:** revert this PR"
 GREEN = [{"name": "tests", "conclusion": "SUCCESS"}]
 
@@ -25,10 +27,12 @@ def failed(result):
 
 class Tier(unittest.TestCase):
     def test_patterns_skip_comments(self):
-        self.assertEqual(PATTERNS, ["/.github/workflows/", "/scripts/update-automaton.sh"])
+        self.assertEqual(PATTERNS, ["/src/Automaton.Identity/", "/scripts/update-automaton.sh"])
+        self.assertEqual(SECURITY, ["/.github/workflows/"])
 
     def test_owner_path_is_high(self):
-        self.assertEqual(gate.path_tier(["README.md", ".github/workflows/tests.yml"], PATTERNS), "high")
+        self.assertEqual(gate.path_tier(["README.md", "src/Automaton.Identity/a.cs"], PATTERNS), "high")
+        self.assertEqual(gate.path_tier([".github/workflows/tests.yml"], PATTERNS), "medium")
         self.assertEqual(gate.path_tier(["scripts/update-automaton.sh"], PATTERNS), "high")
 
     def test_docs_only_is_low(self):
@@ -67,8 +71,15 @@ class Gate(unittest.TestCase):
         self.assertEqual(tier, "high")
         self.assertEqual(failed((tier, rows)), ["owner", "security"])
 
-    def test_high_needs_security_and_owner(self):
+    def test_security_path_needs_security_but_not_owner(self):
         paths = [".github/workflows/tests.yml"]
+        self.assertEqual(failed(gate.check(pr(paths, [review("APPROVE")]), PATTERNS, SECURITY)), ["security"])
+        ok = review("APPROVE\nTier: medium\nSecurity: checked the token permissions")
+        self.assertEqual(gate.check(pr(paths, [ok]), PATTERNS, SECURITY)[0], "medium")
+        self.assertEqual(failed(gate.check(pr(paths, [ok]), PATTERNS, SECURITY)), [])
+
+    def test_high_needs_security_and_owner(self):
+        paths = ["src/Automaton.Identity/a.cs"]
         ok = review("APPROVE\nTier: high\n\nSecurity: checked the token permissions")
         self.assertEqual(failed(gate.check(pr(paths, [ok]), PATTERNS)), ["owner"])
         self.assertEqual(failed(gate.check(pr(paths, [ok], labels=["owner-approved"]), PATTERNS)), [])

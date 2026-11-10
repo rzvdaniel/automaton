@@ -13,8 +13,8 @@ The change sets how much review it gets, not its author.
 | Tier | The change | Before merge |
 | --- | --- | --- |
 | Low | Only documentation for people: Markdown under `docs/`, the Admin docs, the root `README.md`. Skills, `AGENTS.md`, templates and guidance shipped to users' agents steer agents and are medium. | Green CI. The author re-reads the diff against the code it describes. |
-| Medium | Everything else | Green CI and one independent review. |
-| High | Touches a path in [`.github/CODEOWNERS`](../../../.github/CODEOWNERS), or the reviewer finds that it drops or rewrites data, lets more people do something, changes how people sign in, or touches production | Green CI, the review, a separate security pass, and the owner's approval (PR label `owner-approved`). |
+| Medium | Everything else | Green CI and one independent review. Paths below the "security pass" marker in [`.github/CODEOWNERS`](../../../.github/CODEOWNERS) (workflows, install and update scripts) also need a security pass. |
+| High | Touches a path above that marker (sign-in, tokens, authorization, secrets, the review rules), or the reviewer finds that it drops or rewrites data, lets more people do something, changes how people sign in, or touches production | Green CI, the review, a separate security pass, and the owner's approval (PR label `owner-approved`). |
 
 The reviewer may raise the tier, never lower it. An agent's approval never stands in for the owner's: only the owner
 adds `owner-approved`, or tells an agent in the session to add it for that PR. `agent:human-review` on the issue means
@@ -27,13 +27,18 @@ issue number and its "Done when", the PR number, [`REVIEW.md`](../../../REVIEW.m
 reads the diff against the code around it, not the diff alone, and asks whether the change does what the issue asks,
 fits the system and breaks anything.
 
-**Security pass.** A second fresh agent that looks only for security problems (in Claude Code: `/security-review`).
-Required for the high tier. Also run it for a medium change that adds or changes an endpoint, a permission check,
-secret handling, a file path or shell command built from input, or anything an app or anonymous visitor can reach.
+**Security pass.** Looks only for security problems (in Claude Code: `/security-review`). For the high tier it is a
+second fresh agent. For a medium change it is part of the same review (one agent, one more section), required on
+the security-pass paths and whenever the change adds or changes an endpoint, a permission check, secret handling, a
+file path or shell command built from input, or anything an app or anonymous visitor can reach.
 
-**Confirm before posting.** For each Important finding, reproduce it (a failing test, a command and its output) or
-have a second agent try to refute it. Drop what cannot be confirmed. A wrong finding costs a commit and another
-round.
+**Confirm before posting.** For each Important finding, reproduce it when that is cheap (a failing test, a command and
+its output); otherwise say what would confirm it and how sure you are. Drop guesses. A wrong finding costs a commit and
+another round.
+
+**Keep it cheap.** The reviewer reads the diff and the files it touches, not the whole repository. A small model is
+enough for a small diff. A re-review after Nit-only fixes is not needed; the gate still wants the review to cover the
+final commit, so say "Nits fixed, no new code" in a short `--comment` review on that commit.
 
 ## Post the result
 
@@ -62,6 +67,13 @@ Not checked: the update script was not run
   needs it: the review must cover the final commit.
 - After two rounds, stop. More rounds mostly find old bugs or mean the approach is wrong. Write what is left on the
   PR, label the issue `agent:blocked`, and take other work.
+
+## Straight to `main`
+
+Low-tier changes (documentation for people) may be pushed to `main` without a PR. So may agent guidance (`AGENTS.md`,
+skills, templates) when the owner asks for it in the session. Before pushing, run `node scripts/check-doc-links.mjs`
+and, for agent guidance, `dotnet test src/UnitTests/Automaton.Api.Tests --filter RepositoryAgentGuidanceTests`;
+afterwards watch the `main` run for the commit. Everything else goes through a PR and the gate.
 
 ## Merge gate
 

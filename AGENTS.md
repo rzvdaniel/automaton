@@ -35,7 +35,7 @@ These skills are the repository contract. Other folders under `.agents/skills/` 
 - **Sign-up** is disabled on purpose. Never re-enable it, insert users into the database, or bypass the invite flow.
 - **Secrets.** Never print, log, commit or post credentials, tokens, API keys or connection strings. Test credentials live where `.agents/environment.md` says: read values literally (CRLF, values may contain `$`), never `source` them.
 - **Issues and the board.** Issue titles say what the work does. Maintainers put each issue under a parent issue and on the project board (`.agents/environment.md`); contributors without board access just file the issue. Changing a single-select field's options through the API clears it on every item: save the values first and set them again afterwards.
-- **Git.** Work on a branch (docs-only changes may go straight to `main` when the owner says so). Check `git status` before switching branches and keep the main folder on `main` between tasks.
+- **Git.** Work on a branch (documentation for people may go straight to `main`, and agent guidance too when the owner says so; see [PR review](.agents/skills/pr-review/SKILL.md#straight-to-main)). Check `git status` before switching branches and keep the main folder on `main` between tasks.
 - **Attribution.** Agents use the owner's GitHub login and end commit messages and PR descriptions with a line naming the agent.
 - **Finish what you start, or leave it clearly open:** report what was verified and what wasn't, and post anything a later agent needs on the issue.
 

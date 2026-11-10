@@ -17,6 +17,8 @@ the area skills that `AGENTS.md` lists for the code you touch; this skill is onl
 - **When you do need the owner, do not stop.** Post the question on the issue with the options and the one you would
   pick, label the issue `agent:blocked`, and continue with everything that does not depend on the answer. If nothing
   is left, take the next issue.
+- **Spend tokens on the change, not on searching.** Start from the files and facts the task names; read files in
+  parts; don't print large logs, whole transcripts or lock files into the conversation.
 - **Never end your turn on a wait.** Wait for CI and releases in the foreground (`gh pr checks <N> --watch`,
   `gh run watch`). A turn that ends while a background job runs leaves the task idle until someone notices.
 - **Others work beside you.** Use your own worktree and branch. Touch only the files your issue needs. Do not upgrade

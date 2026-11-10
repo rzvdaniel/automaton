@@ -15,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_LABEL = "owner-approved"
+SECURITY_MARKER = "# --- security pass ---"
 # A change is low risk when every file is documentation for people: Markdown in these places and nothing else.
 # Skills, AGENTS.md, templates and the guidance shipped to users' agents steer agents, so they are never low.
 PEOPLE_DOCS = ("docs/", "src/Automaton.Api/Documentation/Admin/")
@@ -23,9 +24,20 @@ CLOSING = re.compile(r"\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+", re.I)
 GREEN = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 
 
+def _patterns(lines) -> list[str]:
+    parts = (line.split("#", 1)[0].split() for line in lines)
+    return [items[0] for items in parts if items]
+
+
 def owner_patterns(text: str) -> list[str]:
-    lines = (line.split("#", 1)[0].split() for line in text.splitlines())
-    return [parts[0] for parts in lines if parts]
+    """High-tier paths: everything above the security-pass marker."""
+    return _patterns(text.split(SECURITY_MARKER, 1)[0].splitlines())
+
+
+def security_patterns(text: str) -> list[str]:
+    """Medium-tier paths whose review must include a security pass: everything below the marker."""
+    parts = text.split(SECURITY_MARKER, 1)
+    return _patterns(parts[1].splitlines()) if len(parts) == 2 else []
 
 
 def matches(path: str, pattern: str) -> bool:
@@ -67,7 +79,7 @@ def read_review(review: dict) -> dict:
     }
 
 
-def check(pr: dict, patterns: list[str]) -> tuple[str, list[tuple[str, str, str]]]:
+def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str, list[tuple[str, str, str]]]:
     """Return the tier and (result, name, detail) rows; result is PASS, FAIL or WARN."""
     rows = []
     head = pr["headRefOid"]
@@ -106,9 +118,11 @@ def check(pr: dict, patterns: list[str]) -> tuple[str, list[tuple[str, str, str]
     else:
         rows.append(("PASS", "review", f"approved at {head[:8]}"))
 
-    if tier == "high":
+    needs_security = tier == "high" or any(matches(path, pattern) for path in paths for pattern in security)
+    if needs_security:
         rows.append(("PASS", "security", "security pass recorded") if review and review["security"] and review["commit"] == head
-                    else ("FAIL", "security", "a high-risk change needs a 'Security:' section in the review of the final commit"))
+                    else ("FAIL", "security", "this change needs a 'Security:' section in the review of the final commit"))
+    if tier == "high":
         rows.append(("PASS", "owner", f"label {OWNER_LABEL}") if OWNER_LABEL in labels
                     else ("FAIL", "owner", f"a high-risk change needs the owner's approval (label {OWNER_LABEL})"))
 
@@ -160,7 +174,7 @@ def main() -> int:
     except subprocess.CalledProcessError:
         local = ROOT / ".github" / "CODEOWNERS"
         owners = local.read_text(encoding="utf-8") if local.exists() else ""
-    tier, rows = check(pr, owner_patterns(owners))
+    tier, rows = check(pr, owner_patterns(owners), security_patterns(owners))
     for result, name, detail in rows:
         print(f"{result}  {name}: {detail}")
     failed = any(result == "FAIL" for result, _, _ in rows)

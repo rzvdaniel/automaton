@@ -48,9 +48,15 @@ It does **not** write product code (exception: skills, docs and small chores the
   at one change.
 - **Start small.** Two or three agents until a batch goes through with no failed check, then add more. The limit is
   how fast reviews and the release check keep up, not how many agents can type.
-- **Stalls.** Keep a watch on every agent you start (when its transcript or log last changed). One that has been
-  quiet past the limit in the configuration is inspected, then resumed or restarted with a smaller task. Usage-limit
-  stops need a resume after the reset.
+- **Stalls.** Watch every agent you start: run `.agents/tools/agent-watchdog.sh <transcript-dir> <minutes> <ids...>`
+  in the background; it exits naming any agent whose transcript has not changed for that long. An agent whose
+  transcript stays empty can't be watched that way (the script says so): check its commits, PRs and test-server
+  activity instead. A stalled agent is inspected, then resumed or restarted with a smaller task. Usage-limit stops
+  need a resume after the reset.
+- **Cost.** Match the model to the task: a small model for fixed-step checks and small diffs, a mid model at low
+  effort for ordinary issues, the largest only for design or hard bugs. Give each agent a brief with the issue numbers,
+  file areas and the facts you already know, so it does not rediscover them. Build- and test-heavy work goes where
+  the configuration says there is capacity (a server agent, one task at a time on a small test server).
 - **Failures feed back.** When the release check fails, the fix-forward PR also fixes the step that should have
   caught it (a test, a line in `REVIEW.md`, a clearer skill).
 
