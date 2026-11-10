@@ -103,7 +103,7 @@ async function saveAccountSettings() {
         return
       }
 
-      if (!/^[a-zA-Z0-9_\-]+$/.test(publicUsername.value)) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(publicUsername.value)) {
         accountError.value = 'Public username can only contain letters, numbers, hyphens, and underscores'
         return
       }

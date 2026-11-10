@@ -69,7 +69,7 @@ public sealed partial class HostContainerExecutionService
         try
         {
             args.Add("--workdir");
-            args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(request.Command.WorkingDirectory, "/automaton/app"));
+            args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(request.Command!.WorkingDirectory, "/automaton/app"));
             DockerContainerRuntime.AddEnvironment(args, environment);
             DockerContainerRuntime.AddEntrypoint(args, request.Command, "/automaton/app");
             args.Add(resolved.ResolvedImage);

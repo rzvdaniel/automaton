@@ -20,6 +20,8 @@ export default [
     rules: {
       'vue/multi-word-component-names': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // 24 existing uses of any; tighten to error once they are typed.
+      '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
 ]

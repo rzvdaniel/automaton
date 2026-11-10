@@ -83,7 +83,7 @@ export const aiChatHistoryService = {
     )
 
     const disposition = response.headers['content-disposition'] as string | undefined
-    const fileNameMatch = disposition?.match(/filename="?([^\"]+)"?/i)
+    const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/i)
     const fileName = fileNameMatch?.[1] || `ai-chat-sessions-${resourceType.toLowerCase()}-${resourceId}.json`
 
     return {

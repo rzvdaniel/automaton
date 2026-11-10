@@ -66,7 +66,7 @@ async function loadOrganization() {
     members.value = await organizationsService.getMembers(organizationId.value)
     
     await loadAppCount()
-  } catch (error) {
+  } catch {
     // Error is handled by the service
     router.push({ name: 'organizations' })
   } finally {
@@ -86,7 +86,7 @@ async function loadAppCount() {
       const apps = await organizationsService.getOrganizationApps(organizationId.value)
       appCount.value = apps.length
     }
-  } catch (error) {
+  } catch {
     appCount.value = 0
     toast.add({
       severity: 'warn',
