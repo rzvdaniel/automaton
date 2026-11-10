@@ -59,6 +59,8 @@ unset PASSWORD
 
 `EMAIL` and `PASSWORD` in the snippet are the sign-in you are creating now: the email you chose, not the certificate email. Keep both: the CLI sign-in below asks for them again. Then sign in the CLI without a browser: see [Log in the CLI on a server without a browser](./automaton-cli#log-in-without-a-browser).
 
+If an AI agent or script created the administrator this way, finish with the one-time link: run `server password-link` and show the printed link to the user, as in [When an AI agent sets up the server for you](#when-an-ai-agent-sets-up-the-server-for-you). Do not end before the link is shown.
+
 The password never goes on the command line: `jq --arg` receives it from the shell variable. If you keep it in a file, make it mode 0600 and delete it afterwards.
 
 ## When an AI agent sets up the server for you

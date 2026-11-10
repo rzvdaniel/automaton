@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using NUnit.Framework;
 
@@ -7,6 +8,38 @@ namespace Automaton.Cli.Tests.Services;
 [TestFixture]
 public class PublishServiceTests
 {
+    private static DeploymentTargetInfo Target(bool isDefault, string? error)
+        => new("t", "n", "s", isDefault, "Failed", null, null, error);
+
+    [Test]
+    public void PickDeployError_PrefersTheDefaultTarget()
+        => Assert.That(PublishService.PickDeployError([Target(false, "staging broke"), Target(true, "live broke")]),
+            Is.EqualTo("live broke"));
+
+    [Test]
+    public void PickDeployError_FallsBackToAnotherTargetWhenDefaultHasNone()
+        => Assert.That(PublishService.PickDeployError([Target(true, null), Target(false, "staging broke")]),
+            Is.EqualTo("staging broke"));
+
+    [Test]
+    public async Task DescribeEmptyApp_FallsBackWhenTheLookupFails()
+    {
+        var (message, hints) = await PublishService.DescribeEmptyAppAsync("nothing to publish",
+            () => throw new HttpRequestException("boom"));
+        Assert.That(message, Is.EqualTo("nothing to publish"));
+        Assert.That(hints, Is.EqualTo(new[] { PublishService.EmptyAppHint }));
+    }
+
+    [Test]
+    public async Task DescribeEmptyApp_ShowsBothMessagesAndHintsWhenADeployFailed()
+    {
+        var (message, hints) = await PublishService.DescribeEmptyAppAsync("nothing to publish",
+            () => Task.FromResult<string?>("build failed"));
+        Assert.That(message, Does.Contain("nothing to publish").And.Contain("build failed"));
+        Assert.That(hints, Has.Length.EqualTo(2));
+        Assert.That(hints[0], Is.EqualTo(PublishService.EmptyAppHint));
+    }
+
     [Test]
     public void ReadCurrentListing_KeepsTheAppsCategoryAndTags()
     {

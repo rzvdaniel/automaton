@@ -19,8 +19,9 @@ output. Follow the image-selection guidance in the generated skill; preserve the
 user's chosen technology and verify dependencies before choosing a minimal image.
 
 Keep the contract accurate when build, runtime, health, storage, or execution
-behavior changes. Keep durable data in the configured data directory and keep
-secrets out of source-controlled files.
+behavior changes. Keep durable data under `AUTOMATON_APP_DATA_DIR`, the data
+directory Automaton supplies to every runtime; build output and other paths are
+replaced on every deploy. Keep secrets out of source-controlled files.
 
 If `automaton.json` is missing and the user wants a new remote app, run
 `automaton new "<name>"`. If the user has an existing remote app, run

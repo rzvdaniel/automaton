@@ -9,6 +9,7 @@ internal sealed record NewAppTemplate(ApplicationContract Contract, IReadOnlyDic
         "node" => new(Runtime("node:22-slim", "node", "server.mjs"), new Dictionary<string, string>
         {
             ["server.mjs"] = """
+                // Keep durable data under AUTOMATON_APP_DATA_DIR; other files are replaced on every deploy.
                 import { createServer } from 'node:http';
 
                 createServer((request, response) => {
@@ -20,6 +21,7 @@ internal sealed record NewAppTemplate(ApplicationContract Contract, IReadOnlyDic
         "python" => new(Runtime("python:3.12-slim", "python", "server.py"), new Dictionary<string, string>
         {
             ["server.py"] = """
+                # Keep durable data under AUTOMATON_APP_DATA_DIR; other files are replaced on every deploy.
                 import os
                 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -70,6 +72,7 @@ internal sealed record NewAppTemplate(ApplicationContract Contract, IReadOnlyDic
                 </Project>
                 """,
             ["Program.cs"] = """
+                // Keep durable data under AUTOMATON_APP_DATA_DIR; other files are replaced on every deploy.
                 var port = int.Parse(Environment.GetEnvironmentVariable("AUTOMATON_PORT")!);
                 var builder = WebApplication.CreateBuilder(args);
                 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
