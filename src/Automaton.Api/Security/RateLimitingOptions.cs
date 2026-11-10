@@ -6,6 +6,8 @@ public class RateLimitingOptions
 
     public RateLimitPolicyOptions GlobalAnonymous { get; set; } = new(200, 60);
     public RateLimitPolicyOptions GlobalAuthenticated { get; set; } = new(1000, 60);
+    /// <summary>Static files (scripts, styles, images, fonts) of an app, per visitor address; a page loads dozens at once.</summary>
+    public RateLimitPolicyOptions AppStaticAssets { get; set; } = new(3000, 60);
     public int MaxConcurrentMultipartRequests { get; set; } = 2;
     public RateLimitPolicyOptions AuthLogin { get; set; } = new(5, 60);
     public RateLimitPolicyOptions AuthRegistration { get; set; } = new(3, 3600);

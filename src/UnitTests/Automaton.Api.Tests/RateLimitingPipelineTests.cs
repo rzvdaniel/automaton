@@ -46,6 +46,36 @@ public class RateLimitingPipelineTests
     }
 
     [Test]
+    public async Task AppStaticAssets_DoNotUseUpTheGeneralLimit_ButOtherAppAndApiRequestsStillDo()
+    {
+        using var host = await CreateHostAsync(configureOptions: options =>
+        {
+            options.GlobalAnonymous = new RateLimitPolicyOptions(3, 60);
+            options.AppStaticAssets = new RateLimitPolicyOptions(50, 60);
+        });
+        var client = host.GetTestClient();
+
+        for (var i = 0; i < 20; i++)
+        {
+            var asset = await client.GetAsync($"/runtime-tunnel/apps/a/targets/b/assets/chunk-{i}.js");
+            Assert.That(asset.StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"asset {i}");
+        }
+
+        // The assets did not consume the general allowance: three calls still pass, the fourth is limited.
+        var codes = new List<HttpStatusCode>();
+        for (var i = 0; i < 4; i++) codes.Add((await client.GetAsync("/test-auth/global-anonymous")).StatusCode);
+        Assert.That(codes.Take(3), Has.All.EqualTo(HttpStatusCode.OK));
+        Assert.That(codes[3], Is.EqualTo((HttpStatusCode)429));
+
+        // A data request through the same app, and an asset-looking path on the API, keep the normal limit.
+        var data = new List<HttpStatusCode>();
+        for (var i = 0; i < 5; i++) data.Add((await client.GetAsync("/runtime-tunnel/apps/a/targets/b/api/items")).StatusCode);
+        Assert.That(data, Has.Some.EqualTo((HttpStatusCode)429));
+        var api = await client.GetAsync("/api/something/file.js");
+        Assert.That(api.StatusCode, Is.EqualTo((HttpStatusCode)429));
+    }
+
+    [Test]
     public async Task GlobalAuthenticatedRateLimiter_Returns429AfterConfiguredLimitPerUser()
     {
         using var host = await CreateHostAsync(configureOptions: options =>
