@@ -12,6 +12,7 @@ import CatalogPanel from '../components/CatalogPanel.vue'
 import SharedAppsSection from '../components/SharedAppsSection.vue'
 import { organizationsService, type OrganizationAppSummary } from '@/features/organizations/services/organizationsService'
 import { useAppsStore } from '../stores/apps.store'
+import { APP_START_PROGRESS } from '../utils/app-action-error'
 import {
   appDescription, appState, matchesFilter, matchesSearch, type AppFilter,
 } from '../utils/app-list-display'
@@ -74,6 +75,7 @@ const pausing = ref<string | null>(null)
 /** Pauses or resumes one app; the row shows the new state when the server has answered. */
 async function togglePaused(id: string, name: string, paused: boolean) {
   pausing.value = id
+  if (!paused) toast.add({ severity: 'info', summary: 'Resuming', detail: APP_START_PROGRESS, life: 6000 })
   try {
     const warnings = await appsStore.setAppPaused(id, paused)
     if (warnings.length > 0) {

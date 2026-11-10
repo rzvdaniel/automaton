@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { isAxiosError } from 'axios'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import { appsService } from '../services/apps.service'
+import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
 
 const props = defineProps<{ appId: string }>()
 const toast = useToast()
@@ -21,8 +21,7 @@ async function restart() {
       life: 4000,
     })
   } catch (failure) {
-    const detail = isAxiosError(failure) ? failure.response?.data?.message : undefined
-    toast.add({ severity: 'error', summary: 'Could not restart', detail: detail ?? 'The app could not be restarted.', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Could not restart', detail: appActionErrorMessage(failure, 'The app could not be restarted.'), life: 12000 })
   } finally {
     busy.value = false
   }
@@ -30,5 +29,13 @@ async function restart() {
 </script>
 
 <template>
-  <Button label="Restart" icon="pi pi-refresh" size="small" severity="secondary" outlined :loading="busy" data-testid="restart-app" @click="restart" />
+  <span class="restart-wrap">
+    <Button label="Restart" icon="pi pi-refresh" size="small" severity="secondary" outlined :loading="busy" data-testid="restart-app" @click="restart" />
+    <small v-if="busy" class="restart-progress" role="status" data-testid="restart-progress">{{ APP_START_PROGRESS }}</small>
+  </span>
 </template>
+
+<style scoped>
+.restart-wrap { display: inline-flex; align-items: center; gap: 0.5rem; }
+.restart-progress { color: var(--p-text-muted-color); }
+</style>

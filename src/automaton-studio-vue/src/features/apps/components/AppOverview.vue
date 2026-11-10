@@ -15,6 +15,7 @@ import {
   type Segment,
 } from '../utils/app-overview'
 import AppRestartButton from './AppRestartButton.vue'
+import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { DeploymentTargetStatus } from '../types/apps.types'
 
@@ -58,12 +59,13 @@ const pauseBusy = ref(false)
 async function togglePaused() {
   const pause = !props.app.isPaused
   pauseBusy.value = true
+  if (!pause) toast.add({ severity: 'info', summary: 'Resuming', detail: APP_START_PROGRESS, life: 6000 })
   try {
     const state = await appsService.setPaused(props.app.id, pause)
     toast.add({ severity: state.warnings.length > 0 ? 'warn' : 'success', summary: pause ? 'Paused' : 'Resumed', detail: state.warnings[0] ?? (pause ? 'The app is paused.' : 'The app is running again.'), life: 4000 })
     emit('paused-changed')
   } catch (err: unknown) {
-    toast.add({ severity: 'error', summary: 'Error', detail: err instanceof Error ? err.message : 'Could not change the app', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: appActionErrorMessage(err, err instanceof Error ? err.message : 'Could not change the app'), life: 12000 })
   } finally {
     pauseBusy.value = false
   }
