@@ -481,8 +481,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         catch (Exception deploymentError)
         {
             var output = await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError);
-            if (deploymentError is TimeoutException && output.Length > 0)
-                throw new TimeoutException($"{deploymentError.Message} Last output of the app:{Environment.NewLine}{output}", deploymentError);
+            if (output.Length > 0)
+            {
+                var message = $"{deploymentError.Message} Last output of the app:{Environment.NewLine}{output}";
+                if (deploymentError is TimeoutException) throw new TimeoutException(message, deploymentError);
+                if (deploymentError is InvalidOperationException) throw new InvalidOperationException(message, deploymentError);
+            }
             throw;
         }
     }
@@ -589,13 +593,22 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         {
             var logs = await GetLogsAsync(attempt.AppId, attempt.TargetId, started.Id, CancellationToken.None);
             logger.LogWarning("Managed application container {ContainerId} failed before promotion. Logs: {Logs}", started.Id, logs);
-            return LastLines(logs, 20, 2000);
+            var secrets = secretSource is null ? null
+                : await secretSource.GetAsync(attempt.AppId, attempt.TargetId, CancellationToken.None);
+            return LastLines(RedactValues(logs, secrets?.Values), 20, 2000);
         }
         catch (Exception cleanupError)
         {
             logger.LogWarning(cleanupError, "Could not collect logs for failed managed runtime container {ContainerId}.", started.Id);
             return string.Empty;
         }
+    }
+
+    internal static string RedactValues(string logs, IEnumerable<string>? secrets)
+    {
+        foreach (var secret in secrets ?? [])
+            if (secret.Length > 0) logs = logs.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
+        return logs;
     }
 
     internal static string LastLines(string? logs, int maxLines, int maxChars)

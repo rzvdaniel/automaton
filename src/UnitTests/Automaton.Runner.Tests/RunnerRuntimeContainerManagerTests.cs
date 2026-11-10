@@ -170,6 +170,27 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public void RedactValuesHidesSecretsInOutput()
+    {
+        var redacted = RunnerRuntimeContainerManager.RedactValues("db=hunter2 ok", ["hunter2", ""]);
+        Assert.That(redacted, Is.EqualTo("db=[REDACTED] ok"));
+    }
+
+    [Test]
+    public async Task CrashingAppWithoutOutputKeepsTheOriginalMessage()
+    {
+        var fake = new FakeContainerRuntime { StartReady = false };
+        var (manager, _, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+
+        var failure = Assert.ThrowsAsync<TimeoutException>(async () =>
+            await manager.ApplyAsync(appId, targetId, Contract(19022)));
+
+        Assert.That(failure!.Message, Does.Not.Contain("Last output"));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public void LastLinesKeepsOnlyTheTail()
     {
         var logs = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"line{i}"));
