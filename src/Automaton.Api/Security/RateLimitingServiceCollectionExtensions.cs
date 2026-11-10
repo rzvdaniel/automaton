@@ -51,6 +51,16 @@ public static class RateLimitingServiceCollectionExtensions
                     _ => CreatePolicyOptions(options.AppStaticAssets));
             }
 
+            // A Runner's own calls (result polling, status, health) carry its API key and come from the proxy's address,
+            // the same address every anonymous visitor shares. They get their own bucket so a busy Runner is not refused
+            // because of other traffic, and cannot use up the visitors' allowance.
+            if (IsRunnerApiRequest(httpContext.Request))
+            {
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, "global:runner-api"),
+                    _ => CreatePolicyOptions(options.RunnerApi));
+            }
+
             var identity = httpContext.User.Identity;
             if (identity?.IsAuthenticated == true)
             {
@@ -63,6 +73,14 @@ public static class RateLimitingServiceCollectionExtensions
                 GetRemoteIpPartitionKey(httpContext, "global:anonymous"),
                 _ => CreatePolicyOptions(options.GlobalAnonymous));
         });
+
+    private static readonly string[] RunnerApiPrefixes =
+        ["/api/host-container-executions", "/api/runner-executions", "/api/server/health"];
+
+    /// <summary>A call to a Runner endpoint that presents an API key (the key itself is checked later by authentication).</summary>
+    internal static bool IsRunnerApiRequest(HttpRequest request)
+        => request.Headers.ContainsKey("X-API-Key")
+            && RunnerApiPrefixes.Any(prefix => request.Path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase));
 
     private static readonly HashSet<string> StaticAssetExtensions = new(StringComparer.OrdinalIgnoreCase)
     {

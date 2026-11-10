@@ -46,6 +46,32 @@ public class RateLimitingPipelineTests
     }
 
     [Test]
+    public async Task RunnerApiCalls_HaveTheirOwnBucket_SoTheyAreNotRefusedByOrDoNotUseUpOtherTraffic()
+    {
+        using var host = await CreateHostAsync(configureOptions: options =>
+        {
+            options.GlobalAnonymous = new RateLimitPolicyOptions(3, 60);
+            options.RunnerApi = new RateLimitPolicyOptions(50, 60);
+        });
+        var client = host.GetTestClient();
+
+        // A Runner polling an operation result many times is not limited at the anonymous limit.
+        for (var i = 0; i < 20; i++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/host-container-executions/x/result");
+            request.Headers.Add("X-API-Key", "k");
+            Assert.That((await client.SendAsync(request)).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"poll {i}");
+        }
+
+        // It did not use up the anonymous allowance, and the same path without a key keeps the normal limit.
+        var codes = new List<HttpStatusCode>();
+        for (var i = 0; i < 4; i++) codes.Add((await client.GetAsync("/test-auth/global-anonymous")).StatusCode);
+        Assert.That(codes.Take(3), Has.All.EqualTo(HttpStatusCode.OK));
+        Assert.That(codes[3], Is.EqualTo((HttpStatusCode)429));
+        Assert.That((await client.GetAsync("/api/host-container-executions/x/result")).StatusCode, Is.EqualTo((HttpStatusCode)429));
+    }
+
+    [Test]
     public async Task AppStaticAssets_DoNotUseUpTheGeneralLimit_ButOtherAppAndApiRequestsStillDo()
     {
         using var host = await CreateHostAsync(configureOptions: options =>

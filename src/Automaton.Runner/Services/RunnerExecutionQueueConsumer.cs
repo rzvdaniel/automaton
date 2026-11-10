@@ -22,7 +22,7 @@ internal sealed class RunnerExecutionQueueConsumer(RunnerExecutionDeliveryHandle
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(token);
         var execution = ConsumeQueueAsync(connection, broker.QueueName, AppActionExecutionService.MaximumConcurrentExecutions,
             api, runnerId, lifetime.Token);
-        var management = ConsumeQueueAsync(connection, broker.ManagementQueueName!, 1, api, runnerId, lifetime.Token);
+        var management = ConsumeQueueAsync(connection, broker.ManagementQueueName!, AppActionExecutionService.MaximumConcurrentExecutions, api, runnerId, lifetime.Token);
         var first = await Task.WhenAny(execution, management);
         await lifetime.CancelAsync();
         try { await Task.WhenAll(execution, management); }

@@ -472,7 +472,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         {
             started = await CreateCandidateContainerAsync(attempt, cancellationToken);
             await StartCandidateRuntimeAsync(attempt, started, cancellationToken);
-            await networkPolicy.WaitForReadinessAsync(attempt.EffectivePort, attempt.Contract.Health, cancellationToken);
+            await networkPolicy.WaitForReadinessAsync(attempt.EffectivePort, attempt.Contract.Health, cancellationToken,
+                token => IsRunningAsync(attempt.AppId, attempt.TargetId, started.Id, token));
             if (!await IsRunningAsync(attempt.AppId, attempt.TargetId, started.Id, cancellationToken))
                 throw new InvalidOperationException("The runtime container exited after readiness and before promotion.");
             var warning = await PromoteAsync(attempt.AppId, attempt.TargetId, previous, attempt.Candidate, cancellationToken);
@@ -585,13 +586,17 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         return output;
     }
 
+    internal static readonly TimeSpan LogCollectionTimeout = TimeSpan.FromSeconds(30);
+
     /// <summary>Logs the failed container's output and returns its last lines for the deploy error.</summary>
     private async Task<string> LogFailedCandidateAsync(RuntimeApplyAttempt attempt, DockerApplicationContainer? started)
     {
         if (started is null) return string.Empty;
         try
         {
-            var logs = await GetLogsAsync(attempt.AppId, attempt.TargetId, started.Id, CancellationToken.None);
+            // Bounded: a Runner that cannot reach Docker must still answer with the error it has.
+            using var logLimit = new CancellationTokenSource(LogCollectionTimeout);
+            var logs = await GetLogsAsync(attempt.AppId, attempt.TargetId, started.Id, logLimit.Token);
             logger.LogWarning("Managed application container {ContainerId} failed before promotion. Logs: {Logs}", started.Id, logs);
             var secrets = secretSource is null ? null
                 : await secretSource.GetAsync(attempt.AppId, attempt.TargetId, CancellationToken.None);

@@ -51,7 +51,7 @@ public sealed class HostContainerExecutionApiClient(
         DateTime deadline,
         CancellationToken cancellationToken)
     {
-        while (DateTime.UtcNow < deadline)
+        for (var poll = 0; DateTime.UtcNow < deadline; poll++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             using var response = await SendWithRetryAsync(token =>
@@ -62,11 +62,15 @@ public sealed class HostContainerExecutionApiClient(
                 ?? throw new InvalidDataException("The API returned no host-container operation result.");
             if (operation.Completed)
                 return operation;
-            await DelayBeforeDeadlineAsync(TimeSpan.FromMilliseconds(500), deadline, cancellationToken);
+            await DelayBeforeDeadlineAsync(PollDelay(poll), deadline, cancellationToken);
         }
 
         throw new TimeoutException($"Host-container operation {operationId} did not complete before its operation deadline.");
     }
+
+    /// <summary>0.5 s for a quick operation, then slower up to 5 s, so waiting operations cannot flood the API.</summary>
+    internal static TimeSpan PollDelay(int poll)
+        => TimeSpan.FromMilliseconds(Math.Min(5000, 500 * Math.Pow(2, Math.Min(poll, 4))));
 
     internal static async Task<HttpResponseMessage> SendWithRetryAsync(
         Func<CancellationToken, Task<HttpResponseMessage>> send,
