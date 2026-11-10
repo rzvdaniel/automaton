@@ -215,6 +215,11 @@ class AppsService {
     return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`)).data
   }
 
+  /** Restart the running app so it loads changed settings and secrets. POST /api/apps/{id}/restart; 409 while paused. */
+  async restart(id: string): Promise<{ restarted: number }> {
+    return (await apiClient.post<{ restarted: number }>(`/api/apps/${id}/restart`)).data
+  }
+
   /** Who can open the app. GET /api/apps/{id}/sharing */
   async getSharing(id: string): Promise<AppSharing> {
     return (await apiClient.get<AppSharing>(`/api/apps/${id}/sharing`)).data

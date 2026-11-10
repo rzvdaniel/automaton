@@ -37,6 +37,20 @@ describe('AppSecrets', () => {
     expect(wrapper.text()).not.toContain('very-secret')
   })
 
+  it('keeps settings off the secrets list', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([
+      { name: 'S3_BUCKET', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' },
+      { name: 'CHECK_INTERVAL_SECONDS', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' },
+    ])
+    const wrapper = mount(AppSecrets, {
+      props: { appId: 'app-1', declared: [{ name: 'S3_BUCKET' }], settingNames: ['CHECK_INTERVAL_SECONDS'] },
+      global: { plugins: [PrimeVue, ConfirmationService] },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('S3_BUCKET')
+    expect(wrapper.text()).not.toContain('CHECK_INTERVAL_SECONDS')
+  })
+
   it('rejects names that are not environment variable names', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
     vi.mocked(appsService.setSecret).mockClear()

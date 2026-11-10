@@ -9,6 +9,7 @@ import type { App, AppDeploymentTarget } from '../types/apps.types'
 import AppAdvanced from './AppAdvanced.vue'
 import AppPermissions from './AppPermissions.vue'
 import AppSecrets from './AppSecrets.vue'
+import AppSettingValues from './AppSettingValues.vue'
 
 const props = defineProps<{ app: App; targets: ReadonlyArray<AppDeploymentTarget>; openAdvanced?: boolean }>()
 const emit = defineEmits<{ targetsChanged: [] }>()
@@ -63,7 +64,8 @@ async function save() {
       </div>
       <div v-if="canEdit && changed" class="actions"><Button label="Save" icon="pi pi-check" :loading="saving" @click="save" /></div>
     </section>
-    <AppSecrets v-if="canEdit" :app-id="app.id" :declared="app.application?.secrets" />
+    <AppSettingValues v-if="canEdit && app.application?.settings?.length" :app-id="app.id" :app="app" :declared="app.application.settings" />
+    <AppSecrets v-if="canEdit" :app-id="app.id" :declared="app.application?.secrets" :setting-names="(app.application?.settings ?? []).map((item) => item.name)" />
     <AppPermissions :app-id="app.id" />
     <AppAdvanced v-if="canEdit" :app="app" :targets="targets" :open="openAdvanced" @changed="emit('targetsChanged')" />
   </div>

@@ -526,6 +526,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppSharingService>();
         services.AddScoped<IAppRuntimeCommandQueue, RunnerExecutionAppCommandQueue>();
         services.AddScoped<AppPauseService>();
+        services.AddScoped<AppRestartService>();
         services.AddScoped<MachineStaticAppPublicationService>();
         services.AddScoped<RunnerRemovalService>();
         services.AddScoped<RunnerUpgradeService>();
