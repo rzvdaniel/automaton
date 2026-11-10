@@ -125,9 +125,10 @@ public sealed class RunnerWholeAppCleanupTests
 
         Assert.That(calls[0], Is.EqualTo(new[] { "docker", "inspect", "--format", "{{json .Mounts}}", "runner-container" }));
         var run = string.Join(' ', calls[1]);
-        Assert.That(run, Does.Contain("type=volume,source=ws-volume,target=/automaton/storage").And.Contain("--user 0")
-            .And.Contain("find /automaton/storage/workspace/data/app-1 -mindepth 1 -delete").And.Contain("--network none"));
+        Assert.That(run, Does.Contain("type=volume,source=ws-volume,target=/purge,volume-subpath=workspace/data/app-1").And.Contain("--user 0")
+            .And.Contain("find /purge -mindepth 1 -delete").And.Contain("--network none"));
         Assert.ThrowsAsync<InvalidOperationException>(() => cleanup.EmptyDirectoryAsync("/etc"));
+        Assert.ThrowsAsync<InvalidOperationException>(() => cleanup.EmptyDirectoryAsync("/automaton/storage/workspace/../../etc"));
         Assert.That(calls.Count(call => call.Contains("find")), Is.EqualTo(1));
     }
 

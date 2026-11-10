@@ -61,7 +61,12 @@ public sealed class MachineApplicationStorageCleanup
                 .Where(item => item.Type == "volume" && !string.IsNullOrEmpty(item.Name) && !string.IsNullOrEmpty(item.Destination)
                     && full.StartsWith(item.Destination.TrimEnd('/') + "/", StringComparison.Ordinal))
                 .OrderByDescending(item => item.Destination.Length).FirstOrDefault();
-            if (volume is not null) return ($"type=volume,source={volume.Name},target={volume.Destination}", full);
+            if (volume is not null && !volume.Name.Contains(',') && !full.Contains(','))
+            {
+                // Only the app's own directory is mounted, not the whole workspace volume.
+                var subpath = full[(volume.Destination.TrimEnd('/').Length + 1)..];
+                return ($"type=volume,source={volume.Name},target=/purge,volume-subpath={subpath}", "/purge");
+            }
         }
         catch (JsonException) { }
         throw new InvalidOperationException("The app's storage is not on a volume the Runner can mount. App storage was preserved for retry.");
