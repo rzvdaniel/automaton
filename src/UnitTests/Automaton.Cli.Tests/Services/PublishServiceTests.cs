@@ -41,6 +41,16 @@ public class PublishServiceTests
     }
 
     [Test]
+    public async Task DescribeEmptyApp_NotDeployedNamesTheFailedDeployWithoutTheDeclareHint()
+    {
+        var (message, hints) = await PublishService.DescribeEmptyAppAsync(PublishService.NotDeployedMessage,
+            () => Task.FromResult<string?>("build failed"));
+        Assert.That(message, Does.Contain("no successful deploy yet").And.Contain("the last deploy failed: build failed"));
+        Assert.That(hints, Has.Length.EqualTo(1));
+        Assert.That(hints, Does.Not.Contain(PublishService.EmptyAppHint));
+    }
+
+    [Test]
     public void ReadCurrentListing_KeepsTheAppsCategoryAndTags()
     {
         using var app = JsonDocument.Parse("""{ "category": "Games", "tags": "game,words" }""");
@@ -76,7 +86,7 @@ public class PublishServiceTests
     }
 
     [Test]
-    public void FindEmptyAppProblem_AllowsAnAppWhoseLocalManifestDeclaresARuntime()
+    public void FindEmptyAppProblem_SaysNotDeployedWhenOnlyTheLocalManifestDeclaresARuntime()
     {
         var dir = Directory.CreateTempSubdirectory("e2e-publish-local").FullName;
         try
@@ -85,7 +95,9 @@ public class PublishServiceTests
             File.WriteAllText(Path.Combine(dir, "automaton.json"),
                 """{ "application": { "runtime": { "command": { "executable": "node" } } } }""");
 
-            Assert.That(PublishService.FindEmptyAppProblem(app.RootElement, dir), Is.Null);
+            var problem = PublishService.FindEmptyAppProblem(app.RootElement, dir);
+            Assert.That(problem, Is.EqualTo(PublishService.NotDeployedMessage));
+            Assert.That(problem, Does.Not.Contain("declares no runtime command"));
         }
         finally { Directory.Delete(dir, true); }
     }

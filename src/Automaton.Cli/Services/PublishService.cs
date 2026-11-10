@@ -105,9 +105,11 @@ public sealed class PublishService
         string? failedDeploy = null;
         try { failedDeploy = await findDeployError(); }
         catch (Exception) { /* keep the empty-app message */ }
-        if (failedDeploy is null) return (emptyApp, [EmptyAppHint]);
-        return ($"{emptyApp}; the last deploy also failed: {failedDeploy}",
-            [EmptyAppHint, "Fix the deploy error, run automaton deploy until it succeeds, then publish"]);
+        const string fixDeploy = "Fix the deploy error, run automaton deploy until it succeeds, then publish";
+        var notDeployed = emptyApp == NotDeployedMessage;
+        if (failedDeploy is null) return (emptyApp, [notDeployed ? NotDeployedHint : EmptyAppHint]);
+        return ($"{emptyApp}; the last deploy {(notDeployed ? "" : "also ")}failed: {failedDeploy}",
+            notDeployed ? [fixDeploy] : [EmptyAppHint, fixDeploy]);
     }
 
     private PublishContextResolution ResolvePublishContext(
@@ -320,15 +322,19 @@ public sealed class PublishService
     internal const string EmptyAppHint =
         "Declare a runtime command, a static-site build command and output directory, or at least one Action for an Actions-only app";
 
+    internal const string NotDeployedMessage = "this app has no successful deploy yet, so there is nothing to publish";
+    internal const string NotDeployedHint = "Run automaton deploy until it succeeds, then publish";
+
     /// <summary>
     /// An app with no runtime, static site, compose file or Action would publish an empty page. The app on the
-    /// server has none until a deploy succeeds, so the local automaton.json counts too.
+    /// server has none until a deploy succeeds, so a runtime declared only in the local automaton.json means the
+    /// app is not deployed yet, not that it declares nothing.
     /// </summary>
     internal static string? FindEmptyAppProblem(JsonElement app, string directory)
     {
-        if (DeclaresRuntime(app) || DeclaresLocalRuntime(directory)) return null;
-        return Core.Models.AppActionManifestParser.Discover(directory).Count > 0
-            ? null
+        if (DeclaresRuntime(app) || Core.Models.AppActionManifestParser.Discover(directory).Count > 0) return null;
+        return DeclaresLocalRuntime(directory)
+            ? NotDeployedMessage
             : "this app declares no runtime command, static site or Action, so there is nothing to publish";
     }
 
