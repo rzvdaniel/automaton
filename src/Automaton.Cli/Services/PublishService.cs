@@ -320,19 +320,38 @@ public sealed class PublishService
     internal const string EmptyAppHint =
         "Declare a runtime command, a static-site build command and output directory, or at least one Action for an Actions-only app";
 
-    /// <summary>An app with no runtime, static site, compose file or Action would publish an empty page.</summary>
+    /// <summary>
+    /// An app with no runtime, static site, compose file or Action would publish an empty page. The app on the
+    /// server has none until a deploy succeeds, so the local automaton.json counts too.
+    /// </summary>
     internal static string? FindEmptyAppProblem(JsonElement app, string directory)
     {
-        if (app.TryGetProperty("application", out var application) && application.ValueKind == JsonValueKind.Object)
-        {
-            if (TryReadBool(application, "isStaticSite") == true) return null;
-            if (HasValue(application, "compose")) return null;
-            if (application.TryGetProperty("runtime", out var runtime) && runtime.ValueKind == JsonValueKind.Object
-                && HasValue(runtime, "command")) return null;
-        }
+        if (DeclaresRuntime(app) || DeclaresLocalRuntime(directory)) return null;
         return Core.Models.AppActionManifestParser.Discover(directory).Count > 0
             ? null
             : "this app declares no runtime command, static site or Action, so there is nothing to publish";
+    }
+
+    private static bool DeclaresRuntime(JsonElement app)
+        => app.TryGetProperty("application", out var application) && application.ValueKind == JsonValueKind.Object
+            && (TryReadBool(application, "isStaticSite") == true
+                || HasValue(application, "compose")
+                || (application.TryGetProperty("runtime", out var runtime) && runtime.ValueKind == JsonValueKind.Object
+                    && HasValue(runtime, "command")));
+
+    private static bool DeclaresLocalRuntime(string directory)
+    {
+        try
+        {
+            var path = Path.Combine(directory, "automaton.json");
+            if (!File.Exists(path)) return false;
+            using var local = JsonDocument.Parse(File.ReadAllText(path));
+            return DeclaresRuntime(local.RootElement);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static bool HasValue(JsonElement element, string propertyName)

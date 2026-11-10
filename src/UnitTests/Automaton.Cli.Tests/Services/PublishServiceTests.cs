@@ -76,6 +76,21 @@ public class PublishServiceTests
     }
 
     [Test]
+    public void FindEmptyAppProblem_AllowsAnAppWhoseLocalManifestDeclaresARuntime()
+    {
+        var dir = Directory.CreateTempSubdirectory("e2e-publish-local").FullName;
+        try
+        {
+            using var app = JsonDocument.Parse("""{ "application": { "runtime": { "command": null } } }""");
+            File.WriteAllText(Path.Combine(dir, "automaton.json"),
+                """{ "application": { "runtime": { "command": { "executable": "node" } } } }""");
+
+            Assert.That(PublishService.FindEmptyAppProblem(app.RootElement, dir), Is.Null);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Test]
     public void FindEmptyAppProblem_AllowsRuntimeStaticSiteAndActions()
     {
         var dir = Directory.CreateTempSubdirectory("e2e-publish-ok").FullName;
