@@ -38,8 +38,12 @@ public sealed class PublishService
 
             if (FindEmptyAppProblem(app, directory) is { } emptyApp)
             {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, emptyApp));
-                nextSteps.Add(EmptyAppHint);
+                var failedDeploy = await FindLastDeployErrorAsync(client, context.AppId, cancellationToken);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false,
+                    failedDeploy is null ? emptyApp : $"the last deploy failed: {failedDeploy}"));
+                nextSteps.Add(failedDeploy is null
+                    ? EmptyAppHint
+                    : "Fix the deploy error, run automaton deploy until it succeeds, then publish");
                 return new PublishResult
                 {
                     Success = false,
@@ -82,6 +86,13 @@ public sealed class PublishService
                 StudioAppUrl = string.Empty
             };
         }
+    }
+
+    private static async Task<string?> FindLastDeployErrorAsync(
+        AutomatonApiClient client, string appId, CancellationToken cancellationToken)
+    {
+        var targets = await client.ListDeploymentTargetsAsync(appId, cancellationToken);
+        return targets.Select(target => target.LastDeploymentError).FirstOrDefault(error => !string.IsNullOrWhiteSpace(error));
     }
 
     private PublishContextResolution ResolvePublishContext(
