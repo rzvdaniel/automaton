@@ -9,11 +9,13 @@ import { appsService } from '../services/apps.service'
 import type { AppSecretSummary, ApplicationSecretDeclaration } from '../types/apps.types'
 import { formatWhen } from '../utils/app-overview'
 
-const props = defineProps<{ appId: string; declared?: ApplicationSecretDeclaration[] }>()
+const props = defineProps<{ appId: string; declared?: ApplicationSecretDeclaration[]; settingNames?: string[] }>()
 /** Secrets the app declares that have no value yet. */
 const missing = computed(() => (props.declared ?? []).filter((item) => !secrets.value.some((secret) => secret.name === item.name)))
 const confirm = useConfirm()
-const secrets = ref<AppSecretSummary[]>([])
+const all = ref<AppSecretSummary[]>([])
+/** Settings are saved like secrets but listed on their own card. */
+const secrets = computed(() => all.value.filter((secret) => !(props.settingNames ?? []).includes(secret.name)))
 const name = ref('')
 const value = ref('')
 const saving = ref(false)
@@ -31,7 +33,7 @@ watch(() => props.appId, load)
 async function load() {
   error.value = null
   try {
-    secrets.value = await appsService.listSecrets(props.appId)
+    all.value = await appsService.listSecrets(props.appId)
     loaded.value = true
   } catch (failure) {
     error.value = message(failure, 'Secrets could not be loaded.')
@@ -118,7 +120,7 @@ function message(failure: unknown, fallback: string) {
     </div>
     <div v-if="missing.length > 0" data-testid="missing-secrets">
       <div v-for="item in missing" :key="item.name" class="row">
-        <span><code>{{ item.name }}</code> <span class="hint">needed, not set<template v-if="item.description"> · {{ item.description }}</template></span></span>
+        <span><code>{{ item.name }}</code> <span class="hint">{{ item.optional ? "optional, not set" : "needed, not set" }}<template v-if="item.description"> · {{ item.description }}</template></span></span>
         <button type="button" class="link" @click="openForm(item.name)">set</button>
       </div>
     </div>

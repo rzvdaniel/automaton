@@ -142,6 +142,7 @@ export interface ApplicationContract {
   health: ApplicationHealthSpec
   storage: ApplicationStorageSpec
   secrets?: ApplicationSecretDeclaration[]
+  settings?: ApplicationSettingDeclaration[]
   permissions?: string[]
   isStaticSite?: boolean
   compose?: unknown
@@ -159,6 +160,14 @@ export interface ApplicationSecretDeclaration {
   name: string
   description?: string | null
   from?: string | null
+  optional?: boolean
+}
+
+export interface ApplicationSettingDeclaration {
+  name: string
+  description?: string | null
+  default?: string | null
+  required?: boolean
 }
 
 export interface AppListItem {

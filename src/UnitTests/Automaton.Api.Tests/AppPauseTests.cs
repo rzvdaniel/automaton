@@ -337,6 +337,37 @@ public sealed class AppPauseTests
         Assert.That(System.Text.Encoding.UTF8.GetString(page.BodyBytes!), Does.Contain("This app is paused"));
     }
 
+    private sealed class CountingRestarter : IAppRuntimeRestarter
+    {
+        public int Calls { get; private set; }
+        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token) { Calls++; return Task.FromResult(1); }
+    }
+
+    private static AppRestartService RestartFor(Harness h, Guid userId, CountingRestarter restarter)
+    {
+        var http = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "Test"))
+        };
+        var context = new UserContextService(new HttpContextAccessor { HttpContext = http });
+        return new AppRestartService(h.Db, new ResourceAuthorizationService(h.Db, context), restarter, context);
+    }
+
+    [Test]
+    public async Task Restart_QueuesARestartForTheOwner_AndRefusesPausedAppsAndStrangers()
+    {
+        await using var h = new Harness();
+        var restarter = new CountingRestarter();
+
+        Assert.That(await RestartFor(h, OwnerId, restarter).RestartAsync(AppId, administrator: false, default), Is.EqualTo(1));
+        Assert.ThrowsAsync<KeyNotFoundException>(() => RestartFor(h, Guid.NewGuid(), restarter).RestartAsync(AppId, administrator: false, default));
+        Assert.That(restarter.Calls, Is.EqualTo(1));
+
+        await h.ServiceFor(OwnerId).PauseAsync(AppId, administrator: false, default);
+        Assert.ThrowsAsync<InvalidOperationException>(() => RestartFor(h, OwnerId, restarter).RestartAsync(AppId, administrator: false, default));
+        Assert.That(restarter.Calls, Is.EqualTo(1));
+    }
+
     private sealed class RecordingQueue : IAppRuntimeCommandQueue
     {
         public List<(Guid RunnerId, AppActionCommand Command)> Sent { get; } = [];
