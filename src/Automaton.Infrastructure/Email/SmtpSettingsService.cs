@@ -26,12 +26,17 @@ public sealed record SmtpSettingsSummary(string Source, string EmailHost, int Em
 
 public sealed record EffectiveSmtpSettings(EmailConfig Config, bool Managed);
 
+public sealed class SmtpNotConfiguredException : Exception
+{
+    public SmtpNotConfiguredException() : base("The server has no SMTP settings. An administrator configures them in Admin > Settings.") { }
+}
+
 public sealed class SmtpSettingsUnreadableException : Exception
 {
     public SmtpSettingsUnreadableException() : base("Saved SMTP settings cannot be decrypted. Restore the matching Data Protection key ring and database backup.") { }
 }
 
-public sealed class SmtpSettingsService(ApplicationDbContext db, IOptions<EmailConfig> fileOptions,
+public class SmtpSettingsService(ApplicationDbContext db, IOptions<EmailConfig> fileOptions,
     IDataProtectionProvider protection)
 {
     private const string SettingKey = "Email.Smtp";
@@ -117,6 +122,28 @@ public sealed class SmtpSettingsService(ApplicationDbContext db, IOptions<EmailC
         message.Body = new TextPart("plain") { Text = "This is a test message from your Automaton installation." };
         using var client = await ConnectAsync(effective.Config, token);
         await client.SendAsync(message, token);
+        await client.DisconnectAsync(true, token);
+    }
+
+    public static bool IsConfigured(EmailConfig config)
+        => !string.IsNullOrWhiteSpace(config.EmailHost) && config.EmailPort > 0
+            && !string.IsNullOrWhiteSpace(config.EmailAccount) && !string.IsNullOrWhiteSpace(config.EmailPassword);
+
+    /// <summary>Sends one plain-text message per recipient so recipients never see each other. Throws <see cref="SmtpNotConfiguredException"/> when no SMTP is set up.</summary>
+    public virtual async Task SendPlainAsync(IReadOnlyCollection<string> recipients, string subject, string text, CancellationToken token)
+    {
+        var config = (await GetEffectiveAsync(token)).Config;
+        if (!IsConfigured(config)) throw new SmtpNotConfiguredException();
+        using var client = await ConnectAsync(config, token);
+        foreach (var recipient in recipients)
+        {
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress("Automaton", config.FromEmail ?? config.EmailAccount));
+            message.To.Add(MailboxAddress.Parse(recipient));
+            message.Subject = subject;
+            message.Body = new TextPart("plain") { Text = text };
+            await client.SendAsync(message, token);
+        }
         await client.DisconnectAsync(true, token);
     }
 

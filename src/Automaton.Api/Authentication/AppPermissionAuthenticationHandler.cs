@@ -10,6 +10,15 @@ public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOpt
     public const string Scheme = "AppPermission";
     public const string BackupsReadPolicy = "AppPermission:backups:read";
     public const string ServerReadPolicy = "AppPermission:server:read";
+    public const string NotifyEmailPolicy = "AppPermission:notify:email";
+
+    /// <summary>Allows only an app whose approved credential carries the permission; administrators and API keys are refused because the call acts on behalf of an app.</summary>
+    public static void AddAppOnlyPermissionPolicy(Microsoft.AspNetCore.Authorization.AuthorizationOptions options, string policyName, string permission)
+        => options.AddPolicy(policyName, policy => policy
+            .AddAuthenticationSchemes(Scheme)
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context => context.User.HasClaim("app_permission", permission)
+                && Guid.TryParse(context.User.FindFirst("app_id")?.Value, out _)));
 
     /// <summary>Allows system administrators (signed in or with a Developer API key) and apps whose approved credential carries the permission.</summary>
     public static void AddPermissionPolicy(Microsoft.AspNetCore.Authorization.AuthorizationOptions options, string policyName, string permission)

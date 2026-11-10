@@ -9,6 +9,9 @@ public static class AuditEventTypes
     public const string AppPermissionApproved = "AppPermissionApproved";
     public const string AppPermissionRejected = "AppPermissionRejected";
     public const string AppPermissionRevoked = "AppPermissionRevoked";
+    public const string AppEmailSent = "AppEmailSent";
+    public const string AppEmailRefused = "AppEmailRefused";
+    public const string NotifyRecipientsChanged = "NotifyRecipientsChanged";
     public const string ApiKeyDeleted = "ApiKeyDeleted";
     public const string ApiKeyAssignedToProject = "ApiKeyAssignedToProject";
     public const string ApiKeyUnassignedFromProject = "ApiKeyUnassignedFromProject";
