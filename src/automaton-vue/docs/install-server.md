@@ -69,7 +69,7 @@ API=https://api.$DOMAIN
 
    Check: `curl -fsS "$API/health"` returns HTTP 200 with `"status":"ok"`. If DNS fails, tell the user which names do not resolve, wait, and rerun the same command. Two A records were enough in every test run; if `apps.domain` itself does not resolve, add it too.
 
-Then, in the same shell: [create the administrator](./first-admin#when-an-ai-agent-sets-up-the-server-for-you), [install the CLI](./automaton-cli#install-and-authenticate) (only the install commands; skip the plain `automaton login`) and [sign it in without a browser](./automaton-cli#log-in-without-a-browser) (after `dotnet-install.sh`, `export DOTNET_ROOT="$HOME/.dotnet" PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"` in this shell), [add a Runner](./deploy-runner#for-ai-agents), build and deploy any requested app ([Build an Automaton app](./build-an-automaton-app)), and last run `server password-link` and show the one-time link in your final message ([first-admin](./first-admin#when-an-ai-agent-sets-up-the-server-for-you)). Do not finish before the link is shown. The whole path takes a few minutes.
+Then, in the same shell: [create the administrator](./first-admin#when-an-ai-agent-sets-up-the-server-for-you), install the CLI with the install script, no .NET needed (`curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh`, then `export PATH="$HOME/.local/bin:$PATH"` in this shell; on Windows `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`) and [sign it in without a browser](./automaton-cli#log-in-without-a-browser), [add a Runner](./deploy-runner#for-ai-agents), build and deploy any requested app ([Build an Automaton app](./build-an-automaton-app)), and last run `server password-link` and show the one-time link in your final message ([first-admin](./first-admin#when-an-ai-agent-sets-up-the-server-for-you)). Do not finish before the link is shown. The whole path takes a few minutes.
 
 ## Verify it worked
 
@@ -86,7 +86,7 @@ A fresh server cannot send email, so password reset emails and email invitations
 ## Common errors
 
 - **DNS check fails.** The installer lists the names that do not resolve to this server. Fix the records, wait for DNS, rerun the same command. Proxied (orange cloud) records break certificates and the Runner broker.
-- **`automaton: command not found`.** The `export` line for `DOTNET_ROOT` and `PATH` is missing in this shell.
+- **`automaton: command not found`.** The install script put it in `~/.local/bin`, which is not on `PATH` in this shell: run `export PATH="$HOME/.local/bin:$PATH"`.
 - **`jq: command not found`.** The agent tools step did not finish; rerun it and read its output.
 - **Port in use or different installation found.** The installer refuses to take over. Free the port or use a clean server.
 - **Certificate not issued.** Port 80 must be reachable from the internet. If the installer reports a Let's Encrypt `429 rateLimited` error, the same host names have used their weekly limit (five certificates in seven days; repeated installs on one domain use it up). Wait until the retry time it prints or use other host names, then rerun the same command: if HTTPS is not answering it restarts Traefik so the certificates are requested again.
