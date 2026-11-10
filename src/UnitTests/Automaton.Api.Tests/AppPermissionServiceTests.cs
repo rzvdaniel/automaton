@@ -162,7 +162,7 @@ public sealed class AppPermissionServiceTests
     private sealed class RecordingRestarter : IAppRuntimeRestarter
     {
         public List<Guid> Apps { get; } = [];
-        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token)
+        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false)
         {
             Apps.Add(appId);
             return Task.FromResult(1);

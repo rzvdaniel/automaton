@@ -9,8 +9,11 @@ namespace Automaton.Api.Services;
 /// <summary>Restarts an app's running runtimes so they load the app's current secrets and credentials.</summary>
 public interface IAppRuntimeRestarter
 {
-    /// <summary>Queues a restart on each Runner hosting a running copy of the app; returns how many were queued.</summary>
-    Task<int> RestartRunningAsync(Guid appId, CancellationToken token);
+    /// <summary>
+    /// Queues a restart on each Runner hosting a running copy of the app; returns how many were queued. With
+    /// <paramref name="wait"/> it waits for each Runner and returns how many restarted, or throws <see cref="RuntimeCommandFailedException"/>.
+    /// </summary>
+    Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false);
 }
 
 /// <summary>
@@ -26,8 +29,9 @@ public sealed class AppRuntimeRestarter(
     ILogger<AppRuntimeRestarter> logger) : IAppRuntimeRestarter
 {
     public const string CommandKind = "restart-runtime";
+    private static readonly TimeSpan RestartTimeout = TimeSpan.FromSeconds(150);
 
-    public async Task<int> RestartRunningAsync(Guid appId, CancellationToken token)
+    public async Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false)
     {
         var targets = await RunningTargets(db, appId).ToListAsync(token);
         var queued = 0;
@@ -35,9 +39,15 @@ public sealed class AppRuntimeRestarter(
         {
             try
             {
-                await operations.QueueAsync(target.RunnerId, user.GetUserId(), new(null, null,
-                    AppActionCommand.Create(CommandKind, new RestartAppRuntimeRequest(appId, target.Id))), token);
+                RunnerExecutionRequest request = new(null, null,
+                    AppActionCommand.Create(CommandKind, new RestartAppRuntimeRequest(appId, target.Id)));
+                if (wait) await operations.QueueAndWaitAsync(target.RunnerId, user.GetUserId(), request, RestartTimeout, token);
+                else await operations.QueueAsync(target.RunnerId, user.GetUserId(), request, token);
                 queued++;
+            }
+            catch (RuntimeCommandFailedException) when (wait)
+            {
+                throw;
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
