@@ -322,6 +322,7 @@ export default defineConfig({
       },
     },
   },
+  ssgOptions: { dirStyle: 'nested', includedRoutes: (paths: string[]) => [...paths.filter(p => !p.includes(':') && !p.includes('*')), '/404'] },
   build: {
     outDir: 'dist',
     sourcemap: true,

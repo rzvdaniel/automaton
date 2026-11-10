@@ -35,6 +35,32 @@ function setCanonical(url: string) {
   link.setAttribute('href', url)
 }
 
+export function seoTags(meta: SeoMeta) {
+  const url = `${baseUrl}${meta.path}`
+  const fullTitle = meta.title.includes(siteName) ? meta.title : `${meta.title} | ${siteName}`
+  const image = meta.image ?? defaultImage
+  const prop = (property: string, content: string) => ({ property, content })
+  const named = (name: string, content: string) => ({ name, content })
+  return {
+    title: fullTitle,
+    meta: [
+      named('description', meta.description),
+      prop('og:type', 'website'),
+      prop('og:site_name', siteName),
+      prop('og:title', fullTitle),
+      prop('og:description', meta.description),
+      prop('og:url', url),
+      prop('og:image', image),
+      named('twitter:card', 'summary_large_image'),
+      named('twitter:title', fullTitle),
+      named('twitter:description', meta.description),
+      named('twitter:image', image),
+      named('robots', meta.noindex ? 'noindex, nofollow' : 'index, follow'),
+    ],
+    link: [{ rel: 'canonical', href: url }],
+  }
+}
+
 export function applySeo(meta: SeoMeta) {
   const url = `${baseUrl}${meta.path}`
   const fullTitle = meta.title.includes(siteName) ? meta.title : `${meta.title} | ${siteName}`
