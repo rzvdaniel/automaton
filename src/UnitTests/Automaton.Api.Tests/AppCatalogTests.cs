@@ -77,7 +77,7 @@ public sealed class AppCatalogTests
             Assert.That(otherSource.TotalApps, Is.EqualTo(30));
             Assert.That(installed.Total, Is.EqualTo(0));
             Assert.That(oversize.PageSize, Is.EqualTo(CatalogQuery.MaximumPageSize));
-            Assert.That(first.Categories.Select(c => (c.Value, c.Count)), Is.EqualTo(new[] { ("Maintenance", 10), ("Tools", 20) }));
+            Assert.That(first.Categories!.Select(c => (c.Value, c.Count)), Is.EqualTo(new[] { ("Maintenance", 10), ("Tools", 20) }));
             Assert.That(first.Sources!.Single().Count, Is.EqualTo(30));
         });
     }

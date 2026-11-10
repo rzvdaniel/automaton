@@ -69,14 +69,14 @@ public sealed class SecretAuditLog(IAuditEventService audit, ApplicationDbContex
             .OrderByDescending(entry => entry.CreatedAtUtc)
             .Take(HistoryLimit)
             .ToListAsync(token);
-        var userIds = rows.Where(row => row.UserId != null).Select(row => row.UserId).Distinct().ToList();
+        var userIds = rows.Where(row => row.UserId != null).Select(row => row.UserId!.Value).Distinct().ToList();
         var names = await db.Users.AsNoTracking().Where(user => userIds.Contains(user.Id))
-            .ToDictionaryAsync(user => (Guid?)user.Id, user => user.DisplayName, token);
+            .ToDictionaryAsync(user => user.Id, user => user.DisplayName, token);
         return rows.Select(row =>
         {
             var metadata = Read(row.MetadataJson);
             // People see a name, not the email the sign-in is recorded under.
-            var shown = row.UserId != null && names.TryGetValue(row.UserId, out var display) && !string.IsNullOrWhiteSpace(display)
+            var shown = row.UserId != null && names.TryGetValue(row.UserId.Value, out var display) && !string.IsNullOrWhiteSpace(display)
                 ? display
                 : row.UserName?.Split('@')[0];
             return new SecretAuditEntry(row.CreatedAtUtc, row.EventType, row.Message, row.UserId, shown,

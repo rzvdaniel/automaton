@@ -46,7 +46,7 @@ jobs:
       - name: Test
         run: >
           dotnet test src/UnitTests/Automaton.${{ matrix.project }}.Tests
-          -p:WarningsAsErrors=NU1902%3BNU1903%3BNU1904
+          -p:WarningsAsErrors=nullable%3BNU1902%3BNU1903%3BNU1904
           --logger "console;verbosity=minimal"
 
   docs:
@@ -98,4 +98,39 @@ jobs:
       - run: npm ci
       - name: Type-check (as the release build does)
         run: npx vue-tsc --noEmit -p tsconfig.app.json
+      - name: Lint (ESLint, errors fail the build)
+        run: npm run lint:check -- --quiet
       - run: npm test
+      - name: Audit packages (high or critical advisories fail)
+        run: npm audit --audit-level=high
+      - name: Audit website packages
+        run: npm audit --audit-level=high
+        working-directory: src/automaton-vue
+
+  dotnet-packages:
+    name: Vulnerable .NET packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: List vulnerable packages
+        run: |
+          dotnet list Automaton.All.sln package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::error::A project uses a package with a known vulnerability (listed above)."
+            exit 1
+          fi
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

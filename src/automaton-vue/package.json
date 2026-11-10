@@ -43,6 +43,7 @@
     "vue-tsc": "^2.2.10"
   },
   "overrides": {
-    "vite": "$vite"
+    "vite": "$vite",
+    "minimatch@>=7 <11": "^11.0.1"
   }
 }

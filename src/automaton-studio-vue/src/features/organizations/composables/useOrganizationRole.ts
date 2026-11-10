@@ -51,7 +51,7 @@ export function useOrganizationRole() {
     try {
       loading.value = true
       organizations.value = await organizationsService.listOrganizations()
-    } catch (error) {
+    } catch {
       // Error already handled by service
       organizations.value = []
     } finally {

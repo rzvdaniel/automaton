@@ -99,7 +99,7 @@ async function loadOrganization() {
         appExecutionAllowUserOverride: organization.value.appExecutionAllowUserOverride,
       }
     }
-  } catch (error) {
+  } catch {
     router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
   } finally {
     loading.value = false
@@ -122,7 +122,7 @@ async function handleSaveSettings() {
     saving.value = true
     await organizationsService.updateOrganization(organizationId.value, settingsForm.value)
     await loadOrganization()
-  } catch (error) {
+  } catch {
     // Error toast is already shown by service
   } finally {
     saving.value = false

@@ -43,7 +43,7 @@ onMounted(async () => {
       router.push({ name: 'apps' })
       return
     }
-  } catch (error) {
+  } catch {
     // Error handled by service
   }
   
@@ -67,7 +67,7 @@ async function loadApps() {
             ...app,
             assignedUsers: assignedUsers.length
           }
-        } catch (error) {
+        } catch {
           // If error getting assignments, just set to 0
           return {
             ...app,
@@ -78,7 +78,7 @@ async function loadApps() {
     )
     
     apps.value = appsWithCounts
-  } catch (error) {
+  } catch {
     // Error handled by service
     apps.value = []
   } finally {

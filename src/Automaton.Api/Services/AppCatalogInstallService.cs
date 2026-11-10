@@ -101,8 +101,8 @@ public sealed partial class AppCatalogInstallService(
         {
             Id = id,
             Name = name,
-            Summary = manifest.Summary,
-            Description = manifest.Description,
+            Summary = manifest.Summary ?? string.Empty,
+            Description = manifest.Description ?? string.Empty,
             Definition = "{}",
             ApplicationContractJson = ApplicationContractSerialization.Serialize(manifest.Application),
             Version = 1,

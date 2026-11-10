@@ -81,6 +81,7 @@ class AppsService {
   private sanitizeArchiveFileName(name: string | undefined, extension: string): string {
     const fallbackBaseName = 'app-export'
     const baseName = (name || '')
+      // eslint-disable-next-line no-control-regex
       .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
       .trim()
 

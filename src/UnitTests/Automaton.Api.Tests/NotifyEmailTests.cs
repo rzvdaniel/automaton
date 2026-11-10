@@ -245,7 +245,7 @@ public sealed class NotifyEmailTests
         Options.Create(config ??= new EmailConfig { EmailHost = "smtp.example.test", EmailPort = 587, EmailAccount = "a", EmailPassword = "p" }),
         new EphemeralDataProtectionProvider())
     {
-        public bool Configured { get => config.EmailHost.Length > 0; set => config.EmailHost = value ? "smtp.example.test" : ""; }
+        public bool Configured { get => config!.EmailHost.Length > 0; set => config!.EmailHost = value ? "smtp.example.test" : ""; }
         public IReadOnlyCollection<string> Recipients { get; set; } = [];
         public string? Subject { get; private set; }
 
