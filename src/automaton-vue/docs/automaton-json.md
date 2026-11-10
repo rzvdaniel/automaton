@@ -116,7 +116,7 @@ An app receives every app secret, and for each declared name it does not have it
 1. The **project vault**, when the app belongs to exactly one project. Project administrators and developers set its secrets; every app of the project that declares the name receives it.
 2. The **user vault** of the app's owner, only for personal apps (in no project, with one owner), so nobody else who can change an app's code can read a person's own secrets.
 
-`from` takes the value from a vault under another name (`project:NAME` or `user:NAME`). Vault secrets an app does not declare never reach it. A changed vault secret applies to every app using it at its next Action run or start.
+`"optional": true` marks a secret the app works without: the install page and `automaton catalog install` let it stay empty, and `automaton secrets status` does not report it as missing. `from` takes the value from a vault under another name (`project:NAME` or `user:NAME`). Vault secrets an app does not declare never reach it. A changed vault secret applies to every app using it at its next Action run or start.
 
 From the app's folder:
 

@@ -43,7 +43,7 @@ public static class SecretsCommand
                     return;
                 }
                 var status = await client.GetSecretStatusAsync(appId, declarations);
-                var missing = status.EnumerateArray().Count(item => !item.GetProperty("present").GetBoolean());
+                var missing = status.EnumerateArray().Count(SecretStatusCheck.IsMissing);
                 if (asJson)
                 {
                     CliJson.Write(new { success = true, missing, secrets = status });
@@ -55,7 +55,7 @@ public static class SecretsCommand
                     var present = item.GetProperty("present").GetBoolean();
                     table.AddRow(
                         Markup.Escape(item.GetProperty("name").GetString() ?? ""),
-                        present ? "[green]present[/]" : $"[yellow]missing[/] {Markup.Escape(Text(item, "problem"))}",
+                        present ? "[green]present[/]" : SecretStatusCheck.IsMissing(item) is false ? "[grey]not set (optional)[/]" : $"[yellow]missing[/] {Markup.Escape(Text(item, "problem"))}",
                         Markup.Escape(Text(item, "providedBy")),
                         Markup.Escape(Text(item, "description")));
                 }

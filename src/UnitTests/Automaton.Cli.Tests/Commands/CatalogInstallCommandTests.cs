@@ -63,6 +63,16 @@ public class CatalogInstallCommandTests
     }
 
     [Test]
+    public void Check_DoesNotReportAnOptionalSecret()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse("""{"secrets":[{"name":"HOOK","optional":true},{"name":"TOKEN"}]}""");
+
+        var (_, _, missingSecrets) = CatalogInstallValues.Check(document.RootElement, new Dictionary<string, string>(), new Dictionary<string, string>());
+
+        Assert.That(missingSecrets, Is.EqualTo(new[] { "TOKEN" }));
+    }
+
+    [Test]
     public void Check_ReportsMissingRequiredSettingsAndSecrets_ButNotDefaultsOrVaultSecrets()
     {
         var (unknown, missingSettings, missingSecrets) = CatalogInstallValues.Check(Application, new Dictionary<string, string>(), new Dictionary<string, string>());

@@ -45,7 +45,7 @@ const isAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin
 const permissions = computed(() => manifest.value.permissions ?? [])
 const missingRequired = computed(() => [
   ...(manifest.value.settings ?? []).filter((item) => item.required && !item.default && !settings[item.name]?.trim()).map((item) => item.name),
-  ...(manifest.value.secrets ?? []).filter((item) => !item.from && !secrets[item.name]).map((item) => item.name),
+  ...(manifest.value.secrets ?? []).filter((item) => !item.from && !item.optional && !secrets[item.name]).map((item) => item.name),
 ])
 
 onMounted(async () => {
@@ -268,7 +268,7 @@ function openInstalledApp() {
               <h3 id="install-secrets" class="m-0">Secrets</h3>
               <small class="text-color-secondary">Stored encrypted and never shown again.</small>
               <div v-for="item in manifest.secrets" :key="item.name" class="flex flex-column gap-1">
-                <label :for="`secret-${item.name}`">{{ item.name }}<span v-if="item.from"> (can come from your {{ item.from.split(':')[0] }} vault)</span></label>
+                <label :for="`secret-${item.name}`">{{ item.name }}<span v-if="item.optional"> (optional)</span><span v-if="item.from"> (can come from your {{ item.from.split(':')[0] }} vault)</span></label>
                 <Password
                   v-model="secrets[item.name]"
                   :input-id="`secret-${item.name}`"

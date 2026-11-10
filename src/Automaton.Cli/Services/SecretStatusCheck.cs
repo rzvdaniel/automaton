@@ -26,10 +26,14 @@ public static class SecretStatusCheck
         return Describe(status);
     }
 
+    /// <summary>A secret without a value that the app cannot do without (an optional one may stay empty).</summary>
+    public static bool IsMissing(JsonElement item)
+        => !item.GetProperty("present").GetBoolean() && !(item.TryGetProperty("optional", out var optional) && optional.ValueKind == JsonValueKind.True);
+
     public static string? Describe(JsonElement status)
     {
         var missing = status.EnumerateArray()
-            .Where(item => !item.GetProperty("present").GetBoolean())
+            .Where(IsMissing)
             .Select(item => item.GetProperty("name").GetString())
             .ToList();
         return missing.Count == 0

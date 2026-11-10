@@ -33,5 +33,7 @@ public sealed class SecretsCommandTests
         Assert.That(SecretStatusCheck.Describe(status.RootElement), Does.StartWith("declared secrets without a value: STRIPE_KEY, SMTP_PASSWORD."));
         using var complete = JsonDocument.Parse("""[{"name":"OWN","present":true}]""");
         Assert.That(SecretStatusCheck.Describe(complete.RootElement), Is.Null);
+        using var optional = JsonDocument.Parse("""[{"name":"HOOK","present":false,"optional":true}]""");
+        Assert.That(SecretStatusCheck.Describe(optional.RootElement), Is.Null);
     }
 }
