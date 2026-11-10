@@ -73,20 +73,13 @@ public static class RateLimitingServiceCollectionExtensions
     /// <summary>A GET or HEAD for a static file through an app's runtime tunnel (an app address, never the platform API).</summary>
     internal static bool IsAppStaticAssetRequest(HttpRequest request)
     {
-        if (!HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method)) return false;
-        // A private app's request first passes the proxy's sign-in check (/internal/runtime/auth, which needs the proxy's
-        // key), and the proxy names the original request in X-Forwarded-Uri. Count that hop with the file it is for.
+        // A private app's request first passes the proxy's sign-in check (/internal/runtime/auth, which only answers with the
+        // proxy's key). The proxy may not pass the original URI on, so every such check counts here, apart from the API.
         var path = request.Path;
         var target = path.Value ?? string.Empty;
-        if (path.StartsWithSegments("/internal/runtime/auth", StringComparison.Ordinal))
-        {
-            var method = request.Headers["X-Forwarded-Method"].ToString();
-            if (method.Length > 0 && !HttpMethods.IsGet(method) && !HttpMethods.IsHead(method)) return false;
-            var uri = request.Headers["X-Forwarded-Uri"].ToString();
-            target = uri.Split('?', '#')[0];
-            return target.StartsWith('/') && StaticAssetExtensions.Contains(Path.GetExtension(target));
-        }
-        return path.StartsWithSegments("/runtime-tunnel/apps", StringComparison.Ordinal)
+        if (path.StartsWithSegments("/internal/runtime/auth", StringComparison.Ordinal)) return true;
+        return (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+            && path.StartsWithSegments("/runtime-tunnel/apps", StringComparison.Ordinal)
             && StaticAssetExtensions.Contains(Path.GetExtension(target));
     }
 

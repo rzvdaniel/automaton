@@ -76,7 +76,7 @@ public class RateLimitingPipelineTests
     }
 
     [Test]
-    public async Task ProxySignInCheckForAnAppStaticFile_UsesTheAssetBucket_ButOtherChecksKeepTheGeneralLimit()
+    public async Task ProxySignInChecksForApps_UseTheirOwnBucket_AndDoNotUseUpTheGeneralLimit()
     {
         using var host = await CreateHostAsync(configureOptions: options =>
         {
@@ -86,26 +86,12 @@ public class RateLimitingPipelineTests
         var client = host.GetTestClient();
 
         for (var i = 0; i < 20; i++)
-        {
-            using var asset = new HttpRequestMessage(HttpMethod.Get, "/internal/runtime/auth");
-            asset.Headers.Add("X-Forwarded-Method", "GET");
-            asset.Headers.Add("X-Forwarded-Uri", $"/assets/chunk-{i}.js?v=1");
-            Assert.That((await client.SendAsync(asset)).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"asset {i}");
-        }
+            Assert.That((await client.GetAsync("/internal/runtime/auth")).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"check {i}");
 
-        var other = new List<HttpStatusCode>();
-        for (var i = 0; i < 5; i++)
-        {
-            using var page = new HttpRequestMessage(HttpMethod.Get, "/internal/runtime/auth");
-            page.Headers.Add("X-Forwarded-Uri", "/api/items.json");
-            other.Add((await client.SendAsync(page)).StatusCode);
-        }
-        Assert.That(other, Has.Some.EqualTo((HttpStatusCode)429));
-
-        using var post = new HttpRequestMessage(HttpMethod.Get, "/internal/runtime/auth");
-        post.Headers.Add("X-Forwarded-Method", "POST");
-        post.Headers.Add("X-Forwarded-Uri", "/upload.js");
-        Assert.That((await client.SendAsync(post)).StatusCode, Is.EqualTo((HttpStatusCode)429));
+        var general = new List<HttpStatusCode>();
+        for (var i = 0; i < 4; i++) general.Add((await client.GetAsync("/test-auth/global-anonymous")).StatusCode);
+        Assert.That(general.Take(3), Has.All.EqualTo(HttpStatusCode.OK));
+        Assert.That(general[3], Is.EqualTo((HttpStatusCode)429));
     }
 
     [Test]
