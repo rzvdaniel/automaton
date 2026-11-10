@@ -31,7 +31,7 @@ test.describe('as the system administrator', () => {
     await goTo(page, '/admin/users')
     await expect(page).toHaveURL(/\/people/)
     await expect(heading(page, 'People')).toBeVisible()
-    await expect(heading(page, 'Members')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Members\b/ })).toBeVisible()
     // At least one member row (the signed-in administrator).
     await expect(page.locator('.studio-row').first()).toBeVisible()
     await page.getByRole('button', { name: 'Create with password' }).click()

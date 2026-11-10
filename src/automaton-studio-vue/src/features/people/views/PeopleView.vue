@@ -166,7 +166,7 @@ onMounted(load)
     </template>
 
     <InvitePeopleDialog v-model:visible="showInvite" :teams="adminTeams" :can-invite-accounts="isAdmin" @done="load" />
-    <AdminAddUserDialog v-if="isAdmin" v-model:visible="showCreate" :can-grant-administrator="isSysAdmin" @added="load" />
+    <AdminAddUserDialog v-if="isAdmin" v-model:visible="showCreate" initial-mode="create" :can-grant-administrator="isSysAdmin" @added="load" />
     <NewTeamDialog v-model:visible="showNewTeam" @created="load" />
   </div>
 </template>
