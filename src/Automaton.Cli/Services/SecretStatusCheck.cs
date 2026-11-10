@@ -29,7 +29,7 @@ public static class SecretStatusCheck
     public static string? Describe(JsonElement status)
     {
         var missing = status.EnumerateArray()
-            .Where(item => !item.GetProperty("present").GetBoolean())
+            .Where(item => !item.GetProperty("present").GetBoolean() && !(item.TryGetProperty("optional", out var optional) && optional.ValueKind == JsonValueKind.True))
             .Select(item => item.GetProperty("name").GetString())
             .ToList();
         return missing.Count == 0

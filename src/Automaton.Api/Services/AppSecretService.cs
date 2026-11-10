@@ -13,7 +13,7 @@ namespace Automaton.Api.Services;
 public sealed record AppSecretSummary(string Name, int Version, DateTime UpdatedAtUtc, string Scope = AppSecretScopes.App, string? Description = null);
 
 /// <summary>One declared secret: whether it is filled and which scope provides it. Never carries a value.</summary>
-public sealed record AppSecretStatus(string Name, string? Description, string? From, bool Present, string? ProvidedBy, string? Problem);
+public sealed record AppSecretStatus(string Name, string? Description, string? From, bool Present, string? ProvidedBy, string? Problem, bool Optional = false);
 
 /// <summary>Where a secret lives. Every scope is addressed relative to an app.</summary>
 public static class AppSecretScopes
@@ -123,7 +123,7 @@ public sealed class AppSecretService(
         return declarations.Select(declaration =>
         {
             var (providedBy, problem) = Locate(declaration, vaults, available);
-            return new AppSecretStatus(declaration.Name, declaration.Description, declaration.From, providedBy is not null, providedBy, problem);
+            return new AppSecretStatus(declaration.Name, declaration.Description, declaration.From, providedBy is not null, providedBy, problem, declaration.Optional);
         }).ToList();
     }
 

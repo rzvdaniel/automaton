@@ -593,7 +593,7 @@ export interface CatalogResponse {
 
 export interface InstallManifest {
   settings?: Array<{ name: string; description?: string | null; default?: string | null; required?: boolean }>
-  secrets?: Array<{ name: string; description?: string | null; from?: string | null }>
+  secrets?: Array<{ name: string; description?: string | null; from?: string | null; optional?: boolean }>
   permissions?: string[]
   schedules?: Array<{
     name: string

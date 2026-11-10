@@ -58,7 +58,7 @@ public static class CatalogInstallValues
             .Concat(secrets.Keys.Where(name => !declaredSecrets.ContainsKey(name)).Select(name => $"secret {name}")).ToList();
         var missingSettings = declaredSettings.Where(item => item.Value.GetBoolOrFalse("required") && string.IsNullOrEmpty(item.Value.GetTextOrEmpty("default")) && !settings.ContainsKey(item.Key))
             .Select(item => item.Key).ToList();
-        var missingSecrets = declaredSecrets.Where(item => string.IsNullOrEmpty(item.Value.GetTextOrEmpty("from")) && !secrets.ContainsKey(item.Key))
+        var missingSecrets = declaredSecrets.Where(item => string.IsNullOrEmpty(item.Value.GetTextOrEmpty("from")) && !item.Value.GetBoolOrFalse("optional") && !secrets.ContainsKey(item.Key))
             .Select(item => item.Key).ToList();
         return (unknown, missingSettings, missingSecrets);
     }

@@ -81,6 +81,9 @@ public sealed class ApplicationSecretDeclaration
     /// <summary>Optional source in a vault under another name: <c>project:NAME</c> or <c>user:NAME</c>.</summary>
     public string? From { get; set; }
 
+    /// <summary>The app works without a value (it reads an empty or missing variable), so the installer may leave it empty.</summary>
+    public bool Optional { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
