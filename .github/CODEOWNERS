@@ -1,0 +1,35 @@
+# Two lists for .agents/tools/merge-gate.py (tiers in .agents/skills/pr-review/SKILL.md). Keep each pattern a rooted
+# folder (ending in /) or a rooted file. Loosen or extend either list only in a pull request the owner approves.
+#
+# High tier, above the "security pass" marker: the owner approves before merge (label owner-approved).
+
+/.github/CODEOWNERS                                            @rzvdaniel
+# The review rules themselves
+/REVIEW.md                                                     @rzvdaniel
+/.agents/skills/pr-review/                                     @rzvdaniel
+/.agents/tools/merge-gate.py                                   @rzvdaniel
+# Sign-in, tokens, authorization, secrets
+/src/Automaton.Identity/                                       @rzvdaniel
+/src/Automaton.Api/Authentication/                             @rzvdaniel
+/src/Automaton.Api/Authorization/                              @rzvdaniel
+/src/Automaton.Api/Controllers/AccountController.cs            @rzvdaniel
+/src/Automaton.Api/Controllers/ApiKeysController.cs            @rzvdaniel
+/src/Automaton.Api/Controllers/CliAuthorizationController.cs   @rzvdaniel
+/src/Automaton.Api/Controllers/TokenController.cs              @rzvdaniel
+/src/Automaton.Api/Controllers/GitHubAuthController.cs         @rzvdaniel
+/src/Automaton.Api/Controllers/AppSecretsController.cs         @rzvdaniel
+/src/Automaton.Api/Controllers/RunnerRuntimeSecretsController.cs @rzvdaniel
+/src/Automaton.Api/Controllers/RunnerEnrollmentsController.cs  @rzvdaniel
+/src/Automaton.Api/Services/AuthTokenService.cs                @rzvdaniel
+/src/Automaton.Api/Services/AdminAuthorizationService.cs       @rzvdaniel
+/src/Automaton.Api/Services/AppSecretService.cs                @rzvdaniel
+/src/Automaton.Api/Services/ExecutionSecretGrantService.cs     @rzvdaniel
+/src/Automaton.Api/Services/DataProtectionSecretProtector.cs   @rzvdaniel
+# --- security pass ---
+# Below this marker: medium tier, but the review must include a security pass (a "Security:" section).
+# Release workflows and scripts that people run as root or pipe into a shell.
+/.github/workflows/                                            @rzvdaniel
+/scripts/cli/                                                  @rzvdaniel
+/docker/install/                                               @rzvdaniel
+/scripts/install-automaton.sh                                  @rzvdaniel
+/scripts/update-automaton.sh                                   @rzvdaniel

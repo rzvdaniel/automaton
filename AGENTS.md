@@ -19,10 +19,11 @@ Read the matching skill before changing the related area:
 | Administrator-visible Studio or API behavior and its documentation | [Admin docs](.agents/skills/admin-docs/SKILL.md) |
 | Roadmaps, architecture guides, other repository documentation | [Documentation maintenance](.agents/skills/documentation-maintenance/SKILL.md) |
 | User-facing Studio UI, theme tokens, visual verification, browser automation | [Studio design](.agents/skills/studio-design/SKILL.md) |
-| Reviewing or merging any pull request | [PR review](.agents/skills/pr-review/SKILL.md) |
+| Reviewing or merging any pull request (risk tier, review, security pass, merge gate) | [PR review](.agents/skills/pr-review/SKILL.md) and [`REVIEW.md`](REVIEW.md) |
 | Creating any GitHub issue | [Write issue](.agents/skills/automaton-write-issue/SKILL.md) |
 | Opening any pull request | [Write PR](.agents/skills/automaton-write-pr/SKILL.md) |
-| Implementing an issue end to end (issue, PR, review, merge, release, test-server verification), when the owner or orchestrator asks for it | [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) |
+| Implementing an issue from claim to merged pull request, when the owner or orchestrator asks for it | [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) |
+| Releasing merged work, checking it on the test server as real users, proofs and labels (one change or a batch) | [Automaton verify release](.agents/skills/automaton-verify-release/SKILL.md) |
 | Only when the owner makes you the orchestrator of the agents | [Automaton orchestrate](.agents/skills/automaton-orchestrate/SKILL.md) |
 
 These skills are the repository contract. Other folders under `.agents/skills/` are developer-local; do not add or commit skills unless the task names that work. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state or metrics harnesses under `.agents/` or `AgentRuns/`.
@@ -34,7 +35,7 @@ These skills are the repository contract. Other folders under `.agents/skills/` 
 - **Sign-up** is disabled on purpose. Never re-enable it, insert users into the database, or bypass the invite flow.
 - **Secrets.** Never print, log, commit or post credentials, tokens, API keys or connection strings. Test credentials live where `.agents/environment.md` says: read values literally (CRLF, values may contain `$`), never `source` them.
 - **Issues and the board.** Issue titles say what the work does. Maintainers put each issue under a parent issue and on the project board (`.agents/environment.md`); contributors without board access just file the issue. Changing a single-select field's options through the API clears it on every item: save the values first and set them again afterwards.
-- **Git.** Work on a branch (docs-only changes may go straight to `main` when the owner says so). Check `git status` before switching branches and keep the main folder on `main` between tasks.
+- **Git.** Work on a branch (documentation for people may go straight to `main`, and agent guidance too when the owner says so; see [PR review](.agents/skills/pr-review/SKILL.md)). Check `git status` before switching branches and keep the main folder on `main` between tasks.
 - **Attribution.** Agents use the owner's GitHub login and end commit messages and PR descriptions with a line naming the agent.
 - **Finish what you start, or leave it clearly open:** report what was verified and what wasn't, and post anything a later agent needs on the issue.
 

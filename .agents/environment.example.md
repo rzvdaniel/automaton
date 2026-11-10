@@ -10,7 +10,7 @@ that the end-to-end check runs after release on a maintainer's test server.
 ## Test server
 - Studio: `https://studio.<test-domain>`; API: `https://api.<test-domain>`.
 - SSH: `ssh <alias>` (root) and, if agents run there, `ssh <alias>-agent` (the unprivileged user agents use).
-- Test logins: `<path to accounts.env>` (keys in `.agents/skills/automaton-implement-issue/verify.md`). Read values
+- Test logins: `<path to accounts.env>` (keys in `.agents/skills/automaton-verify-release/SKILL.md`). Read values
   literally; never `source` it; never print it.
 - Mail catcher (Mailpit) container and how to reach its API, if any.
 - Browser helpers (login and screenshot scripts for `agent-browser`), if any.

@@ -1,9 +1,34 @@
-# Deliver and verify
+---
+name: automaton-verify-release
+description: Use after pull requests are merged, to release, upgrade the test server, check each change as real users, attach the proof to each issue and label it - for one change or a whole batch. Also holds the labels, the close gate and the test accounts.
+license: Apache-2.0
+---
+
+# Automaton verify release
+
+Merged is not done. This skill takes merged work to "proved on the test server": one agent's own change, or a batch
+of several agents' changes checked by one verifier.
 
 ## Where to test
 
 All end-to-end checks run on the test server named in `.agents/environment.md`; the exact URLs are in `accounts.env` below.
 An agent running on that machine is already on the test server. Never test on production, and never use a local stack in place of the end-to-end check.
+
+The test server is shared. Only one agent at a time releases and upgrades it: the verifier of a batch, or an agent
+working alone. Everyone else waits for that release instead of cutting another.
+
+## One change or a batch
+
+- **One change:** release, upgrade, run the PR's "Check after release" list, proof, label.
+- **A batch:** list the PRs merged since the last release (`gh pr list --state merged --search "merged:>=<date>"`),
+  release once, upgrade once, then run each PR's "Check after release" list and write one proof per issue. A list
+  that is missing or too vague to follow is a finding on that PR; write the checks from the issue's "Done when".
+- Risky changes (Runner, migrations, install or update scripts) get a release of their own, so a failure points at
+  one change.
+- **When a check fails:** label that issue `verification-failed` and fix forward with a small follow-up PR (same
+  review and CI), a new release and a re-check; the other issues in the batch keep their results. Revert instead only
+  when the fix is not quick or the failure blocks other work on the test server. The follow-up PR also fixes the step
+  that should have caught it ([PR review](../pr-review/SKILL.md), last section).
 
 ## Release
 
@@ -79,15 +104,19 @@ Proof on the issue: GitHub shows artifacts on issues, not on pull requests. Writ
 publish it on the **issue** the PR closes with the helper, then comment its link on the PR:
 
 ```bash
-python3 .agents/skills/automaton-implement-issue/proof.py <issue> proof.html
+python3 .agents/skills/automaton-verify-release/proof.py <issue> proof.html
 ```
 
 The page lists each done criterion from the issue, the evidence for it (the command and what came back, or a link
 to a screenshot) and pass, fail or not checked with the reason. Keep it plain: one `<table>` (criterion, result,
 evidence), inline `<style>` only, no scripts, no embedded images. Running `proof.py` again replaces the issue's `proof`.
 
-Then label the issue: `verified` when every "Done when" check passed end to end, `verified-partial` when only unit
-tests or some of the checks ran (say which in the proof), `verification-failed` when a check fails. Swap the label when the fix-forward release passes its re-check.
+Then label the issue (see Labels below) and swap the label when a fix-forward release passes its re-check.
+
+Proof cost: viewing an image costs about 1,500 tokens and stays in your context. Use text proofs (status code,
+response body, page text) for functional checks and screenshots only for visual changes. Capture the viewport, not
+the full page, unless the whole layout is the point. Look at each screenshot once to confirm it shows the right
+thing, then post it.
 
 Screenshots: push them to the orphan branch `pr-screenshots` under `pr-<N>/` (create it with
 `git switch --orphan pr-screenshots` if it does not exist; never merge or delete it). Link them, do not embed them:
@@ -103,9 +132,28 @@ After every test-server upgrade, also run the Studio smoke checks (`src/automato
 sign in as the administrator and a regular user, and leave a screenshot of each page in `smoke-results/`; attach the
 ones your change affects to the PR. A failure is a finding to fix or report, not something to skip.
 
-Name everything you create `e2e-...` (apps, projects, API keys). Remove it when done:
-`python .agents/tools/test-server-cleanup.py` lists it, `--apply` removes it. Test accounts stay. A nightly timer
-removes `e2e-` items older than a day.
+Name everything you create `e2e-<issue>-...` (apps, projects, API keys), so agents checking different issues do not
+collide. Remove it when done: `python .agents/tools/test-server-cleanup.py` lists it, `--apply` removes it. Test
+accounts stay. A nightly timer removes `e2e-` items older than a day.
+
+## Labels and closing
+
+- `verified`: every "Done when" check passed end to end on the test server, with a proof artifact.
+- `verified-partial`: only unit tests or part of the checks ran; the proof says what is missing and why. If an agent
+  can run the missing check, it is not partial yet: run it.
+- `verification-failed`: a check failed; fix forward.
+- `live`: set by whoever updates production, just before closing.
+
+After labelling, comment the results (pass or fail per check) and every administrator action on the PR and link that
+comment from the issue. Leave the issue open with board Status In Progress: `is:open label:verified` is what the next
+production update ships.
+
+**Close gate** (at the production update). Done means live on production. Whoever updates production checks it, then
+closes each issue in that release with a comment naming the version (`.agents/tools/close-released-issues.py`), when:
+- the merge gate held (`python3 .agents/tools/merge-gate.py <N>` output is on the PR);
+- the issue has a `proof` artifact naming the release and how it was checked;
+- the label is `verified` (a `verified-partial` issue closes only when the owner accepts the gap, said in a comment);
+- the production version contains the merge commit.
 
 ## Production
 
