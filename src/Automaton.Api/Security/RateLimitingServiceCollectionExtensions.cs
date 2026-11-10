@@ -42,6 +42,15 @@ public static class RateLimitingServiceCollectionExtensions
     private static PartitionedRateLimiter<HttpContext> CreateGlobalLimiter(RateLimitingOptions options)
         => PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         {
+            // An app's own scripts, styles and images get their own, larger bucket so loading one page cannot
+            // use up the visitor's general allowance. Everything else, including the API, keeps the normal limits.
+            if (IsAppStaticAssetRequest(httpContext.Request))
+            {
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, "global:app-assets"),
+                    _ => CreatePolicyOptions(options.AppStaticAssets));
+            }
+
             var identity = httpContext.User.Identity;
             if (identity?.IsAuthenticated == true)
             {
@@ -54,6 +63,21 @@ public static class RateLimitingServiceCollectionExtensions
                 GetRemoteIpPartitionKey(httpContext, "global:anonymous"),
                 _ => CreatePolicyOptions(options.GlobalAnonymous));
         });
+
+    private static readonly HashSet<string> StaticAssetExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".js", ".mjs", ".css", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
+        ".woff", ".woff2", ".ttf", ".otf", ".wasm", ".webmanifest"
+    };
+
+    /// <summary>A GET or HEAD for a static file through an app's runtime tunnel (an app address, never the platform API).</summary>
+    internal static bool IsAppStaticAssetRequest(HttpRequest request)
+    {
+        if (!HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method)) return false;
+        var path = request.Path;
+        return path.StartsWithSegments("/runtime-tunnel/apps", StringComparison.Ordinal)
+            && StaticAssetExtensions.Contains(Path.GetExtension(path.Value ?? string.Empty));
+    }
 
     private static ValueTask WriteRateLimitRejectionAsync(
         OnRejectedContext context,
