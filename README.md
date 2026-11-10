@@ -39,6 +39,14 @@ curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/inst
 sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com
 ```
 
+**The CLI.** No .NET needed:
+
+```bash
+curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh
+```
+
+On Windows, in PowerShell: `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. With the .NET 10 SDK you can use `dotnet tool install -g Automaton.Cli` instead.
+
 Then [create the administrator](https://automaton.monster/docs/first-admin), [add a Runner](https://automaton.monster/docs/deploy-runner) and [deploy your first app](https://automaton.monster/docs/getting-started).
 
 In our tests, the installer finished in about 2 minutes, and an AI agent went from an empty server to a live app in about 6 ([measurements](https://github.com/rzvdaniel/automaton/issues/561)).

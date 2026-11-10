@@ -10,19 +10,17 @@ Automaton. Read `automaton.json` and the generated local guidance before editing
 
 ## Install and authenticate
 
-Use the API URL from [your server installation](./install-server) or your team administrator. The NuGet CLI requires the .NET 10 SDK or later. Ubuntu 22.04 and Debian 12 have no .NET 10 package in apt; install the SDK per user:
+Use the API URL from [your server installation](./install-server) or your team administrator. The CLI is a single file that needs no .NET. On Linux or macOS:
 
 ```bash
-curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
-bash dotnet-install.sh --channel 10.0
-export DOTNET_ROOT="$HOME/.dotnet"
-export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
+curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh
 ```
 
-Add the two `export` lines to your shell profile so `automaton` is found in new sessions.
+On Windows (PowerShell): `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. The script puts `automaton` in `~/.local/bin` (Windows: `%LOCALAPPDATA%\Automaton\bin`) and checks its SHA-256. Set `AUTOMATON_VERSION=server-v<version>` to pick a release.
+
+Already have the .NET 10 SDK? `dotnet tool install -g Automaton.Cli` installs the same CLI.
 
 ```bash
-dotnet tool install -g Automaton.Cli
 automaton --help
 automaton login --server https://api.your-domain.com
 ```

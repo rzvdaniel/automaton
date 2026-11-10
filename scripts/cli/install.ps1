@@ -1,40 +1,42 @@
-# Automaton CLI installer for Windows PowerShell
+# Automaton CLI installer for Windows: downloads the self-contained automaton.exe, no .NET needed.
 # Usage (PowerShell):
-#   irm https://your-server/install.ps1 | iex
-#
-# Requires the .NET 10 SDK or later. Install from https://dot.net if not already present.
+#   irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex
+# Options (environment): AUTOMATON_VERSION=server-v0.2.90 (default: latest), AUTOMATON_INSTALL_DIR
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 
-# Check for .NET
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    Write-Host "ERROR: .NET SDK not found." -ForegroundColor Red
-    Write-Host "Install the .NET SDK (9 or later) from https://dot.net and re-run this script."
+$repo = "rzvdaniel/automaton"
+$dir = if ($env:AUTOMATON_INSTALL_DIR) { $env:AUTOMATON_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Automaton\bin" }
+$asset = "automaton-win-x64.exe"
+$base = if ($env:AUTOMATON_VERSION) { "https://github.com/$repo/releases/download/$($env:AUTOMATON_VERSION)" } else { "https://github.com/$repo/releases/latest/download" }
+
+if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+    Write-Host "Only 64-bit Intel/AMD Windows has a standalone build; install with 'dotnet tool install -g Automaton.Cli' instead." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Installing Automaton CLI..." -ForegroundColor Cyan
-
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("automaton-" + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
-    dotnet tool install --global Automaton.Cli 2>&1 | Out-Null
-} catch {
-    dotnet tool update --global Automaton.Cli | Out-Null
+    Write-Host "Downloading $asset..." -ForegroundColor Cyan
+    Invoke-WebRequest "$base/$asset" -OutFile (Join-Path $tmp "automaton.exe")
+    $expected = ((Invoke-WebRequest "$base/$asset.sha256").Content.ToString().Trim() -split "\s+")[0]
+    $actual = (Get-FileHash (Join-Path $tmp "automaton.exe") -Algorithm SHA256).Hash
+    if ($expected -ine $actual) { throw "Checksum mismatch; nothing was installed." }
+
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    Move-Item (Join-Path $tmp "automaton.exe") (Join-Path $dir "automaton.exe") -Force
+} finally {
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Ensure dotnet tools are on PATH for this session
-$dotnetTools = "$env:USERPROFILE\.dotnet\tools"
-if ($env:PATH -notlike "*$dotnetTools*") {
-    $env:PATH = "$env:PATH;$dotnetTools"
-    Write-Host ""
-    Write-Host "NOTE: Add the following to your system PATH permanently:" -ForegroundColor Yellow
-    Write-Host "  $dotnetTools"
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ";") -notcontains $dir) {
+    [Environment]::SetEnvironmentVariable("Path", "$userPath;$dir", "User")
+    $env:Path = "$env:Path;$dir"
+    Write-Host "Added $dir to your user PATH; open a new terminal to use it everywhere."
 }
 
-Write-Host ""
-Write-Host "Automaton CLI installed." -ForegroundColor Green
-Write-Host "Run 'automaton --help' to get started."
-Write-Host ""
-Write-Host "Quick start:"
-Write-Host "  automaton config --server https://your-automaton-server --key ak_execute_xxx"
-Write-Host "  automaton init --name `"My App`""
-Write-Host "  automaton deploy"
+Write-Host "Installed: $(& (Join-Path $dir 'automaton.exe') --version | Select-Object -First 1)" -ForegroundColor Green
+Write-Host "Next: automaton config --server https://your-automaton-server --key ak_execute_xxx"

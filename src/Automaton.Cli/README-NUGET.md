@@ -4,6 +4,16 @@ Automaton CLI is the .NET global tool for creating, validating, deploying, and p
 
 ## Install
 
+Without .NET, download the standalone binary (Linux, macOS, Windows x64):
+
+```bash
+curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh
+```
+
+PowerShell: `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`
+
+With the .NET 10 SDK:
+
 ```bash
 dotnet tool install --global Automaton.Cli
 ```
