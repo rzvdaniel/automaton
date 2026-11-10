@@ -39,6 +39,7 @@ public sealed class AppPauseController(
         }
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+        catch (RuntimeCommandFailedException ex) { return StatusCode(StatusCodes.Status502BadGateway, new { message = ex.Message }); }
         catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message }); }
     }
 }

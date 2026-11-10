@@ -271,6 +271,9 @@ internal static class DeploymentFixtureServiceFactory
     {
         public Task QueueAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
             => Task.CompletedTask;
+
+        public Task<RunnerExecutionResult> RunAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
+            => Task.FromResult(new RunnerExecutionResult { Outcome = "Succeeded" });
     }
 
     internal static AppFileStorageService CreateStorage(ApplicationDbContext db, TestWebHostEnvironment environment)

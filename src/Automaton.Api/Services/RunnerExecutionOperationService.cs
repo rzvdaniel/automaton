@@ -150,6 +150,29 @@ public sealed class RunnerExecutionOperationService(
         return operation.Id;
     }
 
+    /// <summary>
+    /// Queues a request and waits for the Runner's answer. A Runner that reports a failure, or does not answer in time
+    /// (offline, or the app does not become ready), raises <see cref="RuntimeCommandFailedException"/>.
+    /// </summary>
+    public async Task<RunnerExecutionResult> QueueAndWaitAsync(
+        Guid runnerId, Guid actor, RunnerExecutionRequest request, TimeSpan timeout, CancellationToken token)
+    {
+        var id = await QueueAsync(runnerId, actor, request, token);
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
+        limit.CancelAfter(timeout);
+        RunnerExecutionResult result;
+        try { result = await WaitAsync(id, limit.Token); }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            throw new RuntimeCommandFailedException(
+                "The Runner did not answer in time, so the app may not be running. It is cancelled if it has not started; try again when the Runner is online.");
+        }
+        if (result.Outcome != "Succeeded")
+            throw new RuntimeCommandFailedException(
+                "The Runner could not start the app: " + (string.IsNullOrWhiteSpace(result.Error) ? result.Outcome : result.Error));
+        return result;
+    }
+
     private static bool IsManagementRequest(RunnerExecutionRequest request)
         => request.ManagedArtifacts is not null
             || request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata

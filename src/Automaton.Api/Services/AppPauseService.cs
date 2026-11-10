@@ -49,6 +49,8 @@ public sealed class AppPauseService(
         }
 
         var warnings = new List<string>();
+        // A resume starts the runtime first: when the Runner cannot, nothing changes and the app stays paused.
+        if (!pause) await QueueRuntimeCommandsAsync(appId, userId, pause: false, warnings, ct);
         var stateChanged = app.IsPaused != pause;
         if (stateChanged)
         {
@@ -74,7 +76,7 @@ public sealed class AppPauseService(
             });
         }
         // Repeating the call also repeats the Runner command, so a Runner that missed it catches up.
-        await QueueRuntimeCommandsAsync(appId, userId, pause, warnings, ct);
+        if (pause) await QueueRuntimeCommandsAsync(appId, userId, pause, warnings, ct);
         return new AppPauseState(appId, app.IsPaused, app.PausedAt, changed, warnings);
     }
 
@@ -165,25 +167,41 @@ public sealed class AppPauseService(
 
     private async Task QueueRuntimeCommandsAsync(Guid appId, Guid userId, bool pause, List<string> warnings, CancellationToken ct)
     {
+        var failures = new List<string>();
         foreach (var target in await AppRuntimeRestarter.PausableTargets(db, appId).ToListAsync(ct))
         {
             try
             {
-                await QueueCommandAsync(appId, target.Id, target.RunnerId, userId, pause, ct);
+                // A resume waits for the Runner, so a start that fails is reported instead of answered with 200.
+                if (pause) await QueueCommandAsync(appId, target.Id, target.RunnerId, userId, pause, ct);
+                else await operations.RunAsync(target.RunnerId, userId,
+                    AppActionCommand.Create(ResumeCommandKind, new ResumeAppRuntimeRequest(appId, target.Id)), ct);
+            }
+            catch (RuntimeCommandFailedException error)
+            {
+                failures.Add(error.Message);
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
                 logger.LogWarning(error, "Could not queue a runtime {Command} for app {AppId} target {TargetId}.",
                     pause ? "pause" : "resume", appId, target.Id);
-                warnings.Add("The Runner could not be told to " + (pause ? "stop" : "start") + " the app. Its address still answers as " + (pause ? "paused." : "running."));
+                if (!pause) failures.Add("The Runner could not be told to start the app. Try again when the Runner is online.");
+                else warnings.Add("The Runner could not be told to stop the app. Its address still answers as running.");
             }
         }
+        if (failures.Count > 0) throw new RuntimeCommandFailedException(string.Join(" ", failures.Distinct()));
     }
 }
+
+/// <summary>The Runner could not carry out a start or restart; the message is safe to show to the person who asked.</summary>
+public sealed class RuntimeCommandFailedException(string message) : Exception(message);
 
 /// <summary>Sends a command to a Runner to run later; the Runner executes it when it is online.</summary>
 public interface IAppRuntimeCommandQueue
 {
+    /// <summary>Sends the command and waits for the Runner's answer; throws <see cref="RuntimeCommandFailedException"/> when it fails.</summary>
+    Task<RunnerExecutionResult> RunAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken);
+
     Task QueueAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken);
 }
 
@@ -192,4 +210,10 @@ public sealed class RunnerExecutionAppCommandQueue(RunnerExecutionOperationServi
 {
     public Task QueueAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
         => operations.QueueAsync(runnerId, actorUserId, new(null, null, command), cancellationToken);
+
+    public Task<RunnerExecutionResult> RunAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
+        => operations.QueueAndWaitAsync(runnerId, actorUserId, new(null, null, command), RuntimeStartTimeout, cancellationToken);
+
+    /// <summary>Longer than an app's start-up wait (60 seconds unless the app asks for more), so a slow start still reports its own error.</summary>
+    private static readonly TimeSpan RuntimeStartTimeout = TimeSpan.FromSeconds(150);
 }

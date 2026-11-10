@@ -340,7 +340,14 @@ public sealed class AppPauseTests
     private sealed class CountingRestarter : IAppRuntimeRestarter
     {
         public int Calls { get; private set; }
-        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token) { Calls++; return Task.FromResult(1); }
+        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false)
+        {
+            Calls++;
+            WaitedFor = wait;
+            return Failure is null ? Task.FromResult(1) : throw Failure;
+        }
+        public bool WaitedFor { get; private set; }
+        public Exception? Failure { get; set; }
     }
 
     private static AppRestartService RestartFor(Harness h, Guid userId, CountingRestarter restarter)
@@ -368,10 +375,65 @@ public sealed class AppPauseTests
         Assert.That(restarter.Calls, Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task Resume_WaitsForTheRunner_AndReportsAStartThatFailsInsteadOfSucceeding()
+    {
+        await using var h = new Harness();
+        h.AddRunningTarget();
+        var service = h.ServiceFor(OwnerId);
+        await service.PauseAsync(AppId, administrator: false, default);
+
+        h.Queue.RunnerError = "Invalid setting: DISK_FREE_WARN_PERCENT";
+        var error = Assert.ThrowsAsync<RuntimeCommandFailedException>(() => service.ResumeAsync(AppId, administrator: false, default));
+        Assert.That(error!.Message, Does.Contain("DISK_FREE_WARN_PERCENT"));
+        Assert.That((await h.Db.WebApps.SingleAsync()).IsPaused, Is.True, "a failed resume leaves the app paused");
+
+        h.Queue.RunnerError = null;
+        var resumed = await service.ResumeAsync(AppId, administrator: false, default);
+        Assert.That(resumed.Paused, Is.False);
+        Assert.That(h.Queue.Sent.Count(item => item.Command.Kind == AppPauseService.ResumeCommandKind), Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task Resume_WhenTheRunnerCannotTakeTheCommand_IsAnErrorNotAWarning()
+    {
+        await using var h = new Harness();
+        h.AddRunningTarget();
+        var service = h.ServiceFor(OwnerId);
+        await service.PauseAsync(AppId, administrator: false, default);
+
+        h.Queue.Fail = true;
+
+        Assert.ThrowsAsync<RuntimeCommandFailedException>(() => service.ResumeAsync(AppId, administrator: false, default));
+    }
+
+    [Test]
+    public async Task Restart_WaitsForTheRunner_AndReportsAStartThatFails()
+    {
+        await using var h = new Harness();
+        var restarter = new CountingRestarter();
+
+        await RestartFor(h, OwnerId, restarter).RestartAsync(AppId, administrator: false, default);
+        Assert.That(restarter.WaitedFor, Is.True);
+
+        restarter.Failure = new RuntimeCommandFailedException("The Runner could not start the app: bad setting");
+        Assert.ThrowsAsync<RuntimeCommandFailedException>(() => RestartFor(h, OwnerId, restarter).RestartAsync(AppId, administrator: false, default));
+    }
+
     private sealed class RecordingQueue : IAppRuntimeCommandQueue
     {
         public List<(Guid RunnerId, AppActionCommand Command)> Sent { get; } = [];
         public bool Fail { get; set; }
+        public string? RunnerError { get; set; }
+
+        public Task<RunnerExecutionResult> RunAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
+        {
+            if (Fail) throw new InvalidOperationException("Runner unavailable");
+            Sent.Add((runnerId, command));
+            return RunnerError is null
+                ? Task.FromResult(new RunnerExecutionResult { Outcome = "Succeeded" })
+                : throw new RuntimeCommandFailedException("The Runner could not start the app: " + RunnerError);
+        }
 
         public Task QueueAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
         {

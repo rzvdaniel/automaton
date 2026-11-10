@@ -14,7 +14,7 @@ public sealed class AppRestartService(
     IAppRuntimeRestarter restarter,
     UserContextService user)
 {
-    /// <summary>Queues a restart on each Runner hosting the app; returns how many were queued (0 when nothing is running).</summary>
+    /// <summary>Restarts the app on each Runner hosting it and waits; returns how many restarted (0 when nothing is running). Throws <see cref="RuntimeCommandFailedException"/> when a Runner cannot start it.</summary>
     public async Task<int> RestartAsync(Guid appId, bool administrator, CancellationToken ct)
     {
         var userId = user.GetUserId();
@@ -27,6 +27,6 @@ public sealed class AppRestartService(
                 throw new UnauthorizedAccessException("You do not have permission to restart this app.");
         }
         if (app.IsPaused) throw new InvalidOperationException("The app is paused. Resume it to start it again.");
-        return await restarter.RestartRunningAsync(appId, ct);
+        return await restarter.RestartRunningAsync(appId, ct, wait: true);
     }
 }
