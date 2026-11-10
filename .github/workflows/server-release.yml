@@ -213,6 +213,7 @@ jobs:
   cli:
     needs: bundle
     if: inputs.cli != 'never' && github.ref == 'refs/heads/main'
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -240,5 +241,9 @@ jobs:
           n=$(printf '%s' "$published" | jq -r --arg d "1.0.$today."             '[.versions[] | select(startswith($d)) | ltrimstr($d) | tonumber] | (max // 0) + 1')
           cli_version="1.0.$today.$n"
           echo "Publishing CLI $cli_version for server-v$VERSION (changes since ${previous:-the first release})."
-          gh workflow run nuget.yml --ref main -f version="$cli_version" -f publish=true
-          echo "### CLI $cli_version publishing started with [Pack CLI and Runner](../actions/workflows/nuget.yml)" >> "$GITHUB_STEP_SUMMARY"
+          url=$(gh workflow run nuget.yml --ref main -f version="$cli_version" -f publish=true 2>&1 | grep -o "https://[^ ]*/runs/[0-9]*" | head -1)
+          [[ -n "$url" ]]
+          echo "### CLI $cli_version publishing with [Pack CLI and Runner]($url)" >> "$GITHUB_STEP_SUMMARY"
+          # Finish only when the package is built and pushed, so a green release means the CLI is on NuGet.
+          run_id=${url##*/}
+          gh run watch "$run_id" --exit-status --interval 20 > /dev/null

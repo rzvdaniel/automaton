@@ -9,7 +9,7 @@ An agent running on that machine is already on the test server. Never test on pr
 
 After the merge, wait for the `Runner image` and `Build production images` workflows on `main` to succeed; a release
 pins the Runner image that exists at that moment. Then run `gh workflow run server-release.yml -f version=<next>` and
-wait for it and for `Pack CLI and Runner`. The CLI is published when it changed; until NuGet indexes it, run the CLI
+wait for it; its `cli` job also waits for `Pack CLI and Runner` when the CLI changed. Until NuGet indexes it, run the CLI
 from `src/Automaton.Cli`.
 
 ## Upgrade the test server
