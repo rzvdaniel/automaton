@@ -5,6 +5,7 @@ using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Automaton.Api.Services;
 
@@ -39,15 +40,32 @@ public sealed class AppCatalogUpdateService(
     AppCatalogService catalog,
     AppCatalogInstallService installer,
     StoredSourceDeploymentService deployment,
-    Services.Interfaces.IAuditEventService auditEventService)
+    Services.Interfaces.IAuditEventService auditEventService,
+    IMemoryCache cache)
 {
+    // The Overview asks on every visit and the answer needs two downloads, so it is kept for a few minutes.
+    private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(10);
+
     /// <exception cref="KeyNotFoundException">The app does not exist for this user.</exception>
-    public async Task<AppCatalogUpdateModel> GetAsync(Guid appId, CancellationToken cancellationToken)
+    public Task<AppCatalogUpdateModel> GetAsync(Guid appId, CancellationToken cancellationToken) =>
+        GetAsync(appId, fresh: false, cancellationToken);
+
+    private async Task<AppCatalogUpdateModel> GetAsync(Guid appId, bool fresh, CancellationToken cancellationToken)
     {
         var (app, ownerId, source) = await FindAsync(appId, cancellationToken);
         if (source is null) return None(app.InstalledFromCommit);
         var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken);
         if (latest is null || latest == source.Commit) return None(source.Commit);
+        var key = $"catalog-update:{appId}:{source.Commit}:{latest}";
+        if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return cached;
+        var model = await CompareAsync(app, ownerId, source, latest, cancellationToken);
+        cache.Set(key, model, CacheFor);
+        return model;
+    }
+
+    private async Task<AppCatalogUpdateModel> CompareAsync(WebApp app, Guid ownerId, GitAppSource source, string latest, CancellationToken cancellationToken)
+    {
+        var appId = app.Id;
 
         using var installed = await installer.DownloadAsync(source, cancellationToken);
         using var newer = await installer.DownloadAsync(source with { Commit = latest }, cancellationToken);
@@ -70,7 +88,7 @@ public sealed class AppCatalogUpdateService(
         var (app, ownerId, source) = await FindAsync(appId, cancellationToken);
         if (!await authorizationService.CanUpdateAppAsync(appId, userId, cancellationToken))
             throw new UnauthorizedAccessException("You do not have permission to update this app.");
-        var update = await GetAsync(appId, cancellationToken);
+        var update = await GetAsync(appId, fresh: true, cancellationToken);
         if (!update.Available || source is null) throw new InvalidOperationException("This app has no update.");
         if (update.Edited && !request.ConfirmEdited)
             throw new InvalidOperationException("This app was edited after it was installed. Confirm that the update replaces your changes.");
@@ -78,11 +96,25 @@ public sealed class AppCatalogUpdateService(
         var target = source with { Commit = update.LatestCommit! };
         using (var package = await installer.DownloadAsync(target, cancellationToken))
         {
-            var directory = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
-            if (Directory.Exists(directory))
-                foreach (var entry in new DirectoryInfo(directory).EnumerateFileSystemInfos())
-                    if (entry is DirectoryInfo folder) folder.Delete(true); else entry.Delete();
-            await AppCatalogInstallService.ExtractAsync(package, target, directory, cancellationToken);
+            // Extract next to the app first and swap only when that worked, so a failed download or extract leaves the
+            // installed files as they were.
+            var directory = Path.GetFullPath(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId)).TrimEnd(Path.DirectorySeparatorChar);
+            var staging = $"{directory}.update-{Guid.NewGuid():N}";
+            var previous = $"{directory}.previous-{Guid.NewGuid():N}";
+            try
+            {
+                Directory.CreateDirectory(staging);
+                await AppCatalogInstallService.ExtractAsync(package, target, staging, cancellationToken);
+                if (Directory.Exists(directory)) Directory.Move(directory, previous);
+                Directory.Move(staging, directory);
+            }
+            catch
+            {
+                if (!Directory.Exists(directory) && Directory.Exists(previous)) Directory.Move(previous, directory);
+                if (Directory.Exists(staging)) Directory.Delete(staging, true);
+                throw;
+            }
+            if (Directory.Exists(previous)) Directory.Delete(previous, true);
         }
 
         var entity = await dbContext.WebApps.FirstAsync(x => x.Id == appId, cancellationToken);
