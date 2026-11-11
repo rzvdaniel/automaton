@@ -70,7 +70,7 @@ The Runner sends a typed host-container operation over HTTPS and waits for its r
 
 - The result queue is declared with the other Runner queues when the Runner fetches its broker configuration (`ResultQueueName`). It is durable and lives in RabbitMQ, so a blue/green API switch does not touch it; unpublished outbox messages are sent by whichever API slot is running. Messages expire after one hour and the queue holds at most 5000, so an older Runner that never reads it cannot fill the broker.
 - The Runner consumes results on their own channel and consumer, apart from management commands and executions, so a slow command never sits in front of a result. A message is matched to a waiting operation by operation ID and Runner ID; a duplicate, or one nobody waits for (for example after a Runner restart), is acknowledged and dropped.
-- Besides the read after a message, the Runner reads the result once each time the result consumer reconnects, and once 30 seconds before the operation deadline. There is no polling loop. Only when the API offers no result queue (an older server) does the Runner read every 5 seconds.
+- Besides the read after a message, the Runner reads the result once each time the result consumer starts on a new broker connection (a Runner restart, or after the consumer stops and restarts), and once 30 seconds before the operation deadline. There is no polling loop. Only when the API offers no result queue (an older server) does the Runner read every 5 seconds.
 - An older Runner does not know the result queue and keeps its GET loop until it is upgraded.
 
 | Operation | API caller | Queue | Runner behavior | Artifact direction |

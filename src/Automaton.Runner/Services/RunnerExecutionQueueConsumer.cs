@@ -78,9 +78,12 @@ internal sealed class RunnerExecutionQueueConsumer(RunnerExecutionDeliveryHandle
             // Always acknowledged: a duplicate or unmatched message is dropped, a missed one is covered by the fallback read.
             await channel.BasicAckAsync(delivery.DeliveryTag, false, token);
         };
+        // A consumer the broker cancels (queue deleted) ends the result consumer, so the whole consumer restarts and reconnects.
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        consumer.UnregisteredAsync += (_, _) => { cancelled.TrySetException(new InvalidOperationException("The Runner result queue consumer was cancelled by the broker.")); return Task.CompletedTask; };
         await channel.BasicConsumeAsync(queue, false, consumer, token);
         results.ConsumerConnected();
-        await Task.Delay(Timeout.Infinite, token);
+        await cancelled.Task.WaitAsync(token);
     }
 
     internal static bool HandleResultReady(ReadOnlySpan<byte> body, Guid runnerId, HostContainerResultNotifier results)
