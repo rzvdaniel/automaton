@@ -435,6 +435,12 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/versions/${encodeURIComponent(version)}`)
   }
 
+  /** False when the app's own headers forbid showing it inside Studio's frame. */
+  async canBeFramed(id: string): Promise<boolean> {
+    const { data } = await apiClient.get<{ canBeFramed: boolean }>(`/api/apps/${id}/embeddable`)
+    return data.canBeFramed
+  }
+
   async createRuntimeLaunch(id: string): Promise<{ runtimeToken: string; runtimeUrl: string }> {
     const { data } = await apiClient.post<{ runtimeToken: string; runtimeUrl: string }>(`/api/apps/${id}/runtime-launch`, {})
     return data

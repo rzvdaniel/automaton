@@ -568,6 +568,8 @@ internal static class ApiAppExecutionRegistration
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
+        services.AddScoped<ITunnelForwarder>(provider => provider.GetRequiredService<RuntimeTunnelService>());
+        services.AddScoped<AppFramingProbe>();
         services.AddScoped<RuntimeTunnelWebSocketService>();
         services.AddScoped<RuntimeFileProxyService>();
         services.AddScoped<ApplicationDeploymentService>();
