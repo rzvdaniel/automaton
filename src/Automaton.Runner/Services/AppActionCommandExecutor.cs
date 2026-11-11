@@ -47,13 +47,17 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
         => deployment.DeleteVersion(request.AppId, request.DeploymentTargetId, request.ActionKey, request.Version);
     private async Task<RestartAppRuntimeResult> RestartAsync(RestartAppRuntimeRequest request, CancellationToken token)
         => new(request.AppId, request.DeploymentTargetId,
-            await runtime.RestartRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
+            await runtime.RestartRuntimeAsync(request.AppId, request.DeploymentTargetId, token)
+                ? true : throw new InvalidOperationException(
+                    "The app is not running on this Runner, so there was nothing to restart. Deploy it again."));
     private async Task<PauseResumeAppRuntimeResult> PauseAsync(PauseAppRuntimeRequest request, CancellationToken token)
         => new(request.AppId, request.DeploymentTargetId,
             await runtime.PauseRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
     private async Task<PauseResumeAppRuntimeResult> ResumeAsync(ResumeAppRuntimeRequest request, CancellationToken token)
         => new(request.AppId, request.DeploymentTargetId,
-            await runtime.ResumeRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
+            await runtime.ResumeRuntimeAsync(request.AppId, request.DeploymentTargetId, token)
+                ? true : throw new InvalidOperationException(
+                    "The app is not paused on this Runner, so it was not started. Restart or deploy it again."));
     private async Task<CleanupAppDeploymentTargetResult> CleanupAsync(CleanupAppDeploymentTargetRequest request)
     {
         if (request.DeleteApplicationStorage && storageCleanup is null)

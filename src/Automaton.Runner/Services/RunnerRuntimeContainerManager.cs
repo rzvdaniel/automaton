@@ -281,8 +281,11 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
     {
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
-        if (metadata is not { State: RuntimeReadinessState.Ready }
-            || metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed }) || string.IsNullOrWhiteSpace(metadata.ContainerId)
+        // A runtime left "starting" by an interrupted start has no container; a restart recovers it.
+        var stuckStarting = metadata is { State: RuntimeReadinessState.Starting } && string.IsNullOrWhiteSpace(metadata.ContainerId);
+        if (metadata is null
+            || !(stuckStarting || metadata is { State: RuntimeReadinessState.Ready } && !string.IsNullOrWhiteSpace(metadata.ContainerId))
+            || metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed })
             || metadata.ComposeCandidateId is not null || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
         var candidateId = Guid.NewGuid();
