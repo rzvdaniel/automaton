@@ -209,10 +209,10 @@ public interface IAppRuntimeCommandQueue
 public sealed class RunnerExecutionAppCommandQueue(RunnerExecutionOperationService operations) : IAppRuntimeCommandQueue
 {
     public Task QueueAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
-        => operations.QueueAsync(runnerId, actorUserId, new(null, null, command), cancellationToken);
+        => operations.QueueAsync(runnerId, actorUserId, new( command), cancellationToken);
 
     public Task<RunnerExecutionResult> RunAsync(Guid runnerId, Guid actorUserId, AppActionCommand command, CancellationToken cancellationToken)
-        => operations.QueueAndWaitAsync(runnerId, actorUserId, new(null, null, command), RuntimeStartTimeout, cancellationToken);
+        => operations.QueueAndWaitAsync(runnerId, actorUserId, new( command), RuntimeStartTimeout, cancellationToken);
 
     /// <summary>Longer than an app's start-up wait (60 seconds unless the app asks for more), so a slow start still reports its own error.</summary>
     private static readonly TimeSpan RuntimeStartTimeout = TimeSpan.FromSeconds(150);

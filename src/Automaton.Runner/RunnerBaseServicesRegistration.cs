@@ -1,5 +1,4 @@
 using Automaton.Runner.Console.Services;
-using Automaton.Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.Runner.Console;
@@ -17,10 +16,6 @@ internal static class RunnerBaseServicesRegistration
         services.AddSingleton<AppActionExecutionCoordinator>();
         services.AddHostedService<AppActionArtifactCleanupService>();
         services.AddSingleton<RunnerDeploymentService>();
-        services.AddSingleton<FlowExecutionService>();
-        services.AddSingleton<AppFlowExecutionService>();
         services.AddSingleton<RunnerHostService>();
-        services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
-        services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
     }
 }

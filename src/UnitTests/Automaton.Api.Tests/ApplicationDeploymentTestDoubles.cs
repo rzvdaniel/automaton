@@ -261,7 +261,6 @@ internal static class DeploymentFixtureServiceFactory
             new DeploymentPackageFinalizationService(
                 state.Db,
                 storage,
-                new ConnectedFlowArtifactService(storage, null!, new PackageManagedArtifactsCommands()),
                 routeService),
             new AppPauseService(
                 state.Db, null!, null!, new NoopRuntimeCommandQueue(), null!, null!,

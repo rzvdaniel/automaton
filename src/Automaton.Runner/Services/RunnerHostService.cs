@@ -1,4 +1,3 @@
-using Automaton.Core.Scripting.Engines.Python;
 using Automaton.Runner.Console.Models;
 using Automaton.Runner.Console.Services;
 using Serilog;
@@ -19,7 +18,6 @@ public class RunnerHostService
     private readonly HubService hubService;
     private readonly HttpClient httpClient;
     private readonly ILogger logger;
-    private readonly ScriptEngineSettingsReporter scriptEngineSettingsReporter;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
 
     private readonly RunnerRegistrationWorkflow registrationWorkflow;
@@ -33,7 +31,6 @@ public class RunnerHostService
         ApiKeyAuthenticationService apiKeyAuthService,
         HubService hubService,
         HttpClient httpClient,
-        ScriptEngineSettingsReporter scriptEngineSettingsReporter,
         RunnerWorkspaceService runnerWorkspaceService)
     {
         this.configService = configService;
@@ -42,7 +39,6 @@ public class RunnerHostService
         this.hubService = hubService;
         this.httpClient = httpClient;
         this.logger = Log.ForContext<RunnerHostService>();
-        this.scriptEngineSettingsReporter = scriptEngineSettingsReporter;
         this.runnerWorkspaceService = runnerWorkspaceService;
         registrationWorkflow = new RunnerRegistrationWorkflow(configService, storageService, httpClient, logger);
         fastApiProcess = new RunnerLocalFastApiProcess(runnerWorkspaceService, logger);
@@ -187,7 +183,6 @@ public class RunnerHostService
             if (!await EnsureInteractiveAuthenticationAsync()) return;
             await SetupHttpClientAuth();
             if (!await EnsureInteractiveRunnerRegistrationAsync()) return;
-            await SubmitDetectedPythonSettingsAsync();
             await StartRunnerAsync();
         }
         catch (Exception ex)
@@ -318,12 +313,6 @@ public class RunnerHostService
         return false;
     }
 
-    private async Task SubmitDetectedPythonSettingsAsync()
-    {
-        var detected = new PythonEnvironmentDetector().Detect();
-        if (detected is not null && detected.IsAutoDetectionSuccessful)
-            await scriptEngineSettingsReporter.SubmitPythonSettingsAsync(detected, CancellationToken.None);
-    }
     /// <summary>
     /// Interactive authentication
     /// </summary>
@@ -731,7 +720,7 @@ public class RunnerHostService
 
             if (response.IsSuccessStatusCode)
             {
-                var runnerDetails = await response.Content.ReadAsAsync<RunnerDetails>();
+                var runnerDetails = await response.Content.ReadFromJsonAsync<RunnerDetails>();
                 if (runnerDetails != null && !string.Equals(configService.RunnerId, runnerDetails.Id.ToString(), StringComparison.OrdinalIgnoreCase))
                 {
                     await storageService.SaveRunnerConfigAsync(runnerDetails.Id.ToString(), runnerName);
@@ -778,7 +767,7 @@ public class RunnerHostService
                 return false;
             }
 
-            var runners = await response.Content.ReadAsAsync<List<RunnerDetails>>();
+            var runners = await response.Content.ReadFromJsonAsync<List<RunnerDetails>>();
             var serverRunner = runners?.FirstOrDefault(runner => runner.Id == runnerId);
             if (serverRunner is null || string.IsNullOrWhiteSpace(serverRunner.Name))
             {

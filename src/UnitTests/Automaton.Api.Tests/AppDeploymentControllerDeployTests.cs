@@ -103,33 +103,9 @@ public sealed class AppDeploymentControllerDeployTests
         var app = await fixture.Db.WebApps.FindAsync(fixture.AppId);
         app!.ProjectId = projectId;
         await fixture.Db.SaveChangesAsync();
-        var finalization = new DeploymentPackageFinalizationService(fixture.Db, null!, null!, null!);
+        var finalization = new DeploymentPackageFinalizationService(fixture.Db, null!, null!);
 
         Assert.That(await finalization.ResolveSourceOwnerIdAsync(fixture.AppId, Guid.NewGuid(), default), Is.EqualTo(fixture.OwnerId));
-    }
-
-    [Test]
-    public async Task EditorDeployFinalizesManagedArtifactsForTheProjectOwner()
-    {
-        await using var fixture = await ApplicationDeploymentServiceTests.DeploymentFixture.CreateAsync();
-        var projectId = Guid.NewGuid();
-        fixture.Db.Projects.Add(AppAuthorizationTestData.CreateProject(projectId, fixture.OwnerId, "project"));
-        fixture.Db.ProjectApps.Add(new ProjectApp { ProjectId = projectId, WebAppId = fixture.AppId });
-        var app = await fixture.Db.WebApps.FindAsync(fixture.AppId);
-        app!.ProjectId = projectId;
-        await fixture.Db.SaveChangesAsync();
-        var commands = new RecordingManagedArtifactsCommands();
-        var environment = new TestWebHostEnvironment { ContentRootPath = Path.GetTempPath() };
-        var storage = DeploymentFixtureServiceFactory.CreateStorage(fixture.Db, environment);
-        var finalization = new DeploymentPackageFinalizationService(
-            fixture.Db, storage, new ConnectedFlowArtifactService(storage, null!, commands), null!);
-        var runner = new Runner { Id = Guid.NewGuid(), Name = "runner", ApiCompatibilityVersion = "999" };
-
-        // Later finalization steps need the full fixture; only the artifact synchronization is under test.
-        try { await finalization.FinalizeAsync(fixture.AppId, Guid.NewGuid(), Guid.NewGuid(), runner, null!, ApplicationContractDefaults.Create(), default); }
-        catch (NullReferenceException) { }
-
-        Assert.That(commands.OwnerIds, Is.EqualTo(new[] { fixture.OwnerId }));
     }
 
     [Test]
@@ -151,18 +127,6 @@ public sealed class AppDeploymentControllerDeployTests
             () => gateway.SynchronizeAsync(runnerId, projectOwnerId, request, null, default));
         Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => gateway.SynchronizeAsync(runnerId, Guid.NewGuid(), request, null, default));
-    }
-
-    private sealed class RecordingManagedArtifactsCommands : IManagedApplicationArtifactCommands
-    {
-        public List<Guid> OwnerIds { get; } = [];
-
-        public Task<SynchronizeApplicationManagedArtifactsResult> SynchronizeAsync(Guid runnerId, Guid ownerId,
-            SynchronizeApplicationManagedArtifactsRequest request, Guid? deploymentOperationId, CancellationToken cancellationToken)
-        {
-            OwnerIds.Add(ownerId);
-            return Task.FromResult(new SynchronizeApplicationManagedArtifactsResult(request.AppId, request.DeploymentTargetId, true));
-        }
     }
 
     private static int? Status(ActionResult<DeploymentOperationResponse> result) =>

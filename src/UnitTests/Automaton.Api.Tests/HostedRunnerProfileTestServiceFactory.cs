@@ -26,7 +26,6 @@ internal static class HostedRunnerProfileTestServiceFactory
                 userContext, RunnerExecutionTestServices.Revocation(db)),
             connectionSessionService: sessions,
             runnerQueryService: queries,
-            flowExecutionService: new RunnerFlowExecutionService(null!),
             connectionLifecycleService: new RunnerConnectionLifecycleService(
                 db,
                 null!,

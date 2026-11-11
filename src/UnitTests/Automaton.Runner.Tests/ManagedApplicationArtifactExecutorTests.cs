@@ -37,7 +37,7 @@ public sealed class ManagedApplicationArtifactExecutorTests
         var journal = new RunnerExecutionJournal(Path.Combine(root, "journal")); var id = Guid.NewGuid();
         var request = new SynchronizeApplicationManagedArtifactsRequest(Guid.NewGuid(), Guid.NewGuid(),
             [new("index.json", "[]"u8.ToArray())]);
-        var payload = new RunnerExecutionRequest(null, null, ManagedArtifacts: request);
+        var payload = new RunnerExecutionRequest(ManagedArtifacts: request);
         var result = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, payload, CancellationToken.None);
         var file = Path.Combine(workspace.GetAppFlowArtifactsRoot(request.AppId, request.DeploymentTargetId), "index.json");
         Assert.That(await File.ReadAllTextAsync(file), Is.EqualTo("[]"));
@@ -68,7 +68,7 @@ public sealed class ManagedApplicationArtifactExecutorTests
         var request = new SynchronizeApplicationManagedArtifactsRequest(Guid.NewGuid(), Guid.NewGuid(),
             [new("index.json", "[]"u8.ToArray())]);
         var result = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id,
-            new(null, null, ManagedArtifacts: request), CancellationToken.None);
+            new( ManagedArtifacts: request), CancellationToken.None);
         Assert.That(result.Outcome, Is.EqualTo("Lost"));
         Assert.That(Directory.Exists(workspace.GetAppFlowArtifactsRoot(request.AppId, request.DeploymentTargetId)), Is.False);
     }

@@ -13,7 +13,7 @@ public sealed class AppActionCommandExecutorTests
     {
         using var services = RegisteredHandlerServices();
         using var dispatcher = new RunnerExecutionExecutor(services);
-        var result = await dispatcher.ExecuteAsync(new(null, null,
+        var result = await dispatcher.ExecuteAsync(new(
             AppActionCommand.Create("read-logs", new ReadAppModuleExecutionArtifactRequest(
                 Guid.NewGuid(), Guid.NewGuid(), "missing", Guid.NewGuid()))), CancellationToken.None);
         Assert.That(result.Outcome, Is.EqualTo("Succeeded"));

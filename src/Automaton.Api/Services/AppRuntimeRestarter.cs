@@ -40,7 +40,7 @@ public sealed class AppRuntimeRestarter(
         {
             try
             {
-                RunnerExecutionRequest request = new(null, null,
+                RunnerExecutionRequest request = new(
                     AppActionCommand.Create(CommandKind, new RestartAppRuntimeRequest(appId, target.Id)));
                 if (wait) await operations.QueueAndWaitAsync(target.RunnerId, user.GetUserId(), request, RestartTimeout, token);
                 else await operations.QueueAsync(target.RunnerId, user.GetUserId(), request, token);

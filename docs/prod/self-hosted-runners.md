@@ -103,7 +103,7 @@ backup automation or legacy migration procedure is implied by this demonstration
 
 Machine Management is the only supported Runner profile. It has access to the Docker
 socket to manage bounded application and Action containers. User app code runs inside
-those containers; raw workflows and custom steps in the Runner process remain disabled.
+those containers; the Runner has no in-process workflow or custom-step execution.
 
 The generated command verifies Docker and the daemon, pulls the configured image,
 creates the container, checks that it remains running after startup, and prints a

@@ -71,7 +71,7 @@ internal sealed class RunnerRegistrationWorkflow
             var response = await httpClient.GetAsync(
                 $"{configService.BaseUrl}/api/runners/by-name/{Uri.EscapeDataString(runnerName)}");
             if (!response.IsSuccessStatusCode) return CreateNewRunnerIdentity();
-            var details = await response.Content.ReadAsAsync<RunnerDetails>();
+            var details = await response.Content.ReadFromJsonAsync<RunnerDetails>();
             if (details is null) return CreateNewRunnerIdentity();
             await RecoverRunnerIdentityAsync(details.Id, runnerName);
             return new RunnerRegistrationIdentity(details.Id, true, true);

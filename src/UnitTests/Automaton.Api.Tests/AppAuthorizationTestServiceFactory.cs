@@ -31,9 +31,6 @@ internal static class AppAuthorizationTestServiceFactory
         return ComposeAppsService(dependencies);
     }
 
-    public static AppsStepExecutionService CreateAppsStepExecutionService(ApplicationDbContext db) =>
-        new(db, null!, null!);
-
     private static AppsServiceDependencies CreateDependencies(
         ApplicationDbContext db,
         Guid userId,

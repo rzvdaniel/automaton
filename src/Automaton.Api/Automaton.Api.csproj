@@ -54,7 +54,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
     <ProjectReference Include="..\Automaton.Messaging\Automaton.Messaging.csproj" />
-    <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
     <ProjectReference Include="..\Automaton.Ai\Automaton.Ai.csproj" />
     <ProjectReference Include="..\Automaton.Mcp\Automaton.Mcp.csproj" />
     <ProjectReference Include="..\Automaton.Infrastructure\Automaton.Infrastructure.csproj" />

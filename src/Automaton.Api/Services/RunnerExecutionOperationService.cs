@@ -20,7 +20,7 @@ public sealed class RunnerExecutionOperationService(
         SynchronizeApplicationManagedArtifactsRequest request, CancellationToken token)
     {
         if (await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) return;
-        try { await QueueAsync(runnerId, ownerId, new(null, null, ManagedArtifacts: request), token, id); }
+        try { await QueueAsync(runnerId, ownerId, new( ManagedArtifacts: request), token, id); }
         catch (DbUpdateException)
         {
             // Competing API callbacks may create the same operation. Its committed, pinned request wins.
@@ -34,7 +34,7 @@ public sealed class RunnerExecutionOperationService(
     public async Task QueueFileTransferAsync(Guid id, Guid runnerId, Guid ownerId,
         RunnerFileTransferCommand request, CancellationToken token)
     {
-        var payload = new RunnerExecutionRequest(null, null, FileTransfer: request);
+        var payload = new RunnerExecutionRequest(FileTransfer: request);
         if (await HasFileTransferOperationAsync(id, runnerId, ownerId, request, token)) return;
         try { await QueueAsync(runnerId, ownerId, payload, token, id); }
         catch (DbUpdateException)
@@ -49,7 +49,7 @@ public sealed class RunnerExecutionOperationService(
     public async Task QueueHostContainerAsync(Guid id, Guid runnerId, Guid ownerId,
         HostContainerExecutionRequest request, CancellationToken token)
     {
-        var payload = new RunnerExecutionRequest(null, null, HostContainer: request);
+        var payload = new RunnerExecutionRequest(HostContainer: request);
         if (await HasHostContainerOperationAsync(id, runnerId, ownerId, request, token)) return;
         try { await QueueAsync(runnerId, ownerId, payload, token, id); }
         catch (DbUpdateException)
