@@ -171,7 +171,7 @@ public sealed partial class AppCatalogInstallService(
 
     public static GitAppSource Validate(string repo, string? folder, string commit) => Validated(repo, folder, commit);
 
-    private async Task<ZipArchive> DownloadAsync(GitAppSource source, CancellationToken cancellationToken)
+    internal async Task<ZipArchive> DownloadAsync(GitAppSource source, CancellationToken cancellationToken)
     {
         using var client = Client();
         // A private source's token is used only for an app its own catalog lists at exactly this folder and commit.
@@ -207,7 +207,7 @@ public sealed partial class AppCatalogInstallService(
     }
 
     /// <summary>The files of the app, with the archive's top-level folder and the app folder removed.</summary>
-    private static IEnumerable<(ZipArchiveEntry Entry, string Path)> AppFiles(ZipArchive package, GitAppSource source)
+    internal static IEnumerable<(ZipArchiveEntry Entry, string Path)> AppFiles(ZipArchive package, GitAppSource source)
     {
         var prefix = source.Folder.Length == 0 ? "" : source.Folder + "/";
         foreach (var entry in package.Entries)
@@ -223,7 +223,7 @@ public sealed partial class AppCatalogInstallService(
         }
     }
 
-    private static Manifest ReadManifest(ZipArchive package, GitAppSource source)
+    internal static Manifest ReadManifest(ZipArchive package, GitAppSource source)
     {
         var file = AppFiles(package, source).FirstOrDefault(item => item.Path == "automaton.json");
         if (file.Entry is null)
@@ -257,7 +257,13 @@ public sealed partial class AppCatalogInstallService(
             metadata.RuntimeSource = AppRuntimeSources.Studio;
         });
 
-        var root = Path.GetFullPath(fileStorageService.GetAppSourceDirectoryPath(UserId, appId));
+        await ExtractAsync(package, source, fileStorageService.GetAppSourceDirectoryPath(UserId, appId), cancellationToken);
+    }
+
+    /// <summary>Writes the app's files into the folder; files already there that the archive does not have are left alone.</summary>
+    internal static async Task ExtractAsync(ZipArchive package, GitAppSource source, string directory, CancellationToken cancellationToken)
+    {
+        var root = Path.GetFullPath(directory);
         foreach (var (entry, relative) in AppFiles(package, source))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -281,5 +287,5 @@ public sealed partial class AppCatalogInstallService(
 
     private string Base(string key, string fallback) => (configuration[key] is { Length: > 0 } value ? value : fallback).TrimEnd('/');
 
-    private sealed record Manifest(string Name, string? Summary, string? Description, ApplicationContract Application);
+    internal sealed record Manifest(string Name, string? Summary, string? Description, ApplicationContract Application);
 }

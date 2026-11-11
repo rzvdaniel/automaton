@@ -31,6 +31,17 @@ import type {
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 
+export type CatalogUpdate = {
+  available: boolean
+  installedCommit: string | null
+  latestCommit: string | null
+  compareUrl: string | null
+  edited: boolean
+  newSecrets: string[]
+  newSettings: string[]
+  newPermissions: string[]
+}
+
 export type DeployAppResult = {
   success: boolean
   message?: string
@@ -326,6 +337,18 @@ class AppsService {
   /** Installs an app from a pinned Git source as a new app of the current user. */
   async installFromGit(source: GitAppSource, name: string, runnerId?: string): Promise<App> {
     const { data } = await apiClient.post<App>('/api/catalog/install', { ...source, name, runnerId })
+    return data
+  }
+
+  /** Whether the catalog pins a newer commit than the one this app was installed from, and what would change. */
+  async getCatalogUpdate(id: string): Promise<CatalogUpdate> {
+    const { data } = await apiClient.get<CatalogUpdate>(`/api/catalog/apps/${id}/update`)
+    return data
+  }
+
+  /** Replaces the app's files with the catalog's newer commit and redeploys it (data, settings, secrets and schedules stay). */
+  async applyCatalogUpdate(id: string, confirmEdited: boolean): Promise<DeploymentOperation> {
+    const { data } = await apiClient.post<DeploymentOperation>(`/api/catalog/apps/${id}/update`, { confirmEdited })
     return data
   }
 

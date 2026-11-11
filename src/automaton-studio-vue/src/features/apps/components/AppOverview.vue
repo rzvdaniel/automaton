@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import type { ActionModule, ActionSchedule } from '../services/action-schedules.service'
-import { appsService, type AppActionExecution } from '../services/apps.service'
+import { appsService, type AppActionExecution, type CatalogUpdate } from '../services/apps.service'
 import type { App, AppDeploymentTarget, AppPermissionStatus, AppSharing } from '../types/apps.types'
 import type { AppViewKey } from '../app-navigation'
 import {
@@ -38,11 +38,17 @@ const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-chan
 const toast = useToast()
 
 const secretNames = ref<string[] | null>(null)
+const update = ref<CatalogUpdate | null>(null)
+const updateBusy = ref(false)
 const permissions = ref<AppPermissionStatus[]>([])
 
 watch(() => props.app.id, async (id) => {
   secretNames.value = null
   permissions.value = []
+  update.value = null
+  if (props.app.installedFromRepo && props.app.canUpdate !== false) {
+    appsService.getCatalogUpdate(id).then((result) => { if (props.app.id === id && result.available) update.value = result }).catch(() => {})
+  }
   const [secrets, perms] = await Promise.allSettled([
     appsService.listSecrets(id),
     appsService.getPermissions(id),
@@ -54,6 +60,24 @@ watch(() => props.app.id, async (id) => {
 
 /** Only people who can change the app change who opens it. */
 const canShare = computed(() => props.app.canUpdate !== false)
+
+/** Replaces the app with the catalog's newer commit and redeploys it; asks first when the owner edited the files. */
+async function applyUpdate() {
+  const current = update.value
+  if (!current || updateBusy.value) return
+  if (current.edited && !window.confirm('You edited this app after installing it. Updating replaces your changes with the new version. Update anyway?')) return
+  updateBusy.value = true
+  try {
+    await appsService.applyCatalogUpdate(props.app.id, current.edited)
+    update.value = null
+    toast.add({ severity: 'success', summary: 'Updating', detail: 'The new version is being deployed.', life: 5000 })
+    emit('paused-changed')
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Update failed', detail: appActionErrorMessage(error, 'The app could not be updated.'), life: 8000 })
+  } finally {
+    updateBusy.value = false
+  }
+}
 
 const pauseBusy = ref(false)
 /** Pauses or resumes the app, then asks the page to reload it. */
@@ -133,6 +157,26 @@ const source = computed(() => {
           <template v-else>{{ part.text }}</template>
         </template>
       </p>
+    </section>
+
+    <section v-if="update" class="card" aria-label="Update available" data-testid="update-card">
+      <div class="row">
+        <span>
+          <span class="pill pill--bad">Update available</span>
+          <span class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
+          <a v-if="update.compareUrl" :href="update.compareUrl" target="_blank" rel="noopener noreferrer"> What changed</a>
+          <template v-if="update.newSettings.length || update.newSecrets.length || update.newPermissions.length">
+            <br><span class="hint">New:
+              <template v-if="update.newSettings.length">settings {{ update.newSettings.join(', ') }}. </template>
+              <template v-if="update.newSecrets.length">secrets {{ update.newSecrets.join(', ') }}. </template>
+              <template v-if="update.newPermissions.length">permissions {{ update.newPermissions.join(', ') }} (an administrator approves them again).</template>
+            </span>
+          </template>
+          <br><span v-if="update.edited" class="hint">You edited this app, so updating replaces your changes. </span>
+          <span class="hint">Its data, settings, secrets, sharing and schedules are kept.</span>
+        </span>
+        <Button :label="update.edited ? 'Replace my changes and update' : 'Update'" icon="pi pi-download" size="small" :loading="updateBusy" @click="applyUpdate" />
+      </div>
     </section>
 
     <section v-if="app.isPaused || canShare" class="card" aria-label="Pause" data-testid="pause-card">
