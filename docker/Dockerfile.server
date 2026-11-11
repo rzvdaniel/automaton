@@ -39,10 +39,6 @@ ENV ASPNETCORE_URLS=http://+:8080
 ARG SERVER_VERSION
 ENV Installation__Version=${SERVER_VERSION}
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY --from=build /app/publish .
 
 RUN mkdir -p /app/AppData/apps /app/logs
