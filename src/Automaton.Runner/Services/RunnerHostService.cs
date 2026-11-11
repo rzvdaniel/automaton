@@ -720,7 +720,7 @@ public class RunnerHostService
 
             if (response.IsSuccessStatusCode)
             {
-                var runnerDetails = await response.Content.ReadFromJsonAsync<RunnerDetails>();
+                var runnerDetails = await response.Content.ReadFromJsonAsync<RunnerDetails>(RunnerApiJson.Options);
                 if (runnerDetails != null && !string.Equals(configService.RunnerId, runnerDetails.Id.ToString(), StringComparison.OrdinalIgnoreCase))
                 {
                     await storageService.SaveRunnerConfigAsync(runnerDetails.Id.ToString(), runnerName);
@@ -767,7 +767,7 @@ public class RunnerHostService
                 return false;
             }
 
-            var runners = await response.Content.ReadFromJsonAsync<List<RunnerDetails>>();
+            var runners = await response.Content.ReadFromJsonAsync<List<RunnerDetails>>(RunnerApiJson.Options);
             var serverRunner = runners?.FirstOrDefault(runner => runner.Id == runnerId);
             if (serverRunner is null || string.IsNullOrWhiteSpace(serverRunner.Name))
             {

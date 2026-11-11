@@ -22,10 +22,7 @@ Also removed: the Studio client methods for those calls (`apps.service.ts`) and 
 | Endpoint | Client that needs it |
 |---|---|
 | `api/projects`, `api/projects/{id}/members`, `apps`, `runners` | CLI (`project`, `runners install`, `share`) and the Studio share dialog (`listMyTeams`) |
-| `api/customsteps` | Install migration check (`docker/install/migration_app_check.py`); kept because its API tests still cover it |
-| `api/flows/{id}`, `api/flowexecutions` | Runner (`FlowExecutionService`, `AppConfig.FlowsUrl`) |
 | `api/ai-guidance` (`AiGuidanceController`) | CLI (`AiGuidancePackService`) |
-| `api/web-apps/...` flow and step execution (`AppsFlowExecutionController`, `AppsStepExecutionController`) | Published apps: the generated config sets `backendApiPath` to `/api/web-apps/{slug}` |
 | `api/webhooks/stripe` (`StripeWebhookController`) | Stripe calls it; not a Studio caller |
 | `PUT /api/admin/settings/store` | API-only app store on/off switch, documented in the Admin docs; no Studio page |
 | `organizations/apps/assigned`, `organizations/{id}/apps/assigned` | Studio app list and organization dashboard |
