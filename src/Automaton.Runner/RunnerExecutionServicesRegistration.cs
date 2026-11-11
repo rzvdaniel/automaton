@@ -35,9 +35,5 @@ internal static class RunnerExecutionServicesRegistration
         services.AddHttpClient();
         services.AddHttpClient<RunnerRuntimeGatewayService>()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
-        services.AddMediatR(configuration =>
-        {
-            configuration.RegisterServicesFromAssembly(typeof(Program).Assembly);
-        });
     }
 }

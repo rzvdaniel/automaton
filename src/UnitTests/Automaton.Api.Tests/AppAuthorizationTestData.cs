@@ -100,20 +100,6 @@ internal static class AppAuthorizationTestData
         IsActive = true
     };
 
-    public static CustomStep CreateStep(Guid id, string name) => new()
-    {
-        Id = id,
-        Name = name,
-        DisplayName = name,
-        Description = string.Empty,
-        MoreInfo = string.Empty,
-        Icon = "code",
-        Category = "App Steps",
-        Definition = "{\"language\":\"Python\",\"codeInputVariables\":[],\"codeOutputVariables\":[]}",
-        Created = DateTime.UtcNow,
-        Updated = DateTime.UtcNow
-    };
-
     public sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()

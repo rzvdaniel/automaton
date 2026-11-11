@@ -75,7 +75,7 @@ public sealed class RunnerExecutionOperationTests
         var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
         var protection = Protection();
         var initiating = RunnerExecutionTestServices.Operations(db, protection: protection);
-        var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(ManagedArtifacts: new SynchronizeApplicationManagedArtifactsRequest(Guid.NewGuid(), Guid.NewGuid(), [])), CancellationToken.None);
+        var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(AppActionCommand.Create("cleanup-app", new { })), CancellationToken.None);
         var callback = RunnerExecutionTestServices.Operations(db, protection: protection);
         Assert.That((await callback.AssignmentAsync(runner.ApiKeyId!.Value, id, CancellationToken.None)).Disposition, Is.EqualTo("execute"));
         var before = await ApplyWorkflowResultAsync(db, callback, runner.ApiKeyId.Value, id);
@@ -147,45 +147,6 @@ public sealed class RunnerExecutionOperationTests
         var id = await service.QueueAsync(runnerId, Guid.NewGuid(), new(AppActionCommand.Create("execute", new { })), CancellationToken.None);
         await service.TerminateRunnerAsync(runnerId, CancellationToken.None);
         Assert.That((await service.WaitAsync(id, CancellationToken.None)).Outcome, Is.EqualTo("Lost"));
-    }
-
-    [TestCase(RunnerPurposes.Managed, "Standard")]
-    [TestCase(RunnerPurposes.Managed, "PrivilegedHost")]
-    public async Task RetiredApplicationProfilesAreRejected(string purpose, string profile)
-    {
-        await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner();
-        runner.Purpose = purpose; runner.ApplicationProfile = profile;
-        runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }];
-        db.Runners.Add(runner); await db.SaveChangesAsync();
-        var admission = new RunnerExecutionAdmissionService(db, null!, null!);
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => admission.AuthorizeAsync(runner.Id, actor, CancellationToken.None));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => admission.AuthorizeAsync(runner.Id, Guid.NewGuid(), CancellationToken.None));
-    }
-
-    [Test]
-    public async Task InfrastructureProfileRequiresAdministrator()
-    {
-        await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner(); runner.Purpose = "Infrastructure";
-        runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }]; db.Runners.Add(runner); await db.SaveChangesAsync();
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => new RunnerExecutionAdmissionService(db, null!, null!)
-            .AuthorizeAsync(runner.Id, actor, CancellationToken.None));
-    }
-
-    [Test]
-    public async Task MachineManagementApiAdmissionRejectsRawWorkflowExecution()
-    {
-        await using var db = Db();
-        var actor = Guid.NewGuid();
-        var runner = Runner();
-        runner.ApplicationProfile = RunnerApplicationProfiles.MachineManagement;
-        runner.CapabilitiesJson = "[\"ApplicationHosting\",\"ManagedContainerExecution\",\"WorkflowExecution\"]";
-        runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }];
-        db.Runners.Add(runner);
-        await db.SaveChangesAsync();
-
-        var admission = new RunnerExecutionAdmissionService(db, null!, null!);
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            admission.AuthorizeAsync(runner.Id, actor, CancellationToken.None));
     }
 
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);

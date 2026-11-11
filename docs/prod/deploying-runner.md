@@ -145,7 +145,6 @@ docker compose up -d
 | `AUTOMATON_RUNNER_NAME` | No | hostname | Display name shown in the Automaton dashboard |
 | `RUNNER_SCRIPTS_DIR` | No | `/app/data/apps` (Docker) or `<exe-dir>/data/apps` (standalone) | Directory where deployed app controller scripts are stored. Override if you want scripts on a different volume or path. |
 | `DOTNET_ENVIRONMENT` | No | `Production` | Set to `Development` **only** when the server uses a self-signed certificate (local dev). Do **not** set this in production |
-| `PYTHONNET_PYDLL` | No | `/usr/local/lib/libpython3.13.so` | Path to the Python shared library used by PythonNet for custom Python steps. Override if using a different Python version or install path. |
 
 ---
 

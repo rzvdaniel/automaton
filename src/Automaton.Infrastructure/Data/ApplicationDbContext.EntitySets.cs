@@ -8,11 +8,6 @@ namespace Automaton.Api.Data;
 public partial class ApplicationDbContext
 {
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
-    public virtual DbSet<Flow> Flows { get; set; }
-    public virtual DbSet<FlowUser> FlowUsers { get; set; }
-    public virtual DbSet<FlowExecution> FlowExecutions { get; set; }
-    public virtual DbSet<FlowExecutionUser> FlowExecutionUsers { get; set; }
-    public virtual DbSet<FlowExecutionLog> FlowExecutionLogs { get; set; }
     public virtual DbSet<AuditEvent> AuditEvents { get; set; }
     public virtual DbSet<RunnerExecutionOperation> RunnerExecutionOperations { get; set; }
     public virtual DbSet<Runner> Runners { get; set; }
@@ -34,10 +29,6 @@ public partial class ApplicationDbContext
     public virtual DbSet<HostedRunnerStorageObservation> HostedRunnerStorageObservations { get; set; }
     public virtual DbSet<HostedRunnerStorageVerification> HostedRunnerStorageVerifications { get; set; }
     public virtual DbSet<HostContainerExecutionOperation> HostContainerExecutionOperations { get; set; }
-    public virtual DbSet<CustomStep> CustomSteps { get; set; }
-    public virtual DbSet<CustomStepUser> CustomStepUsers { get; set; }
-    public virtual DbSet<Schedule> Schedules { get; set; }
-    public virtual DbSet<ScheduleUser> ScheduleUsers { get; set; }
     public virtual DbSet<RecentActivity> RecentActivities { get; set; }
     public virtual DbSet<ApiKey> ApiKeys { get; set; }
     public virtual DbSet<ApiKeyUser> ApiKeyUsers { get; set; }
@@ -54,9 +45,7 @@ public partial class ApplicationDbContext
     public virtual DbSet<WebAppScreenshot> WebAppScreenshots { get; set; }
     public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
     public virtual DbSet<AppShare> AppShares { get; set; }
-    public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
     public virtual DbSet<AppVersion> AppVersions { get; set; }
-    public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }
     public virtual DbSet<AppModuleExecution> AppModuleExecutions { get; set; }
     public virtual DbSet<ActionSchedule> ActionSchedules { get; set; }
     public virtual DbSet<ActionScheduleOccurrence> ActionScheduleOccurrences { get; set; }
@@ -65,15 +54,11 @@ public partial class ApplicationDbContext
     public virtual DbSet<SecretVersion> SecretVersions { get; set; }
     public virtual DbSet<ExecutionSecretGrant> ExecutionSecretGrants { get; set; }
     public virtual DbSet<Setting> Settings { get; set; }
-    public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
-    public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
     public virtual DbSet<UserGitHubToken> UserGitHubTokens { get; set; }
     public virtual DbSet<Project> Projects { get; set; }
     public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
     public virtual DbSet<ProjectApp> ProjectApps { get; set; }
-    public virtual DbSet<ProjectFlow> ProjectFlows { get; set; }
     public virtual DbSet<ProjectRunner> ProjectRunners { get; set; }
-    public virtual DbSet<ProjectCustomStep> ProjectCustomSteps { get; set; }
     public virtual DbSet<ProjectApiKey> ProjectApiKeys { get; set; }
     public virtual DbSet<ProjectAiApiKey> ProjectAiApiKeys { get; set; }
     public virtual DbSet<InvitationToken> InvitationTokens { get; set; }

@@ -16,21 +16,6 @@ public sealed class RunnerExecutionOperationService(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector protector = protection.CreateProtector("RunnerExecutionOperation.v1");
 
-    public async Task QueueManagedArtifactsAsync(Guid id, Guid runnerId, Guid ownerId,
-        SynchronizeApplicationManagedArtifactsRequest request, CancellationToken token)
-    {
-        if (await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) return;
-        try { await QueueAsync(runnerId, ownerId, new( ManagedArtifacts: request), token, id); }
-        catch (DbUpdateException)
-        {
-            // Competing API callbacks may create the same operation. Its committed, pinned request wins.
-            var added = db.ChangeTracker.Entries<RunnerExecutionOperation>()
-                .SingleOrDefault(entry => entry.Entity.Id == id && entry.State == EntityState.Added);
-            if (added is not null) added.State = EntityState.Detached;
-            if (!await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) throw;
-        }
-    }
-
     public async Task QueueFileTransferAsync(Guid id, Guid runnerId, Guid ownerId,
         RunnerFileTransferCommand request, CancellationToken token)
     {
@@ -103,19 +88,6 @@ public sealed class RunnerExecutionOperationService(
         return true;
     }
 
-    private async Task<bool> HasManagedArtifactsOperationAsync(Guid id, Guid runnerId, Guid ownerId,
-        SynchronizeApplicationManagedArtifactsRequest request, CancellationToken token)
-    {
-        var operation = await db.RunnerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, token);
-        if (operation is null) return false;
-        var pinned = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions);
-        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId
-            || pinned?.ManagedArtifacts?.AppId != request.AppId
-            || pinned.ManagedArtifacts.DeploymentTargetId != request.DeploymentTargetId)
-            throw new UnauthorizedAccessException("Managed artifact operation identity belongs to another assignment.");
-        return true;
-    }
-
     private async Task<bool> HasHostContainerOperationAsync(Guid id, Guid runnerId, Guid ownerId,
         HostContainerExecutionRequest request, CancellationToken token)
     {
@@ -174,8 +146,7 @@ public sealed class RunnerExecutionOperationService(
     }
 
     private static bool IsManagementRequest(RunnerExecutionRequest request)
-        => request.ManagedArtifacts is not null
-            || request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata
+        => request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata
             || request.HostContainer is not null
             // Cleanup and runtime restarts wait for typed Docker work on the management queue.
             // They must leave that queue's single consumer free to run its nested operations.

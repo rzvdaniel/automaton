@@ -1116,50 +1116,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("AppVersions");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.AppVersionStep", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Action")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("AppVersionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CodeSnapshot")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Language")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("StepId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StepName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("citext");
-
-                    b.Property<string>("VariablesSnapshot")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppVersionId");
-
-                    b.HasIndex("StepId");
-
-                    b.ToTable("AppVersionSteps");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.ApplicationEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1515,69 +1471,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("CliAuthorizationRequests");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.CustomStep", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasColumnType("citext");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Definition")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasColumnType("citext");
-
-                    b.Property<string>("Icon")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("MoreInfo")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("citext");
-
-                    b.Property<DateTime>("Updated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("VisibleInExplorer")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("CustomSteps");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.CustomStepUser", b =>
-                {
-                    b.Property<Guid>("CustomStepId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("CustomStepId", "UserId");
-
-                    b.HasIndex(new[] { "CustomStepId" }, "IX_CustomStepUser_CustomStepId");
-
-                    b.ToTable("CustomStepUsers");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.DeploymentOperation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1724,112 +1617,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasIndex("OperationId", "RevokedAtUtc", "ConsumedAtUtc");
 
                     b.ToTable("ExecutionSecretGrants");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.Flow", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Body")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("citext");
-
-                    b.Property<DateTime>("Updated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Flows");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowExecution", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Application")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Finished")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("Started")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("FlowExecutions");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("FlowExecutionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LogsJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FlowExecutionId")
-                        .IsUnique();
-
-                    b.ToTable("FlowExecutionLogs");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionUser", b =>
-                {
-                    b.Property<Guid>("FlowExecutionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("FlowExecutionId", "UserId");
-
-                    b.HasIndex(new[] { "FlowExecutionId" }, "IX_FlowExecutionUser_FlowExecutionId");
-
-                    b.ToTable("FlowExecutionUsers");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowUser", b =>
-                {
-                    b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("FlowId", "UserId");
-
-                    b.HasIndex(new[] { "FlowId" }, "IX_FlowUser_FlowId");
-
-                    b.ToTable("FlowUsers");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.HostContainerExecutionOperation", b =>
@@ -2959,56 +2746,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("ProjectApps");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.ProjectCustomStep", b =>
-                {
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CustomStepId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("AddedBy")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("ProjectId", "CustomStepId");
-
-                    b.HasIndex("AddedBy");
-
-                    b.HasIndex("CustomStepId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("ProjectCustomSteps");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.ProjectFlow", b =>
-                {
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("AddedBy")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("ProjectId", "FlowId");
-
-                    b.HasIndex("AddedBy");
-
-                    b.HasIndex("FlowId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("ProjectFlows");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.ProjectMember", b =>
                 {
                     b.Property<Guid>("ProjectId")
@@ -3686,47 +3423,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("RunnerUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.Schedule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CronRecurrence")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("citext");
-
-                    b.Property<string>("RunnerIds")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Schedules");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.ScheduleUser", b =>
-                {
-                    b.Property<Guid>("ScheduleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("ScheduleId", "UserId");
-
-                    b.HasIndex(new[] { "ScheduleId" }, "IX_ScheduleUser_ScheduleId");
-
-                    b.ToTable("ScheduleUsers");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.SecretDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3864,79 +3560,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.ToTable("SelfHostedRunnerEnrollments");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariable", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("citext");
-
-                    b.Property<string>("EncryptedValue")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<DateTime?>("LastUsedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("citext");
-
-                    b.Property<Guid>("ResourceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ResourceType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("citext");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("VariableScope")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("citext");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsActive");
-
-                    b.HasIndex("LastUsedAt");
-
-                    b.HasIndex("ResourceType", "ResourceId");
-
-                    b.ToTable("SensitiveVariables");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariableUser", b =>
-                {
-                    b.Property<Guid>("SensitiveVariableId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("SensitiveVariableId", "UserId");
-
-                    b.HasIndex(new[] { "SensitiveVariableId" }, "IX_SensitiveVariableUser_SensitiveVariableId");
-
-                    b.ToTable("SensitiveVariableUsers");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.Setting", b =>
@@ -4370,31 +3993,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("WebAppStars");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.WebAppStep", b =>
-                {
-                    b.Property<Guid>("WebAppId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CustomStepId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("LinkedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LinkedBy")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("WebAppId", "CustomStepId");
-
-                    b.HasIndex("CustomStepId");
-
-                    b.HasIndex("LinkedBy");
-
-                    b.HasIndex("WebAppId");
-
-                    b.ToTable("WebAppSteps");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.WebAppUser", b =>
                 {
                     b.Property<Guid>("WebAppId")
@@ -4680,25 +4278,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("WebApp");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.AppVersionStep", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.AppVersion", "AppVersion")
-                        .WithMany("Steps")
-                        .HasForeignKey("AppVersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Automaton.Api.Entities.CustomStep", "Step")
-                        .WithMany()
-                        .HasForeignKey("StepId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AppVersion");
-
-                    b.Navigation("Step");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.ApplicationUser", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.SubscriptionPlan", "SubscriptionPlan")
@@ -4728,15 +4307,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.CustomStepUser", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.CustomStep", null)
-                        .WithMany("CustomStepUsers")
-                        .HasForeignKey("CustomStepId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.DeploymentOperation", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.WebApp", null)
@@ -4755,35 +4325,6 @@ namespace Automaton.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("SecretVersion");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionLog", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.FlowExecution", "FlowExecution")
-                        .WithMany()
-                        .HasForeignKey("FlowExecutionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("FlowExecution");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionUser", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.FlowExecution", null)
-                        .WithMany("FlowExecutionUsers")
-                        .HasForeignKey("FlowExecutionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowUser", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.Flow", null)
-                        .WithMany("FlowUsers")
-                        .HasForeignKey("FlowId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
@@ -5078,58 +4619,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("WebApp");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.ProjectCustomStep", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
-                        .WithMany()
-                        .HasForeignKey("AddedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Automaton.Api.Entities.CustomStep", "CustomStep")
-                        .WithMany()
-                        .HasForeignKey("CustomStepId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Automaton.Api.Entities.Project", "Project")
-                        .WithMany("ProjectCustomSteps")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AddedByUser");
-
-                    b.Navigation("CustomStep");
-
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.ProjectFlow", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
-                        .WithMany()
-                        .HasForeignKey("AddedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Automaton.Api.Entities.Flow", "Flow")
-                        .WithMany()
-                        .HasForeignKey("FlowId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Automaton.Api.Entities.Project", "Project")
-                        .WithMany("ProjectFlows")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AddedByUser");
-
-                    b.Navigation("Flow");
-
-                    b.Navigation("Project");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.ProjectMember", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.ApplicationUser", "Inviter")
@@ -5272,15 +4761,6 @@ namespace Automaton.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.ScheduleUser", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.Schedule", null)
-                        .WithMany("ScheduleUsers")
-                        .HasForeignKey("ScheduleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.SecretVersion", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.SecretDefinition", "SecretDefinition")
@@ -5290,15 +4770,6 @@ namespace Automaton.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("SecretDefinition");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariableUser", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.SensitiveVariable", null)
-                        .WithMany("SensitiveVariableUsers")
-                        .HasForeignKey("SensitiveVariableId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.WebApp", b =>
@@ -5316,32 +4787,6 @@ namespace Automaton.Infrastructure.Migrations
                         .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("WebApp");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.WebAppStep", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.CustomStep", "CustomStep")
-                        .WithMany()
-                        .HasForeignKey("CustomStepId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "LinkedByUser")
-                        .WithMany()
-                        .HasForeignKey("LinkedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Automaton.Api.Entities.WebApp", "WebApp")
-                        .WithMany()
-                        .HasForeignKey("WebAppId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CustomStep");
-
-                    b.Navigation("LinkedByUser");
 
                     b.Navigation("WebApp");
                 });
@@ -5415,11 +4860,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("ProjectApiKeys");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
-                {
-                    b.Navigation("Steps");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.ApplicationRole", b =>
                 {
                     b.Navigation("UserRoles");
@@ -5436,21 +4876,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("ProjectMemberships");
 
                     b.Navigation("UserRoles");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.CustomStep", b =>
-                {
-                    b.Navigation("CustomStepUsers");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.Flow", b =>
-                {
-                    b.Navigation("FlowUsers");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.FlowExecution", b =>
-                {
-                    b.Navigation("FlowExecutionUsers");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
@@ -5498,10 +4923,6 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Navigation("ProjectApps");
 
-                    b.Navigation("ProjectCustomSteps");
-
-                    b.Navigation("ProjectFlows");
-
                     b.Navigation("ProjectRunners");
                 });
 
@@ -5521,11 +4942,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("RunnerEnrollments");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.Schedule", b =>
-                {
-                    b.Navigation("ScheduleUsers");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.SecretDefinition", b =>
                 {
                     b.Navigation("Versions");
@@ -5534,11 +4950,6 @@ namespace Automaton.Infrastructure.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.SecretVersion", b =>
                 {
                     b.Navigation("Grants");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariable", b =>
-                {
-                    b.Navigation("SensitiveVariableUsers");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.WebApp", b =>

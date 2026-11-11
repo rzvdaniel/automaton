@@ -108,27 +108,6 @@ public sealed class AppDeploymentControllerDeployTests
         Assert.That(await finalization.ResolveSourceOwnerIdAsync(fixture.AppId, Guid.NewGuid(), default), Is.EqualTo(fixture.OwnerId));
     }
 
-    [Test]
-    public async Task ManagedArtifactsAcceptTheProjectOwnerWhoIsNotLinkedToTheApp()
-    {
-        await using var fixture = await ApplicationDeploymentServiceTests.DeploymentFixture.CreateAsync();
-        var projectOwnerId = Guid.NewGuid();
-        var projectId = Guid.NewGuid();
-        fixture.Db.Projects.Add(AppAuthorizationTestData.CreateProject(projectId, projectOwnerId, "project"));
-        var app = await fixture.Db.WebApps.FindAsync(fixture.AppId);
-        app!.ProjectId = projectId;
-        await fixture.Db.SaveChangesAsync();
-        var gateway = new ManagedApplicationArtifactGateway(fixture.Db, null!);
-        var request = new SynchronizeApplicationManagedArtifactsRequest(fixture.AppId, fixture.Target.Id, []);
-        var runnerId = fixture.Target.ExecutionRunnerId!.Value;
-
-        // Authorization passes; queueing needs the Runner command pipeline, which this fixture does not have.
-        Assert.ThrowsAsync<NullReferenceException>(
-            () => gateway.SynchronizeAsync(runnerId, projectOwnerId, request, null, default));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => gateway.SynchronizeAsync(runnerId, Guid.NewGuid(), request, null, default));
-    }
-
     private static int? Status(ActionResult<DeploymentOperationResponse> result) =>
         (result.Result as ObjectResult)?.StatusCode ?? (result.Result as StatusCodeResult)?.StatusCode;
 

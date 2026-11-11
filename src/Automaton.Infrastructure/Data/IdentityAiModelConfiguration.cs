@@ -18,14 +18,10 @@ internal static class IdentityAiModelConfiguration
         ConfigureAiProvider(modelBuilder);
         ConfigureAiModel(modelBuilder);
         ConfigureSubscriptionPlan(modelBuilder);
-        ConfigureFlowExecutionLog(modelBuilder);
         ConfigureSetting(modelBuilder);
-        ConfigureSensitiveVariable(modelBuilder);
-        ConfigureSensitiveVariableUser(modelBuilder);
         ConfigureProject(modelBuilder);
         ConfigureProjectMember(modelBuilder);
         ConfigureProjectApp(modelBuilder);
-        ConfigureProjectFlow(modelBuilder);
         ConfigureProjectRunner(modelBuilder);
     }
 
@@ -185,26 +181,6 @@ internal static class IdentityAiModelConfiguration
             });
     }
 
-    private static void ConfigureFlowExecutionLog(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<FlowExecutionLog>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.FlowExecutionId).IsRequired();
-                entity.Property(e => e.LogsJson).IsRequired();
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UpdatedAt).IsRequired();
-
-                entity.HasOne(e => e.FlowExecution)
-                    .WithMany()
-                    .HasForeignKey(e => e.FlowExecutionId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                // Unique index to ensure one log entry per execution
-                entity.HasIndex(e => e.FlowExecutionId).IsUnique();
-            });
-    }
-
     private static void ConfigureSetting(ModelBuilder modelBuilder)
     {
             modelBuilder.Entity<Setting>(entity =>
@@ -216,38 +192,6 @@ internal static class IdentityAiModelConfiguration
                 entity.Property(e => e.Description).HasMaxLength(500);
 
                 entity.HasIndex(e => e.Key).IsUnique();
-            });
-    }
-
-    private static void ConfigureSensitiveVariable(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<SensitiveVariable>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
-                entity.Property(e => e.EncryptedValue).IsRequired().HasMaxLength(2000);
-                entity.Property(e => e.Description).HasMaxLength(500);
-                entity.Property(e => e.ResourceType).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.ResourceId).IsRequired();
-                entity.Property(e => e.VariableScope).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UpdatedAt).IsRequired();
-                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-
-                entity.HasIndex(e => new { e.ResourceType, e.ResourceId });
-                entity.HasIndex(e => e.IsActive);
-                entity.HasIndex(e => e.LastUsedAt);
-            });
-    }
-
-    private static void ConfigureSensitiveVariableUser(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<SensitiveVariableUser>(entity =>
-            {
-                entity.HasKey(e => new { e.SensitiveVariableId, e.UserId });
-                entity.HasIndex(e => e.SensitiveVariableId, "IX_SensitiveVariableUser_SensitiveVariableId");
-                entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.SensitiveVariableId).IsRequired();
             });
     }
 
@@ -337,33 +281,6 @@ internal static class IdentityAiModelConfiguration
                 entity.HasOne(e => e.WebApp)
                     .WithMany(a => a.ProjectApps)
                     .HasForeignKey(e => e.WebAppId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.AddedByUser)
-                    .WithMany()
-                    .HasForeignKey(e => e.AddedBy)
-                    .OnDelete(DeleteBehavior.Restrict);
-            });
-    }
-
-    private static void ConfigureProjectFlow(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<ProjectFlow>(entity =>
-            {
-                entity.HasKey(e => new { e.ProjectId, e.FlowId });
-                entity.Property(e => e.AddedAt).IsRequired();
-
-                entity.HasIndex(e => e.ProjectId);
-                entity.HasIndex(e => e.FlowId);
-
-                entity.HasOne(e => e.Project)
-                    .WithMany(p => p.ProjectFlows)
-                    .HasForeignKey(e => e.ProjectId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.Flow)
-                    .WithMany()
-                    .HasForeignKey(e => e.FlowId)
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasOne(e => e.AddedByUser)

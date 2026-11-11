@@ -42,7 +42,6 @@ public class ProjectDto
     public bool IsActive { get; set; }
     public int MemberCount { get; set; }
     public int AppCount { get; set; }
-    public int FlowCount { get; set; }
     public ProjectRole? CurrentUserRole { get; set; }
 }
 

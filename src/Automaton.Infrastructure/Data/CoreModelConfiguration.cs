@@ -15,13 +15,9 @@ internal static class CoreModelConfiguration
         ConfigureApplicationUser(modelBuilder);
         ConfigureActionSchedule(modelBuilder);
         ConfigureActionScheduleOccurrence(modelBuilder);
-        ConfigureFlow(modelBuilder);
-        ConfigureFlowUser(modelBuilder);
-        ConfigureFlowExecution(modelBuilder);
         ConfigureAuditEvent(modelBuilder);
         ConfigureApplicationEvent(modelBuilder);
         ConfigureAppModuleExecution(modelBuilder);
-        ConfigureFlowExecutionUser(modelBuilder);
     }
 
     private static void ConfigureApplicationUserRole(ModelBuilder modelBuilder)
@@ -93,33 +89,6 @@ internal static class CoreModelConfiguration
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => new { e.ScheduleId, e.Status, e.ScheduledForUtc });
                 entity.HasOne(e => e.Schedule).WithMany().HasForeignKey(e => e.ScheduleId).OnDelete(DeleteBehavior.Cascade);
-            });
-    }
-
-    private static void ConfigureFlow(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<Flow>(entity =>
-            {
-                entity.HasKey(e => new { e.Id });
-            });
-    }
-
-    private static void ConfigureFlowUser(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<FlowUser>(entity =>
-            {
-                entity.HasKey(e => new { e.FlowId, e.UserId });
-                entity.HasIndex(e => e.FlowId, "IX_FlowUser_FlowId");
-                entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.FlowId).IsRequired();
-            });
-    }
-
-    private static void ConfigureFlowExecution(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<FlowExecution>(entity =>
-            {
-                entity.HasKey(e => new { e.Id });
             });
     }
 
@@ -200,14 +169,4 @@ internal static class CoreModelConfiguration
             });
     }
 
-    private static void ConfigureFlowExecutionUser(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<FlowExecutionUser>(entity =>
-            {
-                entity.HasKey(e => new { e.FlowExecutionId, e.UserId });
-                entity.HasIndex(e => e.FlowExecutionId, "IX_FlowExecutionUser_FlowExecutionId");
-                entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.FlowExecutionId).IsRequired();
-            });
-    }
 }

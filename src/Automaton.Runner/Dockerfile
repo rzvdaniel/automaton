@@ -72,42 +72,6 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
     && rm dotnet-install.sh \
     && ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
 
-# Install common Python packages for custom steps
-# These are the most frequently used packages in automation workflows
-RUN pip install --no-cache-dir \
-    # HTTP & API
-    requests \
-    httpx \
-    aiohttp \
-    python-multipart \
-    # Validation & configuration
-    pydantic \
-    pydantic-settings \
-    # Data processing
-    pandas \
-    numpy \
-    pytz \
-    # JSON/YAML/CSV
-    pyyaml \
-    python-dateutil \
-    openpyxl \
-    xlsxwriter \
-    python-docx \
-    pypdf \
-    # Database connectors
-    sqlalchemy \
-    pymysql \
-    psycopg2-binary \
-    # Cloud SDKs
-    boto3 \
-    # Utilities
-    beautifulsoup4 \
-    lxml \
-    Pillow \
-    python-dotenv \
-    jinja2 \
-    markdown
-
 # Create non-root user
 RUN useradd -m -s /bin/bash automaton
 
@@ -157,9 +121,6 @@ ENV AUTOMATON_RUNNER_NAME=""
 ENV AUTOMATON_WORKSPACE_ROOT=/automaton/workspace
 ENV RUNNER_SCRIPTS_DIR=/automaton/workspace/apps
 
-# PythonNet configuration - required for Python custom steps on Linux
-ENV PYTHONNET_PYDLL=/usr/local/lib/libpython3.13.so
-ENV PYTHONHOME=/usr/local
 ENV PATH="/usr/local/bin:/usr/share/dotnet:$PATH"
 
 USER automaton
