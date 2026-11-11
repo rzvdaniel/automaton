@@ -19,6 +19,7 @@ internal static class RunnerExecutionServicesRegistration
         services.AddSingleton<MachineActionDependencyPreparer>();
         services.AddSingleton<MachineActionExecutionHandler>();
         services.AddSingleton<HostContainerBuildCleanupService>();
+        services.AddSingleton<HostContainerResultNotifier>();
         services.AddSingleton<HostContainerExecutionApiClient>();
         services.AddSingleton<TunnelForwarderService>();
         services.AddSingleton<IRunnerExecutionExecutor, RunnerExecutionExecutor>();

@@ -700,6 +700,7 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerExecutionDispatchService>();
         services.AddScoped<RunnerExecutionCommandPublisher>();
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
+        services.AddTransient<RunnerExecutionResultReadyCapSubscriber>();
         services.AddScoped<RunnerConnectionLifecycleService>();
         services.AddScoped<AdminSubscriptionPlanOperationsService>();
         return services;

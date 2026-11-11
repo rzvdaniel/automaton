@@ -2,7 +2,7 @@
 
 The [self-hosted roadmap](../roadmap/README.md) defines the supported Runner model. This guide describes the current Machine Management Runner transport; the retired Hosted, Standard, Privileged Host and Infrastructure profiles are not supported.
 
-Updated: 28 October 2026.
+Updated: 11 November 2026.
 
 The supported Runner is an enrolled Machine Management Runner. Its SignalR connection and HTTPS operations require the same persisted Runner API key; owner keys cannot impersonate a Runner. The former Admin Hosted/Infrastructure Runner screens, installers, and registration endpoints are retired. Bundled Infrastructure System Application Actions are no longer offered through Admin; new legacy system schedules are rejected, and the Worker skips retained platform schedules without deleting their history. A replacement system capability should be built as an ordinary administrator-owned App.
 
@@ -63,6 +63,15 @@ Fresh app deletion failure releases its claim and regenerates routes from durabl
 Whole-app cleanup also discovers Docker Compose data volumes by app identity and verifies managed/resource labels, target identity and the deterministic volume name before removing them. Volumes are removed without force, after runtime cleanup and before app workspace/data deletion; a busy or unverified volume fails deletion and preserves remaining storage. Individual-environment cleanup retains persistent volumes. Newly created Compose data volumes carry the machine Runner identity so the host uninstall command can refuse retained app data rather than silently orphan it.
 
 App/target cleanup commands use the execution queue, because container teardown can await typed Docker operations on the management queue. The management queue runs as many commands at once as the execution queue (4), so a slow typed Docker operation for one app does not hold up the others, and each of the four running executions always has a slot for its nested operation. Metadata reads and typed host-container operations keep their existing management routing.
+
+### Host-container results (pushed)
+
+The Runner sends a typed host-container operation over HTTPS and waits for its result. The database row stays the source of truth: when the API saves the result (`RunnerExecutionOperationService.ApplyAsync`) it publishes a `RunnerExecutionResultReadyEvent` through the CAP outbox in the same transaction, and `RunnerExecutionResultReadyCapSubscriber` puts a message with only the operation and Runner IDs on that Runner's result queue (`automaton.runner-result.<runner>`). The Runner reads the saved result with one `GET /api/host-container-executions/{id}/result`.
+
+- The result queue is declared with the other Runner queues when the Runner fetches its broker configuration (`ResultQueueName`). It is durable and lives in RabbitMQ, so a blue/green API switch does not touch it; unpublished outbox messages are sent by whichever API slot is running. Messages expire after one hour and the queue holds at most 5000, so an older Runner that never reads it cannot fill the broker.
+- The Runner consumes results on their own channel and consumer, apart from management commands and executions, so a slow command never sits in front of a result. A message is matched to a waiting operation by operation ID and Runner ID; a duplicate, or one nobody waits for (for example after a Runner restart), is acknowledged and dropped.
+- Besides the read after a message, the Runner reads the result once each time the result consumer starts on a new broker connection (a Runner restart, or after the consumer stops and restarts), and once 30 seconds before the operation deadline. There is no polling loop. Only when the API offers no result queue (an older server) does the Runner read every 5 seconds.
+- An older Runner does not know the result queue and keeps its GET loop until it is upgraded.
 
 | Operation | API caller | Queue | Runner behavior | Artifact direction |
 | --- | --- | --- | --- | --- |
