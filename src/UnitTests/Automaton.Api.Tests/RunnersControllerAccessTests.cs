@@ -18,7 +18,7 @@ public sealed class RunnersControllerAccessTests
         var users = AppAuthorizationTestData.CreateUserContextService(stranger);
         var service = new RunnerService(db, users, new ResourceAuthorizationService(db, users),
             runnerDeletionService: null!, connectionSessionService: null!, runnerQueryService: null!,
-            flowExecutionService: null!, connectionLifecycleService: null!);
+                    connectionLifecycleService: null!);
 
         var result = await new RunnersController(service, Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Config.HostedRunnerOptions()))
             .Put(Guid.NewGuid(), new Automaton.Api.Models.UpdateRunnerRequest { Name = "renamed" }, default);

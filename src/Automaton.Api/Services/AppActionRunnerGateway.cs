@@ -23,7 +23,7 @@ public sealed class AppActionRunnerGateway(
     private async Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, TimeSpan? limit, CancellationToken token)
     {
         var id = await operations.QueueAsync(runnerId, userContext.GetUserId(),
-            new(null, null, AppActionCommand.Create(kind, payload)), token);
+            new( AppActionCommand.Create(kind, payload)), token);
         using var timer = CancellationTokenSource.CreateLinkedTokenSource(token);
         if (limit is { } wait) timer.CancelAfter(wait);
         RunnerExecutionResult result;
@@ -45,7 +45,7 @@ public sealed class AppActionRunnerGateway(
         Guid runnerId, Guid requestedByUserId, Guid operationId,
         ExecuteAppActionModuleRequest request, CancellationToken token)
         => operations.QueueAsync(runnerId, requestedByUserId,
-            new(null, null, AppActionCommand.Create("execute", request)), token, operationId);
+            new( AppActionCommand.Create("execute", request)), token, operationId);
 
     public Task<AppActionModulesResponse> ListModulesAsync(Guid runnerId, Guid appId, Guid targetId, string key, CancellationToken token)
         => SendQuickAsync<AppActionModulesResponse>(runnerId, "list-modules", new AppActionModuleRequest(appId, targetId, key), token);

@@ -1,4 +1,3 @@
-using Automaton.Core.Scripting;
 using Automaton.Ai.Extensions;
 using Automaton.AiGuidance;
 using Automaton.Mcp.Client.Extensions;
@@ -509,8 +508,6 @@ internal static class ApiAppCatalogRegistration
 {
     internal static IServiceCollection AddApiAppCatalogServices(this IServiceCollection services)
     {
-        services.AddScoped<CustomStepsService>();
-        services.AddScoped<CustomStepRunnerExecutionService>();
         services.AddScoped<AppForkingService>();
         services.AddScoped<CatalogSourceStore>();
         services.AddScoped<AppCatalogService>();
@@ -549,8 +546,6 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<PublicMarketplaceCreatorAppsQuery>();
         services.AddScoped<PublicMarketplaceCatalogQuery>();
         services.AddScoped<WebAppStarService>();
-        services.AddScoped<AppStepsService>();
-        services.AddScoped<AppsStepExecutionService>();
         services.AddSingleton<TunnelRequestRegistry>();
         services.AddSingleton<TunnelLongLivedLimiter>();
         return services;
@@ -582,7 +577,6 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<HostContainerExecutionOperationService>();
         services.AddScoped<HostContainerRelayService>();
         services.AddScoped<HostContainerRelayStateResolver>();
-        services.AddScoped<ConnectedFlowArtifactService>();
         services.AddScoped<IManagedApplicationArtifactCommands, ManagedApplicationArtifactGateway>();
         services.AddScoped<DeploymentOperationService>();
         services.AddScoped<StoredSourceDeploymentService>();
@@ -599,7 +593,6 @@ internal static class ApiAppExecutionRegistration
         services.AddHostedService<ManagedRuntimeRouteReconciliationService>();
         services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
         services.AddScoped(typeof(UserImpersonationServiceFactory<>));
-        services.AddScoped<FlowsService>();
         return services;
     }
 }
@@ -623,13 +616,10 @@ internal static class ApiRunnerRegistration
         services.AddScoped<SelfHostedRunnerInstallationService>();
         services.AddScoped<SelfHostedRunnerEnrollmentExchangeService>();
         services.AddScoped<HostedRunnerBrokerProvisioner>();
-        services.AddScoped<FlowExecutionHistoryService>();
-        services.AddScoped<FlowExecutionLogService>();
         services.AddScoped<RecentActivityService>();
         services.AddScoped<AccountRegistrationService>();
         services.AddScoped<IAuditEventService, AuditEventService>();
         services.AddScoped<AuditEventService>();
-        services.AddScoped<DashboardStatsService>();
         services.AddScoped<UserContextService>();
         services.AddScoped<AdminAuthorizationService>();
         services.AddScoped<AppFileStorageService>();
@@ -677,7 +667,6 @@ internal static class ApiAccountRegistration
         services.AddScoped<ConfirmedEmailGuardService>();
         services.AddScoped<AuthTokenService>();
         services.AddTransient<RoleManagerService>();
-        services.AddTransient<ScheduleService>();
         return services;
     }
 }
@@ -701,7 +690,6 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerDeletionPolicy>();
         services.AddScoped<RunnerConnectionSessionService>();
         services.AddScoped<RunnerQueryService>();
-        services.AddScoped<RunnerFlowExecutionService>();
         services.AddScoped<RunnerExecutionAdmissionService>();
         services.AddScoped<RunnerExecutionIdentityService>();
         services.AddScoped<RunnerExecutionRevocationService>();
@@ -740,8 +728,6 @@ internal static class ApiMcpToolRegistration
 {
     internal static IServiceCollection AddApiMcpToolServices(this IServiceCollection services)
     {
-        // MCP Tool Provider for step AI conversations
-        services.AddScoped<StepMcpToolProvider>();
         services.AddSingleton<Automaton.Mcp.Tools.IUiAutomationActionAckService,
                              Automaton.Mcp.Tools.UiAutomationActionAckService>();
         // File IO tool group — wired to app-scoped file system
@@ -802,7 +788,6 @@ internal static class ApiProjectRegistration
         services.AddScoped<ProjectCredentialResourceService>();
         services.AddScoped<InvitationTokenService>();
         services.AddScoped<ResourceAuthorizationService>();
-        services.AddScoped<SensitiveVariableService>();
         services.AddScoped<UserSettingsService>();
         services.AddScoped<IOrganizationService, OrganizationService>();
         services.AddScoped<OrganizationAiPolicySettingsService>();
@@ -837,9 +822,6 @@ internal static class ApiFoundationRegistration
         services.AddFluentValidationAutoValidation();
         services.AddValidatorsFromAssemblyContaining<Program>();
 
-        services.AddScripting();
-        services.AddAutomatonSteps();
-        services.AddAutomatonCore();
         return services;
     }
 }

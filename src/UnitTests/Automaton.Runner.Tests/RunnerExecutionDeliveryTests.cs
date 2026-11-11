@@ -146,7 +146,7 @@ public sealed class RunnerExecutionDeliveryTests
                 var disposition = Results.ContainsKey(id) ? "already-applied" : "execute";
                 if (Cancel && !Results.ContainsKey(id)) disposition = "cancel";
                 return new(HttpStatusCode.OK) { Content = JsonContent.Create(new RunnerExecutionAssignment(
-                    disposition, new(Guid.NewGuid(), null, HostContainer: Request))) };
+                    disposition, new(HostContainer: Request))) };
             }
             var body = await request.Content!.ReadAsStringAsync(cancellationToken); Posts.Add(body);
             if (Posts.Count <= FailResults)

@@ -58,7 +58,7 @@ public sealed class RunnerExecutionQueueCapacityTests
             var id = Guid.Parse(request.RequestUri!.AbsolutePath.Split('/')[3]);
             var kind = Management[id] ? "read-logs" : "execute";
             object body = request.Method == HttpMethod.Get
-                ? new RunnerExecutionAssignment("execute", new(null, null, AppActionCommand.Create(kind, new { })))
+                ? new RunnerExecutionAssignment("execute", new( AppActionCommand.Create(kind, new { })))
                 : new RunnerExecutionReceipt("accepted");
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) });
         }

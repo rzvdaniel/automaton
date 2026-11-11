@@ -148,7 +148,7 @@ public sealed class RunnerRemovalTests
 
     private static async Task QueueManagementAsync(RunnerExecutionOperationService operations, Guid runnerId, Guid owner)
         => await operations.QueueAsync(runnerId, owner,
-            new(null, null, AppActionCommand.Create("list-modules", new { })), CancellationToken.None);
+            new( AppActionCommand.Create("list-modules", new { })), CancellationToken.None);
 
     private static Runner SeedRunner(Automaton.Api.Data.ApplicationDbContext db, Guid owner)
     {

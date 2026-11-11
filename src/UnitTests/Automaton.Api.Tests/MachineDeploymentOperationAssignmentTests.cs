@@ -101,7 +101,7 @@ public sealed class MachineDeploymentOperationAssignmentTests
             var request = new RunnerFileTransferCommand(
                 RunnerFileTransferKinds.DeployPackage, App.Id, "package",
                 DeploymentTargetId: Target.Id, DeploymentOperationId: deploymentOperationId, ExecutionAttemptId: AttemptId);
-            await Service.QueueAsync(Runner.Id, ActorId, new(null, null, FileTransfer: request), CancellationToken.None, TransferOperationId);
+            await Service.QueueAsync(Runner.Id, ActorId, new( FileTransfer: request), CancellationToken.None, TransferOperationId);
             return this;
         }
 
@@ -120,7 +120,7 @@ public sealed class MachineDeploymentOperationAssignmentTests
             await db.SaveChangesAsync();
             var transferId = Guid.NewGuid();
             await Service.QueueAsync(Runner.Id, SecondActorId,
-                new(null, null, FileTransfer: new RunnerFileTransferCommand(
+                new( FileTransfer: new RunnerFileTransferCommand(
                     RunnerFileTransferKinds.DeployPackage, App.Id, "second-package",
                     DeploymentTargetId: Target.Id, DeploymentOperationId: operationId, ExecutionAttemptId: attemptId)),
                 CancellationToken.None, transferId);
@@ -152,7 +152,7 @@ public sealed class MachineDeploymentOperationAssignmentTests
                 ActionKey = "queued-action",
                 Input = JsonSerializer.SerializeToElement(new { value = "queued" })
             });
-            await Service.QueueAsync(Runner.Id, ActorId, new(null, null, Action: command), CancellationToken.None, operationId);
+            await Service.QueueAsync(Runner.Id, ActorId, new( Action: command), CancellationToken.None, operationId);
             return operationId;
         }
 

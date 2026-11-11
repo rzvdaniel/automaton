@@ -15,8 +15,6 @@ WORKDIR /src
 # Copy solution and project files for restore
 COPY src/*.sln ./
 COPY src/Automaton.Core/*.csproj ./Automaton.Core/
-COPY src/Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
-COPY src/Automaton.Steps/*.csproj ./Automaton.Steps/
 COPY src/Automaton.Ai/*.csproj ./Automaton.Ai/
 COPY src/Automaton.AiGuidance/*.csproj ./Automaton.AiGuidance/
 COPY src/Automaton.Mcp/*.csproj ./Automaton.Mcp/
@@ -30,8 +28,6 @@ RUN dotnet restore Automaton.Runner/Automaton.Runner.csproj
 
 # Copy all source code
 COPY src/Automaton.Core/ ./Automaton.Core/
-COPY src/Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
-COPY src/Automaton.Steps/ ./Automaton.Steps/
 COPY src/Automaton.Ai/ ./Automaton.Ai/
 COPY src/Automaton.AiGuidance/ ./Automaton.AiGuidance/
 COPY src/Automaton.Mcp/ ./Automaton.Mcp/

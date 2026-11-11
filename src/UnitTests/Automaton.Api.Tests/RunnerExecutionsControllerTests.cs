@@ -47,7 +47,7 @@ public sealed class RunnerExecutionsControllerTests
             var runner = new Runner { Id = Guid.NewGuid(), Name = "test", ApiKeyId = Guid.NewGuid(), ApplicationProfile = "MachineManagement" };
             db.Runners.Add(runner); await db.SaveChangesAsync();
             var operations = RunnerExecutionTestServices.Operations(db);
-            var id = await operations.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
+            var id = await operations.QueueAsync(runner.Id, Guid.NewGuid(), new(Automaton.Core.Models.AppActionCommand.Create("execute", new { })), CancellationToken.None);
             var controller = CreateController(operations, runner.Id);
             return new(db, controller, id, runner.ApiKeyId.Value);
         }

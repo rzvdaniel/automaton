@@ -22,7 +22,6 @@
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj" />
     <ProjectReference Include="..\..\Automaton.Core\Automaton.Core.csproj" />
   </ItemGroup>
 </Project>
