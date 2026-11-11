@@ -23,7 +23,8 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
      ```bash
      #!/usr/bin/env bash
      set -euo pipefail
-     [[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$ ]] \n       || { echo "refused"; exit 1; }
+     [[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+       || { echo "refused"; exit 1; }
      exec $SSH_ORIGINAL_COMMAND
      ```
    - `PROD_SSH_KNOWN_HOSTS`: the server's host key line, from `ssh-keyscan -t ed25519 <host>` checked against the real server.
