@@ -284,6 +284,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         // A runtime left "starting" by an interrupted start has no container; a restart recovers it.
         var stuckStarting = metadata is { State: RuntimeReadinessState.Starting } && string.IsNullOrWhiteSpace(metadata.ContainerId);
         var running = metadata is { State: RuntimeReadinessState.Ready };
+        if (HasNoContainerRuntime(metadata)) return true;
         if (metadata is null || !(stuckStarting || running)) return false;
         // A running Compose runtime gets no app secrets and is left alone: that is not a failed restart.
         if (metadata.ComposeCandidateId is not null && running) return true;
@@ -338,6 +339,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
         // Already running (a repeated resume, or one whose answer was lost) is success: the app is up.
         if (metadata is { State: RuntimeReadinessState.Ready } && !string.IsNullOrWhiteSpace(metadata.ContainerId)) return true;
+        if (HasNoContainerRuntime(metadata)) return true;
         if (metadata is not { State: RuntimeReadinessState.Paused } || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
         // A fresh candidate identity, like a restart: brokered hosts name (and reuse) containers by it.
@@ -358,6 +360,15 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
         return true;
     }
+
+    /// <summary>
+    /// A static site or an action-only app has no container: Pause has nothing to stop (it returns false and the
+    /// app's paused state lives on the API), so Resume and Restart have nothing to start and are not a failure.
+    /// </summary>
+    private static bool HasNoContainerRuntime(RunnerRuntimeDeploymentMetadata? metadata)
+        => metadata is null
+            || metadata.State != RuntimeReadinessState.Paused && string.IsNullOrWhiteSpace(metadata.ContainerId)
+                && string.IsNullOrWhiteSpace(metadata.Runtime?.Image) && string.IsNullOrWhiteSpace(metadata.ComposeJson);
 
     private async Task<RunnerRuntimeDeploymentMetadata?> ReadExistingMetadataAsync(
         string metadataPath,

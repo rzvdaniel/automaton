@@ -62,7 +62,7 @@ public sealed class RunnerRuntimeContainerManagerTests
         var manager = new RunnerRuntimeContainerManager(workspace, new RunnerRuntimeRegistry(), fake,
             NullLogger<RunnerRuntimeContainerManager>.Instance, secrets);
         await manager.StartAsync(CancellationToken.None);
-        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing runs yet.");
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True, "No container record (static site or action-only app): nothing to restart.");
 
         await manager.ApplyAsync(appId, targetId, Contract(19021));
         var first = await ReadMetadataAsync(workspace, appId, targetId);
@@ -107,13 +107,47 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task ResumeAndRestartOfAnAppWithNoContainerAreNotAFailure_ButAContainerThatCannotStartIs()
+    {
+        var fake = new FakeContainerRuntime();
+        var (manager, workspace, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+
+        // Static site: the Runner has no runtime record at all.
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.False);
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+
+        // Action-only app: a stopped record with no image, container or Compose file.
+        await manager.ApplyAsync(appId, targetId, Contract(19042));
+        var metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        metadata.ContainerId = null;
+        metadata.ContainerName = null;
+        metadata.Runtime = null;
+        metadata.ComposeJson = null;
+        metadata.State = RuntimeReadinessState.Stopped;
+        await WriteMetadataAsync(workspace, metadata);
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+
+        // A container app whose runtime is Failed still reports that nothing was started.
+        await manager.ApplyAsync(appId, targetId, Contract(19043));
+        metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        metadata.State = RuntimeReadinessState.Failed;
+        await WriteMetadataAsync(workspace, metadata);
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.False);
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.False);
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task PauseStopsTheContainerKeepsItsFilesAndIsNotRestartedWithTheRunner_ResumeStartsItAgain()
     {
         var fake = new FakeContainerRuntime();
         var (manager, workspace, appId, targetId) = CreateManager(fake);
         await manager.StartAsync(CancellationToken.None);
         Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing runs yet.");
-        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing is paused yet.");
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True, "No container record: nothing to start.");
         await manager.ApplyAsync(appId, targetId, Contract(19031));
         var running = await ReadMetadataAsync(workspace, appId, targetId);
         await File.WriteAllTextAsync(Path.Combine(running.ArtifactRoot!, "app.txt"), "deployed");
