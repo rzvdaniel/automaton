@@ -39,7 +39,12 @@ ENV ASPNETCORE_URLS=http://+:8080
 ARG SERVER_VERSION
 ENV Installation__Version=${SERVER_VERSION}
 
-RUN apt-get update \
+# If the Ubuntu archive can't be reached (for example a DNS outage for archive.ubuntu.com on the build
+# machine), retry once through Azure's Ubuntu mirror, which serves the same signed packages.
+RUN (apt-get update -o Acquire::Retries=3 -o APT::Update::Error-Mode=any \
+        || (sed -i -E 's#https?://(archive|security)\.ubuntu\.com#http://azure.archive.ubuntu.com#g' \
+                /etc/apt/sources.list.d/ubuntu.sources \
+            && apt-get update -o Acquire::Retries=3 -o APT::Update::Error-Mode=any)) \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
