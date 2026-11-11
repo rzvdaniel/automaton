@@ -26,7 +26,10 @@ export const createApp = ViteSSG(App, { routes, scrollBehavior }, ({ app, router
 
   router.afterEach((to) => {
     const seo = seoFor(to)
-    if (isClient) applySeo(seo)
+    if (isClient) {
+      applySeo(seo)
+      analytics.pageview(to.path)
+    }
     else head?.push(seoTags(seo))
   })
 })
