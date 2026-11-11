@@ -13,21 +13,23 @@ public sealed class AppPauseController(
     UserContextService userContextService,
     ConfirmedEmailGuardService confirmedEmailGuardService) : ControllerBase
 {
+    // A browser that gives up must not cancel a Runner operation midway (a half-done start leaves the runtime
+    // "starting"), so these actions ignore the request-aborted token and end on the Runner operation's own deadline.
     [HttpPost("pause")]
     [Authorize(Policy = "AllowApiKey")]
     public Task<IActionResult> Pause(Guid id, CancellationToken cancellationToken) =>
-        RunAsync(() => pauseService.PauseAsync(id, User.IsInRole("Administrators"), cancellationToken));
+        RunAsync(() => pauseService.PauseAsync(id, User.IsInRole("Administrators"), CancellationToken.None));
 
     [HttpPost("resume")]
     [Authorize(Policy = "AllowApiKey")]
     public Task<IActionResult> Resume(Guid id, CancellationToken cancellationToken) =>
-        RunAsync(() => pauseService.ResumeAsync(id, User.IsInRole("Administrators"), cancellationToken));
+        RunAsync(() => pauseService.ResumeAsync(id, User.IsInRole("Administrators"), CancellationToken.None));
 
     /// <summary>Restarts the app so it loads its current settings and secrets. 409 while the app is paused.</summary>
     [HttpPost("restart")]
     [Authorize(Policy = "AllowApiKey")]
     public Task<IActionResult> Restart(Guid id, CancellationToken cancellationToken) =>
-        RunAsync(async () => new { appId = id, restarted = await restartService.RestartAsync(id, User.IsInRole("Administrators"), cancellationToken) });
+        RunAsync(async () => new { appId = id, restarted = await restartService.RestartAsync(id, User.IsInRole("Administrators"), CancellationToken.None) });
 
     private async Task<IActionResult> RunAsync<T>(Func<Task<T>> action)
     {

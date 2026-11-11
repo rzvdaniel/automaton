@@ -124,6 +124,22 @@ public sealed class RunnerExecutionOperationTests
     }
 
     [Test]
+    public async Task ADisconnectingCallerDoesNotCancelTheRunnerOperation()
+    {
+        await using var db = Db(); var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
+        var service = RunnerExecutionTestServices.Operations(db);
+        using var disconnected = new CancellationTokenSource();
+        var waiting = service.QueueAndWaitAsync(runner.Id, Guid.NewGuid(),
+            new(AppActionCommand.Create("execute", new { })), TimeSpan.FromSeconds(30), disconnected.Token);
+        while (!await db.RunnerExecutionOperations.AsNoTracking().AnyAsync()) await Task.Delay(50);
+        disconnected.Cancel();
+        await Task.Delay(500);
+        Assert.That(await db.RunnerExecutionOperations.AsNoTracking().AnyAsync(o => o.CancellationRequested), Is.False);
+        await service.TerminateRunnerAsync(runner.Id, CancellationToken.None);
+        Assert.ThrowsAsync<RuntimeCommandFailedException>(() => waiting);
+    }
+
+    [Test]
     public async Task RevocationTerminatesUnfinishedWork()
     {
         await using var db = Db(); var service = RunnerExecutionTestServices.Operations(db);

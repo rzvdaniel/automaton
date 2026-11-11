@@ -158,11 +158,11 @@ public sealed class RunnerExecutionOperationService(
         Guid runnerId, Guid actor, RunnerExecutionRequest request, TimeSpan timeout, CancellationToken token)
     {
         var id = await QueueAsync(runnerId, actor, request, token);
-        using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
-        limit.CancelAfter(timeout);
+        // Only the deadline ends the wait: a caller that disconnects must not cancel the operation midway.
+        using var limit = new CancellationTokenSource(timeout);
         RunnerExecutionResult result;
         try { result = await WaitAsync(id, limit.Token); }
-        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
             throw new RuntimeCommandFailedException(
                 "The Runner did not answer in time, so the app may not be running. It is cancelled if it has not started; try again when the Runner is online.");

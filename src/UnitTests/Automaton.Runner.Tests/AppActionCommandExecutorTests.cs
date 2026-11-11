@@ -8,6 +8,20 @@ namespace Automaton.Runner.Console.Tests;
 
 public sealed class AppActionCommandExecutorTests
 {
+    [TestCase("restart-runtime")]
+    [TestCase("resume-runtime")]
+    public void RestartAndResumeThatDidNothingFailInsteadOfSucceeding(string kind)
+    {
+        var workspace = new RunnerWorkspaceService();
+        var runtime = new RunnerDeploymentService(workspace, new NoopProcessManager(), new AppActionDeploymentService(workspace));
+        var executor = new AppActionCommandExecutor(null!, null!, runtime);
+        object request = kind == "restart-runtime"
+            ? new RestartAppRuntimeRequest(Guid.NewGuid(), Guid.NewGuid())
+            : new ResumeAppRuntimeRequest(Guid.NewGuid(), Guid.NewGuid());
+        Assert.ThrowsAsync<InvalidOperationException>(
+            () => executor.ExecuteAsync(AppActionCommand.Create(kind, request), CancellationToken.None));
+    }
+
     [Test]
     public async Task ExecutionDispatcherUsesTheRegisteredCommandHandler()
     {
@@ -48,5 +62,13 @@ public sealed class AppActionCommandExecutorTests
         var response = await executor.ExecuteAsync(AppActionCommand.Create(kind,
             new AppActionModuleRequest(Guid.NewGuid(), Guid.NewGuid(), "missing")), CancellationToken.None);
         Assert.That(response.Outcome, Is.EqualTo("Succeeded")); Assert.That(response.ActionResult, Is.Not.Null);
+    }
+
+    private sealed class NoopProcessManager : IAppRuntimeProcessManager
+    {
+        public Task<RuntimeApplyResult> ApplyAsync(Guid appId, Guid deploymentTargetId, ApplicationContract contract,
+            CancellationToken cancellationToken = default, string? artifactRoot = null, Guid? candidateId = null,
+            Guid? deploymentAttemptId = null) => Task.FromResult(new RuntimeApplyResult());
+        public Task StopAsync(Guid appId, Guid deploymentTargetId) => Task.CompletedTask;
     }
 }

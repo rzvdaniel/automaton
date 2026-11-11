@@ -281,9 +281,15 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
     {
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
-        if (metadata is not { State: RuntimeReadinessState.Ready }
-            || metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed }) || string.IsNullOrWhiteSpace(metadata.ContainerId)
-            || metadata.ComposeCandidateId is not null || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+        // A runtime left "starting" by an interrupted start has no container; a restart recovers it.
+        var stuckStarting = metadata is { State: RuntimeReadinessState.Starting } && string.IsNullOrWhiteSpace(metadata.ContainerId);
+        var running = metadata is { State: RuntimeReadinessState.Ready };
+        if (metadata is null || !(stuckStarting || running)) return false;
+        // A running Compose runtime gets no app secrets and is left alone: that is not a failed restart.
+        if (metadata.ComposeCandidateId is not null && running) return true;
+        if (metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed })
+            || running && string.IsNullOrWhiteSpace(metadata.ContainerId)
+            || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
         var candidateId = Guid.NewGuid();
         var artifact = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, deploymentTargetId, candidateId);
@@ -330,6 +336,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     public async Task<bool> ResumeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
     {
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        // Already running (a repeated resume, or one whose answer was lost) is success: the app is up.
+        if (metadata is { State: RuntimeReadinessState.Ready } && !string.IsNullOrWhiteSpace(metadata.ContainerId)) return true;
         if (metadata is not { State: RuntimeReadinessState.Paused } || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
         // A fresh candidate identity, like a restart: brokered hosts name (and reuse) containers by it.

@@ -89,6 +89,24 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task RestartRecoversARuntimeLeftStartingByAnInterruptedStart()
+    {
+        var fake = new FakeContainerRuntime();
+        var (manager, workspace, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19041));
+        var metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        metadata.State = RuntimeReadinessState.Starting;
+        metadata.ContainerId = null;
+        await WriteMetadataAsync(workspace, metadata);
+
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That((await ReadMetadataAsync(workspace, appId, targetId)).State, Is.EqualTo(RuntimeReadinessState.Ready));
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True, "Resume of a running app is success.");
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task PauseStopsTheContainerKeepsItsFilesAndIsNotRestartedWithTheRunner_ResumeStartsItAgain()
     {
         var fake = new FakeContainerRuntime();
