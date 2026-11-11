@@ -1,4 +1,4 @@
-// Cookie-free page counts with our self-hosted GoatCounter (stats.automaton.monster).
+// Cookie-free page counts with our self-hosted GoatCounter (stats.apps.automaton.monster).
 // Off in dev and when VITE_GOATCOUNTER_URL is empty.
 const countUrl = import.meta.env.VITE_GOATCOUNTER_URL?.trim() || ''
 const isEnabled = !import.meta.env.DEV && !!countUrl
