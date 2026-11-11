@@ -60,11 +60,19 @@ token=$(cat "$CONFIG_DIR/secrets/setup-token")
 curl -fsS "$address/api/install/status" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert not d["installationComplete"] and d["setupTokenRequired"]'
 [[ $(curl -s -o /dev/null -w '%{http_code}' -X POST "$address/api/install/checks") == 403 ]]
 curl -fsS -X POST -H "X-Automaton-Setup-Token: $token" "$address/api/install/checks" | python3 -c 'import json,sys; assert all(x["status"]!="error" for x in json.load(sys.stdin))'
-python3 - "$CONFIG_DIR/appsettings.Production.json" <<'PYAUTH' | "${compose[@]}" exec -T api curl -fsS --retry 5 --retry-delay 2 --retry-all-errors --config - http://rabbitmq:15672/api/whoami | python3 -c 'import json,sys; assert "administrator" in json.load(sys.stdin)["tags"]'
-import json,sys
+# The API image has no curl, so talk HTTP to RabbitMQ with bash /dev/tcp inside the api container.
+for attempt in 1 2 3 4 5 6; do
+    if python3 - "$CONFIG_DIR/appsettings.Production.json" <<'PYREQ' | "${compose[@]}" exec -T api bash -c 'exec 3<>/dev/tcp/rabbitmq/15672 && cat >&3 && cat <&3' | python3 -c 'import json,sys; body=sys.stdin.read().split("\r\n\r\n",1)[1]; assert "administrator" in json.loads(body)["tags"]' 2>/dev/null; then
+import base64,json,sys
 broker=json.load(open(sys.argv[1]))['RabbitMq']
-print('user = "' + broker['Username'] + ':' + broker['Password'] + '"')
-PYAUTH
+auth=base64.b64encode((broker['Username'] + ':' + broker['Password']).encode()).decode()
+sys.stdout.write('GET /api/whoami HTTP/1.0\r\nHost: rabbitmq\r\nAuthorization: Basic ' + auth + '\r\n\r\n')
+PYREQ
+        break
+    fi
+    [[ $attempt == 6 ]] && { echo 'RabbitMQ management API did not report an administrator' >&2; exit 1; }
+    sleep 2
+done
 # Concurrent claims must produce exactly one administrator, even with valid tokens.
 for attempt in 1 2; do
     curl -s -o "$fixture/claim-$attempt.json" -w '%{http_code}' -H 'Content-Type: application/json' \
