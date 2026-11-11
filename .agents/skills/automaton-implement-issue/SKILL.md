@@ -45,8 +45,8 @@ Create a to-do item for each step and tick them off.
 5. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
    applies, at most two rounds. For a high-tier change, add the `agent:human-review` label and ask the owner now, not
    after the review, so the two waits overlap.
-6. **Merge.** Run `python3 .agents/tools/merge-gate.py <N>`; on PASS squash-merge, delete the branch and watch the
-   `main` run for your commit. Also hold anything the owner said to hold.
+6. **Merge.** Run `python3 .agents/tools/merge-gate.py <N> --merge`; it squash-merges and deletes the branch only on
+   PASS. Never run `gh pr merge` yourself. Then watch the `main` run for your commit. Also hold anything the owner said to hold.
 7. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).
    - *Working alone:* release, upgrade the test server, run your "Check after release" list as real users, attach
      the proof and label the issue.
