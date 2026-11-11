@@ -102,6 +102,7 @@ public sealed class RunnerRuntimeContainerManagerTests
 
         Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
         Assert.That((await ReadMetadataAsync(workspace, appId, targetId)).State, Is.EqualTo(RuntimeReadinessState.Ready));
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True, "Resume of a running app is success.");
         await manager.StopAsync(CancellationToken.None);
     }
 

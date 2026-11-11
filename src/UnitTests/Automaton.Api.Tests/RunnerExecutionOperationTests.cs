@@ -131,7 +131,7 @@ public sealed class RunnerExecutionOperationTests
         using var disconnected = new CancellationTokenSource();
         var waiting = service.QueueAndWaitAsync(runner.Id, Guid.NewGuid(),
             new(AppActionCommand.Create("execute", new { })), TimeSpan.FromSeconds(30), disconnected.Token);
-        await Task.Delay(500);
+        while (!await db.RunnerExecutionOperations.AsNoTracking().AnyAsync()) await Task.Delay(50);
         disconnected.Cancel();
         await Task.Delay(500);
         Assert.That(await db.RunnerExecutionOperations.AsNoTracking().AnyAsync(o => o.CancellationRequested), Is.False);
