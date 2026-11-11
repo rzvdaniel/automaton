@@ -12,9 +12,23 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
 4. **Environment secrets** (not repository secrets):
    - `PROD_SSH_HOST`: the server's host name or IP.
    - `PROD_SSH_USER`: the SSH user, which may run `sudo /usr/bin/bash /opt/automaton-server/update.sh` without a password.
-   - `PROD_SSH_KEY`: a private key dedicated to this workflow, with its public key in that user's `authorized_keys`.
+   - `PROD_SSH_KEY`: a private key dedicated to this workflow, with its public key in that user's `authorized_keys`. Lock that line to the update command, so a leaked key can do nothing else:
+
+     ```
+     restrict,command="/usr/local/bin/automaton-deploy" ssh-ed25519 AAAA... deploy-production
+     ```
+
+     `/usr/local/bin/automaton-deploy` (root-owned, mode 755) accepts only the workflow's command:
+
+     ```bash
+     #!/usr/bin/env bash
+     set -euo pipefail
+     [[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$ ]] \n       || { echo "refused"; exit 1; }
+     exec $SSH_ORIGINAL_COMMAND
+     ```
    - `PROD_SSH_KNOWN_HOSTS`: the server's host key line, from `ssh-keyscan -t ed25519 <host>` checked against the real server.
-5. Keep agent accounts without admin rights, so they cannot edit environments or secrets. Changes to `.github/workflows/` are High tier and need your `owner-approved` label.
+5. Known limit: an agent working on your machine under your own GitHub login (not the bot) can start and approve a run as you. Only approve runs you started or asked for, and check the version and the actor on the run page.
+6. Keep agent accounts without admin rights, so they cannot edit environments or secrets. Changes to `.github/workflows/` are High tier and need your `owner-approved` label.
 
 ## Run it
 
