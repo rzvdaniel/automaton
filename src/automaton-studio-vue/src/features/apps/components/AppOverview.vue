@@ -164,7 +164,7 @@ const source = computed(() => {
         <span>
           <span class="pill pill--bad">Update available</span>
           <span class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
-          <a v-if="update.compareUrl" :href="update.compareUrl" target="_blank" rel="noopener noreferrer"> What changed</a>
+          <a v-if="update.compareUrl" class="link" :href="update.compareUrl" target="_blank" rel="noopener noreferrer"> What changed</a>
           <template v-if="update.newSettings.length || update.newSecrets.length || update.newPermissions.length">
             <br><span class="hint">New:
               <template v-if="update.newSettings.length">settings {{ update.newSettings.join(', ') }}. </template>
@@ -282,6 +282,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .row:last-of-type { border-bottom: 0; }
 .hint { color: var(--ink-soft); font-size: 13px; }
 p.hint { margin: 0; }
+.link { color: var(--signal-ink); text-decoration: underline; }
 .mono { font-family: var(--mono); font-size: 12px; }
 .status .mono { font-size: 15px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
