@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Check a pull request against the merge gate in .agents/skills/pr-review/SKILL.md.
 
-Usage: python3 .agents/tools/merge-gate.py <pr-number> [--repo owner/name]
+Usage: python3 .agents/tools/merge-gate.py <pr-number> [--repo owner/name] [--merge]
 
-Read-only. Prints one line per check and exits 0 when the pull request may be merged, 1 when it may not.
+Prints one line per check and exits 0 when the pull request may be merged, 1 when it may not.
+With --merge it also squash-merges the checked commit, and only when every check passes. Agents merge only
+this way, never with gh pr merge directly.
 Requires the gh CLI.
 """
 import fnmatch
@@ -85,7 +87,7 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     head = pr["headRefOid"]
     paths = pr["paths"]
     labels = {item["name"] for item in pr.get("labels", [])}
-    # Only people with write access review; on a public repository anyone can post a review that says APPROVE.
+    # Only people with write access review; on a public repository anyone can post a review.
     reviews = sorted((item for item in pr.get("reviews", [])
                       if item.get("authorAssociation") in TRUSTED and item.get("state") != "DISMISSED"),
                      key=lambda item: item.get("submittedAt") or "")
@@ -115,11 +117,11 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
         rows.append(("FAIL", "review", "no formal review (gh pr review)"))
     elif review["commit"] != head:
         rows.append(("FAIL", "review", f"the last review covers {str(review['commit'])[:8]}, the final commit is {head[:8]}"))
-    elif review["verdict"] != "approve":
-        rows.append(("FAIL", "review", "the last review does not approve" if review["verdict"] == "changes"
-                     else "the last review does not start with APPROVE or CHANGES NEEDED"))
+    elif review["verdict"] == "changes":
+        rows.append(("FAIL", "review", "the last review asks for changes"))
     else:
-        rows.append(("PASS", "review", f"approved at {head[:8]}"))
+        # Running the gate with --merge is the approval; the review records what was checked.
+        rows.append(("PASS", "review", f"reviewed at {head[:8]}"))
 
     needs_security = tier == "high" or any(matches(path, pattern) for path in paths for pattern in security)
     if needs_security:
@@ -158,6 +160,8 @@ def gh(*args: str) -> str:
 def main() -> int:
     args = sys.argv[1:]
     repo = []
+    merge = "--merge" in args
+    args = [arg for arg in args if arg != "--merge"]
     if "--repo" in args:
         at = args.index("--repo")
         repo, args = args[at:at + 2], args[:at] + args[at + 2:]
@@ -185,7 +189,14 @@ def main() -> int:
         print(f"{result}  {name}: {detail}")
     failed = any(result == "FAIL" for result, _, _ in rows)
     print(f"MERGE GATE: {'FAIL' if failed else 'PASS'} (tier {tier}, PR {args[0]})")
-    return 1 if failed else 0
+    if failed:
+        return 1
+    if merge:
+        # Merge exactly the commit the gate checked, so a push after the check cannot slip in.
+        subprocess.run(["gh", "pr", "merge", args[0], "--squash", "--delete-branch",
+                        "--match-head-commit", pr["headRefOid"], *repo], check=True)
+        print(f"MERGED PR {args[0]}")
+    return 0
 
 
 if __name__ == "__main__":

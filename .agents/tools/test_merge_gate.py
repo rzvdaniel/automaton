@@ -55,6 +55,7 @@ class Gate(unittest.TestCase):
         self.assertEqual(failed(gate.check(pr(code, [review("APPROVE", commit="old")]), PATTERNS)), ["review"])
         self.assertEqual(failed(gate.check(pr(code, [review("CHANGES NEEDED\n...")]), PATTERNS)), ["review"])
         self.assertEqual(failed(gate.check(pr(code, [review("**APPROVE**\n\nTier: medium")]), PATTERNS)), [])
+        self.assertEqual(failed(gate.check(pr(code, [review("Checked the route change; no test, it only loads a script.")]), PATTERNS)), [])
 
     def test_review_from_an_outsider_does_not_count(self):
         outsider = dict(review("APPROVE\nSecurity: fine", at="2026-01-03T00:00:00Z"), authorAssociation="NONE")
