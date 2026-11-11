@@ -54,7 +54,7 @@ gh pr review <N> --comment --body-file review.md           # your own PR: GitHub
 The body starts like this, then lists the findings in the `REVIEW.md` format:
 
 ```markdown
-APPROVE            (or CHANGES NEEDED)
+CHANGES NEEDED     (only when it does; any other first line counts as no objection)
 Tier: medium - ordinary Studio change
 Important: 0, Nit: 2, Pre-existing: 1
 Security: checked who can call the new endpoint / not needed, no reachable surface
@@ -84,13 +84,15 @@ who added `owner-approved`. Independence comes from the reviewer being a fresh a
 when the owner said so for that PR.
 
 ```bash
-python3 .agents/tools/merge-gate.py <N>
+python3 .agents/tools/merge-gate.py <N>           # check only
+python3 .agents/tools/merge-gate.py <N> --merge   # check, then squash-merge the checked commit on PASS
 ```
 
-It checks from GitHub that CI is green on the final commit, the last review (from an account with write access;
-a later review replaces an earlier one) approves that commit, a high-tier change
+Agents merge only with `--merge`, never with `gh pr merge`: running it is the approval. It checks from GitHub that CI
+is green on the final commit, the last review (from an account with write access; a later review replaces an earlier
+one) covers that commit and does not start with CHANGES NEEDED, a high-tier change
 has its security pass and the owner's approval, and the description says how the change was verified and how to
-revert it. Merge only on `MERGE GATE: PASS`, and paste the output in a PR comment. Read its warnings (no test in the
+revert it. It merges only on `MERGE GATE: PASS`; paste the output in a PR comment. Read its warnings (no test in the
 diff, comments newer than the last commit) and act on them.
 
 Squash-merge and delete the branch. Then watch the `main` run for your merge commit: two PRs that pass alone can

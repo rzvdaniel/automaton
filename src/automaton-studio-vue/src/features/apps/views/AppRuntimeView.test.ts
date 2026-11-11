@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   listDeploymentTargets: vi.fn(),
   createRuntimeLaunch: vi.fn(),
+  canBeFramed: vi.fn(),
 }))
 
 vi.mock('../services/apps.service', () => ({ appsService: mocks }))
@@ -19,7 +20,8 @@ function app(requiresAuthentication: boolean) {
   return { id: 'app-id', isPublished: false, requiresAuthentication } as never
 }
 
-async function mountView(requiresAuthentication: boolean) {
+async function mountView(requiresAuthentication: boolean, framable = true) {
+  mocks.canBeFramed.mockResolvedValue(framable)
   mocks.get.mockResolvedValue(app(requiresAuthentication))
   mocks.listDeploymentTargets.mockResolvedValue([{ isDefault: true, genericRuntimeDeployed: true }])
   mocks.createRuntimeLaunch.mockResolvedValue({ runtimeToken: '' })
@@ -42,6 +44,17 @@ describe('AppRuntimeView runtime bootstrap', () => {
     expect(iframe.attributes('src')).toMatch(/^https?:\/\/app-appid\..+\/?$/)
     expect(iframe.attributes('src')).not.toContain('?v=')
     expect(iframe.attributes('src')).not.toContain('/api/apps/app-id/launch-runtime')
+  })
+
+  it('shows a note and an Open in a new tab button instead of a blank frame when the app forbids framing', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = await mountView(true, false)
+
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(wrapper.text()).toContain('cannot be shown inside Studio')
+    await wrapper.get('[data-testid="open-in-new-tab"]').trigger('click')
+    expect(open).toHaveBeenCalledWith(expect.stringMatching(/^https?:\/\/app-appid\./), '_blank', 'noopener')
+    open.mockRestore()
   })
 
   it('still hands out the session cookie when the app does not require sign-in, because its private address always asks for it', async () => {

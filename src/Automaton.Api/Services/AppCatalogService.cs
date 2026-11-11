@@ -114,6 +114,19 @@ public sealed class AppCatalogService(
         return (null, entry.Document.Apps.Count);
     }
 
+    /// <summary>The commit the enabled catalogs pin for an app today, or null when no catalog lists that repository and folder.</summary>
+    public async Task<string?> PinnedCommitAsync(string repo, string? folder, CancellationToken cancellationToken)
+    {
+        var key = InstalledKey(repo, folder);
+        foreach (var source in await sources.EnabledAsync(cancellationToken))
+        {
+            var (entry, _) = await LoadSourceAsync(source, false, cancellationToken);
+            var app = entry?.Document.Apps.FirstOrDefault(item => InstalledKey(entry.Document.Repo, item.Folder) == key);
+            if (app is not null) return app.Commit;
+        }
+        return null;
+    }
+
     /// <summary>The read token of a private source, only for an app that source's catalog lists at exactly that folder and commit.</summary>
     public async Task<string?> TokenForAsync(string repo, string folder, string commit, CancellationToken cancellationToken)
     {

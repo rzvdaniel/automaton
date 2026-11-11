@@ -31,6 +31,17 @@ import type {
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 
+export type CatalogUpdate = {
+  available: boolean
+  installedCommit: string | null
+  latestCommit: string | null
+  compareUrl: string | null
+  edited: boolean
+  newSecrets: string[]
+  newSettings: string[]
+  newPermissions: string[]
+}
+
 export type DeployAppResult = {
   success: boolean
   message?: string
@@ -329,6 +340,18 @@ class AppsService {
     return data
   }
 
+  /** Whether the catalog pins a newer commit than the one this app was installed from, and what would change. */
+  async getCatalogUpdate(id: string): Promise<CatalogUpdate> {
+    const { data } = await apiClient.get<CatalogUpdate>(`/api/catalog/apps/${id}/update`)
+    return data
+  }
+
+  /** Replaces the app's files with the catalog's newer commit and redeploys it (data, settings, secrets and schedules stay). */
+  async applyCatalogUpdate(id: string, confirmEdited: boolean): Promise<DeploymentOperation> {
+    const { data } = await apiClient.post<DeploymentOperation>(`/api/catalog/apps/${id}/update`, { confirmEdited })
+    return data
+  }
+
   /** Deploys the app from the source the server stores for it; returns the pending operation. */
   async deployStoredSource(id: string, targetSlug?: string): Promise<DeploymentOperation> {
     const { data } = await apiClient.post<DeploymentOperation>(`/api/apps/${id}/deploy`, null, {
@@ -433,6 +456,12 @@ class AppsService {
 
   async deleteActionVersion(id: string, actionKey: string, version: string): Promise<void> {
     await apiClient.delete(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/versions/${encodeURIComponent(version)}`)
+  }
+
+  /** False when the app's own headers forbid showing it inside Studio's frame. */
+  async canBeFramed(id: string): Promise<boolean> {
+    const { data } = await apiClient.get<{ canBeFramed: boolean }>(`/api/apps/${id}/embeddable`)
+    return data.canBeFramed
   }
 
   async createRuntimeLaunch(id: string): Promise<{ runtimeToken: string; runtimeUrl: string }> {

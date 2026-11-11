@@ -512,6 +512,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<CatalogSourceStore>();
         services.AddScoped<AppCatalogService>();
         services.AddScoped<AppCatalogInstallService>();
+        services.AddScoped<AppCatalogUpdateService>();
         services.AddHostedService<EssentialCatalogBootstrapService>();
         services.AddHostedService<SetupTokenRotationService>();
         services.AddScoped<AppMutationService>();
@@ -568,6 +569,8 @@ internal static class ApiAppExecutionRegistration
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
+        services.AddScoped<ITunnelForwarder>(provider => provider.GetRequiredService<RuntimeTunnelService>());
+        services.AddScoped<AppFramingProbe>();
         services.AddScoped<RuntimeTunnelWebSocketService>();
         services.AddScoped<RuntimeFileProxyService>();
         services.AddScoped<ApplicationDeploymentService>();

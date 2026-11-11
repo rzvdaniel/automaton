@@ -35,6 +35,11 @@ class Tier(unittest.TestCase):
         self.assertEqual(gate.path_tier([".github/workflows/tests.yml"], PATTERNS), "medium")
         self.assertEqual(gate.path_tier(["scripts/update-automaton.sh"], PATTERNS), "high")
 
+    def test_workflows_are_high_in_the_real_codeowners(self):
+        root = os.path.join(os.path.dirname(__file__), "..", "..", ".github", "CODEOWNERS")
+        patterns = gate.owner_patterns(open(root).read())
+        self.assertEqual(gate.path_tier([".github/workflows/deploy-production.yml"], patterns), "high")
+
     def test_docs_only_is_low(self):
         self.assertEqual(gate.path_tier(["docs/roadmap/README.md", "src/Automaton.Api/Documentation/Admin/apps.md"], PATTERNS), "low")
 
@@ -55,6 +60,7 @@ class Gate(unittest.TestCase):
         self.assertEqual(failed(gate.check(pr(code, [review("APPROVE", commit="old")]), PATTERNS)), ["review"])
         self.assertEqual(failed(gate.check(pr(code, [review("CHANGES NEEDED\n...")]), PATTERNS)), ["review"])
         self.assertEqual(failed(gate.check(pr(code, [review("**APPROVE**\n\nTier: medium")]), PATTERNS)), [])
+        self.assertEqual(failed(gate.check(pr(code, [review("Checked the route change; no test, it only loads a script.")]), PATTERNS)), [])
 
     def test_review_from_an_outsider_does_not_count(self):
         outsider = dict(review("APPROVE\nSecurity: fine", at="2026-01-03T00:00:00Z"), authorAssociation="NONE")

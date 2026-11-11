@@ -18,7 +18,6 @@
   "dependencies": {
     "@primevue/themes": "^4.5.4",
     "pinia": "^3.0.4",
-    "posthog-js": "^1.258.3",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
     "vite-ssg": "^28.3.0",

@@ -171,6 +171,19 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task PinnedCommit_IsWhatTheCatalogPinsNow_AndNullForAnAppItDoesNotList()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(CatalogJson, null)), version: "0.2.31");
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await service.PinnedCommitAsync("Owner/Apps", "/maintenance/backup/", default), Is.EqualTo("0123456789abcdef0123456789abcdef01234567"));
+            Assert.That(await service.PinnedCommitAsync("owner/apps", "other", default), Is.Null);
+        });
+    }
+
+    [Test]
     public async Task Get_MarksAnAppInstalledFromTheOfficialCatalogEvenWhenRepoCaseOrFolderSlashesDiffer()
     {
         await using var db = CreateDb();

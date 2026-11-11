@@ -1,0 +1,66 @@
+name: Deploy production
+
+# Manual only. The `production` environment needs the owner's approval, only accepts runs from main, and holds the
+# SSH settings as environment secrets. Setup: docs/prod/deploy-from-github.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release to deploy, for example 0.2.103
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.version }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Check the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 1; }
+          echo "Deploying $VERSION, approved by the environment reviewer, started by $GITHUB_ACTOR."
+
+      - name: Update production
+        env:
+          VERSION: ${{ inputs.version }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$(mktemp -d)"
+          trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$PROD_SSH_KEY" > "$dir/key"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          # update.sh takes the release tag as --version server-vX.Y.Z.
+          ssh -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v$VERSION"
+
+      - name: Check the public routes
+        run: |
+          set -euo pipefail
+          for url in https://api.automaton.monster/health https://studio.automaton.monster https://store.automaton.monster https://automaton.monster; do
+            ok=false
+            for attempt in 1 2 3 4 5 6; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || true)"
+              if [[ "$code" == 200 ]]; then ok=true; break; fi
+              sleep 10
+            done
+            echo "$url -> $code"
+            [[ "$ok" == true ]] || exit 1
+          done
