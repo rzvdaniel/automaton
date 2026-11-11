@@ -18,11 +18,11 @@ public sealed class HostedRunnerBrokerProvisioner(
             throw new InvalidOperationException("Workflow and custom-step Runner broker connections require TLS.");
         return ProvisionQueueAsync($"execution-runner-{runnerId:N}",
             RunnerExecutionCommandPublisher.QueueName(runnerId), cancellationToken,
-            RunnerExecutionCommandPublisher.ManagementQueueName(runnerId));
+            RunnerExecutionCommandPublisher.ManagementQueueName(runnerId), RunnerExecutionCommandPublisher.ResultQueueName(runnerId));
     }
 
     private async Task<RunnerBrokerConfiguration> ProvisionQueueAsync(string username,
-        string queueName, CancellationToken cancellationToken, string? managementQueueName = null)
+        string queueName, CancellationToken cancellationToken, string? managementQueueName = null, string? resultQueueName = null)
     {
         var rabbit = rabbitOptions.Value;
         var external = runnerBrokerOptions.Value;
@@ -42,19 +42,24 @@ public sealed class HostedRunnerBrokerProvisioner(
         if (managementQueueName is not null)
             await PutAsync(client, $"api/queues/{encodedVhost}/{Uri.EscapeDataString(managementQueueName)}",
                 new { durable = true, auto_delete = false, arguments = new { } }, cancellationToken);
+        // The result queue lives in the broker, not in an API slot, so a blue/green switch does not touch it.
+        // Messages expire and the queue is bounded, so an older Runner that never reads it cannot fill the broker.
+        if (resultQueueName is not null)
+            await PutAsync(client, $"api/queues/{encodedVhost}/{Uri.EscapeDataString(resultQueueName)}",
+                new { durable = true, auto_delete = false, arguments = new Dictionary<string, object> { ["x-message-ttl"] = 3_600_000, ["x-max-length"] = 5000 } }, cancellationToken);
         await PutAsync(client, $"api/users/{Uri.EscapeDataString(username)}",
             new { password = brokerPassword, tags = "" }, cancellationToken);
         await PutAsync(client, $"api/permissions/{encodedVhost}/{Uri.EscapeDataString(username)}",
-            new { configure = "", write = "", read = ReadPermission(queueName, managementQueueName) }, cancellationToken);
+            new { configure = "", write = "", read = ReadPermission(queueName, managementQueueName, resultQueueName) }, cancellationToken);
 
         return new RunnerBrokerConfiguration(
             external.Host, external.Port, rabbit.VirtualHost, username, brokerPassword, queueName,
-            external.TlsEnabled, external.TlsServerName, managementQueueName);
+            external.TlsEnabled, external.TlsServerName, managementQueueName, resultQueueName);
     }
 
-    private static string ReadPermission(string queue, string? managementQueue)
-        => managementQueue is null ? $"^{System.Text.RegularExpressions.Regex.Escape(queue)}$"
-            : $"^({System.Text.RegularExpressions.Regex.Escape(queue)}|{System.Text.RegularExpressions.Regex.Escape(managementQueue)})$";
+    private static string ReadPermission(string queue, string? managementQueue, string? resultQueue)
+        => "^(" + string.Join("|", new[] { queue, managementQueue, resultQueue }
+            .Where(name => name is not null).Select(name => System.Text.RegularExpressions.Regex.Escape(name!))) + ")$";
 
     public async Task RevokeAsync(Guid runnerId, CancellationToken cancellationToken)
     {
@@ -72,6 +77,8 @@ public sealed class HostedRunnerBrokerProvisioner(
             $"api/queues/{encodedVhost}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.QueueName(runnerId))}", cancellationToken);
         await DeleteIfPresentAsync(client,
             $"api/queues/{encodedVhost}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId))}", cancellationToken);
+        await DeleteIfPresentAsync(client,
+            $"api/queues/{encodedVhost}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ResultQueueName(runnerId))}", cancellationToken);
         await DeleteIfPresentAsync(client, $"api/users/{Uri.EscapeDataString(username)}", cancellationToken);
         await DeleteIfPresentAsync(client,
             $"api/queues/{encodedVhost}/{Uri.EscapeDataString(LegacyDeploymentQueueName(runnerId))}",
@@ -90,6 +97,9 @@ public sealed class HostedRunnerBrokerProvisioner(
             cancellationToken);
         await DeleteIfPresentAsync(client,
             $"api/queues/{Uri.EscapeDataString(rabbit.VirtualHost)}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId))}",
+            cancellationToken);
+        await DeleteIfPresentAsync(client,
+            $"api/queues/{Uri.EscapeDataString(rabbit.VirtualHost)}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ResultQueueName(runnerId))}",
             cancellationToken);
     }
 

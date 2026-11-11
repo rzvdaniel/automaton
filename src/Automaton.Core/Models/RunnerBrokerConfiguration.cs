@@ -9,4 +9,5 @@ public sealed record RunnerBrokerConfiguration(
     string QueueName,
     bool TlsEnabled = false,
     string? TlsServerName = null,
-    string? ManagementQueueName = null);
+    string? ManagementQueueName = null,
+    string? ResultQueueName = null);

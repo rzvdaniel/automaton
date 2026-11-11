@@ -343,11 +343,17 @@ public sealed class RunnerExecutionOperationService(
             if (await PersistResultAsync(operationId, json, ct))
             {
                 await action.ApplyAsync(operationId, projection, ct);
+                // Same transaction as the saved result (CAP outbox): the row is the truth, this only wakes the Runner.
+                if (IsHostContainerOperation(operation))
+                    await events.PublishAsync(new RunnerExecutionResultReadyEvent(operationId, operation.RunnerId), ct);
                 receipt = new("accepted");
             }
         }, token);
         return receipt;
     }
+
+    private bool IsHostContainerOperation(RunnerExecutionOperation operation)
+        => JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions)?.HostContainer is not null;
 
     private void EnsureHostContainerResult(
         RunnerExecutionOperation operation, RunnerExecutionResult result)

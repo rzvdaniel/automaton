@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;
 
@@ -111,11 +112,77 @@ public sealed class HostContainerExecutionApiClientTests
         }
     }
 
+    private static HostContainerExecutionOperationResponse Done() => new(Guid.NewGuid(), true, new());
+    private static HostContainerExecutionOperationResponse Pending() => new(Guid.NewGuid(), false, null);
+
     [Test]
-    public void ResultPollingBacksOffToFiveSecondsInsteadOfTwoRequestsPerSecond()
+    public async Task PushedResultIsReadWithExactlyOneGetAndNoPolling()
     {
-        Assert.That(HostContainerExecutionApiClient.PollDelay(0), Is.EqualTo(TimeSpan.FromMilliseconds(500)));
-        Assert.That(HostContainerExecutionApiClient.PollDelay(2), Is.EqualTo(TimeSpan.FromSeconds(2)));
-        Assert.That(HostContainerExecutionApiClient.PollDelay(1000), Is.EqualTo(TimeSpan.FromSeconds(5)));
+        var notifier = new HostContainerResultNotifier();
+        var id = Guid.NewGuid();
+        using var waiter = notifier.Register(id);
+        var reads = 0;
+        var task = HostContainerExecutionApiClient.WaitForPushedResultAsync(
+            () => { reads++; return Task.FromResult(Done()); }, waiter.Signaled, notifier.NextConnection,
+            DateTime.UtcNow.AddMinutes(5), id);
+        await Task.Delay(300); // a polling loop would have read several times by now
+        Assert.That(reads, Is.EqualTo(0));
+        Assert.That(notifier.Notify(id), Is.True);
+        Assert.That((await task).Completed, Is.True);
+        Assert.That(reads, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ReconnectReadsOnceAndDeadlineFallbackReadsOnce()
+    {
+        var notifier = new HostContainerResultNotifier();
+        var id = Guid.NewGuid();
+        using var waiter = notifier.Register(id);
+        var reads = 0;
+        var task = HostContainerExecutionApiClient.WaitForPushedResultAsync(
+            () => Task.FromResult(++reads >= 2 ? Done() : Pending()), waiter.Signaled, notifier.NextConnection,
+            DateTime.UtcNow.AddSeconds(5), id, fallbackLead: TimeSpan.FromSeconds(4.2));
+        await Task.Delay(100);
+        notifier.ConsumerConnected();
+        await Task.Delay(300);
+        Assert.That(reads, Is.EqualTo(1), "one read per reconnect, no loop");
+        Assert.That((await task).Completed, Is.True);
+        Assert.That(reads, Is.EqualTo(2), "the second read is the one near the deadline");
+    }
+
+    [Test]
+    public void NoResultBeforeTheDeadlineTimesOutAfterOneFallbackRead()
+    {
+        var notifier = new HostContainerResultNotifier();
+        var id = Guid.NewGuid();
+        using var waiter = notifier.Register(id);
+        var reads = 0;
+        Assert.ThrowsAsync<TimeoutException>(() => HostContainerExecutionApiClient.WaitForPushedResultAsync(
+            () => { reads++; return Task.FromResult(Pending()); }, waiter.Signaled, notifier.NextConnection,
+            DateTime.UtcNow.AddSeconds(1), id, fallbackLead: TimeSpan.FromMilliseconds(500)));
+        Assert.That(reads, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void DuplicateAndOrphanResultMessagesAreDroppedAndMatchIsByOperationAndRunner()
+    {
+        var notifier = new HostContainerResultNotifier();
+        var runner = Guid.NewGuid();
+        var id = Guid.NewGuid();
+        byte[] Message(Guid op, Guid run) => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Automaton.Core.Models.RunnerExecutionResultReady(op, run), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+        Assert.That(RunnerExecutionQueueConsumer.HandleResultReady(Message(id, runner), runner, notifier), Is.False, "nobody waits: orphan");
+        using (var waiter = notifier.Register(id))
+        {
+            Assert.That(RunnerExecutionQueueConsumer.HandleResultReady(Message(Guid.NewGuid(), runner), runner, notifier), Is.False);
+            Assert.That(RunnerExecutionQueueConsumer.HandleResultReady(Message(id, Guid.NewGuid()), runner, notifier), Is.False, "another Runner");
+            Assert.That(waiter.Signaled.IsCompleted, Is.False);
+            Assert.That(RunnerExecutionQueueConsumer.HandleResultReady(Message(id, runner), runner, notifier), Is.True);
+            Assert.That(RunnerExecutionQueueConsumer.HandleResultReady(Message(id, runner), runner, notifier), Is.False, "duplicate");
+            Assert.That(waiter.Signaled.IsCompleted, Is.True);
+        }
+        Assert.That(RunnerExecutionQueueConsumer.HandleResultReady(Message(id, runner), runner, notifier), Is.False, "waiter gone after a restart or finish");
+        Assert.That(RunnerExecutionQueueConsumer.HandleResultReady("not json"u8, runner, notifier), Is.False);
     }
 }

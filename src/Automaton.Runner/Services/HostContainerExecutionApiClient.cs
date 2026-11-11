@@ -9,8 +9,14 @@ namespace Automaton.Runner.Console.Services;
 
 public sealed class HostContainerExecutionApiClient(
     IConfiguration configuration,
-    FileStorageService storage)
+    FileStorageService storage,
+    HostContainerResultNotifier notifier)
 {
+    /// <summary>How long before the deadline the one last fallback read is made when no message arrived.</summary>
+    internal static readonly TimeSpan DeadlineFallbackLead = TimeSpan.FromSeconds(30);
+    /// <summary>Only for an API that offers no result queue: read the result at this fixed interval.</summary>
+    internal static readonly TimeSpan LegacyReadInterval = TimeSpan.FromSeconds(5);
+
     public async Task<HostContainerExecutionResponse> ExecuteAsync(
         HostContainerExecutionRequest request,
         CancellationToken cancellationToken)
@@ -24,11 +30,18 @@ public sealed class HostContainerExecutionApiClient(
         if (DateTime.UtcNow >= deadline)
             throw new TimeoutException($"Host-container operation {operation.OperationId} did not complete before its operation deadline.");
 
+        // Register before submitting so a result pushed immediately is not missed.
+        using var waiter = notifier.Register(operation.OperationId);
         var submission = await SubmitAsync(client, operation, deadline, cancellationToken);
         if (submission.Completed)
             return RequireResult(submission);
 
-        return RequireResult(await ReadUntilCompletedAsync(client, operation.OperationId, deadline, cancellationToken));
+        Task<HostContainerExecutionOperationResponse> ReadAsync() => ReadOnceAsync(client, operation.OperationId, deadline, cancellationToken);
+        var completed = notifier.ResultQueueAvailable
+            ? await WaitForPushedResultAsync(ReadAsync, waiter.Signaled, notifier.NextConnection, deadline,
+                operation.OperationId, cancellationToken: cancellationToken)
+            : await ReadAtIntervalAsync(ReadAsync, deadline, operation.OperationId, cancellationToken);
+        return RequireResult(completed);
     }
 
     private static async Task<HostContainerExecutionOperationResponse> SubmitAsync(
@@ -45,32 +58,85 @@ public sealed class HostContainerExecutionApiClient(
             ?? throw new InvalidDataException("The API returned no host-container operation submission.");
     }
 
-    private static async Task<HostContainerExecutionOperationResponse> ReadUntilCompletedAsync(
+    private static async Task<HostContainerExecutionOperationResponse> ReadOnceAsync(
         HttpClient client,
         Guid operationId,
         DateTime deadline,
         CancellationToken cancellationToken)
     {
-        for (var poll = 0; DateTime.UtcNow < deadline; poll++)
+        using var response = await SendWithRetryAsync(token =>
+            client.GetAsync($"api/host-container-executions/{operationId:D}/result", token),
+            deadline, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<HostContainerExecutionOperationResponse>(cancellationToken)
+            ?? throw new InvalidDataException("The API returned no host-container operation result.");
+    }
+
+    /// <summary>
+    /// Waits for the "result ready" message, then reads the saved result once. Besides that read, the result is
+    /// read once each time the result consumer reconnects (a message may have been missed while offline) and once
+    /// shortly before the deadline (a purged queue). There is no polling loop.
+    /// </summary>
+    internal static async Task<HostContainerExecutionOperationResponse> WaitForPushedResultAsync(
+        Func<Task<HostContainerExecutionOperationResponse>> read,
+        Task signaled,
+        Func<Task> nextConnection,
+        DateTime deadline,
+        Guid operationId,
+        TimeProvider? time = null,
+        CancellationToken cancellationToken = default,
+        TimeSpan? fallbackLead = null)
+    {
+        time ??= TimeProvider.System;
+        var lastChance = deadline - (fallbackLead ?? DeadlineFallbackLead);
+        var lastChanceTaken = false;
+        var connection = nextConnection();
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var response = await SendWithRetryAsync(token =>
-                client.GetAsync($"api/host-container-executions/{operationId:D}/result", token),
-                deadline, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            var operation = await response.Content.ReadFromJsonAsync<HostContainerExecutionOperationResponse>(cancellationToken)
-                ?? throw new InvalidDataException("The API returned no host-container operation result.");
+            var now = time.GetUtcNow().UtcDateTime;
+            if (now >= deadline)
+                throw new TimeoutException($"Host-container operation {operationId} did not complete before its operation deadline.");
+            var wakeAt = lastChanceTaken ? deadline : (lastChance > now ? lastChance : now);
+            using var timerStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var timer = Task.Delay(wakeAt - now, time, timerStop.Token);
+            var first = await Task.WhenAny(signaled, connection, timer);
+            await timerStop.CancelAsync();
+            if (first == timer)
+            {
+                if (lastChanceTaken)
+                    continue; // the deadline check at the top throws
+                lastChanceTaken = true;
+            }
+            else if (first == connection)
+                connection = nextConnection();
+            else
+                signaled = new TaskCompletionSource().Task; // consumed: a read that finds nothing waits for a reconnect or the deadline
+
+            var operation = await read();
             if (operation.Completed)
                 return operation;
-            await DelayBeforeDeadlineAsync(PollDelay(poll), deadline, cancellationToken);
+        }
+    }
+
+    /// <summary>For an API without a result queue only (older server): a plain fixed-interval read.</summary>
+    private static async Task<HostContainerExecutionOperationResponse> ReadAtIntervalAsync(
+        Func<Task<HostContainerExecutionOperationResponse>> read,
+        DateTime deadline,
+        Guid operationId,
+        CancellationToken cancellationToken)
+    {
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = await read();
+            if (operation.Completed)
+                return operation;
+            await DelayBeforeDeadlineAsync(LegacyReadInterval, deadline, cancellationToken);
         }
 
         throw new TimeoutException($"Host-container operation {operationId} did not complete before its operation deadline.");
     }
-
-    /// <summary>0.5 s for a quick operation, then slower up to 5 s, so waiting operations cannot flood the API.</summary>
-    internal static TimeSpan PollDelay(int poll)
-        => TimeSpan.FromMilliseconds(Math.Min(5000, 500 * Math.Pow(2, Math.Min(poll, 4))));
 
     internal static async Task<HttpResponseMessage> SendWithRetryAsync(
         Func<CancellationToken, Task<HttpResponseMessage>> send,

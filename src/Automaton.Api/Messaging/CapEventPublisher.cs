@@ -15,6 +15,7 @@ public sealed class CapEventPublisher(ICapPublisher capPublisher) : IEventPublis
         return message switch
         {
             RunnerExecutionRequestedEvent => capPublisher.PublishAsync(EventTopics.RunnerExecutionRequested, message, cancellationToken: cancellationToken),
+            RunnerExecutionResultReadyEvent => capPublisher.PublishAsync(EventTopics.RunnerExecutionResultReady, message, cancellationToken: cancellationToken),
             UserRegisteredEvent => capPublisher.PublishAsync(EventTopics.UserRegistered, message, cancellationToken: cancellationToken),
             DeploymentPackageRequestedEvent => capPublisher.PublishAsync(EventTopics.DeploymentPackageRequested, message, cancellationToken: cancellationToken),
             _ => throw new InvalidOperationException($"No topic configured for event type '{typeof(T).FullName}'.")
