@@ -58,6 +58,7 @@ public sealed class AppsRuntimeControllerTests
             UserAppsTestServices.CreateAppsService(dbContext, http),
             userContext,
             InternalRuntimeControllerTests.CreateRuntimeCookieService(),
+            null!,
             authorization,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.test" }))
         {

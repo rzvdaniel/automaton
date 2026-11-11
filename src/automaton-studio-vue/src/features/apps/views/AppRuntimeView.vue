@@ -16,6 +16,7 @@ const applicationUrl = ref('')
 const isLoading = ref(true)
 const error = ref('')
 const isNotDeployed = ref(false)
+const canBeFramed = ref(true)
 
 async function loadRuntimeView() {
   if (!appId.value) {
@@ -42,12 +43,19 @@ async function loadRuntimeView() {
     // The private address always asks for sign-in, so the session cookie is always handed out.
     await appsService.createRuntimeLaunch(appId.value)
 
+    // A failed check keeps the framed view, which is what every app had before.
+    canBeFramed.value = await appsService.canBeFramed(appId.value).catch(() => true)
+
     applicationUrl.value = new URL(getOpenAppUrl(app.value), window.location.origin).toString()
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load application.'
   } finally {
     isLoading.value = false
   }
+}
+
+function openInNewTab() {
+  window.open(applicationUrl.value, '_blank', 'noopener')
 }
 
 onMounted(() => {
@@ -72,6 +80,15 @@ onMounted(() => {
       <div class="runtime-state__actions">
         <button class="runtime-action" type="button" @click="router.push(`/apps/${appId}`)">Back to Studio</button>
         <button class="runtime-action runtime-action--primary" type="button" @click="loadRuntimeView">Retry</button>
+      </div>
+    </div>
+
+    <div v-else-if="!canBeFramed" class="runtime-state" data-testid="runtime-not-framable">
+      <i class="pi pi-external-link runtime-state__icon"></i>
+      <p>This app cannot be shown inside Studio. Open it in its own tab instead.</p>
+      <div class="runtime-state__actions">
+        <button class="runtime-action" type="button" @click="router.push(`/apps/${appId}`)">Back to Studio</button>
+        <button class="runtime-action runtime-action--primary" type="button" data-testid="open-in-new-tab" @click="openInNewTab">Open in a new tab</button>
       </div>
     </div>
 
