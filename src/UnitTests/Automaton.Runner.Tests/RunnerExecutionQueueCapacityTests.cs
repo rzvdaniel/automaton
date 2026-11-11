@@ -114,9 +114,9 @@ public sealed class RunnerExecutionQueueCapacityTests
             Assert.That(executor.ActionCalls, Is.EqualTo(4));
             Assert.That(queued.IsCompleted, Is.False);
             Assert.That(broker.Queues["execution"].Capacity, Is.EqualTo(4));
-            Assert.That(broker.Queues["management"].Capacity, Is.EqualTo(1));
+            Assert.That(broker.Queues["management"].Capacity, Is.EqualTo(4));
             Assert.That(broker.Queues["execution"].DispatchConcurrency, Is.EqualTo(4));
-            Assert.That(broker.Queues["management"].DispatchConcurrency, Is.EqualTo(1));
+            Assert.That(broker.Queues["management"].DispatchConcurrency, Is.EqualTo(4));
         }
 
         public void ReleaseActions() => executor.Finish.TrySetResult();

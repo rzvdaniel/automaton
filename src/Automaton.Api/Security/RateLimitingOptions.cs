@@ -5,6 +5,7 @@ public class RateLimitingOptions
     public const string SectionName = "RateLimiting";
 
     public RateLimitPolicyOptions GlobalAnonymous { get; set; } = new(200, 60);
+    public RateLimitPolicyOptions RunnerApi { get; set; } = new(2000, 60);
     public RateLimitPolicyOptions GlobalAuthenticated { get; set; } = new(1000, 60);
     /// <summary>Static files (scripts, styles, images, fonts) of an app, per visitor address; a page loads dozens at once.</summary>
     public RateLimitPolicyOptions AppStaticAssets { get; set; } = new(3000, 60);

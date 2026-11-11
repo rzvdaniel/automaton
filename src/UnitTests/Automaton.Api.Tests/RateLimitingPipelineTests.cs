@@ -46,6 +46,33 @@ public class RateLimitingPipelineTests
     }
 
     [Test]
+    public async Task RunnerApiCalls_WithAnAcceptedKeyHaveTheirOwnBucket_ButAnyOtherKeyValueDoesNot()
+    {
+        using var host = await CreateHostAsync(configureOptions: options =>
+        {
+            options.GlobalAnonymous = new RateLimitPolicyOptions(3, 60);
+            options.RunnerApi = new RateLimitPolicyOptions(50, 60);
+        });
+        var client = host.GetTestClient();
+        Task<HttpResponseMessage> Poll(string key)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/host-container-executions/x/result");
+            request.Headers.Add("X-API-Key", key);
+            return client.SendAsync(request);
+        }
+
+        // A header value nobody accepted keeps the normal limit, so it cannot be used to guess keys faster.
+        var unknown = new List<HttpStatusCode>();
+        for (var i = 0; i < 6; i++) unknown.Add((await Poll("not-a-real-key")).StatusCode);
+        Assert.That(unknown, Has.Some.EqualTo((HttpStatusCode)429));
+
+        // A key that authentication has accepted: a Runner polling many times is not limited at the anonymous limit.
+        RateLimitedApiKeys.Remember(host.Services.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), "runner-key");
+        for (var i = 0; i < 20; i++)
+            Assert.That((await Poll("runner-key")).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"poll {i}");
+    }
+
+    [Test]
     public async Task AppStaticAssets_DoNotUseUpTheGeneralLimit_ButOtherAppAndApiRequestsStillDo()
     {
         using var host = await CreateHostAsync(configureOptions: options =>

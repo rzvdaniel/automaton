@@ -110,4 +110,12 @@ public sealed class HostContainerExecutionApiClientTests
             public ValueTask DisposeAsync() => default;
         }
     }
+
+    [Test]
+    public void ResultPollingBacksOffToFiveSecondsInsteadOfTwoRequestsPerSecond()
+    {
+        Assert.That(HostContainerExecutionApiClient.PollDelay(0), Is.EqualTo(TimeSpan.FromMilliseconds(500)));
+        Assert.That(HostContainerExecutionApiClient.PollDelay(2), Is.EqualTo(TimeSpan.FromSeconds(2)));
+        Assert.That(HostContainerExecutionApiClient.PollDelay(1000), Is.EqualTo(TimeSpan.FromSeconds(5)));
+    }
 }
