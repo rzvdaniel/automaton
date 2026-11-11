@@ -35,6 +35,11 @@ class Tier(unittest.TestCase):
         self.assertEqual(gate.path_tier([".github/workflows/tests.yml"], PATTERNS), "medium")
         self.assertEqual(gate.path_tier(["scripts/update-automaton.sh"], PATTERNS), "high")
 
+    def test_workflows_are_high_in_the_real_codeowners(self):
+        root = os.path.join(os.path.dirname(__file__), "..", "..", ".github", "CODEOWNERS")
+        patterns = gate.owner_patterns(open(root).read())
+        self.assertEqual(gate.path_tier([".github/workflows/deploy-production.yml"], patterns), "high")
+
     def test_docs_only_is_low(self):
         self.assertEqual(gate.path_tier(["docs/roadmap/README.md", "src/Automaton.Api/Documentation/Admin/apps.md"], PATTERNS), "low")
 

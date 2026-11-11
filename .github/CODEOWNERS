@@ -8,6 +8,8 @@
 /REVIEW.md                                                     @rzvdaniel
 /.agents/skills/pr-review/                                     @rzvdaniel
 /.agents/tools/merge-gate.py                                   @rzvdaniel
+# Workflows: they hold the production deploy and can reach its secrets
+/.github/workflows/                                            @rzvdaniel
 # Sign-in, tokens, authorization, secrets
 /src/Automaton.Identity/                                       @rzvdaniel
 /src/Automaton.Api/Authentication/                             @rzvdaniel
@@ -27,8 +29,7 @@
 /src/Automaton.Api/Services/DataProtectionSecretProtector.cs   @rzvdaniel
 # --- security pass ---
 # Below this marker: medium tier, but the review must include a security pass (a "Security:" section).
-# Release workflows and scripts that people run as root or pipe into a shell.
-/.github/workflows/                                            @rzvdaniel
+# Release scripts that people run as root or pipe into a shell.
 /scripts/cli/                                                  @rzvdaniel
 /docker/install/                                               @rzvdaniel
 /scripts/install-automaton.sh                                  @rzvdaniel
