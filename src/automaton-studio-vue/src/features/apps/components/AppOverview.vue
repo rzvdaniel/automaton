@@ -11,6 +11,7 @@ import {
   audienceLabel,
   appOriginLabel,
   describeSchedule,
+  secretsPill,
   statusSentence,
   type Segment,
 } from '../utils/app-overview'
@@ -93,9 +94,7 @@ const scheduleFor = (actionKey: string) => {
 }
 
 const declaredSecrets = computed(() => props.app.application?.secrets ?? [])
-const missingSecrets = computed(() => secretNames.value === null
-  ? 0
-  : declaredSecrets.value.filter((item) => !secretNames.value!.includes(item.name)).length)
+const pill = computed(() => secretNames.value === null ? null : secretsPill(declaredSecrets.value, secretNames.value))
 const settingNames = computed(() => (props.app.application?.settings ?? []).map((item) => item.name))
 /** Settings are saved like secrets, so saved names that are declared settings do not count as secrets. */
 const secretCount = computed(() => Math.max(declaredSecrets.value.length, (secretNames.value ?? []).filter((name) => !settingNames.value.includes(name)).length))
@@ -203,7 +202,7 @@ const source = computed(() => {
         <button v-if="secretCount > 0" type="button" class="row row--link" @click="emit('navigate', 'settings')">
           <span>{{ secretCount }} {{ secretCount === 1 ? 'secret' : 'secrets' }}</span>
           <span class="end">
-            <span v-if="secretNames !== null" class="pill" :class="missingSecrets > 0 ? 'pill--bad' : 'pill--ok'">{{ missingSecrets > 0 ? `${missingSecrets} missing` : 'all set' }}</span>
+            <span v-if="pill" class="pill" :class="pill.bad ? 'pill--bad' : 'pill--ok'">{{ pill.text }}</span>
             <i class="pi pi-chevron-right chevron" aria-hidden="true"></i>
           </span>
         </button>
