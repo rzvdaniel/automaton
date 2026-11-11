@@ -1,5 +1,6 @@
 using Automaton.Api.Config;
 using Automaton.Api.Data;
+using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -9,22 +10,33 @@ namespace Automaton.Api.Services;
 /// <summary>Decides from an app's own response headers whether browsers will let Studio show it in a frame.</summary>
 public static class AppFramingPolicy
 {
-    /// <summary>True when X-Frame-Options or a CSP frame-ancestors rule stops <paramref name="studioOrigin"/> from framing the app.</summary>
+    /// <summary>
+    /// True when the app's headers stop <paramref name="studioOrigin"/> from framing it. A CSP frame-ancestors directive
+    /// decides alone when present (browsers then ignore X-Frame-Options); otherwise DENY or SAMEORIGIN forbid framing.
+    /// ALLOW-FROM is obsolete and ignored by browsers, so it does not forbid.
+    /// </summary>
     public static bool ForbidsFraming(IReadOnlyDictionary<string, string[]> headers, string studioOrigin)
     {
-        foreach (var (name, values) in headers)
-        {
-            if (name.Equals("X-Frame-Options", StringComparison.OrdinalIgnoreCase)
-                && values.Any(value => value.Trim().ToUpperInvariant() is "DENY" or "SAMEORIGIN"))
-                return true;
+        var withFrameAncestors = headers
+            .Where(header => header.Key.Equals("Content-Security-Policy", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(header => header.Value)
+            .SelectMany(value => value.Split(','))
+            .Where(HasFrameAncestors)
+            .ToList();
+        if (withFrameAncestors.Count > 0)
+            return withFrameAncestors.Any(policy => FrameAncestorsBlock(policy, studioOrigin));
 
-            if (name.Equals("Content-Security-Policy", StringComparison.OrdinalIgnoreCase)
-                && values.SelectMany(value => value.Split(',')).Any(policy => FrameAncestorsBlock(policy, studioOrigin)))
-                return true;
-        }
-
-        return false;
+        return headers
+            .Where(header => header.Key.Equals("X-Frame-Options", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(header => header.Value)
+            .SelectMany(value => value.Split(',', StringSplitOptions.TrimEntries))
+            .Any(token => token.Equals("DENY", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("SAMEORIGIN", StringComparison.OrdinalIgnoreCase));
     }
+
+    private static bool HasFrameAncestors(string policy)
+        => policy.Split(';', StringSplitOptions.TrimEntries)
+            .Any(directive => directive.StartsWith("frame-ancestors", StringComparison.OrdinalIgnoreCase));
 
     private static bool FrameAncestorsBlock(string policy, string studioOrigin)
     {
@@ -52,18 +64,30 @@ public static class AppFramingPolicy
     }
 }
 
+/// <summary>Sends a request for an app through its Runner tunnel.</summary>
+public interface ITunnelForwarder
+{
+    Task<TunnelResponse> ForwardAsync(Guid appId, Guid deploymentTargetId, HttpRequest request, string path, CancellationToken cancellationToken);
+}
+
 /// <summary>Asks an app's root page, through the Runner tunnel, whether it can be shown inside Studio.</summary>
 public sealed class AppFramingProbe(
     ApplicationDbContext dbContext,
-    RuntimeTunnelService tunnelService,
+    ITunnelForwarder tunnelService,
     IOptions<PublishedAppsConfig> publishedAppsOptions,
     ILogger<AppFramingProbe> logger)
 {
     private const int MaxRedirects = 3;
 
-    /// <summary>False only when the app answered and forbids framing; any failure keeps today's framed view.</summary>
-    public async Task<bool> CanBeFramedAsync(Guid appId, string studioOrigin, CancellationToken cancellationToken)
+    /// <summary>One budget for the whole check, all hops included.</summary>
+    internal TimeSpan Budget { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>False only when the app answered and forbids framing; any failure or timeout keeps today's framed view.</summary>
+    public async Task<bool> CanBeFramedAsync(Guid appId, string studioOrigin, CancellationToken callerToken)
     {
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(callerToken);
+        budget.CancelAfter(Budget);
+        var cancellationToken = budget.Token;
         try
         {
             var targetId = await dbContext.AppDeploymentTargets
@@ -98,6 +122,10 @@ public sealed class AppFramingProbe(
 
                 return !AppFramingPolicy.ForbidsFraming(response.HeaderValues, studioOrigin);
             }
+        }
+        catch (OperationCanceledException) when (!callerToken.IsCancellationRequested)
+        {
+            logger.LogWarning("Checking whether app {AppId} can be framed ran out of time", appId);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

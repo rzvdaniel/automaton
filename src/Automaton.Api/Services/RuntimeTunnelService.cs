@@ -22,7 +22,7 @@ public sealed class RuntimeTunnelService(
     RuntimeTunnelRequestSender requestSender,
     IOptions<PublishedAppsConfig> publishedAppsOptions,
     ApiInstanceIdentityService apiInstanceIdentityService,
-    ILogger<RuntimeTunnelService> logger)
+    ILogger<RuntimeTunnelService> logger) : ITunnelForwarder
 {
     private readonly PublishedAppsConfig publishedAppsConfig = publishedAppsOptions.Value;
 
