@@ -158,3 +158,11 @@ export function appOriginLabel(app: Pick<App, 'forkedFromAppName' | 'installedFr
   if (app.forkedFromAppName) return `From the catalog · ${app.forkedFromAppName}`
   return app.developmentMode === 'local' || app.runtimeSource !== 'studio' ? 'Deployed with the CLI' : 'Built in Studio'
 }
+
+/** The pill beside "N secrets": only required secrets that are not set count as missing; an unset optional one says so. */
+export function secretsPill(declared: Array<{ name: string; optional?: boolean }>, saved: string[]): { text: string; bad: boolean } {
+  const unset = declared.filter((item) => !saved.includes(item.name))
+  const missing = unset.filter((item) => !item.optional).length
+  if (missing > 0) return { text: `${missing} missing`, bad: true }
+  return { text: unset.length > 0 ? 'optional, not set' : 'all set', bad: false }
+}

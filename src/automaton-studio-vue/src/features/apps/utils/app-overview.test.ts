@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accessLabel, appOriginLabel, appKindOf, describeSchedule, formatWhen, getAppHealth, statusSentence, type StatusInput } from './app-overview'
+import { accessLabel, appOriginLabel, appKindOf, describeSchedule, formatWhen, getAppHealth, secretsPill, statusSentence, type StatusInput } from './app-overview'
 import type { AppOperationalSummary } from './app-operational-summary'
 
 const now = new Date('2026-11-08T12:00:00Z')
@@ -92,5 +92,19 @@ describe('appOriginLabel', () => {
     expect(appOriginLabel({ ...base, forkedFromAppName: 'Todo' })).toBe('From the catalog · Todo')
     expect(appOriginLabel(base)).toBe('Deployed with the CLI')
     expect(appOriginLabel({ developmentMode: 'studio', runtimeSource: 'studio' })).toBe('Built in Studio')
+  })
+})
+
+describe('secretsPill', () => {
+  it('counts only required secrets as missing', () => {
+    expect(secretsPill([{ name: 'A' }, { name: 'B', optional: true }], [])).toEqual({ text: '1 missing', bad: true })
+  })
+
+  it('says an unset optional secret is optional', () => {
+    expect(secretsPill([{ name: 'A' }, { name: 'WEBHOOK_URL', optional: true }], ['A'])).toEqual({ text: 'optional, not set', bad: false })
+  })
+
+  it('says all set when nothing is unset', () => {
+    expect(secretsPill([{ name: 'A' }], ['A'])).toEqual({ text: 'all set', bad: false })
   })
 })
