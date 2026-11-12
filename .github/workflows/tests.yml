@@ -73,6 +73,19 @@ jobs:
           sudo apt-get install -y python3-cryptography
           sudo python3 scripts/tests/server-updater-test.py
 
+  action-pins:
+    name: Pinned action shas
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .agents/tools/test_check_action_pins.py
+      - run: python3 .agents/tools/check-action-pins.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   studio:
     name: Studio tests
     runs-on: ubuntu-24.04
