@@ -182,8 +182,9 @@ const source = computed(() => {
     <section v-if="app.isPaused || canShare" class="card" aria-label="Pause" data-testid="pause-card">
       <div class="row">
         <span v-if="app.isPaused"><span class="pill pill--bad">Paused</span> <span class="hint">· stopped, its schedules are off and its address shows a paused page</span></span>
+        <span v-else-if="app.actionsOnly" class="hint" data-testid="pause-hint">Changes to settings and secrets apply on the next run. Pause turns its schedules off; its data, secrets, settings and address are kept.</span>
         <span v-else class="hint">Restart loads changed settings and secrets. Pause stops the app and its schedules; its data, secrets, settings and address are kept.</span>
-        <AppRestartButton v-if="canShare && !app.isPaused" :app-id="app.id" />
+        <AppRestartButton v-if="canShare && !app.isPaused && !app.actionsOnly" :app-id="app.id" />
         <Button
           v-if="canShare"
           :label="app.isPaused ? 'Resume' : 'Pause'"

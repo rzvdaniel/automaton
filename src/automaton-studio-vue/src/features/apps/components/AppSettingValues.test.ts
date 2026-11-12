@@ -15,12 +15,24 @@ const declared = [
   { name: 'CHECK_INTERVAL_SECONDS', description: 'How often', default: '30' },
   { name: 'SITE', required: true },
 ]
-const mountSettings = () => mount(AppSettingValues, {
-  props: { appId: 'app-1', app: { id: 'app-1', isPaused: false } as App, declared },
+const mountSettings = (extra: Partial<App> = {}) => mount(AppSettingValues, {
+  props: { appId: 'app-1', app: { id: 'app-1', isPaused: false, ...extra } as App, declared },
   global: { plugins: [PrimeVue, ToastService] },
 })
 
 describe('AppSettingValues', () => {
+  it('offers no restart for an Actions-only app and says changes apply on the next run', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([{ name: 'SITE', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' }])
+    vi.mocked(appsService.deleteSecret).mockResolvedValue()
+    const wrapper = mountSettings({ actionsOnly: true })
+    await flushPromises()
+    await wrapper.find('[aria-label="Use the default for SITE"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="restart-app"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="settings-restart-hint"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="settings-note"]').text()).toContain('Changes apply on the next run.')
+  })
+
   it('lists every declared setting with its default, even when nothing was saved', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
     const wrapper = mountSettings()

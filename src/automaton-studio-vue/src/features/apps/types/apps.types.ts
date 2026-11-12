@@ -50,6 +50,8 @@ export interface App {
   isPublished: boolean
   /** Stopped on purpose: schedules off, address shows a paused page. */
   isPaused?: boolean
+  /** No web runtime or static site: the app only has Actions (nothing to restart). */
+  actionsOnly?: boolean
   canLaunchPublicly?: boolean
   isForkable: boolean
   publicUrl?: string

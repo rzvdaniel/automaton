@@ -15,6 +15,8 @@ public class AppModel
     public bool IsPublished { get; set; }
     /// <summary>Read-only here: change it with POST /api/apps/{id}/pause and /resume.</summary>
     public bool IsPaused { get; set; }
+    /// <summary>The app has no web runtime or static site: it only has Actions (no container to restart).</summary>
+    public bool ActionsOnly { get; set; }
     [JsonRequired]
     public bool IsForkable { get; set; }
     public string? PublicUrl { get; set; }

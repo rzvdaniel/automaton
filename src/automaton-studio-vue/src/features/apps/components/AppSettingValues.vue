@@ -75,10 +75,11 @@ async function useDefault(name: string) {
   <section class="card" aria-labelledby="settings-title" data-testid="settings-card">
     <div class="card-head">
       <h2 id="settings-title">Settings</h2>
-      <AppRestartButton v-if="!app.isPaused" :app-id="appId" />
+      <AppRestartButton v-if="!app.isPaused && !app.actionsOnly" :app-id="appId" />
     </div>
-    <p class="hint">Plain values the app reads as environment variables. A change applies when the app restarts.</p>
-    <p v-if="changed && !app.isPaused" class="hint" data-testid="settings-restart-hint">Changed. Restart the app to apply it.</p>
+    <p v-if="app.actionsOnly" class="hint" data-testid="settings-note">Plain values the app reads as environment variables. Changes apply on the next run.</p>
+    <p v-else class="hint" data-testid="settings-note">Plain values the app reads as environment variables. A change applies when the app restarts.</p>
+    <p v-if="changed && !app.isPaused && !app.actionsOnly" class="hint" data-testid="settings-restart-hint">Changed. Restart the app to apply it.</p>
     <div v-for="item in rows" :key="item.name" class="row" data-testid="setting-row">
       <span>
         <code>{{ item.name }}</code>
