@@ -1,0 +1,12 @@
+{
+  "marginPercent": 10,
+  "comment": "Image sizes in bytes as `docker image inspect` reports them on the GitHub Actions runner after #1058 (smaller than `docker images` on a Docker host, which counts unpacked layers differently). scripts/check-image-sizes.py fails the Build workflow when an image is more than marginPercent above its baseline. To accept a deliberate increase, or to record a shrink, edit the number in the same pull request and say why.",
+  "images": {
+    "server": 289200000,
+    "worker": 218400000,
+    "studio": 16100000,
+    "store": 12900000,
+    "website": 17400000,
+    "runner": 372000000
+  }
+}
