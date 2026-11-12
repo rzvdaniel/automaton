@@ -484,6 +484,12 @@ export interface AppPermissionsResponse {
   approvalUrl?: string | null
 }
 
+export interface AppSettingValue {
+  name: string
+  value: string
+  updatedAtUtc: string
+}
+
 export interface AppSecretSummary {
   name: string
   version: number

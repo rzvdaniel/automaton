@@ -5,28 +5,28 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { appsService } from '../services/apps.service'
-import type { App, AppSecretSummary, ApplicationSettingDeclaration } from '../types/apps.types'
+import type { App, AppSecretSummary, AppSettingValue, ApplicationSettingDeclaration } from '../types/apps.types'
 import { formatWhen } from '../utils/app-overview'
 import AppRestartButton from './AppRestartButton.vue'
 
 const props = defineProps<{ appId: string; app: App; declared: ApplicationSettingDeclaration[] }>()
-/** Settings are saved like secrets; a saved value replaces the declared default. */
+/** Values saved as settings can be shown again; `saved` lists older overrides stored as secrets, which cannot. */
 const saved = ref<AppSecretSummary[]>([])
-const values = ref<Record<string, string>>({})
+const values = ref<AppSettingValue[]>([])
 const editing = ref<string | null>(null)
 const value = ref('')
 const saving = ref(false)
 const error = ref<string | null>(null)
 const changed = ref(false)
 
-const rows = computed(() => props.declared.map((item) => ({ ...item, custom: saved.value.find((secret) => secret.name === item.name) })))
+const rows = computed(() => props.declared.map((item) => ({ ...item, current: values.value.find((setting) => setting.name === item.name), earlier: saved.value.find((secret) => secret.name === item.name) })))
 
 onMounted(load)
 watch(() => props.appId, load)
 
 async function load() {
   try {
-    const [secrets, current] = await Promise.all([appsService.listSecrets(props.appId), appsService.getSettingValues(props.appId)])
+    const [secrets, current] = await Promise.all([appsService.listSecrets(props.appId), appsService.listSettingValues(props.appId)])
     saved.value = secrets
     values.value = current
   } catch {
@@ -36,7 +36,7 @@ async function load() {
 
 function edit(name: string) {
   editing.value = name
-  value.value = values.value[name] ?? rows.value.find((row) => row.name === name)?.default ?? ''
+  value.value = values.value.find((setting) => setting.name === name)?.value ?? rows.value.find((row) => row.name === name)?.default ?? ''
   error.value = null
 }
 
@@ -52,7 +52,7 @@ async function save() {
   }
   saving.value = true
   try {
-    await appsService.setSecret(props.appId, editing.value, value.value.trim())
+    await appsService.setSettingValue(props.appId, editing.value, value.value.trim())
     editing.value = null
     changed.value = true
     await load()
@@ -65,7 +65,7 @@ async function save() {
 
 async function useDefault(name: string) {
   try {
-    await appsService.deleteSecret(props.appId, name)
+    await appsService.deleteSettingValue(props.appId, name)
     changed.value = true
     await load()
   } catch (failure) {
@@ -87,18 +87,16 @@ async function useDefault(name: string) {
         <code>{{ item.name }}</code>
         <span v-if="item.required" class="hint"> (required)</span><br>
         <span class="hint">
-          <template v-if="item.custom">
-            <template v-if="values[item.name] !== undefined"><code data-testid="setting-current">{{ values[item.name] }}</code> (custom, set {{ formatWhen(item.custom.updatedAtUtc) }})</template>
-            <template v-else>custom value set {{ formatWhen(item.custom.updatedAtUtc) }}</template>
-          </template>
+          <template v-if="item.current"><code data-testid="setting-current">{{ item.current.value }}</code> (custom, set {{ formatWhen(item.current.updatedAtUtc) }})</template>
+          <template v-else-if="item.earlier">set earlier, save again to show the value</template>
           <template v-else-if="item.default">default: <code>{{ item.default }}</code></template>
           <template v-else>not set</template>
           <template v-if="item.description"> · {{ item.description }}</template>
         </span>
       </span>
       <span class="hint">
-        <button type="button" class="link" :aria-label="`Set ${item.name}`" @click="edit(item.name)">{{ item.custom ? 'replace' : 'set' }}</button>
-        <template v-if="item.custom"> · <button type="button" class="link" :aria-label="`Use the default for ${item.name}`" @click="useDefault(item.name)">use default</button></template>
+        <button type="button" class="link" :aria-label="`Set ${item.name}`" @click="edit(item.name)">{{ item.current || item.earlier ? 'replace' : 'set' }}</button>
+        <template v-if="item.current || item.earlier"> · <button type="button" class="link" :aria-label="`Use the default for ${item.name}`" @click="useDefault(item.name)">use default</button></template>
       </span>
     </div>
     <form v-if="editing" class="add" @submit.prevent="save">

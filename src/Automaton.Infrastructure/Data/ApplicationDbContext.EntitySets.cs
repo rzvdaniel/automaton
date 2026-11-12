@@ -51,6 +51,7 @@ public partial class ApplicationDbContext
     public virtual DbSet<ActionScheduleOccurrence> ActionScheduleOccurrences { get; set; }
     public virtual DbSet<SecretDefinition> SecretDefinitions { get; set; }
     public virtual DbSet<AppPermissionApproval> AppPermissionApprovals { get; set; }
+    public virtual DbSet<AppSettingValue> AppSettingValues { get; set; }
     public virtual DbSet<SecretVersion> SecretVersions { get; set; }
     public virtual DbSet<ExecutionSecretGrant> ExecutionSecretGrants { get; set; }
     public virtual DbSet<Setting> Settings { get; set; }

@@ -49,6 +49,10 @@ namespace Automaton.Api.Data
                 .HasOne<WebApp>().WithMany().HasForeignKey(approval => approval.AppId).OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<AppPermissionApproval>()
                 .Property(approval => approval.Status).HasDefaultValue(AppPermissionStatuses.Pending);
+            modelBuilder.Entity<AppSettingValue>()
+                .HasIndex(setting => new { setting.AppId, setting.Name }).IsUnique();
+            modelBuilder.Entity<AppSettingValue>()
+                .HasOne<WebApp>().WithMany().HasForeignKey(setting => setting.AppId).OnDelete(DeleteBehavior.Cascade);
             if (Database.IsNpgsql()) PostgreSqlModelConfiguration.Apply(modelBuilder);
         }
 
