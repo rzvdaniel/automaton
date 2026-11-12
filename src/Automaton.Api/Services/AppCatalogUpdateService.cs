@@ -39,6 +39,7 @@ public sealed class AppCatalogUpdateService(
     AppFileStorageService fileStorageService,
     AppCatalogService catalog,
     AppCatalogInstallService installer,
+    AppCatalogBackfillService backfill,
     StoredSourceDeploymentService deployment,
     Services.Interfaces.IAuditEventService auditEventService,
     IMemoryCache cache)
@@ -143,6 +144,8 @@ public sealed class AppCatalogUpdateService(
         var info = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken) ?? throw new KeyNotFoundException("App not found.");
         var ownerId = info.OwnerId ?? userId;
         var app = await dbContext.WebApps.AsNoTracking().FirstAsync(x => x.Id == appId, cancellationToken);
+        if (await authorizationService.CanUpdateAppAsync(appId, userId, cancellationToken) && await backfill.TryLinkAsync(appId, ownerId, cancellationToken))
+            app = await dbContext.WebApps.AsNoTracking().FirstAsync(x => x.Id == appId, cancellationToken);
         var valid = app.InstalledFromRepo is { Length: > 0 } && app.InstalledFromCommit is { Length: > 0 }
             && AppCatalogInstallService.IsValidSource(app.InstalledFromRepo, (app.InstalledFromFolder ?? "").Trim('/'), app.InstalledFromCommit);
         return (app, ownerId, valid ? new GitAppSource(app.InstalledFromRepo!, (app.InstalledFromFolder ?? "").Trim('/'), app.InstalledFromCommit!) : null);
