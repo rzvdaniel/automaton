@@ -54,6 +54,22 @@ public sealed class AppSecretService(
             .ToListAsync(token);
     }
 
+    /// <summary>
+    /// Current custom values of the settings the app declares in its contract, for people who can update the app.
+    /// Settings are stored like app secrets, so only declared setting names are ever read back; declared
+    /// secrets and undeclared names are never returned.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, string>> SettingValuesAsync(Guid appId, Guid userId, CancellationToken token)
+    {
+        await EnsureCanUpdateAppAsync(appId, userId, token);
+        var contract = await ContractAsync(appId, token);
+        var secretNames = (contract.Secrets ?? []).Select(secret => secret.Name).ToHashSet(StringComparer.Ordinal);
+        var names = (contract.Settings ?? []).Select(setting => setting.Name).Where(name => !secretNames.Contains(name)).ToHashSet(StringComparer.Ordinal);
+        if (names.Count == 0) return new Dictionary<string, string>();
+        var current = await CurrentAsync(new SecretOwner(SecretOwnerTypes.App, appId), names, token);
+        return current.ToDictionary(secret => secret.Name, secret => protector.Unprotect(secret.ProtectedValue), StringComparer.Ordinal);
+    }
+
     public Task<AppSecretSummary> SetAsync(Guid appId, Guid userId, string name, string value, CancellationToken token)
         => SetAsync(appId, userId, AppSecretScopes.App, name, value, null, token);
 

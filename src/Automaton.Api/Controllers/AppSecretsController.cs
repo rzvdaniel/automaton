@@ -23,6 +23,11 @@ public sealed class AppSecretsController(AppSecretService secrets, UserContextSe
     public async Task<IActionResult> List(Guid appId, [FromQuery] string scope = AppSecretScopes.App, CancellationToken token = default)
         => await Run(async () => Ok(await secrets.ListAsync(appId, users.GetUserId(), scope, token)));
 
+    /// <summary>Current custom values of the app's declared plain settings (never secrets), for people who can edit the app.</summary>
+    [HttpGet("setting-values")]
+    public async Task<IActionResult> SettingValues(Guid appId, CancellationToken token)
+        => await Run(async () => Ok(await secrets.SettingValuesAsync(appId, users.GetUserId(), token)));
+
     [HttpPut("{name}")]
     public async Task<IActionResult> Set(Guid appId, string name, [FromBody] SetAppSecretRequest request,
         [FromQuery] string scope = AppSecretScopes.App, CancellationToken token = default)

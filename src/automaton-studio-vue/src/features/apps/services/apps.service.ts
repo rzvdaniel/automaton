@@ -147,6 +147,12 @@ class AppsService {
     return data
   }
 
+  /** Current custom values of the app's declared plain settings (never secrets). */
+  async getSettingValues(appId: string): Promise<Record<string, string>> {
+    const { data } = await apiClient.get<Record<string, string>>(`/api/apps/${appId}/secrets/setting-values`)
+    return data
+  }
+
   async setSecret(appId: string, name: string, value: string): Promise<void> {
     await apiClient.put(`/api/apps/${appId}/secrets/${encodeURIComponent(name)}`, { value })
   }

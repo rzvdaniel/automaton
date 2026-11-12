@@ -12,6 +12,7 @@ import AppRestartButton from './AppRestartButton.vue'
 const props = defineProps<{ appId: string; app: App; declared: ApplicationSettingDeclaration[] }>()
 /** Settings are saved like secrets; a saved value replaces the declared default. */
 const saved = ref<AppSecretSummary[]>([])
+const values = ref<Record<string, string>>({})
 const editing = ref<string | null>(null)
 const value = ref('')
 const saving = ref(false)
@@ -25,7 +26,9 @@ watch(() => props.appId, load)
 
 async function load() {
   try {
-    saved.value = await appsService.listSecrets(props.appId)
+    const [secrets, current] = await Promise.all([appsService.listSecrets(props.appId), appsService.getSettingValues(props.appId)])
+    saved.value = secrets
+    values.value = current
   } catch {
     error.value = 'Settings could not be loaded.'
   }
@@ -33,7 +36,7 @@ async function load() {
 
 function edit(name: string) {
   editing.value = name
-  value.value = ''
+  value.value = values.value[name] ?? rows.value.find((row) => row.name === name)?.default ?? ''
   error.value = null
 }
 
@@ -84,7 +87,10 @@ async function useDefault(name: string) {
         <code>{{ item.name }}</code>
         <span v-if="item.required" class="hint"> (required)</span><br>
         <span class="hint">
-          <template v-if="item.custom">custom value set {{ formatWhen(item.custom.updatedAtUtc) }}</template>
+          <template v-if="item.custom">
+            <template v-if="values[item.name] !== undefined"><code data-testid="setting-current">{{ values[item.name] }}</code> (custom, set {{ formatWhen(item.custom.updatedAtUtc) }})</template>
+            <template v-else>custom value set {{ formatWhen(item.custom.updatedAtUtc) }}</template>
+          </template>
           <template v-else-if="item.default">default: <code>{{ item.default }}</code></template>
           <template v-else>not set</template>
           <template v-if="item.description"> · {{ item.description }}</template>

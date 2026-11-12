@@ -28,6 +28,23 @@ public sealed class AppSecretServiceTests
         Assert.That(await db.SecretVersions.AnyAsync(version => version.ProtectedValue.Contains("second")), Is.False);
     }
 
+    [Test]
+    public async Task DeclaredSettingValuesAreReturnedButSecretsAndUndeclaredNamesAreNot()
+    {
+        var (service, db, appId, ownerId) = Create();
+        var app = await db.WebApps.SingleAsync(app => app.Id == appId);
+        app.ApplicationContractJson = """{"settings":[{"name":"S3_ENDPOINT"}],"secrets":[{"name":"S3_SECRET_KEY"}]}""";
+        await db.SaveChangesAsync();
+        await service.SetAsync(appId, ownerId, "S3_ENDPOINT", "https://r2.example", CancellationToken.None);
+        await service.SetAsync(appId, ownerId, "S3_SECRET_KEY", "hunter2", CancellationToken.None);
+        await service.SetAsync(appId, ownerId, "OTHER", "x", CancellationToken.None);
+
+        var values = await service.SettingValuesAsync(appId, ownerId, CancellationToken.None);
+
+        Assert.That(values, Is.EqualTo(new Dictionary<string, string> { ["S3_ENDPOINT"] = "https://r2.example" }));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SettingValuesAsync(appId, Guid.NewGuid(), CancellationToken.None));
+    }
+
     [TestCase("lowercase")]
     [TestCase("1STARTS_WITH_DIGIT")]
     [TestCase("AUTOMATON_APP_ID")]
