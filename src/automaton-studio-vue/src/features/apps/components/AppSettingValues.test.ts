@@ -8,7 +8,7 @@ import { appsService } from '../services/apps.service'
 import type { App } from '../types/apps.types'
 
 vi.mock('../services/apps.service', () => ({
-  appsService: { listSecrets: vi.fn(), setSecret: vi.fn(), deleteSecret: vi.fn(), restart: vi.fn() },
+  appsService: { listSecrets: vi.fn(), listSettingValues: vi.fn().mockResolvedValue([]), setSettingValue: vi.fn(), deleteSettingValue: vi.fn(), restart: vi.fn() },
 }))
 
 const declared = [
@@ -44,19 +44,53 @@ describe('AppSettingValues', () => {
     expect(text).toContain('not set')
   })
 
-  it('shows a saved value as custom, resets it to the default, and offers a restart', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([{ name: 'CHECK_INTERVAL_SECONDS', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' }])
-    vi.mocked(appsService.deleteSecret).mockResolvedValue()
+  it('shows the current custom value, prefills the replace box, and resets to the default', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([])
+    vi.mocked(appsService.listSettingValues).mockResolvedValue([{ name: 'CHECK_INTERVAL_SECONDS', value: '45', updatedAtUtc: '2026-11-01T03:00:00Z' }])
+    vi.mocked(appsService.deleteSettingValue).mockResolvedValue()
     const wrapper = mountSettings()
     await flushPromises()
-    expect(wrapper.text()).toContain('custom value set')
+    expect(wrapper.find('[data-testid="setting-current"]').text()).toBe('45')
+
+    await wrapper.find('[aria-label="Set CHECK_INTERVAL_SECONDS"]').trigger('click')
+    expect((wrapper.find('#setting-value').element as HTMLInputElement).value).toBe('45')
 
     await wrapper.find('[aria-label="Use the default for CHECK_INTERVAL_SECONDS"]').trigger('click')
     await flushPromises()
-
-    expect(appsService.deleteSecret).toHaveBeenCalledWith('app-1', 'CHECK_INTERVAL_SECONDS')
+    expect(appsService.deleteSettingValue).toHaveBeenCalledWith('app-1', 'CHECK_INTERVAL_SECONDS')
     expect(wrapper.find('[data-testid="settings-restart-hint"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="restart-app"]').exists()).toBe(true)
+  })
+
+  it('saves through the settings endpoint', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([])
+    vi.mocked(appsService.listSettingValues).mockResolvedValue([])
+    vi.mocked(appsService.setSettingValue).mockResolvedValue()
+    const wrapper = mountSettings()
+    await flushPromises()
+    await wrapper.find('[aria-label="Set SITE"]').trigger('click')
+    await wrapper.find('#setting-value').setValue('example.org')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(appsService.setSettingValue).toHaveBeenCalledWith('app-1', 'SITE', 'example.org')
+  })
+
+  it('says a value set earlier must be saved again to show it', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([{ name: 'CHECK_INTERVAL_SECONDS', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' }])
+    vi.mocked(appsService.listSettingValues).mockResolvedValue([])
+    const wrapper = mountSettings()
+    await flushPromises()
+    expect(wrapper.text()).toContain('set earlier, save again to show the value')
+    expect(wrapper.find('[data-testid="setting-current"]').exists()).toBe(false)
+  })
+
+  it('prefills the default when no custom value is set', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([])
+    vi.mocked(appsService.listSettingValues).mockResolvedValue([])
+    const wrapper = mountSettings()
+    await flushPromises()
+    await wrapper.find('[aria-label="Set CHECK_INTERVAL_SECONDS"]').trigger('click')
+    expect((wrapper.find('#setting-value').element as HTMLInputElement).value).toBe('30')
   })
 
   it('restarts the app from the card', async () => {

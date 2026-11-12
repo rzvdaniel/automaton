@@ -1035,6 +1035,38 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("AppPermissionApprovals");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppSettingValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("AppSettingValues");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AppShare", b =>
                 {
                     b.Property<Guid>("WebAppId")
@@ -4236,6 +4268,15 @@ namespace Automaton.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AppPermissionApproval", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppSettingValue", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.WebApp", null)
                         .WithMany()

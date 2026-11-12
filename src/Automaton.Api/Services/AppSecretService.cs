@@ -198,10 +198,7 @@ public sealed class AppSecretService(
             delivered.Add(new(AppPermissionApproval.CredentialVariable, "permission", null, credential.Permission));
         }
         var contract = await ContractAsync(appId, token);
-        // Settings are saved like app secrets; a declared default applies until the installer sets a value.
-        foreach (var setting in contract.Settings ?? [])
-            if (setting.Default is { Length: > 0 } fallback && !values.ContainsKey(setting.Name))
-                values[setting.Name] = fallback;
+        await ApplySettingsAsync(appId, contract, values, delivered, token);
         // Lets an app keep per-install data apart (for example a storage prefix); AUTOMATON_ names cannot be declared.
         values["AUTOMATON_APP_ID"] = appId.ToString();
         var plain = (contract.Settings ?? []).Select(setting => setting.Name).Append("AUTOMATON_APP_ID").ToList();
@@ -214,6 +211,27 @@ public sealed class AppSecretService(
         var wanted = (contract.Secrets ?? []).Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
         if (wanted.Count > 0) await AddVaultSecretsAsync(vaults, wanted, values, delivered, token);
         return (values, delivered, plain);
+    }
+
+    /// <summary>
+    /// A value saved in the settings table wins over an older override in the secret store, which wins over the
+    /// declared default. Names declared as secrets are never taken from the settings table.
+    /// </summary>
+    private async Task ApplySettingsAsync(Guid appId, ApplicationContract contract, Dictionary<string, string> values,
+        List<SecretDelivery> delivered, CancellationToken token)
+    {
+        var declaredSecrets = (contract.Secrets ?? []).Select(secret => secret.Name).ToHashSet(StringComparer.Ordinal);
+        var settingNames = (contract.Settings ?? []).Select(setting => setting.Name).Where(name => !declaredSecrets.Contains(name)).ToList();
+        var chosen = await db.AppSettingValues.Where(setting => setting.AppId == appId && settingNames.Contains(setting.Name))
+            .Select(setting => new { setting.Name, setting.Value }).ToListAsync(token);
+        foreach (var setting in chosen)
+        {
+            values[setting.Name] = setting.Value;
+            delivered.RemoveAll(entry => entry.Name == setting.Name && entry.Scope == AppSecretScopes.App);
+        }
+        foreach (var setting in contract.Settings ?? [])
+            if (setting.Default is { Length: > 0 } fallback && !values.ContainsKey(setting.Name))
+                values[setting.Name] = fallback;
     }
 
     private async Task AddVaultSecretsAsync(AppVaults vaults, List<ApplicationSecretDeclaration> wanted,
@@ -348,7 +366,7 @@ public sealed class AppSecretService(
         return current.Select(secret => new CurrentSecret(secret.Name, secret.ProtectedValue, secret.Version)).ToList();
     }
 
-    private async Task<ApplicationContract> ContractAsync(Guid appId, CancellationToken token)
+    internal async Task<ApplicationContract> ContractAsync(Guid appId, CancellationToken token)
     {
         var json = await db.WebApps.Where(app => app.Id == appId).Select(app => app.ApplicationContractJson).SingleOrDefaultAsync(token);
         if (string.IsNullOrWhiteSpace(json)) return new();

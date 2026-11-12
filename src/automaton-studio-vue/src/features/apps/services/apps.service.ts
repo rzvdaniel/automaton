@@ -14,6 +14,7 @@ import type {
   DeploymentOperation,
   AppPermissionsResponse,
   AppSecretSummary,
+  AppSettingValue,
   SecretAuditEntry,
   AppDeploymentTarget,
   App,
@@ -145,6 +146,21 @@ class AppsService {
   async listSecrets(appId: string): Promise<AppSecretSummary[]> {
     const { data } = await apiClient.get<AppSecretSummary[]>(`/api/apps/${appId}/secrets`)
     return data
+  }
+
+  /** Values saved as settings, which can be shown again. Declared secrets never appear. */
+  async listSettingValues(appId: string): Promise<AppSettingValue[]> {
+    const { data } = await apiClient.get<AppSettingValue[]>(`/api/apps/${appId}/setting-values`)
+    return data
+  }
+
+  async setSettingValue(appId: string, name: string, value: string): Promise<void> {
+    await apiClient.put(`/api/apps/${appId}/setting-values/${encodeURIComponent(name)}`, { value })
+  }
+
+  /** Back to the declared default; also removes an older override stored as a secret. */
+  async deleteSettingValue(appId: string, name: string): Promise<void> {
+    await apiClient.delete(`/api/apps/${appId}/setting-values/${encodeURIComponent(name)}`)
   }
 
   async setSecret(appId: string, name: string, value: string): Promise<void> {
