@@ -226,9 +226,7 @@ export interface UiToolExecutionFeedback {
 
 export const ChatResourceType = {
   General: 'General',
-  CustomStep: 'CustomStep',
   WebApp: 'WebApp',
-  Flow: 'Flow',
 } as const
 
 export type ChatResourceType = typeof ChatResourceType[keyof typeof ChatResourceType]

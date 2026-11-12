@@ -65,18 +65,3 @@ public sealed record PauseResumeAppRuntimeResult(Guid AppId, Guid DeploymentTarg
 
 /// <summary><c>Restarted</c> is false when the target had no running runtime that takes secrets.</summary>
 public sealed record RestartAppRuntimeResult(Guid AppId, Guid DeploymentTargetId, bool Restarted);
-
-public sealed record ApplicationManagedArtifactFile(
-    string RelativePath,
-    byte[] Content);
-
-public sealed record SynchronizeApplicationManagedArtifactsRequest(
-    Guid AppId,
-    Guid DeploymentTargetId,
-    IReadOnlyList<ApplicationManagedArtifactFile> Files);
-
-public sealed record SynchronizeApplicationManagedArtifactsResult(
-    Guid AppId,
-    Guid DeploymentTargetId,
-    bool Success,
-    string? Error = null);

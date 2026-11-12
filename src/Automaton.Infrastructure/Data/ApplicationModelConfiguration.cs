@@ -16,9 +16,7 @@ internal static class ApplicationModelConfiguration
         ConfigureAppShare(modelBuilder);
         ConfigureWebAppStar(modelBuilder);
         ConfigureWebAppScreenshot(modelBuilder);
-        ConfigureWebAppStep(modelBuilder);
         ConfigureAppVersion(modelBuilder);
-        ConfigureAppVersionStep(modelBuilder);
         ConfigureRefreshToken(modelBuilder);
         ConfigureRecentActivity(modelBuilder);
     }
@@ -93,33 +91,6 @@ internal static class ApplicationModelConfiguration
             });
     }
 
-    private static void ConfigureWebAppStep(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<WebAppStep>(entity =>
-            {
-                entity.HasKey(e => new { e.WebAppId, e.CustomStepId });
-                entity.Property(e => e.LinkedAt).IsRequired();
-
-                entity.HasIndex(e => e.WebAppId);
-                entity.HasIndex(e => e.CustomStepId);
-
-                entity.HasOne(e => e.WebApp)
-                    .WithMany()
-                    .HasForeignKey(e => e.WebAppId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.CustomStep)
-                    .WithMany()
-                    .HasForeignKey(e => e.CustomStepId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.LinkedByUser)
-                    .WithMany()
-                    .HasForeignKey(e => e.LinkedBy)
-                    .OnDelete(DeleteBehavior.Restrict);
-            });
-    }
-
     private static void ConfigureAppVersion(ModelBuilder modelBuilder)
     {
             modelBuilder.Entity<AppVersion>(entity =>
@@ -151,34 +122,6 @@ internal static class ApplicationModelConfiguration
                     .WithMany()
                     .HasForeignKey(e => e.CreatedBy)
                     .OnDelete(DeleteBehavior.Restrict);
-            });
-    }
-
-    private static void ConfigureAppVersionStep(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<AppVersionStep>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.AppVersionId).IsRequired();
-                entity.Property(e => e.StepId).IsRequired();
-                entity.Property(e => e.StepName).IsRequired().HasMaxLength(200);
-                entity.Property(e => e.Action).IsRequired();
-                entity.Property(e => e.Description).HasMaxLength(2000);
-                entity.Property(e => e.CodeSnapshot).IsRequired();
-                entity.Property(e => e.VariablesSnapshot).IsRequired().HasColumnType("jsonb");
-
-                entity.HasIndex(e => e.AppVersionId);
-                entity.HasIndex(e => e.StepId);
-
-                entity.HasOne(e => e.AppVersion)
-                    .WithMany(p => p.Steps)
-                    .HasForeignKey(e => e.AppVersionId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.Step)
-                    .WithMany()
-                    .HasForeignKey(e => e.StepId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
     }
 

@@ -23,7 +23,6 @@ internal static class RunnerStorageModelConfiguration
         ConfigureHostedRunnerSpecificationRevision(modelBuilder);
         ConfigureHostedRunnerPlatformSettings(modelBuilder);
         ConfigureHostedRunnerDeployment(modelBuilder);
-        ConfigureSchedule(modelBuilder);
     }
 
     private static void ConfigureExecutionSecretGrant(ModelBuilder modelBuilder)
@@ -263,11 +262,4 @@ internal static class RunnerStorageModelConfiguration
             });
     }
 
-    private static void ConfigureSchedule(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<Schedule>(entity =>
-            {
-                entity.HasKey(e => new { e.Id });
-            });
-    }
 }

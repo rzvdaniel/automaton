@@ -80,7 +80,6 @@ public class ProjectService
             .Include(p => p.Organization)
             .Include(p => p.Members)
             .Include(p => p.ProjectApps)
-            .Include(p => p.ProjectFlows)
             .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
         if (project == null)
@@ -106,7 +105,6 @@ public class ProjectService
             IsActive = project.IsActive,
             MemberCount = project.Members.Count(m => m.IsActive),
             AppCount = project.ProjectApps.Count,
-            FlowCount = project.ProjectFlows.Count,
             CurrentUserRole = userRole ?? ProjectRole.Viewer
         };
     }
@@ -202,7 +200,6 @@ public class ProjectService
             IsActive = project.IsActive,
             MemberCount = 1,
             AppCount = 0,
-            FlowCount = 0,
             CurrentUserRole = ProjectRole.ProjectAdmin
         };
     }
@@ -223,7 +220,6 @@ public class ProjectService
             .Include(p => p.Owner)
             .Include(p => p.Members)
             .Include(p => p.ProjectApps)
-            .Include(p => p.ProjectFlows)
             .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
         if (project == null)
@@ -270,7 +266,6 @@ public class ProjectService
             IsActive = project.IsActive,
             MemberCount = project.Members.Count(m => m.IsActive),
             AppCount = project.ProjectApps.Count,
-            FlowCount = project.ProjectFlows.Count,
             CurrentUserRole = userRole ?? ProjectRole.Viewer
         };
     }

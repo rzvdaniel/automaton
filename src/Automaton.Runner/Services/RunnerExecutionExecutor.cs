@@ -13,9 +13,6 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
     {
         using var scope = services.CreateScope();
         EnsureSinglePayload(request);
-        if (request.ManagedArtifacts is not null)
-            return new ManagedApplicationArtifactExecutor(scope.ServiceProvider.GetRequiredService<RunnerWorkspaceService>())
-                .Execute(request.ManagedArtifacts, token);
         if (request.HostContainer is not null)
         {
             var started = DateTime.UtcNow;
@@ -43,7 +40,7 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
 
     private static void EnsureSinglePayload(RunnerExecutionRequest request)
     {
-        var count = (request.Action is not null ? 1 : 0) + (request.ManagedArtifacts is not null ? 1 : 0)
+        var count = (request.Action is not null ? 1 : 0)
             + (request.FileTransfer is not null ? 1 : 0) + (request.HostContainer is not null ? 1 : 0);
         if (count != 1) throw new InvalidDataException("Exactly one Runner execution payload is required.");
     }

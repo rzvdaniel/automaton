@@ -580,7 +580,6 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<HostContainerExecutionOperationService>();
         services.AddScoped<HostContainerRelayService>();
         services.AddScoped<HostContainerRelayStateResolver>();
-        services.AddScoped<IManagedApplicationArtifactCommands, ManagedApplicationArtifactGateway>();
         services.AddScoped<DeploymentOperationService>();
         services.AddScoped<StoredSourceDeploymentService>();
         services.AddSingleton<DeploymentOperationDispatcher>();
@@ -693,14 +692,12 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerDeletionPolicy>();
         services.AddScoped<RunnerConnectionSessionService>();
         services.AddScoped<RunnerQueryService>();
-        services.AddScoped<RunnerExecutionAdmissionService>();
         services.AddScoped<RunnerExecutionIdentityService>();
         services.AddScoped<RunnerExecutionRevocationService>();
         services.AddScoped<RunnerExecutionOperationService>();
         services.AddScoped<RunnerExecutionArtifactService>();
         services.AddScoped<RunnerFileTransferGateway>();
         services.AddScoped<IRunnerFileTransferGateway>(provider => provider.GetRequiredService<RunnerFileTransferGateway>());
-        services.AddScoped<RunnerExecutionDispatchService>();
         services.AddScoped<RunnerExecutionCommandPublisher>();
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
         services.AddTransient<RunnerExecutionResultReadyCapSubscriber>();

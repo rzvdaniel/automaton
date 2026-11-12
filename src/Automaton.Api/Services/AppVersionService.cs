@@ -112,18 +112,7 @@ public class AppVersionService
         {
             var summaryParts = new List<string>();
 
-            // Get the previous version to track step changes
-            var prevVersionNumber = versionNumber - 1;
-            var currentVersion = await dataContext.AppVersions
-                .Include(v => v.Steps)
-                .FirstOrDefaultAsync(v => v.AppId == appId && v.VersionNumber == versionNumber);
-
-            var prevVersion = await dataContext.AppVersions
-                .Include(v => v.Steps)
-                .FirstOrDefaultAsync(v => v.AppId == appId && v.VersionNumber == prevVersionNumber);
-
             AppendFileChangeSummary(summaryParts, filesChangeSummary);
-            AppendStepChangeSummary(summaryParts, currentVersion?.Steps, prevVersion?.Steps);
 
             // Fallback if no changes detected
             if (!summaryParts.Any())
@@ -170,20 +159,6 @@ public class AppVersionService
         if (added > 0) summaryParts.Add($"{added} added");
         if (modified > 0) summaryParts.Add($"{modified} modified");
         if (deleted > 0) summaryParts.Add($"{deleted} removed");
-    }
-
-    private static void AppendStepChangeSummary(
-        List<string> summaryParts,
-        ICollection<AppVersionStep>? currentSteps,
-        ICollection<AppVersionStep>? previousSteps)
-    {
-        var current = currentSteps ?? Array.Empty<AppVersionStep>();
-        var previous = previousSteps ?? Array.Empty<AppVersionStep>();
-        var addedCount = current.Count(step => previous.All(previousStep => previousStep.StepId != step.StepId));
-        var removedCount = previous.Count(step => current.All(currentStep => currentStep.StepId != step.StepId));
-
-        if (addedCount > 0) summaryParts.Add($"{addedCount} step(s) added");
-        if (removedCount > 0) summaryParts.Add($"{removedCount} step(s) removed");
     }
 
     /// <summary>

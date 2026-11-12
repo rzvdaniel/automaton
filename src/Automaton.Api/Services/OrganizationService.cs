@@ -792,7 +792,6 @@ public class OrganizationService : IOrganizationService
             .Include(p => p.Owner)
             .Include(p => p.Members)
             .Include(p => p.ProjectApps)
-            .Include(p => p.ProjectFlows)
             .OrderByDescending(p => p.Updated)
             .ToListAsync(cancellationToken);
 
@@ -812,7 +811,6 @@ public class OrganizationService : IOrganizationService
             IsActive = p.IsActive,
             MemberCount = p.Members.Count(m => m.IsActive),
             AppCount = p.ProjectApps.Count,
-            FlowCount = p.ProjectFlows.Count,
             CurrentUserRole = ProjectRole.Viewer
         });
 

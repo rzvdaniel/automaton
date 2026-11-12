@@ -42,7 +42,6 @@ public class ProjectDto
     public bool IsActive { get; set; }
     public int MemberCount { get; set; }
     public int AppCount { get; set; }
-    public int FlowCount { get; set; }
     public ProjectRole? CurrentUserRole { get; set; }
 }
 
@@ -124,19 +123,6 @@ public class ProjectAppDto
 }
 
 /// <summary>
-/// Response model for project flow
-/// </summary>
-public class ProjectFlowDto
-{
-    public Guid ProjectId { get; set; }
-    public Guid FlowId { get; set; }
-    public string FlowName { get; set; } = string.Empty;
-    public DateTime AddedAt { get; set; }
-    public Guid? AddedBy { get; set; }
-    public string AddedByName { get; set; } = string.Empty;
-}
-
-/// <summary>
 /// Response model for project runner
 /// </summary>
 public class ProjectRunnerDto
@@ -144,19 +130,6 @@ public class ProjectRunnerDto
     public Guid ProjectId { get; set; }
     public Guid RunnerId { get; set; }
     public string RunnerName { get; set; } = string.Empty;
-    public DateTime AddedAt { get; set; }
-    public Guid? AddedBy { get; set; }
-    public string AddedByName { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// Response model for project custom step
-/// </summary>
-public class ProjectCustomStepDto
-{
-    public Guid ProjectId { get; set; }
-    public Guid StepId { get; set; }
-    public string StepName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public Guid? AddedBy { get; set; }
     public string AddedByName { get; set; } = string.Empty;

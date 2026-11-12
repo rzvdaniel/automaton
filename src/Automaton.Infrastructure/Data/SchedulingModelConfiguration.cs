@@ -11,42 +11,9 @@ internal static class SchedulingModelConfiguration
 {
     public static void Apply(ModelBuilder modelBuilder)
     {
-        ConfigureScheduleUser(modelBuilder);
-        ConfigureCustomStep(modelBuilder);
-        ConfigureCustomStepUser(modelBuilder);
         ConfigureWebApp(modelBuilder);
         ConfigureAppDeploymentTarget(modelBuilder);
         ConfigureDeploymentOperation(modelBuilder);
-    }
-
-    private static void ConfigureScheduleUser(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<ScheduleUser>(entity =>
-            {
-                entity.HasKey(e => new { e.ScheduleId, e.UserId });
-                entity.HasIndex(e => e.ScheduleId, "IX_ScheduleUser_ScheduleId");
-                entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.ScheduleId).IsRequired();
-            });
-    }
-
-    private static void ConfigureCustomStep(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<CustomStep>(entity =>
-            {
-                entity.HasKey(e => new { e.Id });
-            });
-    }
-
-    private static void ConfigureCustomStepUser(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<CustomStepUser>(entity =>
-            {
-                entity.HasKey(e => new { e.CustomStepId, e.UserId });
-                entity.HasIndex(e => e.CustomStepId, "IX_CustomStepUser_CustomStepId");
-                entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.CustomStepId).IsRequired();
-            });
     }
 
     private static void ConfigureWebApp(ModelBuilder modelBuilder)

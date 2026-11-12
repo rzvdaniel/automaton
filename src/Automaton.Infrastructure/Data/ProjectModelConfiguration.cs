@@ -11,7 +11,6 @@ internal static class ProjectModelConfiguration
 {
     public static void Apply(ModelBuilder modelBuilder)
     {
-        ConfigureProjectCustomStep(modelBuilder);
         ConfigureProjectApiKey(modelBuilder);
         ConfigureProjectAiApiKey(modelBuilder);
         ConfigureInvitationToken(modelBuilder);
@@ -20,33 +19,6 @@ internal static class ProjectModelConfiguration
         ConfigureAiChatSessionUser(modelBuilder);
         ConfigureAiGuidanceDocument(modelBuilder);
         ConfigureUserSetting(modelBuilder);
-    }
-
-    private static void ConfigureProjectCustomStep(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<ProjectCustomStep>(entity =>
-            {
-                entity.HasKey(e => new { e.ProjectId, e.CustomStepId });
-                entity.Property(e => e.AddedAt).IsRequired();
-
-                entity.HasIndex(e => e.ProjectId);
-                entity.HasIndex(e => e.CustomStepId);
-
-                entity.HasOne(e => e.Project)
-                    .WithMany(p => p.ProjectCustomSteps)
-                    .HasForeignKey(e => e.ProjectId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.CustomStep)
-                    .WithMany()
-                    .HasForeignKey(e => e.CustomStepId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.AddedByUser)
-                    .WithMany()
-                    .HasForeignKey(e => e.AddedBy)
-                    .OnDelete(DeleteBehavior.Restrict);
-            });
     }
 
     private static void ConfigureProjectApiKey(ModelBuilder modelBuilder)
