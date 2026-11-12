@@ -186,7 +186,10 @@ public sealed partial class HostContainerExecutionService
             return inspection with { Logs = logs.Length <= MaximumLogCharacters ? logs : logs[^MaximumLogCharacters..] };
         }
         if (request.Operation == HostContainerOperationKinds.RemoveContainer)
+        {
+            await ReleaseImageAsync(inspection.Labels, cancellationToken);
             return new HostContainerExecutionResponse { Success = true, ContainerId = inspection.ContainerId };
+        }
         var postStart = await InspectOwnedContainerAsync(inspection.ContainerId, request.Scope, cancellationToken, discoverEndpoint: true);
         if (!postStart.Success || !postStart.Exists || !postStart.Running || !postStart.HostPort.HasValue)
             return Failure("container_start_endpoint", "The application container started without a valid running private endpoint.") with
@@ -199,6 +202,25 @@ public sealed partial class HostContainerExecutionService
             };
         return postStart;
     }
+
+    /// <summary>
+    /// A removed app container is either the previous version (the new one is healthy) or a failed candidate. Either way its
+    /// image is no longer needed: remove it, unless another container still uses it (Docker refuses then), and cap the build cache.
+    /// Best effort; a cleanup problem must not fail the deployment.
+    /// </summary>
+    private async Task ReleaseImageAsync(IReadOnlyDictionary<string, string>? labels, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (labels is not null && labels.TryGetValue("automaton.resolved-image", out var image)
+                && image.Contains("@sha256:", StringComparison.Ordinal) && !image.StartsWith('-'))
+                await executor(["docker", "rmi", image], RuntimeOperationTimeout, cancellationToken);
+            await executor(["docker", "builder", "prune", "--force", "--keep-storage", BuildCacheLimit], RuntimeOperationTimeout, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { }
+    }
+
+    internal const string BuildCacheLimit = "2GB";
 
     private async Task<HostContainerExecutionResponse> InspectOwnedContainerAsync(
         string reference, HostContainerScope scope, CancellationToken cancellationToken, bool discoverEndpoint)

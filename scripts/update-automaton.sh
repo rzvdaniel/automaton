@@ -116,9 +116,14 @@ fi
 # previous updater predates backups get them by running update.sh again. Failures only warn.
 ensure_backups() {
     local script
-    for script in backup.sh restore.sh; do
+    for script in backup.sh cleanup.sh restore.sh; do
         if [[ -f "$bundle/$script" ]]; then install -m 0700 "$bundle/$script" "$install_dir/$script"; fi
     done
+    # Nightly Docker and journal cleanup, after the backup. Failures only warn.
+    if [[ -f "$install_dir/cleanup.sh" ]]; then
+        bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --install-timer \
+            || echo "Warning: nightly cleanup could not be enabled. Run: sudo bash $install_dir/cleanup.sh --install-timer" >&2
+    fi
     [[ -f "$install_dir/backup.sh" ]] || return 0
     if bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer \
         && { [[ -s "$config_dir/secrets/backup-key" && -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then

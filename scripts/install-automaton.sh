@@ -261,7 +261,7 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py; do
+for script in backup.sh cleanup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
@@ -311,5 +311,9 @@ printf 'After the first administrator and Runner connect, Server Console, Websit
 if [[ -f "$install_dir/backup.sh" ]]; then
     bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && bash "$install_dir/backup.sh" --install-dir "$install_dir" \
         || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
+fi
+if [[ -f "$install_dir/cleanup.sh" ]]; then
+    bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --install-timer \
+        || echo "Warning: nightly cleanup could not be enabled. Run: sudo bash $install_dir/cleanup.sh --install-timer" >&2
 fi
 printf 'Backups: nightly database and key backups are kept in %s/backups/nightly. Also enable your provider'"'"'s server backups (snapshots) and copy %s off-host.\n' "$install_dir" "$config_dir"

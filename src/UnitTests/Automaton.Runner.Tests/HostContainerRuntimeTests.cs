@@ -316,6 +316,31 @@ public sealed class HostContainerRuntimeTests
         Assert.That(calls, Has.Count.EqualTo(1));
     }
 
+    [Test]
+    public async Task RemoveFreesTheContainersImageAndCapsBuildCache()
+    {
+        var state = Inspection();
+        state["Config"]!["Labels"]!["automaton.resolved-image"] = Digest;
+        var result = await Service(args => new() { Success = true, Output = state.ToJsonString() })
+            .ExecuteAsync(Operation(HostContainerOperationKinds.RemoveContainer));
+        Assert.That(result.Success, Is.True, result.Error);
+        Assert.That(calls.Select(call => string.Join(' ', call.Skip(1).Take(2))),
+            Is.EqualTo(new[] { "container inspect", "rm -f", "rmi " + Digest, "builder prune" }));
+        Assert.That(calls[3], Does.Contain("--keep-storage"));
+    }
+
+    [Test]
+    public async Task RemoveSucceedsWhenTheImageIsStillInUse()
+    {
+        var state = Inspection();
+        state["Config"]!["Labels"]!["automaton.resolved-image"] = Digest;
+        var result = await Service(args => args[1] is "rmi" or "builder"
+            ? new() { Error = "conflict: image is being used by running container" }
+            : new() { Success = true, Output = state.ToJsonString() })
+            .ExecuteAsync(Operation(HostContainerOperationKinds.RemoveContainer));
+        Assert.That(result.Success, Is.True, result.Error);
+    }
+
     [TestCase("success")]
     [TestCase("wrong-owner")]
     [TestCase("remove-failure")]
