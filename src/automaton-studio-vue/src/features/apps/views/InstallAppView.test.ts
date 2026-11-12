@@ -77,7 +77,7 @@ describe('InstallAppView', () => {
     expect(wrapper.text()).not.toContain('shh')
     expect(wrapper.get('.install-progress').text()).toContain('Installed')
     expect(wrapper.get('.install-progress').text()).toContain('Deploy and start the app')
-    expect(wrapper.get('.install-progress').text()).toContain('Nightly runs on cron 30 3 * * *')
+    expect(wrapper.get('.install-progress').text()).toContain('Nightly runs every day at 03:30 UTC')
     expect(wrapper.text()).toContain('Open the installed app')
   })
 
