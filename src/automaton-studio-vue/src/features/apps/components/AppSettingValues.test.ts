@@ -8,7 +8,7 @@ import { appsService } from '../services/apps.service'
 import type { App } from '../types/apps.types'
 
 vi.mock('../services/apps.service', () => ({
-  appsService: { listSecrets: vi.fn(), listSettingValues: vi.fn().mockResolvedValue([]), setSettingValue: vi.fn(), deleteSettingValue: vi.fn(), restart: vi.fn() },
+  appsService: { listSecrets: vi.fn(), listSettingValues: vi.fn().mockResolvedValue([]), setSettingValue: vi.fn(), deleteSettingValue: vi.fn(), deleteSecret: vi.fn(), restart: vi.fn() },
 }))
 
 const declared = [
