@@ -18,8 +18,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Runs before the environment approval, so the run page shows the AI verdict and the report to read first.
+  # Red is a warning only; it never blocks the deploy.
+  report:
+    name: Release report ${{ inputs.version }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Show the verdict
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 1; }
+          url="https://github.com/$GITHUB_REPOSITORY/releases/tag/server-v$VERSION"
+          body=$(gh release view "server-v$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null || true)
+          verdict=$(printf '%s\n' "$body" | grep -m1 -E '^Verdict: (Green|Yellow|Red)$' | sed 's/^Verdict: //' || true)
+          {
+            echo "### Release $VERSION: AI check ${verdict:-unavailable}"
+            echo
+            if [[ "$verdict" == Red ]]; then echo "**Red: read the report before approving.** This is a warning; it does not block the deploy."; echo; fi
+            printf '%s\n' "$body" | sed -n '/^## AI check/,/^## Automaton Server/p' | sed '$d'
+            echo "[Full release report]($url)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: Deploy ${{ inputs.version }}
+    needs: report
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
