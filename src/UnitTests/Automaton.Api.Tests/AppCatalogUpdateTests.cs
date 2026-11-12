@@ -80,4 +80,17 @@ public class AppCatalogUpdateTests
             Assert.That(AppCatalogBackfillService.NameMatches("", "Off-site Backup"), Is.False);
         });
     }
+
+    [Test]
+    public void Backfill_ReadsTheNameFromTheAppsOwnManifest_AndIgnoresBadOnes()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogBackfillService.ManifestName(Folder(("automaton.json", "{\"name\":\"Off-site Backup\"}"))), Is.EqualTo("Off-site Backup"));
+            Assert.That(AppCatalogBackfillService.ManifestName(Folder(("automaton.json", "not json"))), Is.Null);
+            Assert.That(AppCatalogBackfillService.ManifestName(Folder(("automaton.json", "[1]"))), Is.Null);
+            Assert.That(AppCatalogBackfillService.ManifestName(Folder(("automaton.json", "{\"name\":5}"))), Is.Null);
+            Assert.That(AppCatalogBackfillService.ManifestName(Folder(("index.html", "x"))), Is.Null);
+        });
+    }
 }

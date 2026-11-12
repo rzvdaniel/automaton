@@ -34,7 +34,10 @@ public sealed class AppCatalogBackfillService(
         cache.Set(key, true, RetryAfter);
 
         var entries = await catalog.PublicEntriesAsync(cancellationToken);
-        var named = entries.Where(e => NameMatches(app.Name, e.App.Name)).ToList();
+        var directory = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
+        // The owner may have renamed the app, so the name in its own automaton.json counts too.
+        var manifestName = ManifestName(directory);
+        var named = entries.Where(e => NameMatches(app.Name, e.App.Name) || (manifestName is not null && NameMatches(manifestName, e.App.Name))).ToList();
         if (named.Count != 1) return false;
         var (source, repo, entry) = named[0];
 
@@ -45,7 +48,6 @@ public sealed class AppCatalogBackfillService(
             return await catalog.PinnedHistoryAsync(source, repo, folder, HistoryLimit, cancellationToken);
         }) ?? [];
         if (!history.Contains(entry.Commit)) history = [entry.Commit, .. history];
-        var directory = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
 
         // Name alone is not proof: a hand-made app may share a catalog entry's name. The app's own files must show it came from there.
         using (var pinned = await installer.DownloadAsync(new GitAppSource(repo, folder, entry.Commit), cancellationToken))
@@ -85,6 +87,23 @@ public sealed class AppCatalogBackfillService(
         if (!Directory.Exists(directory) || !File.Exists(Path.Combine(directory, "automaton.json"))) return false;
         var paths = AppCatalogInstallService.AppFiles(package, source).Select(file => file.Path).ToList();
         return paths.Contains("automaton.json") && paths.Count(path => File.Exists(Path.Combine(directory, path))) * 2 >= paths.Count;
+    }
+
+    internal static string? ManifestName(string directory)
+    {
+        try
+        {
+            var path = Path.Combine(directory, "automaton.json");
+            if (!File.Exists(path) || new FileInfo(path).Length > 256 * 1024) return null;
+            using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            return document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                && document.RootElement.TryGetProperty("name", out var name) && name.ValueKind == System.Text.Json.JsonValueKind.String
+                ? name.GetString() : null;
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The names are equal or one contains the other ("Automaton Off-site Backup" was the catalog name before it was shortened).</summary>
