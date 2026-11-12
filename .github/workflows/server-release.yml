@@ -46,7 +46,7 @@ jobs:
         timeout-minutes: 10
         # The token exists only in this workflow (manual runs from main), never in pull_request workflows.
         # Pinned to a commit; tools are read-only plus one output file. PR text is untrusted input.
-        uses: anthropics/claude-code-action@97e0a7f336e732b8c9400f7c7d71d41725923201 # v1
+        uses: anthropics/claude-code-action@4fa93a88de49bbef68b10eb15aabedf28ca0e1ed # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
