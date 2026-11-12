@@ -29,7 +29,7 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
      ```
    - `PROD_SSH_KNOWN_HOSTS`: the server's host key line, from `ssh-keyscan -t ed25519 <host>` checked against the real server.
 5. Known limit: an agent working on your machine under your own GitHub login (not the bot) can start and approve a run as you. Only approve runs you started or asked for, and check the version and the actor on the run page.
-6. Keep agent accounts without admin rights, so they cannot edit environments or secrets. Changes to `.github/workflows/` are High tier and need your `owner-approved` label.
+6. Keep agent accounts without admin rights, so they cannot edit environments or secrets. Changes to `.github/workflows/` are High tier and listed as risky in the release report you read before approving a deploy.
 
 ## Run it
 

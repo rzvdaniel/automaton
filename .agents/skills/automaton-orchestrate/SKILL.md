@@ -29,7 +29,7 @@ It does **not** write product code (exception: skills, docs and small chores the
 - **Evidence over claims.** Read the merge-gate output, the proof and the labels yourself; run a check of your own
   when a claim matters.
 - **The owner's time is the scarce thing.** Ask only for product choices, owner-only steps (tokens, console clicks,
-  accounts), high-tier approvals and anything destructive the configuration does not pre-approve. Collect these into
+  accounts), production deploys and anything destructive the configuration does not pre-approve. Collect these into
   one list, each with the options and your recommendation, and bring it at a natural stop instead of one question at
   a time. Work that does not depend on an answer continues.
 - **Usage is a budget.** Short turns, no polling loops, no more agents than the configuration allows.

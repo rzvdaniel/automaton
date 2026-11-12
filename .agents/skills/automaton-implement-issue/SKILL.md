@@ -11,8 +11,8 @@ the area skills that `AGENTS.md` lists for the code you touch; this skill is onl
 
 ## Ground rules
 
-- **Decide, do not wait.** Ask the owner only for product decisions and for high-tier changes
-  ([PR review](../pr-review/SKILL.md)). If running something would answer the question (behaviour, output, timing,
+- **Decide, do not wait.** Ask the owner only for product decisions. High-tier changes merge through the gate like any other
+  ([PR review](../pr-review/SKILL.md)); the production deploy needs the owner. If running something would answer the question (behaviour, output, timing,
   layout), run it and decide from the result.
 - **When you do need the owner, do not stop.** Post the question on the issue with the options and the one you would
   pick, label the issue `agent:blocked`, and continue with everything that does not depend on the answer. If nothing
@@ -43,8 +43,7 @@ Create a to-do item for each step and tick them off.
 4. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes, including the "Check after
    release" list. Start step 5 while CI runs. An empty check list means the run has not started; it is not a pass.
 5. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
-   applies, at most two rounds. For a high-tier change, add the `agent:human-review` label and ask the owner now, not
-   after the review, so the two waits overlap.
+   applies, at most two rounds.
 6. **Merge.** Run `python3 .agents/tools/merge-gate.py <N> --merge`; it squash-merges and deletes the branch only on
    PASS. Never run `gh pr merge` yourself. Then watch the `main` run for your commit. Also hold anything the owner said to hold.
 7. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).

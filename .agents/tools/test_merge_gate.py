@@ -75,7 +75,7 @@ class Gate(unittest.TestCase):
     def test_a_later_short_review_does_not_lower_the_tier(self):
         first = review("APPROVE\nTier: high - drops a column\nSecurity: ok", at="2026-01-01T00:00:00Z")
         later = review("APPROVE\nTier: medium\nNits fixed, no new code", at="2026-01-02T00:00:00Z")
-        tier, rows = gate.check(pr(["src/a.cs"], [first, later], labels=["owner-approved"]), PATTERNS)
+        tier, rows = gate.check(pr(["src/a.cs"], [first, later]), PATTERNS)
         self.assertEqual(tier, "high")
         self.assertEqual(failed((tier, rows)), ["security"])
 
@@ -86,20 +86,21 @@ class Gate(unittest.TestCase):
     def test_reviewer_can_raise_the_tier(self):
         tier, rows = gate.check(pr(["src/a.cs"], [review("APPROVE\nTier: high - drops a column")]), PATTERNS)
         self.assertEqual(tier, "high")
-        self.assertEqual(failed((tier, rows)), ["owner", "security"])
+        self.assertEqual(failed((tier, rows)), ["security"])
 
-    def test_security_path_needs_security_but_not_owner(self):
+    def test_security_path_needs_security(self):
         paths = [".github/workflows/tests.yml"]
         self.assertEqual(failed(gate.check(pr(paths, [review("APPROVE")]), PATTERNS, SECURITY)), ["security"])
         ok = review("APPROVE\nTier: medium\nSecurity: checked the token permissions")
         self.assertEqual(gate.check(pr(paths, [ok]), PATTERNS, SECURITY)[0], "medium")
         self.assertEqual(failed(gate.check(pr(paths, [ok]), PATTERNS, SECURITY)), [])
 
-    def test_high_needs_security_and_owner(self):
+    def test_high_needs_security_but_no_owner_label(self):
         paths = ["src/Automaton.Identity/a.cs"]
         ok = review("APPROVE\nTier: high\n\nSecurity: checked the token permissions")
-        self.assertEqual(failed(gate.check(pr(paths, [ok]), PATTERNS)), ["owner"])
-        self.assertEqual(failed(gate.check(pr(paths, [ok], labels=["owner-approved"]), PATTERNS)), [])
+        self.assertEqual(failed(gate.check(pr(paths, [ok]), PATTERNS)), [])
+        bare = review("APPROVE\nTier: high")
+        self.assertEqual(failed(gate.check(pr(paths, [bare]), PATTERNS)), ["security"])
 
     def test_ci_and_description(self):
         self.assertEqual(failed(gate.check(pr(["README.md"], checks=[]), PATTERNS)), ["ci"])

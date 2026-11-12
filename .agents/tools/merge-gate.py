@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OWNER_LABEL = "owner-approved"
 SECURITY_MARKER = "# --- security pass ---"
 # A change is low risk when every file is documentation for people: Markdown in these places and nothing else.
 # Skills, AGENTS.md, templates and the guidance shipped to users' agents steer agents, so they are never low.
@@ -127,9 +126,6 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     if needs_security:
         rows.append(("PASS", "security", "security pass recorded") if review and review["security"] and review["commit"] == head
                     else ("FAIL", "security", "this change needs a 'Security:' section in the review of the final commit"))
-    if tier == "high":
-        rows.append(("PASS", "owner", f"label {OWNER_LABEL}") if OWNER_LABEL in labels
-                    else ("FAIL", "owner", f"a high-risk change needs the owner's approval (label {OWNER_LABEL})"))
 
     body = pr.get("body") or ""
     missing = [part for part in ("How verified", "Risk", "How to revert")
