@@ -1,0 +1,12 @@
+{
+  "marginPercent": 10,
+  "comment": "Uncompressed image sizes in bytes (docker image inspect .Size) after #1058. scripts/check-image-sizes.py fails the Build workflow when an image is more than marginPercent above its baseline. To accept a deliberate increase, or to record a shrink, edit the number in the same pull request and say why.",
+  "images": {
+    "server": 408800000,
+    "worker": 310900000,
+    "studio": 25100000,
+    "store": 20800000,
+    "website": 27500000,
+    "runner": 538800000
+  }
+}
