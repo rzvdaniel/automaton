@@ -29,9 +29,17 @@ COPY shared/ai-guidance/ /shared/ai-guidance/
 RUN dotnet publish Automaton.Api/Automaton.Api.csproj \
     -c Release \
     -o /app/publish \
-    -p:UseAppHost=false
+    -p:UseAppHost=false \
+    -p:DebugType=none \
+    -p:GenerateDocumentationFile=false \
+    -p:SatelliteResourceLanguages=en
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+
+# Identical in server and worker so the layer is shared. bash runs the compose
+# health check, tzdata serves IANA time zones. The alpine image runs with
+# invariant globalization (no ICU): the code uses no culture-specific APIs.
+RUN apk add --no-cache bash tzdata
 
 WORKDIR /app
 
