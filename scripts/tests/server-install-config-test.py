@@ -209,6 +209,29 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertEqual((self.root / 'secrets/cloudflare-token').read_text(), 'test-cloudflare-token-not-a-secret')
         self.assertFalse(module.switch_tls(self.root, 'cloudflare'))  # idempotent; keeps the token
 
+    def test_delegated_mode_uses_httpreq_challenge_and_no_token(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'delegated')
+        traefik = json.loads((self.root / 'traefik.yml').read_text())
+        challenge = traefik['certificatesResolvers']['delegated']['acme']['dnsChallenge']
+        self.assertEqual(challenge['provider'], 'httpreq')
+        edge = json.loads((self.root / 'dynamic/installation.yml').read_text())
+        self.assertEqual(edge['http']['routers']['apps']['tls']['certResolver'], 'delegated')
+        self.assertEqual(edge['tls']['stores']['default']['defaultGeneratedCert']['resolver'], 'delegated')
+        self.assertEqual((self.root / 'secrets/cloudflare-token').read_text(), '')
+
+    def test_switch_to_delegated_matches_fresh_and_back_to_cloudflare_and_http(self):
+        self.configure()
+        self.assertTrue(module.switch_tls(self.root, 'delegated'))
+        fresh = Path(self.temporary.name) / 'fresh'
+        module.configure(fresh, 'example.com', 'owner@example.com', 'delegated')
+        for name in ('traefik.yml', 'dynamic/installation.yml', 'dynamic/store.yml', 'dynamic/studio-paths.yml'):
+            self.assertEqual(json.loads((fresh / name).read_text()), json.loads((self.root / name).read_text()), name)
+        settings = json.loads((self.root / 'appsettings.Production.json').read_text())
+        self.assertEqual(settings['PublishedApps']['CertificateResolver'], 'delegated')
+        self.assertFalse(module.switch_tls(self.root, 'delegated'))
+        self.assertTrue(module.switch_tls(self.root, 'http'))
+        self.assertNotIn('tls', json.loads((self.root / 'dynamic/installation.yml').read_text()))
+
     def test_switch_back_to_http_matches_fresh_http_and_empties_token(self):
         module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
         self.assertTrue(module.switch_tls(self.root, 'http'))

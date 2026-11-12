@@ -2,7 +2,7 @@
 
 This is the detailed reference for operators and maintainers (custom paths, protected settings, adopted installations, recovery, publishing a release). For the short task pages use the website docs: [install](../../src/automaton-vue/docs/install-server.md), [first administrator](../../src/automaton-vue/docs/first-admin.md), [update](../../src/automaton-vue/docs/update-server.md), [backup and restore](../../src/automaton-vue/docs/backup-restore.md). Those pages are the source for the quick path; this page is the source for everything beyond it.
 
-The server release installs API, Studio, the public app store, Worker, PostgreSQL 16, RabbitMQ and Traefik together with Docker Compose. The installer supports **x86_64 Linux with systemd** and public DNS. On Ubuntu and Debian it installs Docker Engine and Compose from Docker's apt repository when missing; on other distributions, install Docker Engine and the Compose plugin first and the installer uses them. Ubuntu LTS is the most tested. HTTPS uses HTTP validation by default; Cloudflare DNS validation is optional for wildcard certificates. It uses prebuilt images, generates unique credentials and stores configuration outside any Git checkout.
+The server release installs API, Studio, the public app store, Worker, PostgreSQL 16, RabbitMQ and Traefik together with Docker Compose. The installer supports **x86_64 Linux with systemd** and public DNS. On Ubuntu and Debian it installs Docker Engine and Compose from Docker's apt repository when missing; on other distributions, install Docker Engine and the Compose plugin first and the installer uses them. Ubuntu LTS is the most tested. HTTPS uses HTTP validation by default; Cloudflare DNS validation or a one-record DNS delegation is optional for wildcard certificates. It uses prebuilt images, generates unique credentials and stores configuration outside any Git checkout.
 
 A server release must first be published by the maintainer using the **Publish Automaton Server** GitHub Actions workflow. Run it from the repository's Actions tab on `main`, choose **Run workflow**, and enter a new version such as `0.1.0` (without the `server-v` prefix). It builds and publishes the API, Worker, Studio and store images, resolves infrastructure image digests, runs an isolated installation smoke test, then creates a GitHub release tagged `server-v0.1.0` with the installer, bundle and checksum. The commands below require that release; source changes alone do not publish an installer release or upgrade any running instance.
 
@@ -128,6 +128,22 @@ sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare
 The command asks for the token (Cloudflare Zone Read + DNS Edit for the domain's zone) at a hidden prompt; paste it there. For scripted or unattended runs, pass `--cloudflare-token-file PATH` (a file only root can read) or set `AUTOMATON_CLOUDFLARE_TOKEN` instead. It is never printed. The command writes `secrets/cloudflare-token`, updates `installation.json`, `traefik.yml`, the generated files in `dynamic/` and `PublishedApps.CertificateResolver`, restarts Traefik and the API, and waits until the public HTTPS checks pass. Published apps then use `*.apps.<domain>`; the wildcard certificate is requested on first use.
 
 To go back: `sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode http` empties the token file and returns to HTTP validation (port 80 must be reachable). Running the command for the mode already in use changes nothing.
+
+### Wildcard certificates without a Cloudflare token (`delegated`)
+
+For a DNS host other than Cloudflare, or Cloudflare used as a plain DNS host without giving the server a token, use `--tls-mode delegated`. It is optional; the default install is unchanged. You add **one** DNS record, once, at your DNS host:
+
+| Type | Name | Value |
+| --- | --- | --- |
+| `NS` | `_acme-challenge.apps.<domain>` | `api.<domain>` |
+
+`api.<domain>` already has an address record, so no further record is needed. The record hands only the Let's Encrypt challenge name to a small DNS responder that runs on your server (Compose service `acme-responder`). It answers that one name and refuses everything else (no recursion), limits queries per source address, and exists only in this mode. Traefik uses it to get one Let's Encrypt wildcard certificate for `*.apps.<domain>` and to renew it, with no token to store.
+
+```bash
+sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode delegated
+```
+
+(or `--tls-mode delegated` on a fresh install). The command checks that UDP and TCP port 53 can be bound, starts the responder, then checks through public DNS and by querying the responder directly over UDP and TCP at `api.<domain>` that the record and the open port work. If any step fails it restores the previous TLS configuration, so it does not leave the server half switched (a failed HTTPS check afterwards keeps the new mode so you can run the same command again). **Open inbound UDP and TCP port 53** to the server (also in a cloud security group); it is opened only in this mode. If another service already listens on port 53 (for example `systemd-resolved` on all addresses), free it first. The responder's control port accepts only requests with a shared secret generated into the installation's `.env`. The responder runs from `python:3-alpine` (override with `RESPONDER_IMAGE` in `release.env`). Switch back with `--tls-mode http` or `cloudflare`; the responder is then removed and port 53 is no longer used.
 
 The domain and email still cannot be changed. Credentials, the database and Docker volumes are never touched. If `traefik.yml` or `dynamic/installation.yml` was written by hand (an adopted installation), the command refuses without changing anything. The command can be repeated safely: it restarts Traefik and checks HTTPS each time, so a switch that failed its check can be retried. Keep your DNS records set to *DNS only*.
 

@@ -187,7 +187,7 @@ jobs:
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]]
           mkdir automaton-server
-          cp docker/install/{compose.yaml,configure.py,check_dns.py,explain_certificate_failure.py,backup.sh,restore.sh,update-from-request.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
+          cp docker/install/{compose.yaml,configure.py,acme_responder.py,check_dns.py,explain_certificate_failure.py,backup.sh,restore.sh,update-from-request.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
           cp scripts/install-automaton.sh automaton-server/install.sh
           cp scripts/update-automaton.sh automaton-server/update.sh
           cp docs/prod/install-automaton.md automaton-server/README.md
