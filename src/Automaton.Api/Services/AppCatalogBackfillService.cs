@@ -34,7 +34,7 @@ public sealed class AppCatalogBackfillService(
         cache.Set(key, true, RetryAfter);
 
         var entries = await catalog.PublicEntriesAsync(cancellationToken);
-        var named = entries.Where(e => string.Equals(e.App.Name, app.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+        var named = entries.Where(e => NameMatches(app.Name, e.App.Name)).ToList();
         if (named.Count != 1) return false;
         var (source, repo, entry) = named[0];
 
@@ -86,6 +86,11 @@ public sealed class AppCatalogBackfillService(
         var paths = AppCatalogInstallService.AppFiles(package, source).Select(file => file.Path).ToList();
         return paths.Contains("automaton.json") && paths.Count(path => File.Exists(Path.Combine(directory, path))) * 2 >= paths.Count;
     }
+
+    /// <summary>The names are equal or one contains the other ("Automaton Off-site Backup" was the catalog name before it was shortened).</summary>
+    internal static bool NameMatches(string appName, string entryName) =>
+        entryName.Length > 0 && appName.Length > 0
+        && (appName.Contains(entryName, StringComparison.OrdinalIgnoreCase) || entryName.Contains(appName, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>No recorded source at all: only then may the server decide where an app came from.</summary>
     internal static bool IsCandidate(string? repo, string? folder, string? commit) =>
