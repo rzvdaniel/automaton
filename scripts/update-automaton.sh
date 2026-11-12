@@ -239,7 +239,7 @@ while [[ ! -d "$disk_path" ]]; do disk_path=$(dirname -- "$disk_path"); done
 available_kb=$(df -Pk "$disk_path" | awk 'NR==2 {print $4}')
 if (( available_kb < 10485760 )); then
     # Short on space: free what Docker can rebuild or pull again (unused images, build cache) and check again.
-    # Never volumes, images of existing containers or the backups.
+    # Never volumes, images of existing containers or the backups. Unused images go too, including rollback ones (pull them again).
     echo 'Less than 10 GiB free: removing unused Docker images and build cache.'
     docker image prune -a -f >/dev/null 2>&1 || echo 'Warning: could not remove unused images.' >&2
     docker builder prune -f >/dev/null 2>&1 || echo 'Warning: could not remove build cache.' >&2
