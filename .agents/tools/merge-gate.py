@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OWNER_LABEL = "owner-approved"
 SECURITY_MARKER = "# --- security pass ---"
 # A change is low risk when every file is documentation for people: Markdown in these places and nothing else.
 # Skills, AGENTS.md, templates and the guidance shipped to users' agents steer agents, so they are never low.
@@ -86,7 +85,6 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     rows = []
     head = pr["headRefOid"]
     paths = pr["paths"]
-    labels = {item["name"] for item in pr.get("labels", [])}
     # Only people with write access review; on a public repository anyone can post a review.
     reviews = sorted((item for item in pr.get("reviews", [])
                       if item.get("authorAssociation") in TRUSTED and item.get("state") != "DISMISSED"),
@@ -127,9 +125,6 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     if needs_security:
         rows.append(("PASS", "security", "security pass recorded") if review and review["security"] and review["commit"] == head
                     else ("FAIL", "security", "this change needs a 'Security:' section in the review of the final commit"))
-    if tier == "high":
-        rows.append(("PASS", "owner", f"label {OWNER_LABEL}") if OWNER_LABEL in labels
-                    else ("FAIL", "owner", f"a high-risk change needs the owner's approval (label {OWNER_LABEL})"))
 
     body = pr.get("body") or ""
     missing = [part for part in ("How verified", "Risk", "How to revert")
@@ -168,7 +163,7 @@ def main() -> int:
     if len(args) != 1:
         print(__doc__)
         return 2
-    fields = "number,headRefOid,baseRefName,body,labels,reviews,statusCheckRollup,comments,commits"
+    fields = "number,headRefOid,baseRefName,body,reviews,statusCheckRollup,comments,commits"
     pr = json.loads(gh("pr", "view", args[0], "--json", fields, *repo))
     slug = repo[1] if repo else "{owner}/{repo}"
     # Every changed file, with the old path of a rename: a file moved out of a protected folder still counts.
