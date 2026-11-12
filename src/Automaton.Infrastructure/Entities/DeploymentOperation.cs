@@ -33,8 +33,20 @@ public sealed class DeploymentOperation
     public DateTime? LeaseExpiresAtUtc { get; set; }
     public DateTime? CompletedAtUtc { get; set; }
 
-    [MaxLength(4000)]
+    public const int ErrorMessageMaxLength = 4000;
+
+    [MaxLength(ErrorMessageMaxLength)]
     public string? ErrorMessage { get; set; }
+
+    /// <summary>Fits an error into the column, keeping the start and the end of a long message.</summary>
+    public static string? FitErrorMessage(string? error)
+    {
+        if (error is null || error.Length <= ErrorMessageMaxLength) return error;
+        const string note = "\n... [error cut to fit; start and end kept] ...\n";
+        var keep = ErrorMessageMaxLength - note.Length;
+        var head = keep / 4;
+        return error[..head] + note + error[^(keep - head)..];
+    }
 
     public string? ResultJson { get; set; }
 }
