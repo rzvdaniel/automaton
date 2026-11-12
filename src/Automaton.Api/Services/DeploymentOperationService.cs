@@ -401,6 +401,7 @@ public sealed class DeploymentOperationService(
         CancellationToken cancellationToken)
     {
         var status = success ? DeploymentOperationStatuses.Succeeded : DeploymentOperationStatuses.Failed;
+        error = DeploymentOperation.FitErrorMessage(error);
         var resultJson = JsonSerializer.Serialize(result, JsonOptions);
         if (dataContext.Database.IsRelational())
         {
