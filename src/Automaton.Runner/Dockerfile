@@ -52,25 +52,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libicu76 \
     libssl3 \
     ca-certificates \
-    wget \
     curl \
     docker-cli \
     util-linux \
     sudo \
-    ffmpeg \
-    ghostscript \
-    imagemagick \
-    poppler-utils \
-    pandoc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the .NET 10 ASP.NET Core runtime. The runner hosts the HTTP runtime gateway.
+# The ASP.NET Core runtime is copied from the official runtime image (the runner hosts the HTTP
+# runtime gateway); no installer or download tool stays in this image.
 ENV DOTNET_ROOT=/usr/share/dotnet
-RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
-    && chmod +x dotnet-install.sh \
-    && ./dotnet-install.sh --runtime aspnetcore --channel 10.0 --install-dir $DOTNET_ROOT \
-    && rm dotnet-install.sh \
-    && ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
+COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0 /usr/share/dotnet $DOTNET_ROOT
+RUN ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
 
 # Create non-root user
 RUN useradd -m -s /bin/bash automaton
