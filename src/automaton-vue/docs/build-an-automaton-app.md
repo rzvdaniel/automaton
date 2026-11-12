@@ -75,6 +75,7 @@ Wait for `Succeeded` and verify the real behavior at the URL. See [Deploy and pu
 
 ## Common errors
 
+- **Build fails with "No space left on device" or exits with code 2 early.** The build container's `/tmp` is small (a few tens of MB), so a build that unpacks a download or caches packages there can fail with "No space left on device". Work inside the app folder instead: unpack and cache under it, and point `HOME` and `TMPDIR` there (for example `export HOME="$PWD/.home" TMPDIR="$PWD/.tmp"; mkdir -p "$HOME" "$TMPDIR"` at the top of `build.sh`). When a build fails, `automaton deploy` and Studio show the last lines of its output.
 - **Build tools exist locally but not on the Runner.** Set `application.build.image` to an image that has them.
 - **`Template would overwrite files`.** Use an empty folder or omit `--template`.
 - **Login does nothing.** The server URL must be the API URL, not Studio.

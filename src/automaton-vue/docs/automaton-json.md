@@ -72,6 +72,8 @@ layout, build system, or application architecture.
 | `application.openPaths` | Optional paths of the private address that answer without Automaton sign-in, for webhooks and callbacks. See below. |
 | `application.publicAccess` | Optional hint `{ "level": "required" or "recommended", "reason": "..." }` for an app that outside callers reach (check-in URLs, a tracking script). New apps are private, so the install page shows it before installing and says to choose "Anyone on the internet" under "Who can open it". It changes nothing by itself. |
 
+The build container's `/tmp` is small (a few tens of MB), so a build that unpacks a download or caches packages there can fail with "No space left on device". Work inside the app folder instead: unpack and cache under it, and point `HOME` and `TMPDIR` there (for example `export HOME="$PWD/.home" TMPDIR="$PWD/.tmp"; mkdir -p "$HOME" "$TMPDIR"` at the top of `build.sh`). When a build fails, `automaton deploy` and Studio show the last lines of its output.
+
 The Runner supplies the effective port in `AUTOMATON_PORT` and the durable data
 path in `AUTOMATON_APP_DATA_DIR`. Every runtime and Action also gets
 `AUTOMATON_API_URL`, the server's public API base URL. A configured health path
