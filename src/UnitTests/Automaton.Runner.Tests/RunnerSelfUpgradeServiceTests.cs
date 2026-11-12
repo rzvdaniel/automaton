@@ -79,6 +79,40 @@ public sealed class RunnerSelfUpgradeServiceTests
         => Assert.That((await Create(_ => (1, "Error: No such object")).StatusAsync(default)).State, Is.EqualTo("none"));
 
     [Test]
+    public async Task AfterASuccessfulUpgradeTheHelperAndTheOldImageAreRemoved()
+    {
+        var service = Create(arguments => (0, arguments[0] == "inspect"
+            ? (arguments[2].Contains("Status") ? "exited 0 sha256:old" : "sha256:new") : ""));
+        await service.CleanupAfterUpgradeAsync(TimeSpan.Zero, TimeSpan.Zero, default);
+        Assert.That(calls, Does.Contain("rm --force"));
+        Assert.That(calls, Does.Contain("rmi --force"));
+    }
+
+    [TestCase("exited 1 sha256:old")]
+    [TestCase("running 0 sha256:old")]
+    public async Task AFailedOrRunningUpgradeKeepsTheHelperAndImage(string helperState)
+    {
+        await Create(_ => (0, helperState)).CleanupAfterUpgradeAsync(TimeSpan.Zero, TimeSpan.Zero, default);
+        Assert.That(calls, Has.None.StartsWith("rm"));
+    }
+
+    [Test]
+    public async Task WhenTheRunnerAlreadyUsedTheCurrentImageOnlyTheHelperGoes()
+    {
+        var service = Create(arguments => (0, arguments[2].Contains("Status") ? "exited 0 sha256:same" : "sha256:same"));
+        await service.CleanupAfterUpgradeAsync(TimeSpan.Zero, TimeSpan.Zero, default);
+        Assert.That(calls, Does.Contain("rm --force"));
+        Assert.That(calls, Has.None.StartsWith("rmi"));
+    }
+
+    [Test]
+    public async Task CleanupDoesNothingWithoutAHelper()
+    {
+        await Create(_ => (1, "No such object")).CleanupAfterUpgradeAsync(TimeSpan.Zero, TimeSpan.Zero, default);
+        Assert.That(calls, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public async Task TheCommandExecutorRoutesTheUpgradeCommands()
     {
         var upgrade = Create(arguments => (0, arguments[0] == "inspect" ? "exited 0" : ""));

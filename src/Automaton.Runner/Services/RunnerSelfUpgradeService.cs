@@ -48,6 +48,34 @@ internal sealed class RunnerSelfUpgradeService(Func<string> runnerId, string? in
         };
     }
 
+    /// <summary>
+    /// Run once this Runner is connected. After a successful upgrade the helper container is stopped and still pins the old
+    /// Runner image: remove both. A failed upgrade keeps the helper, because its log is how the failure is shown.
+    /// </summary>
+    public async Task CleanupAfterUpgradeAsync(TimeSpan settle, TimeSpan helperWait, CancellationToken token)
+    {
+        string helper;
+        try { helper = HelperName(); }
+        catch (InvalidOperationException) { return; }
+        var deadline = DateTime.UtcNow + helperWait;
+        string[] state;
+        while (true)
+        {
+            var inspected = await run(["inspect", "--format", "{{.State.Status}} {{.State.ExitCode}} {{.Image}}", helper], token);
+            if (inspected.ExitCode != 0) return;
+            state = inspected.Output.Trim().Split(' ');
+            if (state[0] is not ("running" or "created") || DateTime.UtcNow >= deadline) break;
+            await Task.Delay(TimeSpan.FromSeconds(2), token);
+        }
+        if (state.Length < 3 || state[0] != "exited" || state[1] != "0") return;
+        // Studio may still be asking the helper for its result while this Runner reports its new image.
+        await Task.Delay(settle, token);
+        var own = await run(["inspect", "--format", "{{.Image}}", Environment.MachineName], token);
+        await run(["rm", "--force", helper], token);
+        if (own.ExitCode == 0 && state[2] != own.Output.Trim())
+            await run(["rmi", "--force", state[2]], token); // Docker still refuses while a container uses it
+    }
+
     private string HelperName()
     {
         var installation = installationId ?? string.Empty;

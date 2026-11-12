@@ -157,7 +157,7 @@ sudo bash /opt/automaton-server/update.sh
 
 To select a particular published release, add `--version server-vX.Y.Z`. The updater refuses a version older than the installed version. Offline `--bundle` updates still require an explicit `--version`.
 
-After verifying a release, the updater continues with that release's own `update.sh`, so changes to the update procedure apply in the same update. It also installs `backup.sh` and `restore.sh`, enables nightly backups and takes a first backup if none exists. Servers on 0.1.18 or earlier still run their previous updater for that first update: run `sudo bash /opt/automaton-server/update.sh` a second time afterwards to enable backups (it reports that the release is already installed and sets them up). Later updates need a single run.
+After verifying a release, the updater continues with that release's own `update.sh`, so changes to the update procedure apply in the same update. It also installs `backup.sh`, `cleanup.sh` and `restore.sh`, enables nightly backups and the nightly cleanup and takes a first backup if none exists. Servers on 0.1.18 or earlier still run their previous updater for that first update: run `sudo bash /opt/automaton-server/update.sh` a second time afterwards to enable backups (it reports that the release is already installed and sets them up). Later updates need a single run.
 
 **Updating to the first release with the app store.** Updaters installed by earlier releases refuse it, because it adds a service. Run the new updater once; afterwards `/opt/automaton-server/update.sh` works as before:
 
@@ -188,6 +188,8 @@ Use `update.sh` for subsequent releases. `install.sh --status` supports the over
 ## Backups and restore
 
 Every installation takes **nightly backups by default**. The installer enables them and takes the first backup immediately; the updater enables them on existing servers. A systemd timer (`automaton-backup.timer`) runs `/opt/automaton-server/backup.sh` every night between 03:00 and 04:00 server time, and catches up after downtime.
+
+**Nightly cleanup** (`automaton-cleanup.timer`, enabled the same way, about 05:00 server time, after the backup) runs `/opt/automaton-server/cleanup.sh`: it removes Docker images no container uses and build cache older than 7 days, and trims the system journal to 200 MB. It never touches volumes, images of existing containers or backups. Runners also remove an app's previous image after each deploy and the old Runner image after an upgrade.
 
 Each backup is a folder `/opt/automaton-server/backups/nightly/automaton-YYYYMMDDTHHMMSSZ` with a consistent PostgreSQL dump in custom format (`database.dump`, written by `pg_dump` and restored by `pg_restore`), the API and Worker Data Protection keys that decrypt it, the server version and a checksum file. The same directory contains an encrypted `.tar.age` archive for each folder. The newest 7 folder/archive pairs are kept. The X25519 private key is `/etc/automaton/secrets/backup-key` (root-only); Studio shows only its public recipient and the command to read the private key. Save the private key separately in a password manager: an encrypted archive cannot be restored without it. The API lists archive size and SHA-256 and streams a selected archive to apps with `backups:read`. Backups are root-only. **Backups** in Studio lists them with the command to restore each one, and the **Backups** check turns into an error when the last backup failed or is older than 36 hours.
 

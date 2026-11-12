@@ -40,6 +40,8 @@ public class HubService : IRuntimeTunnelReconnectRequester
     private Task? retryTask;
     private readonly HubHeartbeatService heartbeatService;
 
+    private readonly IServiceProvider serviceProvider;
+
     public HubService(
         ConfigurationService configService,
         ApiKeyAuthenticationService apiKeyAuthService,
@@ -48,6 +50,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
         AppActionExecutionService appActionExecutionService)
     {
         this.configService = configService;
+        this.serviceProvider = serviceProvider;
         this.apiKeyAuthService = apiKeyAuthService;
         this.logger = Log.ForContext<HubService>();
         heartbeatService = new HubHeartbeatService(() => connection, logger);
@@ -183,6 +186,15 @@ public class HubService : IRuntimeTunnelReconnectRequester
 
     private void ReportConnectionEstablished(int attempts)
     {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await (serviceProvider.GetService<RunnerSelfUpgradeService>()?.CleanupAfterUpgradeAsync(
+                    TimeSpan.FromSeconds(60), TimeSpan.FromMinutes(3), CancellationToken.None) ?? Task.CompletedTask);
+            }
+            catch (Exception ex) { logger.Debug(ex, "Upgrade cleanup skipped"); }
+        });
         logger.Debug("Successfully connected via continuous retry loop (attempts: {Attempts})", attempts);
         if (attempts <= 1)
         {
