@@ -56,4 +56,17 @@ public class AppCatalogUpdateTests
             Assert.That(AppCatalogBackfillService.IsCandidate(null, null, null, Guid.NewGuid()), Is.False);
         });
     }
+
+    [Test]
+    public void Backfill_NeedsTheCatalogFilesOnDisk_NotJustTheName()
+    {
+        var catalog = new[] { ("automaton.json", "{}"), ("index.html", "hi"), ("run.js", "x"), ("README.md", "r") };
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogBackfillService.SharesFiles(Archive(catalog), Source, Folder(catalog)), Is.True);
+            Assert.That(AppCatalogBackfillService.SharesFiles(Archive(catalog), Source, Folder(("automaton.json", "{\"x\":1}"), ("index.html", "edited"))), Is.True);
+            Assert.That(AppCatalogBackfillService.SharesFiles(Archive(catalog), Source, Folder(("index.html", "hi"), ("run.js", "x"), ("README.md", "r"))), Is.False);
+            Assert.That(AppCatalogBackfillService.SharesFiles(Archive(catalog), Source, Folder(("automaton.json", "{}"), ("notes.txt", "mine"))), Is.False);
+        });
+    }
 }
