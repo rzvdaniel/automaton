@@ -12,6 +12,10 @@ public class BackendRouteConfigService
 {
     private const string RouteFileName = "managed-runtime-routes.yml";
 
+    // The service is scoped, so concurrent deploys each have an instance but share one route file and one temporary
+    // file. Refreshes run one at a time, and the later one reads the database after the earlier one has written.
+    private static readonly SemaphoreSlim RefreshLock = new(1, 1);
+
     private readonly ApplicationDbContext dbContext;
     private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly IWebHostEnvironment environment;
@@ -52,9 +56,18 @@ public class BackendRouteConfigService
         var eligibleTargets = CreateEligibleTargets(
             pendingGenericRuntimeTargetId,
             pendingGenericRuntimeDeployed);
-        var routes = await LoadSelfHostedRoutesAsync(eligibleTargets, cancellationToken);
 
-        await WriteRoutesAsync(routes, cancellationToken);
+        await RefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            var routes = await LoadSelfHostedRoutesAsync(eligibleTargets, cancellationToken);
+
+            await WriteRoutesAsync(routes, cancellationToken);
+        }
+        finally
+        {
+            RefreshLock.Release();
+        }
     }
 
     private IQueryable<Automaton.Api.Entities.AppDeploymentTarget> CreateEligibleTargets(
