@@ -68,4 +68,16 @@ public class AppCatalogUpdateTests
             Assert.That(AppCatalogBackfillService.SharesFiles(Archive(catalog), Source, Folder(("automaton.json", "{}"), ("notes.txt", "mine"))), Is.False);
         });
     }
+
+    [Test]
+    public void Backfill_MatchesAnOlderOrRenamedCatalogName()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogBackfillService.NameMatches("Automaton Off-site Backup", "Off-site Backup"), Is.True);
+            Assert.That(AppCatalogBackfillService.NameMatches("off-site backup", "Off-site Backup"), Is.True);
+            Assert.That(AppCatalogBackfillService.NameMatches("My notes", "Off-site Backup"), Is.False);
+            Assert.That(AppCatalogBackfillService.NameMatches("", "Off-site Backup"), Is.False);
+        });
+    }
 }
