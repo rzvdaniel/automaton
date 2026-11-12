@@ -1,7 +1,7 @@
 # Two lists for .agents/tools/merge-gate.py (tiers in .agents/skills/pr-review/SKILL.md). Keep each pattern a rooted
 # folder (ending in /) or a rooted file. Loosen or extend either list only in a pull request.
 #
-# High tier, above the "security pass" marker: these changes need a security pass; the tier shows in the release report. The production deploy still needs the owner.
+# High tier, above the "security pass" marker: these changes need a security pass and show as risky in the release report.
 
 /.github/CODEOWNERS                                            @rzvdaniel
 # The review rules themselves

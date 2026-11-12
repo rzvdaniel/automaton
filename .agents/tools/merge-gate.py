@@ -85,7 +85,6 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     rows = []
     head = pr["headRefOid"]
     paths = pr["paths"]
-    labels = {item["name"] for item in pr.get("labels", [])}
     # Only people with write access review; on a public repository anyone can post a review.
     reviews = sorted((item for item in pr.get("reviews", [])
                       if item.get("authorAssociation") in TRUSTED and item.get("state") != "DISMISSED"),
@@ -164,7 +163,7 @@ def main() -> int:
     if len(args) != 1:
         print(__doc__)
         return 2
-    fields = "number,headRefOid,baseRefName,body,labels,reviews,statusCheckRollup,comments,commits"
+    fields = "number,headRefOid,baseRefName,body,reviews,statusCheckRollup,comments,commits"
     pr = json.loads(gh("pr", "view", args[0], "--json", fields, *repo))
     slug = repo[1] if repo else "{owner}/{repo}"
     # Every changed file, with the old path of a rename: a file moved out of a protected folder still counts.
