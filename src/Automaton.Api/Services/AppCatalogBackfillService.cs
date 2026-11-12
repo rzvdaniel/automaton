@@ -7,8 +7,8 @@ namespace Automaton.Api.Services;
 
 /// <summary>
 /// Links an app installed from a catalog before install sources were recorded (#718) to its catalog entry, so Update is offered.
-/// Done lazily when the Overview asks for the update; it only touches an app that has no recorded source, is not a fork, and
-/// is named like exactly one public catalog entry. The recorded commit is the pinned commit whose files match the app's files,
+/// Done lazily when the Overview asks for the update; it only touches an app that has no recorded source and
+/// is named like exactly one public catalog entry (apps copied from the store before install sources were recorded are forks, and still qualify). The recorded commit is the pinned commit whose files match the app's files,
 /// or the oldest pinned commit in the catalog's history when none match (an edited app then shows "edited" on Update).
 /// </summary>
 public sealed class AppCatalogBackfillService(
@@ -29,8 +29,8 @@ public sealed class AppCatalogBackfillService(
         var key = $"catalog-backfill:{appId}";
         if (cache.TryGetValue(key, out _)) return false;
         var app = await dbContext.WebApps.AsNoTracking().Where(x => x.Id == appId)
-            .Select(x => new { x.Name, x.InstalledFromRepo, x.InstalledFromFolder, x.InstalledFromCommit, x.ForkedFromAppId }).FirstOrDefaultAsync(cancellationToken);
-        if (app is null || !IsCandidate(app.InstalledFromRepo, app.InstalledFromFolder, app.InstalledFromCommit, app.ForkedFromAppId)) return false;
+            .Select(x => new { x.Name, x.InstalledFromRepo, x.InstalledFromFolder, x.InstalledFromCommit }).FirstOrDefaultAsync(cancellationToken);
+        if (app is null || !IsCandidate(app.InstalledFromRepo, app.InstalledFromFolder, app.InstalledFromCommit)) return false;
         cache.Set(key, true, RetryAfter);
 
         var entries = await catalog.PublicEntriesAsync(cancellationToken);
@@ -70,7 +70,7 @@ public sealed class AppCatalogBackfillService(
 
         var entity = await dbContext.WebApps.FirstAsync(x => x.Id == appId, cancellationToken);
         // Check again on the tracked row: another request may have linked it meanwhile.
-        if (!IsCandidate(entity.InstalledFromRepo, entity.InstalledFromFolder, entity.InstalledFromCommit, entity.ForkedFromAppId)) return false;
+        if (!IsCandidate(entity.InstalledFromRepo, entity.InstalledFromFolder, entity.InstalledFromCommit)) return false;
         entity.InstalledFromRepo = repo;
         entity.InstalledFromFolder = folder;
         entity.InstalledFromCommit = commit;
@@ -87,7 +87,7 @@ public sealed class AppCatalogBackfillService(
         return paths.Contains("automaton.json") && paths.Count(path => File.Exists(Path.Combine(directory, path))) * 2 >= paths.Count;
     }
 
-    /// <summary>No recorded source at all and not a fork: only then may the server decide where an app came from.</summary>
-    internal static bool IsCandidate(string? repo, string? folder, string? commit, Guid? forkedFrom) =>
-        string.IsNullOrEmpty(repo) && string.IsNullOrEmpty(folder) && string.IsNullOrEmpty(commit) && forkedFrom is null;
+    /// <summary>No recorded source at all: only then may the server decide where an app came from.</summary>
+    internal static bool IsCandidate(string? repo, string? folder, string? commit) =>
+        string.IsNullOrEmpty(repo) && string.IsNullOrEmpty(folder) && string.IsNullOrEmpty(commit);
 }
