@@ -71,6 +71,9 @@ elif args[:2]==['image','inspect'] and '{{.Created}} {{.Id}}' in args:
     print(created.get(args[-1],'2000-01-01T00:00:00Z'), args[-1])
 elif args[:2]==['image','inspect'] and '{{.Id}}' in args:
     print(args[-1] if args[-1].startswith('sha256:') else 'sha256:pinned')
+elif args[:2]==['image','prune'] or args[:2]==['builder','prune']:
+    if os.environ.get('FAKE_PRUNE_FREES')=='1': open(os.environ['FAKE_PRUNED'],'w').close()
+elif args[:2]==['system','df']: print('TYPE TOTAL ACTIVE SIZE RECLAIMABLE')
 elif args[0]=='cp':
     with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
         data=b'key-or-data'
@@ -100,7 +103,12 @@ case "$*" in
   *) echo '{"installationComplete":true}' ;;
 esac
 """)
-        (self.bin / 'df').write_text('#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 29000000 4%% /\\n"\n')
+        (self.bin / 'df').write_text('''#!/bin/sh
+# FAKE_DF_LOW_KB: free space until the fake docker has pruned images (it creates $FAKE_PRUNED), then 29000000.
+free=29000000
+if [ -n "$FAKE_DF_LOW_KB" ] && [ ! -e "$FAKE_PRUNED" ]; then free=$FAKE_DF_LOW_KB; fi
+printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 %s 4%% /\\n" "$free"
+''')
         for tool in self.bin.iterdir():
             tool.chmod(0o755)
         self.update_dir = self.root / 'update'
@@ -324,6 +332,31 @@ esac
         calls = [json.loads(line) for line in log.read_text().splitlines()]
         removed = [args[-1] for args in calls if args[:2] == ['image', 'rm'] and args[-1].startswith('sha256:')]
         self.assertEqual(removed, ['sha256:old1', 'sha256:old2'])
+
+    def test_prunes_unused_docker_data_when_disk_is_short_and_continues(self):
+        log = self.root / 'docker.log'
+        low = {'FAKE_DOCKER_LOG': str(log), 'FAKE_DF_LOW_KB': '8000000', 'FAKE_PRUNED': str(self.root / 'pruned'), 'FAKE_PRUNE_FREES': '1'}
+        result = self.update(*self.bundle(), extra=low)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Freed', result.stdout)
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        self.assertIn(['image', 'prune', '-a', '-f'], calls)
+        self.assertIn(['builder', 'prune', '-f'], calls)
+        self.assertFalse([c for c in calls if 'volume' in c or c[:2] == ['system', 'prune']])
+
+    def test_still_short_after_pruning_names_what_uses_the_disk(self):
+        low = {'FAKE_DF_LOW_KB': '8000000', 'FAKE_PRUNED': str(self.root / 'pruned')}
+        result = self.update(*self.bundle(), extra=low)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('At least 10 GiB free disk space is required', result.stderr)
+        self.assertIn('TYPE TOTAL ACTIVE SIZE RECLAIMABLE', result.stderr)
+        self.assertIn('Backups in', result.stderr)
+
+    def test_does_not_prune_when_enough_space_is_free(self):
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('prune', log.read_text())
 
     def test_keep_backups_option_and_failed_update_keep_everything(self):
         created, manual = self.old_backups(3)

@@ -237,7 +237,23 @@ fi
 disk_path=$backup_root
 while [[ ! -d "$disk_path" ]]; do disk_path=$(dirname -- "$disk_path"); done
 available_kb=$(df -Pk "$disk_path" | awk 'NR==2 {print $4}')
-(( available_kb >= 10485760 )) || { echo 'At least 10 GiB free disk space is required before updating.' >&2; exit 1; }
+if (( available_kb < 10485760 )); then
+    # Short on space: free what Docker can rebuild or pull again (unused images, build cache) and check again.
+    # Never volumes, images of existing containers or the backups. Unused images go too, including rollback ones (pull them again).
+    echo 'Less than 10 GiB free: removing unused Docker images and build cache.'
+    docker image prune -a -f >/dev/null 2>&1 || echo 'Warning: could not remove unused images.' >&2
+    docker builder prune -f >/dev/null 2>&1 || echo 'Warning: could not remove build cache.' >&2
+    after_kb=$(df -Pk "$disk_path" | awk 'NR==2 {print $4}')
+    echo "Freed $(( (after_kb - available_kb) / 1024 )) MiB; $(( after_kb / 1048576 )) GiB free now."
+    available_kb=$after_kb
+fi
+if (( available_kb < 10485760 )); then
+    echo 'At least 10 GiB free disk space is required before updating, even after removing unused Docker images and build cache.' >&2
+    echo 'What uses the disk:' >&2
+    docker system df >&2 || true
+    echo "Backups in $backup_root: $(du -sh "$backup_root" 2>/dev/null | cut -f1)" >&2
+    exit 1
+fi
 
 domain=$(python3 - "$config_dir/installation.json" <<'PY'
 import json, sys
