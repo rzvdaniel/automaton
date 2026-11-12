@@ -13,6 +13,7 @@ import { actionSchedulesService } from '../services/action-schedules.service'
 import { adminAppsService } from '@/features/admin/services/adminAppsService'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { getDeploymentTargetRunnerOptions } from '../utils/deployment-target-runner'
+import { describeCron } from '../utils/app-overview'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { InstallManifest, InstallSource } from '../types/apps.types'
 
@@ -185,7 +186,7 @@ const stepIcon: Record<StepState, string> = {
 const scheduleSummary = computed(() =>
   (manifest.value.schedules ?? [])
     .filter((item) => schedules[item.name])
-    .map((item) => `${item.name} runs ${item.cron ? `on cron ${item.cron}` : `every ${item.intervalSeconds} seconds`}`),
+    .map((item) => `${item.name} runs ${item.cron ? (describeCron(item.cron, item.timeZone) ?? `on cron ${item.cron}`) : `every ${item.intervalSeconds} seconds`}`),
 )
 
 function openInstalledApp() {
@@ -327,7 +328,7 @@ function openInstalledApp() {
               <label :for="`schedule-${item.name}`">
                 {{ item.name }}
                 <small class="text-color-secondary block">
-                  Runs <code>{{ item.action }}</code> {{ item.cron ? `on cron ${item.cron}` : `every ${item.intervalSeconds} seconds` }}<template v-if="item.description"> · {{ item.description }}</template>
+                  Runs <code>{{ item.action }}</code> {{ item.cron ? (describeCron(item.cron, item.timeZone) ?? `on cron ${item.cron}`) : `every ${item.intervalSeconds} seconds` }}<template v-if="item.description"> · {{ item.description }}</template>
                 </small>
               </label>
             </div>

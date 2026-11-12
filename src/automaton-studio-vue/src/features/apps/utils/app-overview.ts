@@ -57,8 +57,60 @@ export function formatWhen(iso: string, now = new Date()): string {
   return seconds < 0 ? `${label} ago` : `in ${label}`
 }
 
-export function describeSchedule(schedule: Pick<ActionSchedule, 'scheduleType' | 'intervalSeconds' | 'cronExpression' | 'runAtUtc'>): string {
-  if (schedule.scheduleType === 'Cron') return `on schedule ${schedule.cronExpression ?? ''}`.trim()
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const pad = (value: number) => String(value).padStart(2, '0')
+
+/** "UTC" when no time zone is set; otherwise the zone's name as stored (for example Europe/Bucharest). */
+export function timeZoneLabel(timeZone?: string | null): string {
+  const zone = (timeZone ?? '').trim()
+  return !zone || zone === 'Etc/UTC' || zone === 'UTC' ? 'UTC' : zone
+}
+
+const whole = (field: string, max: number, min = 0): number | null =>
+  /^\d{1,2}$/.test(field) && Number(field) >= min && Number(field) <= max ? Number(field) : null
+
+/**
+ * Plain words for the common cron shapes (every N minutes, hourly at :MM, daily, weekly on a day, monthly on a day),
+ * with the time zone; null for anything else, so the caller shows the cron text.
+ */
+export function describeCron(expression: string, timeZone?: string | null): string | null {
+  const fields = expression.trim().split(/\s+/)
+  if (fields.length !== 5) return null
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = fields as [string, string, string, string, string]
+  const zone = timeZoneLabel(timeZone)
+  if (month !== '*') return null
+
+  const step = /^\*\/(\d{1,2})$/.exec(minute)
+  if (step && hour === '*' && dayOfMonth === '*' && dayOfWeek === '*') {
+    const every = Number(step[1])
+    return every >= 1 && every <= 59 ? (every === 1 ? 'every minute' : `every ${every} minutes`) : null
+  }
+  if (minute === '*' && hour === '*' && dayOfMonth === '*' && dayOfWeek === '*') return 'every minute'
+
+  const m = whole(minute, 59)
+  if (m === null) return null
+  if (hour === '*' && dayOfMonth === '*' && dayOfWeek === '*') return m === 0 ? 'every hour' : `every hour at :${pad(m)}`
+
+  const h = whole(hour, 23)
+  if (h === null) return null
+  const time = `${pad(h)}:${pad(m)} ${zone}`
+  if (dayOfMonth === '*' && dayOfWeek === '*') return `every day at ${time}`
+  if (dayOfMonth === '*') {
+    const day = whole(dayOfWeek, 7)
+    return day === null ? null : `every ${WEEKDAYS[day % 7]} at ${time}`
+  }
+  if (dayOfWeek === '*') {
+    const day = whole(dayOfMonth, 31, 1)
+    return day === null ? null : `on day ${day} of every month at ${time}`
+  }
+  return null
+}
+
+export function describeSchedule(schedule: Pick<ActionSchedule, 'scheduleType' | 'intervalSeconds' | 'cronExpression' | 'runAtUtc'> & { timeZone?: string | null }): string {
+  if (schedule.scheduleType === 'Cron') {
+    const expression = schedule.cronExpression ?? ''
+    return describeCron(expression, schedule.timeZone) ?? `on schedule ${expression}`.trim()
+  }
   if (schedule.scheduleType === 'OneTime') return 'once'
   const seconds = schedule.intervalSeconds ?? 0
   if (seconds > 0 && seconds % 86400 === 0) return seconds === 86400 ? 'every day' : `every ${seconds / 86400} days`
@@ -98,7 +150,7 @@ export function audienceLabel(audience: SharingAudience | undefined, peopleCount
 export interface StatusInput {
   kind: AppKind
   lastRun?: RunSummary | null
-  schedules: ReadonlyArray<Pick<ActionSchedule, 'enabled' | 'scheduleType' | 'intervalSeconds' | 'cronExpression' | 'runAtUtc' | 'nextRunAtUtc'>>
+  schedules: ReadonlyArray<Pick<ActionSchedule, 'enabled' | 'scheduleType' | 'intervalSeconds' | 'cronExpression' | 'runAtUtc' | 'nextRunAtUtc'> & { timeZone?: string | null }>
   host: string
   audience?: SharingAudience
   peopleCount: number
