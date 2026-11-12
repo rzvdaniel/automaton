@@ -14,7 +14,7 @@ public sealed class HostContainerBuildFailureOutputTests
         Assert.That(message, Does.Contain("exited with code 2"));
         Assert.That(message, Does.Contain("line 200"));
         Assert.That(message, Does.Contain("No space left on device"));
-        Assert.That(message, Does.Not.Contain("line 1\n"));
+        Assert.That(message, Does.Not.Contain("line 170"));
         Assert.That(message.Length, Is.LessThan(2700));
     }
 
