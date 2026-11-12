@@ -45,15 +45,14 @@ public class AppCatalogUpdateTests
         Assert.That(AppCatalogUpdateService.Added(["A", "B"], ["B", "C"]), Is.EqualTo(new[] { "C" }));
 
     [Test]
-    public void Backfill_OnlyTouchesAppsWithNoRecordedSourceThatAreNotForks()
+    public void Backfill_OnlyTouchesAppsWithNoRecordedSource()
     {
         Assert.Multiple(() =>
         {
-            Assert.That(AppCatalogBackfillService.IsCandidate(null, null, null, null), Is.True);
-            Assert.That(AppCatalogBackfillService.IsCandidate("", "", "", null), Is.True);
-            Assert.That(AppCatalogBackfillService.IsCandidate("owner/repo", "tool", new string('a', 40), null), Is.False);
-            Assert.That(AppCatalogBackfillService.IsCandidate("owner/repo", null, null, null), Is.False);
-            Assert.That(AppCatalogBackfillService.IsCandidate(null, null, null, Guid.NewGuid()), Is.False);
+            Assert.That(AppCatalogBackfillService.IsCandidate(null, null, null), Is.True);
+            Assert.That(AppCatalogBackfillService.IsCandidate("", "", ""), Is.True);
+            Assert.That(AppCatalogBackfillService.IsCandidate("owner/repo", "tool", new string('a', 40)), Is.False);
+            Assert.That(AppCatalogBackfillService.IsCandidate("owner/repo", null, null), Is.False);
         });
     }
 
