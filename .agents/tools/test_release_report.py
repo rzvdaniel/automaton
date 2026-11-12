@@ -38,6 +38,8 @@ class Parts(unittest.TestCase):
     def test_findings_count(self):
         self.assertEqual(rr.findings_count(REVIEW["body"]), 2)
         self.assertIsNone(rr.findings_count("APPROVE"))
+        self.assertEqual(rr.findings_count("APPROVE\nImportant: 1, Nit: 2, Pre-existing: 0"), 3)
+        self.assertEqual(rr.findings_count("Important: 0 findings"), 0)
 
     def test_migration_notes(self):
         self.assertIn("Down reverses it without losing data", rr.migration_note("A", DOWN_OK))

@@ -46,8 +46,12 @@ def what_changed(body: str) -> str:
 
 
 def findings_count(review_body: str) -> int | None:
-    """Bullets or numbered items under a 'Findings' heading; None when the review has no such list."""
-    match = re.search(r"^\W*(?:findings|important|issues)\W*$(.*?)(?=^\W*(?:security|nits?|pre-existing|tier)\W*:?\W*$|\Z)",
+    """Findings the review lists: the counts on an 'Important: 0, Nit: 1' line, else bullets under a 'Findings'
+    heading; None when the review has neither."""
+    counts = re.search(r"^\W*(?:important|blocking)\W*:?\s*(\d+)(.*)$", review_body or "", re.I | re.M)
+    if counts:
+        return int(counts.group(1)) + sum(int(n) for n in re.findall(r"(?:nits?|pre-existing)\W*:?\s*(\d+)", counts.group(2), re.I))
+    match = re.search(r"^\W*findings\W*$(.*?)(?=^\W*(?:security|nits?|pre-existing|tier)\W*:?\W*$|\Z)",
                       review_body or "", re.I | re.M | re.S)
     if not match:
         return None

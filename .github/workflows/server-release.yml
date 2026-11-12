@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Render the report
         id: render
         continue-on-error: true
@@ -42,6 +43,7 @@ jobs:
         id: ai
         if: steps.render.outcome == 'success'
         continue-on-error: true
+        timeout-minutes: 10
         # The token exists only in this workflow (manual runs from main), never in pull_request workflows.
         # Pinned to a commit; tools are read-only plus one output file. PR text is untrusted input.
         uses: anthropics/claude-code-action@97e0a7f336e732b8c9400f7c7d71d41725923201 # v1
@@ -62,10 +64,13 @@ jobs:
         if: always()
         run: |
           {
+            echo "## AI check"; echo
+            # The release body is public: keep only the verdict line and up to five short bullets, never raw model output.
             if [[ -f release-ai-check.md ]] && head -1 release-ai-check.md | grep -qE '^Verdict: (Green|Yellow|Red)$'; then
-              echo "## AI check"; echo; cat release-ai-check.md
+              head -1 release-ai-check.md
+              tail -n +2 release-ai-check.md | grep -E '^- ' | grep -viE 'sk-ant|oat0|gh[pousr]_|token|secret|password' | head -5 | cut -c1-240 || true
             else
-              echo "## AI check"; echo; echo "AI check unavailable"
+              echo "AI check unavailable"
             fi
             echo
             if [[ -f release-report.md ]]; then cat release-report.md; else echo "Release report unavailable; see the merged pull requests."; fi
@@ -158,6 +163,8 @@ jobs:
           path: '*.image'
   bundle:
     needs: [images, report]
+    # A report problem must never stop a release: run whenever the images were built.
+    if: always() && needs.images.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write

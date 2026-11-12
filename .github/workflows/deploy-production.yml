@@ -34,12 +34,13 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 1; }
           url="https://github.com/$GITHUB_REPOSITORY/releases/tag/server-v$VERSION"
           body=$(gh release view "server-v$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null || true)
-          verdict=$(printf '%s\n' "$body" | grep -m1 -E '^Verdict: (Green|Yellow|Red)$' | sed 's/^Verdict: //' || true)
+          section=$(printf '%s\n' "$body" | sed -n '/^## AI check/,/^## Automaton Server/p' | sed '$d')
+          verdict=$(printf '%s\n' "$section" | grep -m1 -E '^Verdict: (Green|Yellow|Red)$' | sed 's/^Verdict: //' || true)
           {
             echo "### Release $VERSION: AI check ${verdict:-unavailable}"
             echo
             if [[ "$verdict" == Red ]]; then echo "**Red: read the report before approving.** This is a warning; it does not block the deploy."; echo; fi
-            printf '%s\n' "$body" | sed -n '/^## AI check/,/^## Automaton Server/p' | sed '$d'
+            printf '%s\n' "$section"
             echo "[Full release report]($url)"
           } >> "$GITHUB_STEP_SUMMARY"
 
