@@ -23,4 +23,12 @@ public sealed class DeploymentOperationErrorMessageTests
         Assert.That(fitted, Does.EndWith("-END"));
         Assert.That(fitted, Does.Contain("cut to fit"));
     }
+
+    [Test]
+    public void LongError_DoesNotSplitAnEmoji()
+    {
+        var fitted = DeploymentOperation.FitErrorMessage(string.Concat(Enumerable.Repeat("😀", 5000)))!;
+        Assert.That(fitted.Length, Is.LessThanOrEqualTo(DeploymentOperation.ErrorMessageMaxLength));
+        Assert.That(() => new System.Text.UTF8Encoding(false, true).GetBytes(fitted), Throws.Nothing);
+    }
 }

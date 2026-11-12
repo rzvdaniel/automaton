@@ -45,7 +45,11 @@ public sealed class DeploymentOperation
         const string note = "\n... [error cut to fit; start and end kept] ...\n";
         var keep = ErrorMessageMaxLength - note.Length;
         var head = keep / 4;
-        return error[..head] + note + error[^(keep - head)..];
+        var tail = keep - head;
+        // Do not split a surrogate pair at either cut: Postgres rejects the lone half.
+        if (char.IsHighSurrogate(error[head - 1])) head--;
+        if (char.IsLowSurrogate(error[^tail])) tail--;
+        return error[..head] + note + error[^tail..];
     }
 
     public string? ResultJson { get; set; }
