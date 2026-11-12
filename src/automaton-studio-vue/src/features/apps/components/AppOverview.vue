@@ -46,7 +46,8 @@ watch(() => props.app.id, async (id) => {
   secretNames.value = null
   permissions.value = []
   update.value = null
-  if (props.app.installedFromRepo && props.app.canUpdate !== false) {
+  // Ask even without a recorded source: the server links apps installed before update tracking during this call (#1080).
+  if (props.app.canUpdate !== false) {
     appsService.getCatalogUpdate(id).then((result) => { if (props.app.id === id && result.available) update.value = result }).catch(() => {})
   }
   const [secrets, perms] = await Promise.allSettled([
