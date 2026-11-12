@@ -43,4 +43,17 @@ public class AppCatalogUpdateTests
     [Test]
     public void Added_ListsOnlyNamesTheNewVersionAdds() =>
         Assert.That(AppCatalogUpdateService.Added(["A", "B"], ["B", "C"]), Is.EqualTo(new[] { "C" }));
+
+    [Test]
+    public void Backfill_OnlyTouchesAppsWithNoRecordedSourceThatAreNotForks()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogBackfillService.IsCandidate(null, null, null, null), Is.True);
+            Assert.That(AppCatalogBackfillService.IsCandidate("", "", "", null), Is.True);
+            Assert.That(AppCatalogBackfillService.IsCandidate("owner/repo", "tool", new string('a', 40), null), Is.False);
+            Assert.That(AppCatalogBackfillService.IsCandidate("owner/repo", null, null, null), Is.False);
+            Assert.That(AppCatalogBackfillService.IsCandidate(null, null, null, Guid.NewGuid()), Is.False);
+        });
+    }
 }

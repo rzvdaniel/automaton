@@ -127,6 +127,59 @@ public sealed class AppCatalogService(
         return null;
     }
 
+    /// <summary>The apps of the enabled public catalog sources (a private source's history cannot be read without its token).</summary>
+    internal async Task<IReadOnlyList<(CatalogSourceStore.SourceRef Source, string Repo, CatalogApp App)>> PublicEntriesAsync(CancellationToken cancellationToken)
+    {
+        var result = new List<(CatalogSourceStore.SourceRef, string, CatalogApp)>();
+        foreach (var source in (await sources.EnabledAsync(cancellationToken)).Where(s => s.Token is null))
+        {
+            var (entry, _) = await LoadSourceAsync(source, false, cancellationToken);
+            if (entry is null) continue;
+            result.AddRange(entry.Document.Apps.Select(app => (source, entry.Document.Repo, app)));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// The commits a public catalog has pinned for a folder over time, newest first (read from the history of its catalog.json,
+    /// at most <paramref name="limit"/> revisions). Empty when GitHub cannot be reached.
+    /// </summary>
+    internal async Task<IReadOnlyList<string>> PinnedHistoryAsync(CatalogSourceStore.SourceRef source, string repo, string folder, int limit, CancellationToken cancellationToken)
+    {
+        var api = (configuration["Catalog:ApiBaseUrl"] is { Length: > 0 } a ? a : "https://api.github.com").TrimEnd('/');
+        var raw = (configuration["Catalog:RawBaseUrl"] is { Length: > 0 } r ? r : "https://raw.githubusercontent.com").TrimEnd('/');
+        var key = InstalledKey(repo, folder);
+        var commits = new List<string>();
+        try
+        {
+            using var client = httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Automaton-Server");
+            using var list = await client.GetAsync($"{api}/repos/{source.Repo}/commits?path=catalog.json&sha={Uri.EscapeDataString(source.Branch)}&per_page={limit}", cancellationToken);
+            if (!list.IsSuccessStatusCode) return commits;
+            using var revisions = JsonDocument.Parse(await list.Content.ReadAsStringAsync(cancellationToken));
+            foreach (var revision in revisions.RootElement.EnumerateArray())
+            {
+                var sha = revision.GetProperty("sha").GetString();
+                if (sha is null) continue;
+                using var file = await client.GetAsync($"{raw}/{source.Repo}/{sha}/catalog.json", cancellationToken);
+                if (!file.IsSuccessStatusCode) continue;
+                var body = await ReadBoundedAsync(file, cancellationToken);
+                CatalogDocument document;
+                try { document = Parse(body, source.Official ? null : source.Repo); }
+                catch (Exception exception) when (exception is InvalidDataException or JsonException) { continue; }
+                var pinned = document.Apps.FirstOrDefault(app => InstalledKey(document.Repo, app.Folder) == key)?.Commit;
+                if (pinned is not null && !commits.Contains(pinned)) commits.Add(pinned);
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or InvalidDataException or JsonException or KeyNotFoundException)
+        {
+            if (cancellationToken.IsCancellationRequested) throw;
+            logger.LogWarning("Catalog history could not be read: {Reason}", exception.Message);
+        }
+        return commits;
+    }
+
     /// <summary>The read token of a private source, only for an app that source's catalog lists at exactly that folder and commit.</summary>
     public async Task<string?> TokenForAsync(string repo, string folder, string commit, CancellationToken cancellationToken)
     {
