@@ -165,6 +165,7 @@ public class AppsService
             Description = entity.Description,
             IsPublished = entity.IsPublished,
             IsPaused = entity.IsPaused,
+            ActionsOnly = AppListingService.IsActionsOnly(entity.ApplicationContractJson),
             IsForkable = entity.IsForkable,
             PublicUrl = entity.PublicUrl,
             PublishedAt = entity.PublishedAt,
