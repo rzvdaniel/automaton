@@ -37,3 +37,27 @@ export interface HealthTile {
   detail: string
   level: TileLevel
 }
+
+/** GET /api/server/cleanup (ServerCleanupResponse). */
+export interface ServerCleanupSettings {
+  timeUtc: string
+  keepDays: number
+  journalLimitMb: number
+}
+
+export interface ServerCleanupRun {
+  id: string
+  runnerName: string
+  startedAtUtc: string
+  finishedAtUtc: string | null
+  result: string
+  bytesFreed: number
+  trigger: string
+  message: string | null
+}
+
+export interface ServerCleanup {
+  settings: ServerCleanupSettings
+  nextRunAtUtc: string
+  runs: ServerCleanupRun[]
+}
