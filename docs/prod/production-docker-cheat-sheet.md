@@ -50,7 +50,7 @@ sudo journalctl --disk-usage
 
 Inspect all relevant filesystems, including Docker/containerd, persistent volumes, logs and backups. Docker layer/cache totals overlap; never remove containerd snapshots manually. Replacement/build admission requires at least 10 GiB and 15% free space. Expand storage if live state and retained artifacts cannot fit with that headroom.
 
-`host-storage.sh` and `docker/host-maintenance/` provide capacity inspection and opt-in retention policies. Applying host policies or restarting Docker is separate from a source merge.
+`docker/host-maintenance/` holds opt-in Docker, journald and tmpfiles settings; Server Console warns about low disk. Applying host policies or restarting Docker is separate from a source merge.
 
 - The Runner's nightly cleanup (Studio, Server, Cleanup) removes unused images and build cache older than the keep days and trims the journal. It never removes images a container uses or volumes.
 - Configure the actual builder's native GC with a 2 GB cache target. After confirming no build is active, bounded one-time cleanup can use `docker builder prune -af --keep-storage 2GB`.
