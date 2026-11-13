@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { appsService } from '../services/apps.service'
 import type { AppPermissionsResponse } from '../types/apps.types'
+import Button from 'primevue/button'
+import { adminAppsService } from '@/features/admin/services/adminAppsService'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 const props = defineProps<{ appId: string }>()
@@ -12,6 +14,22 @@ const loading = ref(false)
 const failed = ref(false)
 
 const isAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+
+const saving = ref<string | null>(null)
+const actionFailed = ref(false)
+
+async function setPermission(permission: string, approved: boolean) {
+  saving.value = permission
+  actionFailed.value = false
+  try {
+    await adminAppsService.setPermission(props.appId, permission, approved)
+    await load()
+  } catch {
+    actionFailed.value = true
+  } finally {
+    saving.value = null
+  }
+}
 
 function pillClass(status: string) {
   switch (status) {
@@ -52,12 +70,18 @@ onMounted(() => {
       <div v-for="item in state.permissions" :key="item.permission" class="row">
         <code>{{ item.permission }}</code>
         <span class="pill" :class="pillClass(item.status)">{{ label(item.status) }}</span>
+        <span v-if="isAdministrator" class="actions">
+          <Button v-if="item.status === 'Approved'" label="Revoke" :aria-label="`Revoke ${item.permission}`" severity="danger" outlined size="small" :loading="saving === item.permission" :disabled="saving !== null" @click="setPermission(item.permission, false)" />
+          <template v-else>
+            <Button label="Approve" :aria-label="`Approve ${item.permission}`" size="small" :loading="saving === item.permission" :disabled="saving !== null" @click="setPermission(item.permission, true)" />
+            <Button v-if="item.status === 'Pending'" label="Reject" :aria-label="`Reject ${item.permission}`" severity="secondary" outlined size="small" :disabled="saving !== null" @click="setPermission(item.permission, false)" />
+          </template>
+        </span>
       </div>
-      <p v-if="state.waiting.length > 0" class="hint">
-        <template v-if="isAdministrator">You can approve this as a system administrator.</template>
-        <template v-else>A system administrator of this server must approve {{ state.waiting.join(', ') }}.</template>
-        <a v-if="state.approvalUrl && isAdministrator" :href="state.approvalUrl">Review and approve</a>
-        <code v-else-if="state.approvalUrl" class="url">{{ state.approvalUrl }}</code>
+      <p v-if="actionFailed" class="hint" role="alert">Could not change the permission.</p>
+      <p v-if="state.waiting.length > 0 && !isAdministrator" class="hint">
+        A system administrator of this server must approve {{ state.waiting.join(', ') }}.
+        <code v-if="state.approvalUrl" class="url">{{ state.approvalUrl }}</code>
       </p>
     </template>
   </section>
@@ -73,5 +97,6 @@ code { font-family: var(--mono); font-size: 13px; }
 .pill--ok { border: 1px solid var(--ok); color: var(--ok); }
 .pill--wait { border: 1px solid var(--signal); color: var(--signal-ink); }
 .pill--bad { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
+.actions { display: flex; gap: 8px; }
 .url { overflow-wrap: anywhere; }
 </style>

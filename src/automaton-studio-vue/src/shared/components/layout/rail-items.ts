@@ -8,6 +8,8 @@ export interface RailItem {
   hideForAppUser?: boolean
   /** Only for system administrators. */
   sysAdminOnly?: boolean
+  /** Shows the waiting-approvals count as a badge. */
+  waitingBadge?: boolean
 }
 
 const startsWith = (prefix: string) => (path: string) => path === prefix || path.startsWith(`${prefix}/`)
@@ -19,6 +21,7 @@ const MAIN: RailItem[] = [
   { label: 'People', icon: 'pi pi-users', to: '/people', match: (p) => startsWith('/people')(p) || startsWith('/organizations')(p) || startsWith('/admin/users')(p) },
   { label: 'Server', icon: 'pi pi-server', to: '/server', match: (p) => startsWith('/server')(p) || startsWith('/runners')(p), hideForAppUser: true },
   { label: 'Backups', icon: 'pi pi-database', to: '/admin/backups', match: startsWith('/admin/backups'), sysAdminOnly: true },
+  { label: 'Admin', icon: 'pi pi-shield', to: '/admin', match: (p) => startsWith('/admin')(p) && !startsWith('/admin/backups')(p) && !startsWith('/admin/users')(p), sysAdminOnly: true, waitingBadge: true },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings', match: startsWith('/settings') },
 ]
 

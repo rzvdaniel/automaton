@@ -5,6 +5,7 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { adminAppsService } from '@/features/admin/services/adminAppsService'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { DOCS_LINK, railItems, roleLabel, type RailItem } from './rail-items'
 
@@ -35,6 +36,14 @@ const roles = computed(() => authStore.user?.roles ?? [])
 const visible = computed(() => railItems({ roles: roles.value, appUserOnly: appUserOnly.value }))
 const userName = computed(() => authStore.userName || authStore.userEmail || 'User')
 const userRole = computed(() => roleLabel(roles.value, appUserOnly.value))
+
+// Permission requests waiting for approval, only fetched for system administrators.
+const waiting = ref(0)
+async function refreshWaiting() {
+  waiting.value = roles.value.includes('SysAdmin') ? await adminAppsService.waitingCount() : 0
+}
+onMounted(refreshWaiting)
+watch(() => route.path, refreshWaiting)
 
 const isActive = (item: RailItem) => item.match(route.path)
 
@@ -86,6 +95,7 @@ const userMenuItems = computed<MenuItem[]>(() => [
           >
             <i :class="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
+            <span v-if="item.waitingBadge && waiting > 0" class="rail-badge" :aria-label="`${waiting} waiting for approval`">{{ waiting }}</span>
           </a>
         </template>
       </nav>
@@ -189,6 +199,17 @@ const userMenuItems = computed<MenuItem[]>(() => [
 .rail-user:focus-visible {
   outline: 2px solid var(--signal);
   outline-offset: 2px;
+}
+
+.rail-badge {
+  margin-left: auto;
+  min-width: 1.3rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font: 600 0.75rem var(--mono);
+  text-align: center;
 }
 
 .rail-item i {

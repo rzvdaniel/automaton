@@ -6,7 +6,16 @@ const labels = (items: { label: string }[]) => items.map((item) => item.label)
 describe('railItems', () => {
   it('shows exactly the six places to a system administrator', () => {
     const { main } = railItems({ roles: ['SysAdmin'], appUserOnly: false })
-    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Backups', 'Settings'])
+    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Backups', 'Admin', 'Settings'])
+  })
+
+  it('keeps Backups and People for their admin pages and Admin for the rest', () => {
+    const { main } = railItems({ roles: ['SysAdmin'], appUserOnly: false })
+    const active = (path: string) => labels(main.filter((item) => item.match(path)))
+    expect(active('/admin')).toEqual(['Admin'])
+    expect(active('/admin/apps/x')).toEqual(['Admin'])
+    expect(active('/admin/backups')).toEqual(['Backups'])
+    expect(active('/admin/users')).toEqual(['People'])
   })
 
   it('hides Backups from members', () => {
@@ -27,6 +36,7 @@ describe('railItems', () => {
       People: '/people',
       Server: '/server',
       Backups: '/admin/backups',
+      Admin: '/admin',
       Settings: '/settings',
     })
   })

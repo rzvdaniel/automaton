@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { isAxiosError } from 'axios'
-import { useAuthStore } from '@/features/auth/stores/auth.store'
 import SelfHostedRunnerInstallDialog from '@/features/runners/components/SelfHostedRunnerInstallDialog.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { isVisibleApplicationRunner } from '@/features/runners/utils/runner-classification'
@@ -17,14 +16,6 @@ import type { ServerHealth } from '../types/server.types'
 
 const refreshMilliseconds = 15000
 
-const authStore = useAuthStore()
-const isAdmin = computed(() => ['Admin', 'SysAdmin'].some((role) => authStore.user?.roles?.includes(role)))
-const adminLinks = [
-  { label: 'All apps', to: '/admin/apps' },
-  { label: 'App activity', to: '/admin/app-activity' },
-  { label: 'File exclusions', to: '/admin/app-deploy-rules' },
-  { label: 'Audit events', to: '/admin/logs' },
-]
 
 const loading = ref(true)
 const runners = ref<Runner[]>([])
@@ -106,12 +97,6 @@ onBeforeUnmount(() => clearInterval(timer))
       <RunnersList v-else :runners="visibleRunners" @changed="loadRunners" />
     </section>
 
-    <section v-if="isAdmin" data-testid="admin-links">
-      <h2 class="studio-section">Administration</h2>
-      <div class="admin-chips">
-        <RouterLink v-for="link in adminLinks" :key="link.to" :to="link.to" class="chip">{{ link.label }}</RouterLink>
-      </div>
-    </section>
 
     <SelfHostedRunnerInstallDialog v-model:visible="showInstall" @created="loadRunners" />
   </div>
