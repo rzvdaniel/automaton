@@ -22,7 +22,7 @@ public sealed class ServerCleanupController(ServerCleanupService cleanup, Viewer
 
     /// <summary>Where Studio is, so an app can link to its Server page (reads only).</summary>
     internal static string? StudioUrl(string? websiteUrl)
-        => Uri.TryCreate(websiteUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri.GetLeftPart(UriPartial.Authority) : null;
+        => Uri.TryCreate(websiteUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.UriEscaped) : null;
 
     [HttpPut("settings")]
     public async Task<ActionResult<ServerCleanupResponse>> Update([FromBody] ServerCleanupSettingsDto request, CancellationToken token)

@@ -174,6 +174,7 @@ public sealed class ServerCleanupTests
     public void TheReadOffersStudiosAddressOnlyWhenItIsAnHttpAddress()
     {
         Assert.That(ServerCleanupController.StudioUrl("https://studio.example.test/some/path"), Is.EqualTo("https://studio.example.test"));
+        Assert.That(ServerCleanupController.StudioUrl("https://user:pass@studio.example.test/x"), Is.EqualTo("https://studio.example.test"));
         Assert.That(ServerCleanupController.StudioUrl("javascript:alert(1)"), Is.Null);
         Assert.That(ServerCleanupController.StudioUrl(""), Is.Null);
         Assert.That(ServerCleanupController.StudioUrl(null), Is.Null);
