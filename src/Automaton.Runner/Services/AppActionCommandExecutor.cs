@@ -8,7 +8,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
     RunnerDeploymentService runtime,
     MachineStaticSitePublisher? staticSites = null,
     MachineApplicationStorageCleanup? storageCleanup = null,
-    RunnerSelfUpgradeService? selfUpgrade = null)
+    RunnerSelfUpgradeService? selfUpgrade = null,
+    HostCleanupService? hostCleanup = null)
 {
     public async Task<RunnerExecutionResult> ExecuteAsync(AppActionCommand command, CancellationToken token)
     {
@@ -32,6 +33,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "upgrade-runner" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable."))
                 .StartAsync(command.Read<UpgradeRunnerRequest>(), token),
             "upgrade-status" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable.")).StatusAsync(token),
+            "host-cleanup" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
+                .RunAsync(command.Read<HostCleanupRequest>(), token),
             _ => throw new InvalidDataException("Unknown App Action command.")
         };
         return new() { Outcome = "Succeeded", Started = started, Finished = DateTime.UtcNow,

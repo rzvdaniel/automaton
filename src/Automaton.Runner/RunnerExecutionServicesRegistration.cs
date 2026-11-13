@@ -15,6 +15,7 @@ internal static class RunnerExecutionServicesRegistration
             var configuration = provider.GetRequiredService<ConfigurationService>();
             return new(() => configuration.RunnerId, Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID"));
         });
+        services.AddSingleton<HostCleanupService>(_ => new());
         services.AddSingleton<AppActionCommandExecutor>();
         services.AddSingleton<MachineActionDependencyPreparer>();
         services.AddSingleton<MachineActionExecutionHandler>();

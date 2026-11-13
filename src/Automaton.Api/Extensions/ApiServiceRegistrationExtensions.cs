@@ -279,6 +279,8 @@ internal static class ApiAuthorizationRegistration
                 AppPermissionAuthenticationOptions.BackupsReadPolicy, AppPermissionApproval.BackupsRead);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.ServerReadPolicy, AppPermissionApproval.ServerRead);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.ServerCleanupPolicy, AppPermissionApproval.ServerCleanup);
             AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.NotifyEmailPolicy, AppPermissionApproval.NotifyEmail);
 
@@ -327,6 +329,8 @@ internal static class ApiMessagingRegistration
         services.AddScoped<AdminUserProvisioningService>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
         services.AddHostedService<SecretGrantCleanupService>();
+        services.AddScoped<Automaton.Api.ServerCleanup.ServerCleanupService>();
+        services.AddHostedService<Automaton.Api.ServerCleanup.ServerCleanupScheduler>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
         services.AddCap(options =>
         {

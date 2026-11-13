@@ -180,29 +180,28 @@ printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 3000000
         self.assertTrue((folders[0] / 'SHA256SUMS').is_file())
         self.assertFalse(list(nightly.glob('*.tar.age')))
 
-    def test_cleanup_script_removes_only_unused_images_and_old_cache_and_installs_a_timer_after_the_backup(self):
+    def test_cleanup_script_removes_the_old_host_timer_and_nothing_else(self):
         script = REPO / 'docker/install/cleanup.sh'
+        (self.systemd_dir / 'automaton-cleanup.timer').write_text('[Timer]\n')
+        (self.systemd_dir / 'automaton-cleanup.service').write_text('[Service]\n')
+        (self.systemd_dir / 'automaton-backup.timer').write_text('[Timer]\n')
         log = self.root / 'cleanup.log'
         environment = self.environment | {'FAKE_DOCKER_LOG': str(log)}
-        run = lambda *args: subprocess.run(['bash', str(script), '--install-dir', str(self.install), *args],
-                                           env=environment, capture_output=True, text=True)
-        result = run()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        calls = [json.loads(line) for line in log.read_text().splitlines()]
-        self.assertIn(['image', 'prune', '-a', '-f', '--filter', 'until=168h'], calls)
-        self.assertIn(['builder', 'prune', '-f', '--filter', 'until=168h'], calls)
-        self.assertIn(['journalctl', '--vacuum-size=200M'], calls)
-        self.assertFalse(any('volume' in ' '.join(call) or '--volumes' in call for call in calls))
-        result = run('--install-timer')
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('After=docker.service automaton-backup.service', (self.systemd_dir / 'automaton-cleanup.service').read_text())
-        self.assertIn('OnCalendar=*-*-* 05:00:00', (self.systemd_dir / 'automaton-cleanup.timer').read_text())
+        for _ in range(2):  # safe to repeat
+            result = subprocess.run(['bash', str(script), '--install-dir', str(self.install), '--remove-timer'],
+                                    env=environment, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.systemd_dir / 'automaton-cleanup.timer').exists())
+        self.assertFalse((self.systemd_dir / 'automaton-cleanup.service').exists())
+        self.assertTrue((self.systemd_dir / 'automaton-backup.timer').exists())
+        self.assertFalse(log.exists() and 'prune' in log.read_text(), 'the host script no longer cleans anything itself')
 
-    def test_update_installs_the_cleanup_timer(self):
+    def test_update_removes_the_old_cleanup_timer(self):
+        (self.systemd_dir / 'automaton-cleanup.timer').write_text('[Timer]\n')
         result = self.update(*self.bundle())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((self.install / 'cleanup.sh').stat().st_mode & 0o777, 0o700)
-        self.assertTrue((self.systemd_dir / 'automaton-cleanup.timer').is_file())
+        self.assertFalse((self.systemd_dir / 'automaton-cleanup.timer').exists())
 
     def test_enables_updates_from_studio_before_the_api_is_recreated(self):
         log = self.root / 'docker.log'
