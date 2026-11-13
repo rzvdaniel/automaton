@@ -18,6 +18,11 @@ describe('railItems', () => {
     expect(active('/admin/users')).toEqual(['People'])
   })
 
+  it('shows Admin, but not Backups, to a plain administrator', () => {
+    const { main } = railItems({ roles: ['Admin'], appUserOnly: false })
+    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Admin', 'Settings'])
+  })
+
   it('hides Backups from members', () => {
     const { main } = railItems({ roles: ['User'], appUserOnly: false })
     expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Settings'])
