@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import Message from 'primevue/message'
@@ -10,6 +10,8 @@ import AppRow from '../components/AppRow.vue'
 import NewAppDialog from '../components/NewAppDialog.vue'
 import CatalogPanel from '../components/CatalogPanel.vue'
 import SharedAppsSection from '../components/SharedAppsSection.vue'
+import { adminAppsService } from '@/features/admin/services/adminAppsService'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { organizationsService, type OrganizationAppSummary } from '@/features/organizations/services/organizationsService'
 import { useAppsStore } from '../stores/apps.store'
 import { APP_START_PROGRESS } from '../utils/app-action-error'
@@ -20,6 +22,13 @@ import {
 const router = useRouter()
 const route = useRoute()
 const appsStore = useAppsStore()
+
+// Notice for system administrators when permission requests are waiting.
+const authStore = useAuthStore()
+const waitingRequests = ref(0)
+onMounted(async () => {
+  if (authStore.user?.roles?.includes('SysAdmin')) waitingRequests.value = await adminAppsService.waitingCount()
+})
 
 // Tab state: the Apps list or the Catalog.
 const activeTabIndex = ref(route.meta.appsTab === 'catalog' ? 1 : 0)
@@ -115,6 +124,12 @@ const handleRetry = async () => {
         </div>
       </header>
 
+      <p v-if="waitingRequests > 0" class="apps-waiting" data-testid="waiting-notice">
+        <RouterLink to="/admin/apps?waiting=true">
+          {{ waitingRequests }} permission {{ waitingRequests === 1 ? 'request is' : 'requests are' }} waiting
+        </RouterLink>
+      </p>
+
       <AppFilterBar
         v-if="appsStore.hasApps"
         v-model:search="searchQuery"
@@ -197,6 +212,8 @@ const handleRetry = async () => {
 .apps-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .apps-head__title { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); }
 .apps-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; max-width: 52ch; }
+.apps-waiting { margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--signal); border-radius: var(--radius-card); font-size: 14px; }
+.apps-waiting a { color: var(--signal-ink); font-weight: 600; }
 .apps-head__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-ink.p-button { min-height: 44px; background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; }
 .btn-ink.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }

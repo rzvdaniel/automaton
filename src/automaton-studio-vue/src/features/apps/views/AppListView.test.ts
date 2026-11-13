@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppListItem } from '../types/apps.types'
 import AppListView from './AppListView.vue'
 import { useAppsStore } from '../stores/apps.store'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 const push = vi.fn()
 const toastAdd = vi.hoisted(() => vi.fn())
@@ -21,6 +22,8 @@ vi.mock('@/features/organizations/services/organizationsService', () => ({
   organizationsService: { getMyAssignedApps: assigned },
 }))
 vi.mock('../services/apps.service', () => ({ appsService: {} }))
+const waitingCount = vi.hoisted(() => vi.fn())
+vi.mock('@/features/admin/services/adminAppsService', () => ({ adminAppsService: { waitingCount } }))
 vi.mock('../components/CatalogPanel.vue', () => ({ default: { template: '<div />' } }))
 
 const live = { name: 'Live', status: 'Running', isHostedRunner: false, runnerOnline: true, genericRuntimeDeployed: true, routePath: '/' }
@@ -29,8 +32,9 @@ const item = (over: Partial<AppListItem>): AppListItem => ({
   canDelete: true, canUpdate: true, runtime: { genericRuntimeDeployed: true }, liveEnvironment: live, ...over,
 })
 
-async function mountView(apps: AppListItem[]) {
+async function mountView(apps: AppListItem[], roles: string[] = []) {
   setActivePinia(createPinia())
+  useAuthStore().user = { roles } as never
   const store = useAppsStore()
   store.fetchApps = vi.fn(async () => { store.listApps = apps })
   const wrapper = mount(AppListView, { global: { plugins: [PrimeVue, ToastService] } })
@@ -43,6 +47,7 @@ const rows = (wrapper: Awaited<ReturnType<typeof mountView>>) => wrapper.findAll
 describe('AppListView', () => {
   beforeEach(() => {
     push.mockClear()
+    waitingCount.mockReset().mockResolvedValue(2)
     assigned.mockResolvedValue([{ id: 'sh1', name: 'Shared Tool', isPublished: false }])
   })
 
@@ -144,5 +149,18 @@ describe('AppListView', () => {
     expect(dialog.props('visible')).toBe(true)
     dialog.vm.$emit('catalog')
     expect(push).toHaveBeenCalledWith({ name: 'apps-catalog' })
+  })
+
+  it('tells a system administrator how many permission requests are waiting', async () => {
+    const wrapper = await mountView([], ['SysAdmin'])
+    const notice = wrapper.find('[data-testid="waiting-notice"]')
+    expect(notice.text()).toContain('2 permission requests are waiting')
+    expect(notice.find('a').attributes('href')).toBe('/admin/apps?waiting=true')
+  })
+
+  it('shows no notice to a plain user', async () => {
+    const wrapper = await mountView([], ['User'])
+    expect(wrapper.find('[data-testid="waiting-notice"]').exists()).toBe(false)
+    expect(waitingCount).not.toHaveBeenCalled()
   })
 })

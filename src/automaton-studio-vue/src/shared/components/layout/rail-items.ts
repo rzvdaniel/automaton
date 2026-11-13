@@ -8,6 +8,10 @@ export interface RailItem {
   hideForAppUser?: boolean
   /** Only for system administrators. */
   sysAdminOnly?: boolean
+  /** Only for administrators (Admin or SysAdmin), like the /admin routes. */
+  adminOnly?: boolean
+  /** Shows the waiting-approvals count as a badge. */
+  waitingBadge?: boolean
 }
 
 const startsWith = (prefix: string) => (path: string) => path === prefix || path.startsWith(`${prefix}/`)
@@ -19,6 +23,7 @@ const MAIN: RailItem[] = [
   { label: 'People', icon: 'pi pi-users', to: '/people', match: (p) => startsWith('/people')(p) || startsWith('/organizations')(p) || startsWith('/admin/users')(p) },
   { label: 'Server', icon: 'pi pi-server', to: '/server', match: (p) => startsWith('/server')(p) || startsWith('/runners')(p), hideForAppUser: true },
   { label: 'Backups', icon: 'pi pi-database', to: '/admin/backups', match: startsWith('/admin/backups'), sysAdminOnly: true },
+  { label: 'Admin', icon: 'pi pi-shield', to: '/admin', match: (p) => startsWith('/admin')(p) && !startsWith('/admin/backups')(p) && !startsWith('/admin/users')(p), adminOnly: true, waitingBadge: true },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings', match: startsWith('/settings') },
 ]
 
@@ -27,8 +32,9 @@ export const DOCS_LINK = { label: 'Documentation', icon: 'pi pi-book', href: 'ht
 
 export function railItems(who: { roles: string[]; appUserOnly: boolean }): { main: RailItem[] } {
   const sysAdmin = who.roles.includes('SysAdmin')
+  const admin = sysAdmin || who.roles.includes('Admin')
   const allowed = (item: RailItem) =>
-    !(item.hideForAppUser && who.appUserOnly) && !(item.sysAdminOnly && !sysAdmin)
+    !(item.hideForAppUser && who.appUserOnly) && !(item.sysAdminOnly && !sysAdmin) && !(item.adminOnly && !admin)
   return { main: MAIN.filter(allowed) }
 }
 

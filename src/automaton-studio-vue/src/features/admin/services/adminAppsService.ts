@@ -63,6 +63,15 @@ class AdminAppsService {
     await apiClient.put(`/api/admin/apps/${appId}/moderation`, request)
   }
 
+  /** Permission requests waiting for a system administrator (the endpoint is SysAdmin-only). */
+  async waitingCount(): Promise<number> {
+    try {
+      return (await this.listApps({ waiting: true, pageSize: 1 })).waitingForApprovalTotal
+    } catch {
+      return 0
+    }
+  }
+
   async getPermissions(appId: string): Promise<AdminAppPermissionStatus[]> {
     const { data } = await apiClient.get<AdminAppPermissionStatus[]>(`/api/admin/apps/${appId}/permissions`)
     return data
