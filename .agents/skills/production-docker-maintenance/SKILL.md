@@ -51,7 +51,7 @@ Run the inspection commands again afterward and confirm that active services rem
 
 The 2 GB cache target is a retention budget, not a minimum required by Docker. Inspect the selected builder first; `docker builder prune` does not maintain an unrelated BuildKit daemon. Prefer its native configured GC for ongoing retention. A prune can reclaim zero bytes; verify actual filesystem free space afterward rather than promising Docker's estimated reclaimable total. Journal vacuuming is a one-time cleanup unless retention configuration is separately changed.
 
-Use the [persisted host policies](../../../docs/prod/production-docker-cheat-sheet.md#disk-cleanup) for ongoing maintenance: per-filesystem alerts/admission, native cache GC, journald limits, container/file-log rotation and explicit image protection. `scripts/host-storage.sh maintain` only removes unused tags in allow-listed repositories, protects container image IDs and deployment revision state, and fails closed on missing protected references. Run it under the same deployment lock; never replace it with a blanket image or volume prune. Source changes do not authorize installing policies or restarting existing hosts.
+Use the [persisted host policies](../../../docs/prod/production-docker-cheat-sheet.md#disk-cleanup) for ongoing maintenance: native cache GC, journald limits, container/file-log rotation and explicit image protection. Unused images are removed by the Runner's nightly cleanup (Studio, Server, Cleanup); never add a blanket image or volume prune. Source changes do not authorize installing policies or restarting existing hosts.
 
 ## Broader cleanup
 
