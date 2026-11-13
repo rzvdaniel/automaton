@@ -7,7 +7,6 @@ import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
 import ServerView from './ServerView.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
-import { appsService } from '@/features/apps/services/apps.service'
 import { serverConsoleService } from '../services/server-console.service'
 import { installService } from '@/features/install/services/install.service'
 import { serverHealthService } from '../services/server-health.service'
@@ -25,9 +24,8 @@ const cleanupBody = (): ServerCleanup => ({
 })
 
 vi.mock('@/features/runners/services/runners.service', () => ({ runnersService: { list: vi.fn() } }))
-vi.mock('@/features/apps/services/apps.service', () => ({ appsService: { list: vi.fn() } }))
 vi.mock('@/features/install/services/install.service', () => ({ installService: { getUpdate: vi.fn(), startUpdate: vi.fn() } }))
-vi.mock('../services/server-console.service', () => ({ serverConsoleService: { install: vi.fn() } }))
+vi.mock('../services/server-console.service', () => ({ serverConsoleService: { get: vi.fn(), install: vi.fn() } }))
 vi.mock('../services/server-health.service', () => ({ serverHealthService: { get: vi.fn() } }))
 vi.mock('../services/server-cleanup.service', () => ({
   serverCleanupService: { get: vi.fn(), saveSettings: vi.fn(), run: vi.fn() },
@@ -67,7 +65,7 @@ describe('ServerView', () => {
   beforeEach(() => {
     vi.mocked(runnersService.list).mockReset().mockResolvedValue([runner()] as never)
     vi.mocked(serverConsoleService.install).mockReset().mockResolvedValue({ appId: 'sc1' })
-    vi.mocked(appsService.list).mockReset().mockResolvedValue([])
+    vi.mocked(serverConsoleService.get).mockReset().mockResolvedValue({ appId: null })
     vi.mocked(serverHealthService.get).mockReset().mockResolvedValue(health(false))
     vi.mocked(installService.getUpdate).mockReset().mockResolvedValue({
       currentVersion: 'server-v1', triggerAvailable: true, run: null, log: null, stale: false, requestPending: false, requestAgeSeconds: null, hint: null,
@@ -141,21 +139,16 @@ describe('ServerView', () => {
     await flushPromises()
     expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('not installed')
     expect(serverConsoleService.install).not.toHaveBeenCalled()
-    vi.mocked(appsService.list).mockResolvedValue([
-      { id: 'sc1', installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/server-console' },
-    ] as never)
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1' })
     await missing.get('[data-testid="server-console-install"]').trigger('click')
     await flushPromises()
     expect(serverConsoleService.install).toHaveBeenCalledTimes(1)
     expect(missing.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
     expect(missing.find('[data-testid="server-console-notice"]').exists()).toBe(false)
     missing.unmount()
-    vi.mocked(appsService.list).mockResolvedValue([])
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: null })
 
-    vi.mocked(appsService.list).mockResolvedValue([
-      { id: 'other', installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/heartbeat' },
-      { id: 'sc1', installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/server-console' },
-    ] as never)
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1' })
     const installed = mountView(['SysAdmin'])
     await flushPromises()
     expect(installed.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')

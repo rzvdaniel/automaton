@@ -4,7 +4,6 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { isAxiosError } from 'axios'
 import SelfHostedRunnerInstallDialog from '@/features/runners/components/SelfHostedRunnerInstallDialog.vue'
-import { appsService } from '@/features/apps/services/apps.service'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { isVisibleApplicationRunner } from '@/features/runners/utils/runner-classification'
 import type { Runner } from '@/features/runners/types/runners.types'
@@ -15,8 +14,6 @@ import RunnersList from '../components/RunnersList.vue'
 import ServerUpdateBanner from '../components/ServerUpdateBanner.vue'
 import { serverHealthService } from '../services/server-health.service'
 import { serverConsoleService } from '../services/server-console.service'
-import { serverConsoleApp } from '../utils/server-console'
-import type { App } from '@/features/apps/types/apps.types'
 import type { ServerHealth } from '../types/server.types'
 
 const refreshMilliseconds = 15000
@@ -32,7 +29,7 @@ const health = ref<ServerHealth | null>(null)
 const healthDenied = ref(false)
 const healthError = ref<string | null>(null)
 const showInstall = ref(false)
-const serverConsole = ref<App | null>(null)
+const serverConsole = ref<string | null>(null)
 const installingConsole = ref(false)
 const installConsoleError = ref<string | null>(null)
 let timer: ReturnType<typeof setInterval> | undefined
@@ -61,7 +58,7 @@ async function loadHealth() {
 
 async function loadServerConsole() {
   try {
-    serverConsole.value = serverConsoleApp(await appsService.list())
+    serverConsole.value = (await serverConsoleService.get()).appId
   } catch {
     serverConsole.value = null
   }
@@ -110,7 +107,7 @@ onBeforeUnmount(() => clearInterval(timer))
     <p v-if="isSystemAdministrator && serverConsole" class="mb-4" data-testid="server-console-link">
       <template v-if="serverConsole">
         Server health, resources and OS updates:
-        <RouterLink :to="`/apps/${serverConsole.id}`" data-testid="server-console-open">open Server Console</RouterLink>.
+        <RouterLink :to="`/apps/${serverConsole}`" data-testid="server-console-open">open Server Console</RouterLink>.
       </template>
     </p>
     <Message v-if="isSystemAdministrator && !serverConsole && !loading" severity="info" :closable="false" class="mb-4" data-testid="server-console-notice">
