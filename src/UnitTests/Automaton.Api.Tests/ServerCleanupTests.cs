@@ -30,6 +30,24 @@ public sealed class ServerCleanupTests
         return (new ServerCleanupService(db, fake), fake, db);
     }
 
+    // Settings that were last changed yesterday, as on a server that has been running.
+    private static async Task Backdate(ServerCleanupService service, Automaton.Api.Data.ApplicationDbContext db)
+    {
+        await service.GetAsync(Now, default);
+        db.ServerCleanupSettings.Single().UpdatedAtUtc = Now.AddDays(-1);
+        await db.SaveChangesAsync();
+    }
+
+    [Test]
+    public async Task ChangingOnlyTheKeepDaysDoesNotSkipTonightsRun()
+    {
+        var (service, _, db) = SetUp();
+        await Backdate(service, db);
+        await service.UpdateAsync(new("05:00", 3, 200), Now.AddMinutes(-1), default);
+        await service.ProcessAsync(Now, default);
+        Assert.That((await service.GetAsync(Now, default)).Runs, Has.Count.EqualTo(1));
+    }
+
     [Test]
     public async Task DefaultsAreFiveAmSevenDaysAndTwoHundredMegabytes()
     {
@@ -93,8 +111,8 @@ public sealed class ServerCleanupTests
     [Test]
     public async Task TheNightlyRunHappensOncePerDayAfterItsTime()
     {
-        var (service, fake, _) = SetUp();
-        await service.UpdateAsync(new("05:00", 7, 200), Now.AddDays(-1), default);
+        var (service, fake, db) = SetUp();
+        await Backdate(service, db);
         await service.ProcessAsync(Now.AddMinutes(-2), default); // 04:59, not yet
         Assert.That((await service.GetAsync(Now, default)).Runs, Is.Empty);
 
@@ -117,8 +135,8 @@ public sealed class ServerCleanupTests
     [Test]
     public async Task ANightlyRunWithNoOnlineRunnerShowsAsFailed()
     {
-        var (service, _, _) = SetUp(online: false);
-        await service.UpdateAsync(new("05:00", 7, 200), Now.AddDays(-1), default);
+        var (service, _, db) = SetUp(online: false);
+        await Backdate(service, db);
         await service.ProcessAsync(Now, default);
         var run = (await service.GetAsync(Now, default)).Runs.Single();
         Assert.That(run.Result, Is.EqualTo("failed"));

@@ -113,7 +113,8 @@ internal sealed partial class HostCleanupService(HostCleanupService.DockerRunner
         limit.CancelAfter(TimeSpan.FromMinutes(15));
         var output = process.StandardOutput.ReadToEndAsync(limit.Token);
         var error = process.StandardError.ReadToEndAsync(limit.Token);
-        await process.WaitForExitAsync(limit.Token);
+        try { await process.WaitForExitAsync(limit.Token); }
+        catch (OperationCanceledException) { try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { } throw; }
         return (process.ExitCode, await output + await error);
     }
 }

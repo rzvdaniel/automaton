@@ -42,10 +42,12 @@ public sealed class ServerCleanupService(ApplicationDbContext db, IRunnerActionC
         if (request.KeepDays is < 1 or > 365) throw new ArgumentException("Keep days must be from 1 to 365.");
         if (request.JournalLimitMb is < 50 or > 100_000) throw new ArgumentException("The journal limit must be from 50 to 100000 MB.");
         var settings = await SettingsAsync(token);
-        settings.MinutesAfterMidnightUtc = time.Hour * 60 + time.Minute;
+        var minutes = time.Hour * 60 + time.Minute;
+        // Only a new time restarts the "a passed slot waits for tomorrow" rule; other changes must not skip tonight's run.
+        if (minutes != settings.MinutesAfterMidnightUtc) settings.UpdatedAtUtc = now;
+        settings.MinutesAfterMidnightUtc = minutes;
         settings.KeepDays = request.KeepDays;
         settings.JournalLimitMb = request.JournalLimitMb;
-        settings.UpdatedAtUtc = now;
         await db.SaveChangesAsync(token);
         return await GetAsync(now, token);
     }
