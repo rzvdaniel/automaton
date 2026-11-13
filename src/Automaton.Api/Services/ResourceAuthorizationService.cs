@@ -84,6 +84,11 @@ public class ResourceAuthorizationService
     public async Task<bool> AppExistsAsync(Guid appId, CancellationToken cancellationToken = default)
         => await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.DeletionClaimId == null, cancellationToken);
 
+    /// <summary>True only for a system administrator, the role that may change server settings.</summary>
+    public async Task<bool> IsSystemAdministratorAsync(Guid userId, CancellationToken cancellationToken = default)
+        => await dbContext.UserRoles.AnyAsync(membership => membership.UserId == userId &&
+            dbContext.Roles.Any(role => role.Id == membership.RoleId && role.Name == UserRole.SystemAdministrator), cancellationToken);
+
     /// <summary>True for administrators and system administrators, who may open every app on the server.</summary>
     public async Task<bool> IsAdministratorAsync(Guid userId, CancellationToken cancellationToken = default)
         => await dbContext.UserRoles.AnyAsync(membership => membership.UserId == userId &&
