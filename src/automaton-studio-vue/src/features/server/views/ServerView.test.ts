@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
@@ -9,11 +9,25 @@ import ServerView from './ServerView.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { installService } from '@/features/install/services/install.service'
 import { serverHealthService } from '../services/server-health.service'
-import type { ServerHealth } from '../types/server.types'
+import { serverCleanupService } from '../services/server-cleanup.service'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
+import type { ServerCleanup, ServerHealth } from '../types/server.types'
+
+const cleanupBody = (): ServerCleanup => ({
+  settings: { timeUtc: '05:00', keepDays: 7, journalLimitMb: 200 },
+  nextRunAtUtc: '2026-11-14T05:00:00Z',
+  runs: [{
+    id: 'c1', runnerName: 'runner-01', startedAtUtc: '2026-11-13T05:12:00Z', finishedAtUtc: '2026-11-13T05:13:00Z',
+    result: 'Succeeded', bytesFreed: 1.8 * 1024 ** 3, trigger: 'Scheduled', message: null,
+  }],
+})
 
 vi.mock('@/features/runners/services/runners.service', () => ({ runnersService: { list: vi.fn() } }))
 vi.mock('@/features/install/services/install.service', () => ({ installService: { getUpdate: vi.fn(), startUpdate: vi.fn() } }))
 vi.mock('../services/server-health.service', () => ({ serverHealthService: { get: vi.fn() } }))
+vi.mock('../services/server-cleanup.service', () => ({
+  serverCleanupService: { get: vi.fn(), saveSettings: vi.fn(), run: vi.fn() },
+}))
 vi.mock('@/features/runners/components/SelfHostedRunnerInstallDialog.vue', () => ({
   default: { props: ['visible'], template: '<div data-testid="install-dialog" :data-visible="visible" />' },
 }))
@@ -35,10 +49,15 @@ const runner = (overrides = {}) => ({
   operatingSystem: 'Ubuntu 24.04', appCount: 3, version: '0.2.6', upgradeAvailable: false, ...overrides,
 })
 
-const mountView = () => mount(ServerView, {
-  attachTo: document.body,
-  global: { plugins: [createPinia(), PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} } },
-})
+const mountView = (roles: string[] = ['User']) => {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  useAuthStore().user = { roles } as never
+  return mount(ServerView, {
+    attachTo: document.body,
+    global: { plugins: [pinia, PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} } },
+  })
+}
 
 describe('ServerView', () => {
   beforeEach(() => {
@@ -48,6 +67,52 @@ describe('ServerView', () => {
       currentVersion: 'server-v1', triggerAvailable: true, run: null, log: null, stale: false, requestPending: false, requestAgeSeconds: null, hint: null,
     })
     vi.mocked(installService.startUpdate).mockReset().mockResolvedValue()
+    vi.mocked(serverCleanupService.get).mockReset().mockResolvedValue(cleanupBody())
+    vi.mocked(serverCleanupService.saveSettings).mockReset().mockResolvedValue(cleanupBody())
+    vi.mocked(serverCleanupService.run).mockReset().mockResolvedValue(cleanupBody())
+  })
+
+  it('shows the cleanup only to system administrators', async () => {
+    for (const roles of [['User'], ['Admin']]) {
+      const plain = mountView(roles)
+      await flushPromises()
+      expect(plain.find('[data-testid="cleanup-section"]').exists()).toBe(false)
+      plain.unmount()
+    }
+    expect(serverCleanupService.get).not.toHaveBeenCalled()
+
+    const wrapper = mountView(['Admin', 'SysAdmin'])
+    await flushPromises()
+    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('2026-11-13 05:12 UTC')
+    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('freed 1.8 GB')
+    expect(wrapper.get('[data-testid="cleanup-next"]').text()).toContain('2026-11-14 05:00 UTC')
+    wrapper.unmount()
+  })
+
+  it('saves the settings and runs the cleanup now, then reloads', async () => {
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    await wrapper.get('[data-testid="cleanup-time"]').setValue('06:30')
+    await wrapper.get('[data-testid="cleanup-section"] form').trigger('submit')
+    await flushPromises()
+    expect(serverCleanupService.saveSettings).toHaveBeenCalledWith({ timeUtc: '06:30', keepDays: 7, journalLimitMb: 200 })
+    expect(serverCleanupService.get).toHaveBeenCalledTimes(2)
+
+    await wrapper.get('[data-testid="cleanup-run"]').trigger('click')
+    await flushPromises()
+    expect(serverCleanupService.run).toHaveBeenCalled()
+    expect(serverCleanupService.get).toHaveBeenCalledTimes(3)
+    wrapper.unmount()
+  })
+
+  it('shows the server error inline when Run now fails', async () => {
+    vi.mocked(serverCleanupService.run).mockRejectedValue({ isAxiosError: true, response: { status: 409, data: { error: 'No Runner is online.' } } })
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    await wrapper.get('[data-testid="cleanup-run"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="cleanup-error"]').text()).toContain('No Runner is online.')
+    wrapper.unmount()
   })
 
   it('shows the health tiles and each Runner with OS, apps and version', async () => {

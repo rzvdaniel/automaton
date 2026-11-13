@@ -8,6 +8,8 @@ import { runnersService } from '@/features/runners/services/runners.service'
 import { isVisibleApplicationRunner } from '@/features/runners/utils/runner-classification'
 import type { Runner } from '@/features/runners/types/runners.types'
 import PageHead from '@/shared/components/PageHead.vue'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
+import CleanupSection from '../components/CleanupSection.vue'
 import HealthTiles from '../components/HealthTiles.vue'
 import RunnersList from '../components/RunnersList.vue'
 import ServerUpdateBanner from '../components/ServerUpdateBanner.vue'
@@ -17,6 +19,8 @@ import type { ServerHealth } from '../types/server.types'
 const refreshMilliseconds = 15000
 
 
+const authStore = useAuthStore()
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 const loading = ref(true)
 const runners = ref<Runner[]>([])
 const runnersError = ref<string | null>(null)
@@ -80,6 +84,8 @@ onBeforeUnmount(() => clearInterval(timer))
       Health and updates are shown to system administrators.
     </Message>
     <Message v-else-if="healthError" severity="warn" :closable="false" class="mb-4">{{ healthError }}</Message>
+
+    <CleanupSection v-if="isSystemAdministrator" />
 
     <section>
       <div class="flex align-items-center justify-content-between flex-wrap gap-2">
