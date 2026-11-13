@@ -26,6 +26,7 @@ public class InternalRuntimeControllerTests
             dbContext,
             new ResourceAuthorizationService(dbContext, userContextService),
             CreateRuntimeCookieService(),
+            new ViewerTokenService(Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("viewer-tests")),
             NullLogger<InternalRuntimeController>.Instance,
             Options.Create(new PublishedAppsConfig
             {
@@ -168,7 +169,7 @@ public class InternalRuntimeControllerTests
         return new ApplicationDbContext(options);
     }
 
-    private static async Task SeedRestrictedAppAsync(
+    internal static async Task SeedRestrictedAppAsync(
         ApplicationDbContext dbContext,
         Guid appId,
         Guid userId)
@@ -217,6 +218,7 @@ public class InternalRuntimeControllerTests
             dbContext,
             authorizationService,
             cookieService,
+            new ViewerTokenService(Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("viewer-tests")),
             NullLogger<InternalRuntimeController>.Instance,
             Options.Create(new PublishedAppsConfig { RuntimeProxyAuthKey = "expected-proxy-key" }),
             StudioConfiguration())

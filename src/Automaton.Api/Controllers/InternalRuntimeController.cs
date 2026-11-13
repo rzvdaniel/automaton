@@ -19,6 +19,7 @@ public class InternalRuntimeController : ControllerBase
     private readonly ApplicationDbContext dbContext;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly RuntimeCookieService runtimeCookieService;
+    private readonly ViewerTokenService viewerTokens;
     private readonly ILogger<InternalRuntimeController> logger;
     private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly ConfigurationService configurationService;
@@ -27,6 +28,7 @@ public class InternalRuntimeController : ControllerBase
         ApplicationDbContext dbContext,
         ResourceAuthorizationService authorizationService,
         RuntimeCookieService runtimeCookieService,
+        ViewerTokenService viewerTokens,
         ILogger<InternalRuntimeController> logger,
         IOptions<PublishedAppsConfig> publishedAppsConfig,
         ConfigurationService configurationService)
@@ -35,6 +37,7 @@ public class InternalRuntimeController : ControllerBase
         this.dbContext = dbContext;
         this.authorizationService = authorizationService;
         this.runtimeCookieService = runtimeCookieService;
+        this.viewerTokens = viewerTokens;
         this.logger = logger;
         this.publishedAppsConfig = publishedAppsConfig.Value;
     }
@@ -86,6 +89,11 @@ public class InternalRuntimeController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden);
         }
 
+        // Tell the app who is using it: the role (the app hides controls) and a short-lived token (the API's proof, for
+        // changes only a system administrator may make). Traefik copies these over whatever the browser sent.
+        var isAdministrator = await authorizationService.IsSystemAdministratorAsync(validation.UserId, cancellationToken);
+        Response.Headers[ViewerHeaders.Role] = isAdministrator ? "administrator" : "user";
+        Response.Headers[ViewerHeaders.Token] = viewerTokens.Create(appId, validation.UserId);
         return NoContent();
     }
 

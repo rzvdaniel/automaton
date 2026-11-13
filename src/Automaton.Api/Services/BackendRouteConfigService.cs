@@ -349,6 +349,8 @@ public class BackendRouteConfigService
         builder.AppendLine("        customRequestHeaders:");
         builder.AppendLine($"          X-App-Id: \"{route.AppId}\"");
         builder.AppendLine($"          X-Automaton-Runtime-Auth: \"{publishedAppsConfig.RuntimeProxyAuthKey}\"");
+        builder.AppendLine("          X-Automaton-Viewer-Role: \"\"");
+        builder.AppendLine("          X-Automaton-Viewer-Token: \"\"");
         builder.AppendLine($"    {key}-auth:");
         builder.AppendLine("      forwardAuth:");
         builder.AppendLine($"        address: \"{publishedAppsConfig.ApiBaseUrl.TrimEnd('/')}/internal/runtime/auth\"");
@@ -358,6 +360,9 @@ public class BackendRouteConfigService
         builder.AppendLine("          - Accept");
         builder.AppendLine("          - X-App-Id");
         builder.AppendLine("          - X-Automaton-Runtime-Auth");
+        builder.AppendLine("        authResponseHeaders:");
+        builder.AppendLine("          - X-Automaton-Viewer-Role");
+        builder.AppendLine("          - X-Automaton-Viewer-Token");
         builder.AppendLine($"    {key}-auth-strip:");
         builder.AppendLine("      headers:");
         builder.AppendLine("        customRequestHeaders:");

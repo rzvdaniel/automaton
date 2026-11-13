@@ -72,6 +72,9 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain("forwardAuth:"));
             Assert.That(content, Does.Contain($"private-{appId:N}-auth-strip"));
             Assert.That(content, Does.Contain("https://api.test/internal/runtime/auth"));
+            Assert.That(content, Does.Contain("authResponseHeaders:"));
+            Assert.That(content, Does.Contain("- X-Automaton-Viewer-Token"));
+            Assert.That(content, Does.Contain("X-Automaton-Viewer-Role: \"\""));
             Assert.That(content, Does.Contain($"X-App-Id: \"{appId}\""));
             Assert.That(content, Does.Contain("X-App-Id: \"\""));
             Assert.That(content, Does.Contain("X-Automaton-Runtime-Auth: \"\""));
