@@ -114,10 +114,13 @@ public sealed class EssentialCatalogBootstrapService(
         {
             foreach (var entry in missing)
             {
-                await installer.InstallAsync(new CatalogInstallRequest
-                {
-                    Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit
-                }, cancellationToken);
+                if (entry.Id == ServerConsoleProvisioningService.AppId)
+                    await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionAsync(adminId, entry, cancellationToken);
+                else
+                    await installer.InstallAsync(new CatalogInstallRequest
+                    {
+                        Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit
+                    }, cancellationToken);
                 logger.LogInformation("Installed essential catalog app {AppName} for the first administrator.", entry.Name);
             }
             return true;
