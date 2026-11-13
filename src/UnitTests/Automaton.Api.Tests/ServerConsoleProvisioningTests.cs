@@ -8,6 +8,7 @@ using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
 namespace Automaton.Api.Tests;
@@ -60,6 +61,60 @@ public sealed class ServerConsoleProvisioningTests
         var statuses = (await service.GetStatusAsync(appId, default)).ToDictionary(s => s.Permission, s => s.Status);
         Assert.That(statuses[AppPermissionApproval.BackupsRead], Is.EqualTo(AppPermissionStatuses.Pending), "a permission outside the list needs a person");
         Assert.That(statuses[AppPermissionApproval.ServerRead], Is.EqualTo(AppPermissionStatuses.Approved));
+    }
+
+    [Test]
+    public async Task AFreshInstallInstallsApprovesAndDeploysInOrder()
+    {
+        var steps = new List<string>();
+        var id = Guid.NewGuid();
+        var result = await ServerConsoleProvisioningService.RunAsync(
+            () => { steps.Add("find"); return Task.FromResult<Guid?>(null); },
+            () => { steps.Add("install"); return Task.FromResult(id); },
+            _ => { steps.Add("approve"); return Task.CompletedTask; },
+            _ => Task.FromResult(true),
+            _ => { steps.Add("deploy"); return Task.CompletedTask; },
+            NullLogger.Instance, default);
+        Assert.That(result, Is.EqualTo(id));
+        Assert.That(steps, Is.EqualTo(new[] { "find", "install", "approve", "deploy" }));
+    }
+
+    [Test]
+    public async Task APassThatStoppedAfterTheInstallResumesWithoutInstallingAgain()
+    {
+        var steps = new List<string>();
+        var id = Guid.NewGuid();
+        await ServerConsoleProvisioningService.RunAsync(
+            () => Task.FromResult<Guid?>(id),
+            () => { steps.Add("install"); return Task.FromResult(Guid.NewGuid()); },
+            _ => { steps.Add("approve"); return Task.CompletedTask; },
+            _ => Task.FromResult(true),
+            _ => { steps.Add("deploy"); return Task.CompletedTask; },
+            NullLogger.Instance, default);
+        Assert.That(steps, Is.EqualTo(new[] { "approve", "deploy" }));
+
+        steps.Clear();
+        await ServerConsoleProvisioningService.RunAsync(
+            () => Task.FromResult<Guid?>(id), () => Task.FromResult(id),
+            _ => { steps.Add("approve"); return Task.CompletedTask; },
+            _ => Task.FromResult(false),
+            _ => { steps.Add("deploy"); return Task.CompletedTask; },
+            NullLogger.Instance, default);
+        Assert.That(steps, Is.EqualTo(new[] { "approve" }), "an already deployed app is not deployed again");
+    }
+
+    [Test]
+    public async Task AFailedFirstDeployDoesNotUndoTheInstallOrTheApproval()
+    {
+        var id = Guid.NewGuid();
+        var approved = false;
+        var result = await ServerConsoleProvisioningService.RunAsync(
+            () => Task.FromResult<Guid?>(null), () => Task.FromResult(id),
+            _ => { approved = true; return Task.CompletedTask; },
+            _ => Task.FromResult(true),
+            _ => throw new InvalidOperationException("no Runner"),
+            NullLogger.Instance, default);
+        Assert.That((result, approved), Is.EqualTo((id, true)));
     }
 
     [Test]

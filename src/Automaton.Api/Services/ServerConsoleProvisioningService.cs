@@ -37,27 +37,35 @@ public sealed class ServerConsoleProvisioningService(
     public async Task<Guid> ProvisionAsync(Guid userId, CatalogEntryDto? entry, CancellationToken token)
     {
         entry ??= await EntryAsync(userId, token) ?? throw new InvalidOperationException("Server Console is not available in the official catalog.");
-        var appId = await FindInstalledAsync(userId, entry, token);
-        var installedNow = appId is null;
-        if (installedNow)
-        {
-            var app = await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token);
-            appId = app.Id;
-        }
+        return await RunAsync(
+            find: () => FindInstalledAsync(userId, entry, token),
+            install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
+            approve: appId => ApprovePendingAsync(permissions, appId, token),
+            needsDeploy: appId => db.WebApps.Where(app => app.Id == appId).AnyAsync(app => !app.DeploymentTargets.Any(), token),
+            deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
+            logger, token);
+    }
 
-        // Only Pending is approved: a permission an administrator rejected or revoked stays that way.
-        await ApprovePendingAsync(permissions, appId!.Value, token);
-
-        if (installedNow)
+    /// <summary>
+    /// The steps in order. Every step is safe to repeat, so a pass that stopped after the install resumes here: approve what is
+    /// still pending and deploy an app that has never been deployed. A failed deploy is logged, not fatal.
+    /// </summary>
+    internal static async Task<Guid> RunAsync(
+        Func<Task<Guid?>> find, Func<Task<Guid>> install, Func<Guid, Task> approve,
+        Func<Guid, Task<bool>> needsDeploy, Func<Guid, Task> deploy, ILogger logger, CancellationToken token)
+    {
+        var appId = await find() ?? await install();
+        await approve(appId);
+        if (await needsDeploy(appId))
         {
-            try { await deployer.AcceptAsync(appId.Value, userId, userId, null, false, token); }
+            try { await deploy(appId); }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 // Installed and approved is useful on its own; the administrator can deploy from the app page.
                 logger.LogWarning(exception, "Server Console was installed but its first deploy could not be started.");
             }
         }
-        return appId.Value;
+        return appId;
     }
 
     internal static async Task ApprovePendingAsync(AppPermissionService permissions, Guid appId, CancellationToken token)
