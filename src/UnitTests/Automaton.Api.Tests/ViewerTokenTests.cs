@@ -7,6 +7,7 @@ using Automaton.Api.ServerCleanup;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,7 +51,7 @@ public sealed class ViewerTokenTests
         {
             var request = InternalRuntimeControllerTests.CreateAuthorizedRequest(appId, user);
             var controller = InternalRuntimeControllerTests.CreateController(db, request.HttpContext, request.CookieService);
-            // a browser-supplied header must not influence the answer
+            // the answer is computed from the signed cookie, never from a role header on the request (Traefik blanking is covered in BackendRouteConfigServiceTests)
             request.HttpContext.Request.Headers[ViewerHeaders.Role] = "administrator";
             var result = await controller.AuthorizeRuntimeRequest(
                 request.HttpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
@@ -80,14 +81,14 @@ public sealed class ViewerTokenTests
         var authorization = new ResourceAuthorizationService(db, new UserContextService(new HttpContextAccessor()));
         var service = new ServerCleanupService(db, new FakeRunner());
 
-        async Task<int?> Put(string? token, bool app = true, Guid? tokenApp = null)
+        async Task<int> Put(string? token, bool app = true, bool run = false)
         {
             var http = new DefaultHttpContext();
             if (app) http.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", appId.ToString())], "AppPermission"));
             if (token is not null) http.Request.Headers[ViewerHeaders.Token] = token;
             var controller = new ServerCleanupController(service, tokens, authorization) { ControllerContext = new ControllerContext { HttpContext = http } };
-            var result = await controller.Update(new ServerCleanupSettingsDto("05:00", 7, 200), default);
-            return (result.Result as StatusCodeResult)?.StatusCode;
+            var result = run ? await controller.Run(default) : await controller.Update(new ServerCleanupSettingsDto("05:00", 7, 200), default);
+            return result.Result is IStatusCodeActionResult status ? status.StatusCode ?? 200 : 200;
         }
 
         Assert.That(await Put(null), Is.EqualTo(403));
@@ -95,7 +96,10 @@ public sealed class ViewerTokenTests
         Assert.That(await Put(tokens.Create(appId, other)), Is.EqualTo(403));
         Assert.That(await Put(tokens.Create(appId, admin, TimeSpan.FromSeconds(-1))), Is.EqualTo(403));
         Assert.That(await Put(tokens.Create(Guid.NewGuid(), admin)), Is.EqualTo(403));
-        Assert.That(await Put(tokens.Create(appId, admin)), Is.Null.Or.Not.EqualTo(403));
-        Assert.That(await Put(null, app: false), Is.Null.Or.Not.EqualTo(403));
+        Assert.That(await Put(null, run: true), Is.EqualTo(403));
+        Assert.That(await Put(tokens.Create(appId, other), run: true), Is.EqualTo(403));
+        Assert.That(await Put(tokens.Create(appId, admin)), Is.EqualTo(200));
+        Assert.That(await Put(null, app: false), Is.EqualTo(200));
+        Assert.That(await Put(tokens.Create(appId, admin), run: true), Is.EqualTo(409)); // past the token check; no Runner is online in this database
     }
 }
