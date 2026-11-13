@@ -86,7 +86,7 @@ public sealed class ViewerTokenTests
             var http = new DefaultHttpContext();
             if (app) http.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", appId.ToString())], "AppPermission"));
             if (token is not null) http.Request.Headers[ViewerHeaders.Token] = token;
-            var controller = new ServerCleanupController(service, tokens, authorization) { ControllerContext = new ControllerContext { HttpContext = http } };
+            var controller = new ServerCleanupController(service, tokens, authorization, null!) { ControllerContext = new ControllerContext { HttpContext = http } };
             var result = run ? await controller.Run(default) : await controller.Update(new ServerCleanupSettingsDto("05:00", 7, 200), default);
             return result.Result is IStatusCodeActionResult status ? status.StatusCode ?? 200 : 200;
         }
