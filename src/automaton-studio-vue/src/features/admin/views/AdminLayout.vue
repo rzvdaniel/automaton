@@ -65,6 +65,9 @@ const navItems: AdminNavItem[] = [
 
 const visibleNavItems = navItems
 
+// Backups and People have their own place in the main menu, so their pages under /admin show no Administration menu.
+const showAdminMenu = computed(() => !['/admin/backups', '/admin/users'].some((prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`)))
+
 const isActive = (item: AdminNavItem) => {
   return route.path.startsWith(item.routePrefix)
 }
@@ -87,7 +90,7 @@ watch(() => route.path, () => {
 <template>
   <div class="admin-layout">
     <!-- Sidebar -->
-    <div class="admin-sidebar">
+    <div v-if="showAdminMenu" class="admin-sidebar">
       <Card class="h-full">
         <template #content>
           <div class="flex flex-column gap-1">
