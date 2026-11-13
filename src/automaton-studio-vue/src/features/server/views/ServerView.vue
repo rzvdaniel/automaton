@@ -65,11 +65,11 @@ async function loadServerConsole() {
 }
 
 async function refresh() {
-  await Promise.all([loadRunners(), isSystemAdministrator.value ? loadServerConsole() : Promise.resolve(), healthDenied.value ? Promise.resolve() : loadHealth()])
+  await Promise.all([loadRunners(), healthDenied.value ? Promise.resolve() : loadHealth()])
 }
 
 onMounted(async () => {
-  await refresh()
+  await Promise.all([refresh(), isSystemAdministrator.value ? loadServerConsole() : Promise.resolve()])
   loading.value = false
   timer = setInterval(() => void refresh(), refreshMilliseconds)
 })
