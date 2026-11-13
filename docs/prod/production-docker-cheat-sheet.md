@@ -52,12 +52,12 @@ Inspect all relevant filesystems, including Docker/containerd, persistent volume
 
 `host-storage.sh` and `docker/host-maintenance/` provide capacity inspection and opt-in retention policies. Applying host policies or restarting Docker is separate from a source merge.
 
-- Preserve active images, configured Runner artifacts and explicitly retained rollback references. Image maintenance uses a protected allow-list and fails closed if a reference is missing. Historical blue/green state may still protect images but is not the active deployment state.
+- The Runner's nightly cleanup (Studio, Server, Cleanup) removes unused images and build cache older than the keep days and trims the journal. It never removes images a container uses or volumes.
 - Configure the actual builder's native GC with a 2 GB cache target. After confirming no build is active, bounded one-time cleanup can use `docker builder prune -af --keep-storage 2GB`.
 - Container stdout, application file logs and audit records have separate retention. Do not delete live application data or audit records as log cleanup.
 - Installer-managed servers run PostgreSQL 16 in the `postgres-data` volume; there is no binary log to purge. Use `pg_dump`/`pg_restore` through the installed `backup.sh` and `restore.sh`.
 - Compare exact resolved backup/staging paths with container mounts before removal. Do not follow backup symlinks into live settings or certificate stores.
-- Never use blanket volume pruning, `docker system prune -a`, or automatic `docker image prune -a`.
+- Never use blanket volume pruning or `docker system prune -a`. Image pruning beyond the nightly cleanup is a manual, one-time step.
 
 Manual maintenance must not overlap an updater. Coordinate the installation and deployment locks on adopted hosts. Keep automatic image cleanup disabled until its protected references and lock coordination are correct. Capacity monitoring and native retention can remain active independently.
 

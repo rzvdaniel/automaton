@@ -45,33 +45,7 @@ df() { printf 'Size Avail\n1073741824000 10737418240\n'; }
 if storage_check check > "$fixture/check"; then exit 1; fi
 grep -q CRITICAL "$fixture/check"
 
-AUTOMATON_STORAGE_IMAGE_ALLOWLIST="$fixture/allow"
-AUTOMATON_STORAGE_DEPLOYMENT_STATE="$fixture/state"
-printf 'owned:rollback\n' > "$fixture/allow"
-printf 'API_PREVIOUS_REVISION=1234567\n' > "$fixture/state"
-: > "$fixture/removed"
-docker() {
-    case "$*" in
-        'context inspect --format {{.Endpoints.docker.Host}}') echo unix:///var/run/docker.sock ;;
-        'image inspect owned:rollback --format {{.Id}}') echo protected ;;
-        'image inspect automaton-prod-api:1234567 --format {{.Id}}') echo state-protected ;;
-        'ps -aq') printf 'running\nstopped\n' ;;
-        'inspect running --format {{.Image}}') echo active ;;
-        'inspect stopped --format {{.Image}}') echo stopped ;;
-        'image ls --no-trunc --format {{.Repository}} {{.Tag}} {{.ID}}')
-            printf '%s\n' 'owned rollback protected' 'owned alias protected' 'owned current active' 'owned old-container stopped' 'owned history unused' 'owned previous state-protected' 'unowned old other' ;;
-        'image rm owned:history') echo "$*" >> "$fixture/removed" ;;
-        *) echo "Unexpected Docker operation: $*" >&2; return 1 ;;
-    esac
-}
-storage_clean_images
-[[ "$(cat "$fixture/removed")" == 'image rm owned:history' ]]
-# A missing protected reference aborts before any removals.
-printf 'owned:missing\n' >> "$fixture/allow"
-: > "$fixture/removed"
-if storage_clean_images 2>/dev/null; then exit 1; fi
-[[ ! -s "$fixture/removed" ]]
 DOCKER_HOST=tcp://remote.invalid:2376
 if storage_require_local_docker 2>/dev/null; then exit 1; fi
 unset DOCKER_HOST
-echo 'host storage capacity and image retention regressions passed'
+echo 'host storage capacity regressions passed'

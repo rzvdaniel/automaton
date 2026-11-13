@@ -1,5 +1,5 @@
 #!/bin/bash
-# Host-local capacity checks and narrowly scoped image maintenance. No volume pruning.
+# Host-local capacity checks. Image cleanup is the Runner's nightly cleanup.
 set -euo pipefail
 
 storage_require_local_docker() {
@@ -63,73 +63,11 @@ storage_check() {
     [[ "$mode" == preflight ]] || return "$result"
 }
 
-storage_clean_images() {
-    storage_require_local_docker || return 1
-    local allowlist="${AUTOMATON_STORAGE_IMAGE_ALLOWLIST:-/etc/automaton/storage-images.allow}"
-    [[ -s "$allowlist" ]] || { echo "[ERROR] Missing image allow-list: $allowlist; no images removed" >&2; return 1; }
-    local ref id repo tag container
-    declare -A protected=() repositories=()
-    # Validate the complete allow-list before deleting anything. Protect by image ID,
-    # so aliases cannot cause deletion of an intentionally retained artifact.
-    while IFS= read -r ref || [[ -n "$ref" ]]; do
-        [[ -z "$ref" || "$ref" == \#* ]] && continue
-        [[ "$ref" =~ ^[^[:space:]]+:[^/:[:space:]]+$ && "$ref" != *:latest ]] || {
-            echo "[ERROR] Use explicit non-latest image tags in $allowlist" >&2; return 1;
-        }
-        id=$(docker image inspect "$ref" --format '{{.Id}}') || return 1
-        protected["$id"]=1
-        repositories["${ref%:*}"]=1
-    done < "$allowlist"
-    # Blue/green state explicitly names current and one rollback revision.
-    # Parse only known keys; never execute the state file as shell.
-    local state="${AUTOMATON_STORAGE_DEPLOYMENT_STATE:-$(dirname "${BASH_SOURCE[0]}")/../.prod-runtime/nginx/state/blue-green-state.env}"
-    local component key revision
-    if [[ -f "$state" ]]; then
-        while IFS='=' read -r key revision; do
-            [[ "$key" =~ ^(API|STUDIO|WEBSITE)_(CURRENT|PREVIOUS)_REVISION$ && -n "$revision" ]] || continue
-            [[ "$revision" =~ ^[0-9a-f]{7,40}$ ]] || { echo '[ERROR] Invalid deployment revision' >&2; return 1; }
-            component="${key%%_*}"
-            repo="automaton-prod-${component,,}"
-            id=$(docker image inspect "$repo:$revision" --format '{{.Id}}') || return 1
-            protected["$id"]=1
-        done < "$state"
-    fi
-    # Include stopped containers; none are removed by maintenance.
-    local containers
-    containers=$(docker ps -aq) || return 1
-    while IFS= read -r container; do
-        [[ -n "$container" ]] || continue
-        id=$(docker inspect "$container" --format '{{.Image}}') || return 1
-        protected["$id"]=1
-    done <<< "$containers"
-    local inventory
-    inventory=$(docker image ls --no-trunc --format '{{.Repository}} {{.Tag}} {{.ID}}') || return 1
-    while read -r repo tag id; do
-        [[ -n "$repo" && -n "${repositories[$repo]:-}" && -z "${protected[$id]:-}" && "$tag" != '<none>' ]] || continue
-        # Check again immediately before removal; Docker's non-force removal also
-        # refuses images acquired by a container since the snapshot.
-        local used=false
-        local latest_image
-        containers=$(docker ps -aq) || return 1
-        while IFS= read -r container; do
-            [[ -n "$container" ]] || continue
-            latest_image=$(docker inspect "$container" --format '{{.Image}}') || return 1
-            [[ "$latest_image" != "$id" ]] || used=true
-        done <<< "$containers"
-        [[ "$used" == false ]] || continue
-        docker image rm "$repo:$tag" || return 1
-    done <<< "$inventory"
-}
 
 storage_main() {
     case "${1:-check}" in
         check|preflight) storage_check "${1:-check}" ;;
-        maintain)
-            # The caller must serialize this with deployments. No automatic
-            # database purge, journal deletion, volume prune or archive deletion.
-            storage_clean_images
-            ;;
-        *) echo 'Usage: host-storage.sh [check|preflight|maintain]' >&2; return 1 ;;
+        *) echo 'Usage: host-storage.sh [check|preflight]' >&2; return 1 ;;
     esac
 }
 
