@@ -7,6 +7,7 @@ import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
 import ServerView from './ServerView.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
+import { appsService } from '@/features/apps/services/apps.service'
 import { installService } from '@/features/install/services/install.service'
 import { serverHealthService } from '../services/server-health.service'
 import { serverCleanupService } from '../services/server-cleanup.service'
@@ -23,6 +24,7 @@ const cleanupBody = (): ServerCleanup => ({
 })
 
 vi.mock('@/features/runners/services/runners.service', () => ({ runnersService: { list: vi.fn() } }))
+vi.mock('@/features/apps/services/apps.service', () => ({ appsService: { list: vi.fn() } }))
 vi.mock('@/features/install/services/install.service', () => ({ installService: { getUpdate: vi.fn(), startUpdate: vi.fn() } }))
 vi.mock('../services/server-health.service', () => ({ serverHealthService: { get: vi.fn() } }))
 vi.mock('../services/server-cleanup.service', () => ({
@@ -55,13 +57,14 @@ const mountView = (roles: string[] = ['User']) => {
   useAuthStore().user = { roles } as never
   return mount(ServerView, {
     attachTo: document.body,
-    global: { plugins: [pinia, PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} } },
+    global: { plugins: [pinia, PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} }, stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } },
   })
 }
 
 describe('ServerView', () => {
   beforeEach(() => {
     vi.mocked(runnersService.list).mockReset().mockResolvedValue([runner()] as never)
+    vi.mocked(appsService.list).mockReset().mockResolvedValue([])
     vi.mocked(serverHealthService.get).mockReset().mockResolvedValue(health(false))
     vi.mocked(installService.getUpdate).mockReset().mockResolvedValue({
       currentVersion: 'server-v1', triggerAvailable: true, run: null, log: null, stale: false, requestPending: false, requestAgeSeconds: null, hint: null,
@@ -115,17 +118,35 @@ describe('ServerView', () => {
     wrapper.unmount()
   })
 
-  it('shows the health tiles and each Runner with OS, apps and version', async () => {
+  it('shows each Runner with OS, apps and version and no health cards', async () => {
     const wrapper = mountView()
     await flushPromises()
-    expect(wrapper.get('[data-testid="tile-disk"]').text()).toContain('50% used')
-    expect(wrapper.get('[data-testid="tile-updates"]').text()).toContain('3 pending')
-    expect(wrapper.get('[data-testid="tile-backup"]').text()).toContain('7 hours ago')
+    expect(wrapper.find('[data-testid="health-tiles"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="host-os"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Automaton server-v1')
     expect(wrapper.get('[data-testid="runner-os"]').text()).toBe('Ubuntu 24.04')
     expect(wrapper.get('[data-testid="runner-apps"]').text()).toBe('3')
     expect(wrapper.get('[data-testid="runner-version"]').text()).toBe('0.2.6')
     expect(wrapper.find('[data-testid="update-available"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="server-console-link"]').exists()).toBe(false)
     wrapper.unmount()
+  })
+
+  it('links a system administrator to Server Console, or says how to install it', async () => {
+    const missing = mountView(['SysAdmin'])
+    await flushPromises()
+    expect(missing.get('[data-testid="server-console-install"]').attributes('href')).toBe('/apps/catalog')
+    missing.unmount()
+
+    vi.mocked(appsService.list).mockResolvedValue([
+      { id: 'other', installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/heartbeat' },
+      { id: 'sc1', installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/server-console' },
+    ] as never)
+    const installed = mountView(['SysAdmin'])
+    await flushPromises()
+    expect(installed.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
+    expect(installed.find('[data-testid="server-console-install"]').exists()).toBe(false)
+    installed.unmount()
   })
 
   it('offers an Update button only when a newer release exists and starts it after confirmation', async () => {
@@ -150,7 +171,6 @@ describe('ServerView', () => {
     const wrapper = mountView()
     await flushPromises()
     expect(wrapper.find('[data-testid="health-denied"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="health-tiles"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="runner-row"]')).toHaveLength(1)
     wrapper.unmount()
   })
