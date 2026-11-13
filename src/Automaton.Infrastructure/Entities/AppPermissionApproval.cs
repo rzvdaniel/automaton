@@ -8,6 +8,7 @@ public sealed class AppPermissionApproval
     public const string BackupsRead = "backups:read";
     public const string ServerRead = "server:read";
     public const string NotifyEmail = "notify:email";
+    public const string ServerCleanup = "server:cleanup";
     public const string CredentialVariable = "APP_AUTOMATON_API_KEY";
 
     [Key]

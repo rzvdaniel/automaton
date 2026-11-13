@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
-# Free disk space on an Automaton server. Runs nightly from automaton-cleanup.timer, after the backup.
-# Removes Docker images no container uses and build cache older than 7 days, and trims the journal to 200 MB.
-# Never volumes, images of existing containers or backups.
+# Retires the host systemd cleanup timer (automaton-cleanup.timer, issue #1083). The nightly cleanup now runs in the
+# Runner on a schedule the server stores, and administrators change it or run it now through the API and Server Console.
 #
-#   cleanup.sh                  clean now
-#   cleanup.sh --install-timer  install and start the nightly systemd timer
+#   cleanup.sh --remove-timer   stop, disable and delete automaton-cleanup.timer and its service (safe to repeat)
 set -euo pipefail
 
-install_dir=/opt/automaton-server
-mode=clean
 while (($#)); do
     case "$1" in
-        --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
-        --install-timer) mode=timer; shift ;;
-        --help) sed -n '2,8p' "$0"; exit 0 ;;
+        --install-dir) shift 2 ;;
+        --remove-timer) shift ;;
+        --help) sed -n '2,6p' "$0"; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -21,42 +17,11 @@ done
 systemd_dir=${AUTOMATON_SYSTEMD_DIR:-/etc/systemd/system}
 [[ -n "${AUTOMATON_UPDATE_TEST:-}" || $EUID -eq 0 ]] || { echo 'Run as root (sudo).' >&2; exit 1; }
 
-install_timer() {
-    cat > $systemd_dir/automaton-cleanup.service <<UNIT
-[Unit]
-Description=Automaton nightly Docker and journal cleanup
-After=docker.service automaton-backup.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/env bash $install_dir/cleanup.sh --install-dir $install_dir
-UNIT
-    # The backup starts at 03:00 with up to an hour of random delay, so this runs well after it.
-    cat > $systemd_dir/automaton-cleanup.timer <<'UNIT'
-[Unit]
-Description=Run the Automaton cleanup nightly, after the backup
-
-[Timer]
-OnCalendar=*-*-* 05:00:00
-RandomizedDelaySec=30m
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-UNIT
-    chmod 0644 $systemd_dir/automaton-cleanup.service $systemd_dir/automaton-cleanup.timer
-    systemctl daemon-reload
-    systemctl enable --now automaton-cleanup.timer >/dev/null
-    echo 'Nightly cleanup enabled (automaton-cleanup.timer).'
-}
-
-clean() {
-    docker image prune -a -f --filter until=168h
-    docker builder prune -f --filter until=168h
-    journalctl --vacuum-size=200M
-}
-
-case "$mode" in
-    timer) install_timer ;;
-    clean) clean ;;
-esac
+if [[ -f "$systemd_dir/automaton-cleanup.timer" || -f "$systemd_dir/automaton-cleanup.service" ]]; then
+    if [[ -z "${AUTOMATON_UPDATE_TEST:-}" ]] && command -v systemctl >/dev/null; then
+        systemctl disable --now automaton-cleanup.timer >/dev/null 2>&1 || true
+    fi
+    rm -f "$systemd_dir/automaton-cleanup.timer" "$systemd_dir/automaton-cleanup.service"
+    if [[ -z "${AUTOMATON_UPDATE_TEST:-}" ]] && command -v systemctl >/dev/null; then systemctl daemon-reload || true; fi
+    echo 'Removed the old host cleanup timer; the Runner now runs the nightly cleanup.'
+fi

@@ -3594,6 +3594,72 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("SelfHostedRunnerEnrollments");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.ServerCleanupRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("BytesFreed")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("RunnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RunnerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAtUtc");
+
+                    b.ToTable("ServerCleanupRuns");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.ServerCleanupSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("JournalLimitMb")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("KeepDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinutesAfterMidnightUtc")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ServerCleanupSettings");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.Setting", b =>
                 {
                     b.Property<string>("Key")

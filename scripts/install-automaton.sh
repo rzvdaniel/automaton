@@ -313,7 +313,7 @@ if [[ -f "$install_dir/backup.sh" ]]; then
         || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
 fi
 if [[ -f "$install_dir/cleanup.sh" ]]; then
-    bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --install-timer \
-        || echo "Warning: nightly cleanup could not be enabled. Run: sudo bash $install_dir/cleanup.sh --install-timer" >&2
+    bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --remove-timer \
+        || echo "Warning: the old host cleanup timer could not be removed. Run: sudo bash $install_dir/cleanup.sh --remove-timer" >&2
 fi
 printf 'Backups: nightly database and key backups are kept in %s/backups/nightly. Also enable your provider'"'"'s server backups (snapshots) and copy %s off-host.\n' "$install_dir" "$config_dir"

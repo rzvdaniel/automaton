@@ -18,3 +18,9 @@ public sealed record UpgradeRunnerStarted(bool Started);
 
 /// <summary>State of the helper container that upgrades a Runner: none, running, succeeded or failed.</summary>
 public sealed record RunnerUpgradeHelperStatus(string State, string? Log);
+
+/// <summary>Asks a Machine Management Runner to free host disk space: unused Docker images and build cache older than <paramref name="KeepDays"/> days, and archived journal files above <paramref name="JournalLimitMb"/> MB.</summary>
+public sealed record HostCleanupRequest(int KeepDays, int JournalLimitMb);
+
+/// <summary>What a host cleanup freed, in bytes, and a short plain-text summary of each step.</summary>
+public sealed record HostCleanupResult(long BytesFreed, string Summary);

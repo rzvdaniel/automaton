@@ -119,10 +119,10 @@ ensure_backups() {
     for script in backup.sh cleanup.sh restore.sh; do
         if [[ -f "$bundle/$script" ]]; then install -m 0700 "$bundle/$script" "$install_dir/$script"; fi
     done
-    # Nightly Docker and journal cleanup, after the backup. Failures only warn.
+    # The nightly cleanup runs in the Runner now: remove the old host timer. Failures only warn.
     if [[ -f "$install_dir/cleanup.sh" ]]; then
-        bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --install-timer \
-            || echo "Warning: nightly cleanup could not be enabled. Run: sudo bash $install_dir/cleanup.sh --install-timer" >&2
+        bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --remove-timer \
+            || echo "Warning: the old host cleanup timer could not be removed. Run: sudo bash $install_dir/cleanup.sh --remove-timer" >&2
     fi
     [[ -f "$install_dir/backup.sh" ]] || return 0
     if bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer \

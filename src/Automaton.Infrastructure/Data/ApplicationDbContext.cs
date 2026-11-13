@@ -53,6 +53,8 @@ namespace Automaton.Api.Data
                 .HasIndex(setting => new { setting.AppId, setting.Name }).IsUnique();
             modelBuilder.Entity<AppSettingValue>()
                 .HasOne<WebApp>().WithMany().HasForeignKey(setting => setting.AppId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<ServerCleanupSettings>().Property(item => item.Id).ValueGeneratedNever();
+            modelBuilder.Entity<ServerCleanupRun>().HasIndex(run => run.StartedAtUtc);
             if (Database.IsNpgsql()) PostgreSqlModelConfiguration.Apply(modelBuilder);
         }
 
