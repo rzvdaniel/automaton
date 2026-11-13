@@ -83,7 +83,7 @@ onMounted(load)
         <label class="flex flex-column gap-1">Time (UTC)
           <InputText v-model="form.timeUtc" placeholder="05:00" data-testid="cleanup-time" />
         </label>
-        <label class="flex flex-column gap-1">Keep build cache (days)
+        <label class="flex flex-column gap-1">Keep unused images and cache (days)
           <InputNumber v-model="form.keepDays" :min="1" :max="365" :use-grouping="false" input-id="cleanup-days" />
         </label>
         <label class="flex flex-column gap-1">Journal limit (MB)
