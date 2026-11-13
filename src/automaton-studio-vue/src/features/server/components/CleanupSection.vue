@@ -6,7 +6,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { isAxiosError } from 'axios'
 import { serverCleanupService } from '../services/server-cleanup.service'
-import { formatGiB } from '../utils/health-tiles'
+import { formatGiB } from '../utils/format'
 import type { ServerCleanup, ServerCleanupSettings } from '../types/server.types'
 
 const cleanup = ref<ServerCleanup | null>(null)

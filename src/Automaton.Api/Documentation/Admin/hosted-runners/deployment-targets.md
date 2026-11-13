@@ -114,7 +114,7 @@ deployed environment rows, then repeat the route, log, and publish smoke checks.
 
 ## Where administrators manage Runner infrastructure
 
-Manage Machine Management Runners from **Server**, which also shows the server version, an Update button when a newer release exists, and health tiles for disk, memory, system updates, certificates and the last backup (system administrators). The old `/runners` address redirects there. The old Admin Runner pages have been removed.
+Manage Machine Management Runners from **Server**, which also shows the server version, an Update button when a newer release exists, the nightly Cleanup (system administrators), and a link to the Server Console app for server health (or how to install it). The old `/runners` address redirects there. The old Admin Runner pages have been removed.
 
 Each Machine Management Runner can host several app deployment targets; each target keeps its own app and environment identity.
 
