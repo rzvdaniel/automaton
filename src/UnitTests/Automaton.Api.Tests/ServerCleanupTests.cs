@@ -169,4 +169,13 @@ public sealed class ServerCleanupTests
         Assert.That(await Allowed(Role(Automaton.Api.Enums.UserRole.User)), Is.False);
         Assert.That(await Allowed(new ClaimsPrincipal(new ClaimsIdentity())), Is.False, "anonymous");
     }
+
+    [Test]
+    public void TheReadOffersStudiosAddressOnlyWhenItIsAnHttpAddress()
+    {
+        Assert.That(ServerCleanupController.StudioUrl("https://studio.example.test/some/path"), Is.EqualTo("https://studio.example.test"));
+        Assert.That(ServerCleanupController.StudioUrl("javascript:alert(1)"), Is.Null);
+        Assert.That(ServerCleanupController.StudioUrl(""), Is.Null);
+        Assert.That(ServerCleanupController.StudioUrl(null), Is.Null);
+    }
 }

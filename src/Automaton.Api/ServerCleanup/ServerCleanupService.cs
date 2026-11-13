@@ -13,7 +13,7 @@ public sealed record ServerCleanupSettingsDto(string TimeUtc, int KeepDays, int 
 public sealed record ServerCleanupRunDto(Guid Id, string RunnerName, DateTime StartedAtUtc, DateTime? FinishedAtUtc,
     string Result, long BytesFreed, string Trigger, string? Message);
 
-public sealed record ServerCleanupResponse(ServerCleanupSettingsDto Settings, DateTime NextRunAtUtc, IReadOnlyList<ServerCleanupRunDto> Runs);
+public sealed record ServerCleanupResponse(ServerCleanupSettingsDto Settings, DateTime NextRunAtUtc, IReadOnlyList<ServerCleanupRunDto> Runs, string? StudioUrl = null);
 
 /// <summary>
 /// The nightly host cleanup: settings, schedule and run history live here; the Runner on each server host does the work

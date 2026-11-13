@@ -14,11 +14,15 @@ namespace Automaton.Api.Controllers;
 [Route("api/server/cleanup")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [Authorize(Policy = AppPermissionAuthenticationOptions.ServerCleanupPolicy)]
-public sealed class ServerCleanupController(ServerCleanupService cleanup, ViewerTokenService viewerTokens, ResourceAuthorizationService authorization) : ControllerBase
+public sealed class ServerCleanupController(ServerCleanupService cleanup, ViewerTokenService viewerTokens, ResourceAuthorizationService authorization, ConfigurationService configuration) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<ServerCleanupResponse>> Get(CancellationToken token)
-        => Ok(await cleanup.GetAsync(DateTime.UtcNow, token));
+        => Ok(await cleanup.GetAsync(DateTime.UtcNow, token) with { StudioUrl = StudioUrl(configuration.WebsiteUrl) });
+
+    /// <summary>Where Studio is, so an app can link to its Server page (reads only).</summary>
+    internal static string? StudioUrl(string? websiteUrl)
+        => Uri.TryCreate(websiteUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri.GetLeftPart(UriPartial.Authority) : null;
 
     [HttpPut("settings")]
     public async Task<ActionResult<ServerCleanupResponse>> Update([FromBody] ServerCleanupSettingsDto request, CancellationToken token)
