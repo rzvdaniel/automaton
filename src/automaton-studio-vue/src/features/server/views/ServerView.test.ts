@@ -8,6 +8,7 @@ import ToastService from 'primevue/toastservice'
 import ServerView from './ServerView.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { appsService } from '@/features/apps/services/apps.service'
+import { serverConsoleService } from '../services/server-console.service'
 import { installService } from '@/features/install/services/install.service'
 import { serverHealthService } from '../services/server-health.service'
 import { serverCleanupService } from '../services/server-cleanup.service'
@@ -26,6 +27,7 @@ const cleanupBody = (): ServerCleanup => ({
 vi.mock('@/features/runners/services/runners.service', () => ({ runnersService: { list: vi.fn() } }))
 vi.mock('@/features/apps/services/apps.service', () => ({ appsService: { list: vi.fn() } }))
 vi.mock('@/features/install/services/install.service', () => ({ installService: { getUpdate: vi.fn(), startUpdate: vi.fn() } }))
+vi.mock('../services/server-console.service', () => ({ serverConsoleService: { install: vi.fn() } }))
 vi.mock('../services/server-health.service', () => ({ serverHealthService: { get: vi.fn() } }))
 vi.mock('../services/server-cleanup.service', () => ({
   serverCleanupService: { get: vi.fn(), saveSettings: vi.fn(), run: vi.fn() },
@@ -64,6 +66,7 @@ const mountView = (roles: string[] = ['User']) => {
 describe('ServerView', () => {
   beforeEach(() => {
     vi.mocked(runnersService.list).mockReset().mockResolvedValue([runner()] as never)
+    vi.mocked(serverConsoleService.install).mockReset().mockResolvedValue({ appId: 'sc1' })
     vi.mocked(appsService.list).mockReset().mockResolvedValue([])
     vi.mocked(serverHealthService.get).mockReset().mockResolvedValue(health(false))
     vi.mocked(installService.getUpdate).mockReset().mockResolvedValue({
@@ -129,14 +132,25 @@ describe('ServerView', () => {
     expect(wrapper.get('[data-testid="runner-version"]').text()).toBe('0.2.6')
     expect(wrapper.find('[data-testid="update-available"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="server-console-link"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="server-console-notice"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
   it('links a system administrator to Server Console, or says how to install it', async () => {
     const missing = mountView(['SysAdmin'])
     await flushPromises()
-    expect(missing.get('[data-testid="server-console-install"]').attributes('href')).toBe('/apps/catalog')
+    expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('not installed')
+    expect(serverConsoleService.install).not.toHaveBeenCalled()
+    vi.mocked(appsService.list).mockResolvedValue([
+      { id: 'sc1', installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/server-console' },
+    ] as never)
+    await missing.get('[data-testid="server-console-install"]').trigger('click')
+    await flushPromises()
+    expect(serverConsoleService.install).toHaveBeenCalledTimes(1)
+    expect(missing.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
+    expect(missing.find('[data-testid="server-console-notice"]').exists()).toBe(false)
     missing.unmount()
+    vi.mocked(appsService.list).mockResolvedValue([])
 
     vi.mocked(appsService.list).mockResolvedValue([
       { id: 'other', installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/heartbeat' },
@@ -145,8 +159,18 @@ describe('ServerView', () => {
     const installed = mountView(['SysAdmin'])
     await flushPromises()
     expect(installed.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
-    expect(installed.find('[data-testid="server-console-install"]').exists()).toBe(false)
+    expect(installed.find('[data-testid="server-console-notice"]').exists()).toBe(false)
     installed.unmount()
+  })
+
+  it('says why Server Console could not be installed', async () => {
+    vi.mocked(serverConsoleService.install).mockRejectedValue({ isAxiosError: true, response: { status: 409, data: { error: 'Server Console is not available in the official catalog.' } } })
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    await wrapper.get('[data-testid="server-console-install"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="server-console-install-error"]').text()).toContain('not available')
+    wrapper.unmount()
   })
 
   it('offers an Update button only when a newer release exists and starts it after confirmation', async () => {

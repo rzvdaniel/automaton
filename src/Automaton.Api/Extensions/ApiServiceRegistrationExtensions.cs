@@ -324,6 +324,7 @@ internal static class ApiMessagingRegistration
         services.AddScoped<AppSettingValueService>();
         services.AddScoped<IAppRuntimeRestarter, AppRuntimeRestarter>();
         services.AddScoped<AppPermissionService>();
+        services.AddScoped<ServerConsoleProvisioningService>();
         services.AddScoped<NotifyEmailService>();
         services.AddScoped<AdminAppDirectoryService>();
         services.AddScoped<AdminUserProvisioningService>();

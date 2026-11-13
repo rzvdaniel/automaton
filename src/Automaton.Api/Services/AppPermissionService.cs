@@ -33,7 +33,7 @@ public sealed class AppPermissionService(
     }
 
     public async Task<IReadOnlyList<AppPermissionStatus>> SetApprovalAsync(Guid appId, string permission, bool approved,
-        CancellationToken token)
+        CancellationToken token, string? reason = null)
     {
         if (!ApplicationContractValidator.SupportedPermissions.Contains(permission)) throw new ArgumentException("Unsupported app permission.", nameof(permission));
         var requested = await RequestedAsync(appId, token);
@@ -80,7 +80,7 @@ public sealed class AppPermissionService(
             {
                 Action = action, EntityType = AuditEntityTypes.AppPermission, EntityId = appId, EventType = eventType,
                 Message = $"App permission {permission} was {row.Status.ToLowerInvariant()}",
-                Metadata = new { permission, appId }
+                Metadata = new { permission, appId, reason }
             }, token);
         }
         if (credentialChanged && runtimes is not null) await runtimes.RestartRunningAsync(appId, CancellationToken.None);

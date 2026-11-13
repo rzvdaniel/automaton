@@ -107,6 +107,9 @@ public sealed class EssentialCatalogBootstrapService(
             .ToListAsync(cancellationToken);
         var missing = MissingEssentials(response, installed.Select(app => (app.Repo, app.Folder)).ToHashSet());
         if (missing is null) return false;
+        // A pass that stopped after installing Server Console must still approve and deploy it.
+        var console = response.Apps.Single(app => app.Id == ServerConsoleProvisioningService.AppId && app.SourceId == CatalogSourceStore.OfficialId);
+        if (!missing.Contains(console)) missing = [console, .. missing];
         var installer = services.GetRequiredService<AppCatalogInstallService>();
         var userContext = services.GetRequiredService<UserContextService>();
         userContext.ImpersonateUser(adminId);
@@ -114,11 +117,14 @@ public sealed class EssentialCatalogBootstrapService(
         {
             foreach (var entry in missing)
             {
-                await installer.InstallAsync(new CatalogInstallRequest
-                {
-                    Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit
-                }, cancellationToken);
-                logger.LogInformation("Installed essential catalog app {AppName} for the first administrator.", entry.Name);
+                if (entry.Id == ServerConsoleProvisioningService.AppId)
+                    await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionAsync(adminId, entry, cancellationToken);
+                else
+                    await installer.InstallAsync(new CatalogInstallRequest
+                    {
+                        Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit
+                    }, cancellationToken);
+                logger.LogInformation("Installed or completed essential catalog app {AppName} for the first administrator.", entry.Name);
             }
             return true;
         }

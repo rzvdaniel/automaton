@@ -14,6 +14,7 @@ import CleanupSection from '../components/CleanupSection.vue'
 import RunnersList from '../components/RunnersList.vue'
 import ServerUpdateBanner from '../components/ServerUpdateBanner.vue'
 import { serverHealthService } from '../services/server-health.service'
+import { serverConsoleService } from '../services/server-console.service'
 import { serverConsoleApp } from '../utils/server-console'
 import type { App } from '@/features/apps/types/apps.types'
 import type { ServerHealth } from '../types/server.types'
@@ -32,6 +33,8 @@ const healthDenied = ref(false)
 const healthError = ref<string | null>(null)
 const showInstall = ref(false)
 const serverConsole = ref<App | null>(null)
+const installingConsole = ref(false)
+const installConsoleError = ref<string | null>(null)
 let timer: ReturnType<typeof setInterval> | undefined
 
 const visibleRunners = computed(() => runners.value.filter(isVisibleApplicationRunner))
@@ -64,6 +67,20 @@ async function loadServerConsole() {
   }
 }
 
+async function installServerConsole() {
+  installingConsole.value = true
+  installConsoleError.value = null
+  try {
+    await serverConsoleService.install()
+    await loadServerConsole()
+  } catch (error) {
+    const message = isAxiosError(error) ? (error.response?.data as { error?: string } | undefined)?.error : undefined
+    installConsoleError.value = message ?? 'Server Console could not be installed.'
+  } finally {
+    installingConsole.value = false
+  }
+}
+
 async function refresh() {
   await Promise.all([loadRunners(), healthDenied.value ? Promise.resolve() : loadHealth()])
 }
@@ -90,16 +107,22 @@ onBeforeUnmount(() => clearInterval(timer))
     </Message>
     <Message v-else-if="healthError" severity="warn" :closable="false" class="mb-4">{{ healthError }}</Message>
 
-    <p v-if="isSystemAdministrator" class="mb-4" data-testid="server-console-link">
+    <p v-if="isSystemAdministrator && serverConsole" class="mb-4" data-testid="server-console-link">
       <template v-if="serverConsole">
         Server health, resources and OS updates:
         <RouterLink :to="`/apps/${serverConsole.id}`" data-testid="server-console-open">open Server Console</RouterLink>.
       </template>
-      <template v-else>
-        Server health, resources and OS updates are shown by the Server Console app.
-        <RouterLink to="/apps/catalog" data-testid="server-console-install">Install Server Console</RouterLink> from the catalog.
-      </template>
     </p>
+    <Message v-if="isSystemAdministrator && !serverConsole && !loading" severity="info" :closable="false" class="mb-4" data-testid="server-console-notice">
+      <div class="flex align-items-center justify-content-between flex-wrap gap-2">
+        <span>Server health, resources and OS updates are shown by the Server Console app. It is not installed yet.</span>
+        <Button
+          label="Install Server Console" class="btn-small" :loading="installingConsole"
+          data-testid="server-console-install" @click="installServerConsole"
+        />
+      </div>
+      <p v-if="installConsoleError" class="mt-2 mb-0" data-testid="server-console-install-error">{{ installConsoleError }}</p>
+    </Message>
 
     <CleanupSection v-if="isSystemAdministrator" />
 
