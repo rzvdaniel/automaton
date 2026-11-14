@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { appsService } from '../services/apps.service'
 import type { AppPermissionsResponse } from '../types/apps.types'
 import Button from 'primevue/button'
-import { adminAppsService, type RunnerMaintenancePermission } from '@/features/admin/services/adminAppsService'
+import { adminAppsService } from '@/features/admin/services/adminAppsService'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 const props = defineProps<{ appId: string }>()
@@ -31,25 +31,6 @@ async function setPermission(permission: string, approved: boolean) {
   }
 }
 
-const machines = ref<RunnerMaintenancePermission[]>([])
-const maintainApproved = computed(() => state.value?.permissions.some(item => item.permission === 'runner:maintain' && item.status === 'Approved') ?? false)
-
-async function loadMachines() {
-  machines.value = isAdministrator.value && maintainApproved.value ? await adminAppsService.getRunnerPermissions(props.appId).catch(() => []) : []
-}
-
-async function setMachine(runnerId: string, approved: boolean) {
-  saving.value = runnerId
-  actionFailed.value = false
-  try {
-    machines.value = await adminAppsService.setRunnerPermission(props.appId, runnerId, approved)
-  } catch {
-    actionFailed.value = true
-  } finally {
-    saving.value = null
-  }
-}
-
 function pillClass(status: string) {
   switch (status) {
     case 'Approved': return 'pill--ok'
@@ -69,7 +50,6 @@ async function load() {
   failed.value = false
   try {
     state.value = await appsService.getPermissions(props.appId)
-    await loadMachines()
   } catch {
     failed.value = true
   } finally {
@@ -97,18 +77,6 @@ onMounted(() => {
             <Button v-if="item.status === 'Pending'" label="Reject" :aria-label="`Reject ${item.permission}`" severity="secondary" outlined size="small" :disabled="saving !== null" @click="setPermission(item.permission, false)" />
           </template>
         </span>
-      </div>
-      <div v-if="isAdministrator && maintainApproved" class="machines">
-        <p class="hint">runner:maintain also needs your approval for each machine. Without it the app cannot run maintenance there.</p>
-        <p v-if="machines.length === 0" class="hint">No machine with a Runner yet.</p>
-        <div v-for="machine in machines" :key="machine.runnerId" class="row">
-          <code>{{ machine.name }}</code>
-          <span class="pill" :class="machine.approved ? 'pill--ok' : 'pill--wait'">{{ machine.approved ? 'approved' : 'not approved' }}</span>
-          <span class="actions">
-            <Button v-if="machine.approved" label="Revoke" :aria-label="`Revoke maintenance on ${machine.name}`" severity="danger" outlined size="small" :loading="saving === machine.runnerId" :disabled="saving !== null" @click="setMachine(machine.runnerId, false)" />
-            <Button v-else label="Approve" :aria-label="`Approve maintenance on ${machine.name}`" size="small" :loading="saving === machine.runnerId" :disabled="saving !== null" @click="setMachine(machine.runnerId, true)" />
-          </span>
-        </div>
       </div>
       <p v-if="actionFailed" class="hint" role="alert">Could not change the permission.</p>
       <p v-if="state.waiting.length > 0 && !isAdministrator" class="hint">
