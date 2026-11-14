@@ -310,6 +310,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         return true;
     }
 
+    // Shorter values are shown as they are. Short values (a setting such as "20" or "7") are not credentials and would turn every digit of a log line into [REDACTED].
+    private const int LogRedactionMinimumLength = 8;
+
     /// <summary>Reads the last lines of the running app container's output; null when it has no container.</summary>
     public async Task<string?> ReadLogsAsync(Guid appId, Guid deploymentTargetId, int lines, CancellationToken cancellationToken)
     {
@@ -318,7 +321,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         if (string.IsNullOrWhiteSpace(id)) return null;
         // The app's own secrets never leave the machine in log text, as on a failed start.
         var secrets = secretSource is null ? null : await secretSource.GetAsync(appId, deploymentTargetId, cancellationToken);
-        var text = RedactValues(await GetLogsAsync(appId, deploymentTargetId, id, cancellationToken), secrets?.Values);
+        var text = RedactValues(await GetLogsAsync(appId, deploymentTargetId, id, cancellationToken), secrets?.Values, LogRedactionMinimumLength);
         var all = text.Split('\n');
         return string.Join('\n', all.Length <= lines ? all : all[^lines..]).TrimEnd();
     }
@@ -641,10 +644,10 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
     }
 
-    internal static string RedactValues(string logs, IEnumerable<string>? secrets)
+    internal static string RedactValues(string logs, IEnumerable<string>? secrets, int minimumLength = 1)
     {
         foreach (var secret in secrets ?? [])
-            if (secret.Length > 0) logs = logs.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
+            if (secret.Length >= minimumLength) logs = logs.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
         return logs;
     }
 
