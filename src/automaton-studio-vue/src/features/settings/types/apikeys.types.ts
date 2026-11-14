@@ -41,7 +41,7 @@ export interface ApiKey {
   id: string
   name: string
   keyPrefix: string
-  scope: ApiKeyScope
+  scope: ApiKeyScope | string // the API sends the name, e.g. "Developer"
   source: ApiKeySource
   createdAt: string // ISO date string
   lastUsedAt?: string // ISO date string
