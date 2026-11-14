@@ -126,8 +126,8 @@ public sealed class RunnerMaintenanceService(ApplicationDbContext db, ServerClea
         return await SendAsync<HostDiskReport>(runnerId, viewerId, "disk-report", new { }, ReadTimeout, token);
     }
 
-    private static readonly TimeSpan UpdateTimeout = TimeSpan.FromMinutes(20);
-    // One OS update or restart at a time per machine, across requests.
+    private static readonly TimeSpan UpdateTimeout = TimeSpan.FromMinutes(14);
+    // Shorter than the Runner's own 15-minute limit on a Docker call. One OS update or restart at a time per machine, across requests.
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> Busy = new();
 
     /// <summary>Installs the security updates on one machine after the admin typed its name; audit-logged before it runs.</summary>
