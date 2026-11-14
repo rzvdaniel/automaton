@@ -107,6 +107,7 @@ public sealed class AppCatalogUpdateService(
             {
                 Directory.CreateDirectory(staging);
                 await AppCatalogInstallService.ExtractAsync(package, target, staging, cancellationToken);
+                KeepServerWrittenFiles(directory, staging);
                 if (Directory.Exists(directory)) Directory.Move(directory, previous);
                 Directory.Move(staging, directory);
             }
@@ -172,8 +173,60 @@ public sealed class AppCatalogUpdateService(
             using var stream = entry.Open();
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
-            if (!memory.GetBuffer().AsSpan(0, (int)memory.Length).SequenceEqual(File.ReadAllBytes(Path.Combine(root, relative)))) return true;
+            var original = memory.GetBuffer().AsSpan(0, (int)memory.Length).ToArray();
+            var current = File.ReadAllBytes(Path.Combine(root, relative));
+            if (original.AsSpan().SequenceEqual(current)) continue;
+            if (relative == ManifestFile && SameManifest(original, current)) continue;
+            if (relative == IgnoreFile) continue;
+            return true;
         }
+        onDisk.Remove(IgnoreFile);
         return onDisk.Count > 0;
+    }
+
+    private const string ManifestFile = "automaton.json";
+    private const string IgnoreFile = ".automatonignore";
+
+    /// <summary>Fields the server and the CLI write into automaton.json themselves (publishing, naming); they are not code edits.</summary>
+    internal static readonly string[] ServerWrittenFields = ["appId", "name", "slug", "server"];
+
+    private static System.Text.Json.Nodes.JsonObject? ParseManifest(byte[] bytes)
+    {
+        try { return System.Text.Json.Nodes.JsonNode.Parse(bytes) as System.Text.Json.Nodes.JsonObject; }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    /// <summary>True when two manifests differ only in the fields the server writes.</summary>
+    internal static bool SameManifest(byte[] original, byte[] current)
+    {
+        var a = ParseManifest(original);
+        var b = ParseManifest(current);
+        if (a is null || b is null) return false;
+        foreach (var field in ServerWrittenFields) { a.Remove(field); b.Remove(field); }
+        return System.Text.Json.Nodes.JsonNode.DeepEquals(a, b);
+    }
+
+    /// <summary>Carries the name, slug and other publish fields of the installed manifest, and .automatonignore, into the freshly extracted files.</summary>
+    internal static void KeepServerWrittenFiles(string installedDirectory, string stagingDirectory)
+    {
+        var oldIgnore = Path.Combine(installedDirectory, IgnoreFile);
+        var newIgnore = Path.Combine(stagingDirectory, IgnoreFile);
+        if (File.Exists(oldIgnore) && !File.Exists(newIgnore)) File.Copy(oldIgnore, newIgnore);
+
+        var oldPath = Path.Combine(installedDirectory, ManifestFile);
+        var newPath = Path.Combine(stagingDirectory, ManifestFile);
+        if (!File.Exists(oldPath) || !File.Exists(newPath)) return;
+        var old = ParseManifest(File.ReadAllBytes(oldPath));
+        var next = ParseManifest(File.ReadAllBytes(newPath));
+        if (old is null || next is null) return;
+        var changed = false;
+        foreach (var field in ServerWrittenFields)
+        {
+            if (!old.TryGetPropertyValue(field, out var value) || value is null) continue;
+            next[field] = value.DeepClone();
+            changed = true;
+        }
+        if (changed)
+            File.WriteAllText(newPath, next.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
     }
 }
