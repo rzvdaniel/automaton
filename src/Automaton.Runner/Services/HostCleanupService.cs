@@ -61,6 +61,37 @@ internal sealed partial class HostCleanupService(HostCleanupService.DockerRunner
         return new(freed, string.Join(' ', steps));
     }
 
+    /// <summary>What Docker uses on this machine, from <c>docker system df</c>; read-only.</summary>
+    public async Task<HostDiskReport> DiskReportAsync(CancellationToken token)
+    {
+        var result = await run(["system", "df", "--format", "{{.Type}}|{{.Size}}|{{.Reclaimable}}"], token);
+        if (result.ExitCode != 0) throw new InvalidOperationException("Docker could not report its disk use: " + Tail(result.Output));
+        return ParseDiskReport(result.Output);
+    }
+
+    /// <summary>Reads the "Type|Size|Reclaimable" lines of <c>docker system df</c>; unknown lines are ignored.</summary>
+    internal static HostDiskReport ParseDiskReport(string output)
+    {
+        long images = 0, containers = 0, volumes = 0, cache = 0, reclaimable = 0;
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = line.Split('|');
+            if (parts.Length != 3) continue;
+            var size = ParseReclaimed("Total reclaimed space: " + parts[1]);
+            var free = ParseReclaimed("Total reclaimed space: " + parts[2].Split(' ')[0]);
+            switch (parts[0])
+            {
+                case "Images": images = size; break;
+                case "Containers": containers = size; break;
+                case "Local Volumes": volumes = size; break;
+                case "Build Cache": cache = size; break;
+                default: continue;
+            }
+            reclaimable += free;
+        }
+        return new(images, containers, volumes, cache, reclaimable);
+    }
+
     private static long Step(string name, (int ExitCode, string Output) result, List<string> steps)
     {
         if (result.ExitCode != 0)

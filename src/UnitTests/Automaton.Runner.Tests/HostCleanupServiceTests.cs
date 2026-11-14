@@ -66,4 +66,15 @@ public sealed class HostCleanupServiceTests
         var result = await executor.ExecuteAsync(AppActionCommand.Create("host-cleanup", new HostCleanupRequest(7, 200)), default);
         Assert.That(result.ActionResult!.Value.GetProperty("BytesFreed").GetInt64(), Is.GreaterThan(0));
     }
+
+    [Test]
+    public async Task TheDiskReportReadsDockerUseWithoutChangingAnything()
+    {
+        var service = Create(_ => (0, "Images|2.5GB|1GB (40%)\nContainers|10MB|0B (0%)\nLocal Volumes|1.2GB|1.2GB (100%)\nBuild Cache|500MB|500MB\nOther|1GB|1GB"));
+        var report = await service.DiskReportAsync(default);
+
+        Assert.That(report, Is.EqualTo(new HostDiskReport(2_500_000_000, 10_000_000, 1_200_000_000, 500_000_000, 2_700_000_000)));
+        Assert.That(calls.Single(), Is.EqualTo(new[] { "system", "df", "--format", "{{.Type}}|{{.Size}}|{{.Reclaimable}}" }));
+        Assert.ThrowsAsync<InvalidOperationException>(() => Create(_ => (1, "no docker")).DiskReportAsync(default));
+    }
 }

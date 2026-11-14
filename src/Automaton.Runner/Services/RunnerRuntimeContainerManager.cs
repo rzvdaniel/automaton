@@ -310,6 +310,17 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         return true;
     }
 
+    /// <summary>Reads the last lines of the running app container's output; null when it has no container.</summary>
+    public async Task<string?> ReadLogsAsync(Guid appId, Guid deploymentTargetId, int lines, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        var id = metadata?.ContainerId;
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        var text = await GetLogsAsync(appId, deploymentTargetId, id, cancellationToken);
+        var all = text.Split('\n');
+        return string.Join('\n', all.Length <= lines ? all : all[^lines..]).TrimEnd();
+    }
+
     /// <summary>
     /// Stops the app's containers and records the runtime as paused. The deployed files and storage stay, and a
     /// paused runtime is not started again when the Runner restarts.

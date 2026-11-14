@@ -334,6 +334,7 @@ internal static class ApiMessagingRegistration
         services.AddHostedService<SecretGrantCleanupService>();
         services.AddScoped<Automaton.Api.ServerCleanup.ServerCleanupService>();
         services.AddScoped<Automaton.Api.ServerCleanup.RunnerMaintenanceService>();
+        services.AddScoped<Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands, Automaton.Api.ServerCleanup.RunnerMaintenanceCommands>();
         services.AddHostedService<Automaton.Api.ServerCleanup.ServerCleanupScheduler>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
         services.AddCap(options =>

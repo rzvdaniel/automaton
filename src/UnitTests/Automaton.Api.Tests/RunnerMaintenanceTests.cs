@@ -34,8 +34,37 @@ public sealed class RunnerMaintenanceTests
         }
     }
 
+    private sealed class Commands : IRunnerMaintenanceCommands
+    {
+        public List<(Guid Runner, Guid Actor, string Kind)> Sent { get; } = [];
+        public Task<System.Text.Json.JsonElement> SendAsync(Guid runnerId, Guid actor, AppActionCommand command, TimeSpan timeout, CancellationToken token)
+        {
+            Sent.Add((runnerId, actor, command.Kind));
+            object answer = command.Kind switch
+            {
+                "app-logs" => new ReadAppLogsResult(Guid.Empty, Guid.Empty, true, "line one\nline two"),
+                "disk-report" => new HostDiskReport(1, 2, 3, 4, 5),
+                _ => new RestartAppRuntimeResult(Guid.Empty, Guid.Empty, true)
+            };
+            return Task.FromResult(System.Text.Json.JsonSerializer.SerializeToElement(answer));
+        }
+    }
+
     private sealed class Setup
     {
+        public required Commands Commands { get; init; }
+        public Guid TargetOne { get; init; } = Guid.NewGuid();
+        public Guid TargetTwo { get; init; } = Guid.NewGuid();
+
+        public async Task<int> Call(string? viewerToken, Guid runner, Func<RunnerMaintenanceController, Task<IActionResult>> action, bool app = true)
+        {
+            var http = new DefaultHttpContext();
+            if (app) http.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", AppId.ToString())], "AppPermission"));
+            if (viewerToken is not null) http.Request.Headers[ViewerHeaders.Token] = viewerToken;
+            var controller = new RunnerMaintenanceController(Maintenance, Cleanup, Tokens, Authorization) { ControllerContext = new ControllerContext { HttpContext = http } };
+            return ((IStatusCodeActionResult)await action(controller)).StatusCode ?? 200;
+        }
+
         public required ApplicationDbContext Db { get; init; }
         public required ViewerTokenService Tokens { get; init; }
         public required RunnerMaintenanceService Maintenance { get; init; }
@@ -62,11 +91,12 @@ public sealed class RunnerMaintenanceTests
     {
         var db = AppAuthorizationTestData.CreateDbContext();
         var audit = new Audit();
+        var commands = new Commands();
         var cleanup = new ServerCleanupService(db, new FakeRunner());
         var setup = new Setup
         {
             Db = db, Tokens = new ViewerTokenService(DataProtectionProvider.Create("rm" + Guid.NewGuid().ToString("N"))),
-            Audit = audit, Cleanup = cleanup, Maintenance = new RunnerMaintenanceService(db, cleanup, audit),
+            Audit = audit, Cleanup = cleanup, Commands = commands, Maintenance = new RunnerMaintenanceService(db, cleanup, audit, commands),
             Authorization = new ResourceAuthorizationService(db, new UserContextService(new HttpContextAccessor()))
         };
         var owner = Guid.NewGuid();
@@ -80,6 +110,8 @@ public sealed class RunnerMaintenanceTests
                 Id = id, Name = name, Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
                 InstallationId = $"sh_{Guid.NewGuid():N}", ConnectionId = "c", LastHeartbeatAtUtc = DateTime.UtcNow
             });
+        foreach (var (target, runner) in new[] { (setup.TargetOne, setup.RunnerOne), (setup.TargetTwo, setup.RunnerTwo) })
+            db.AppDeploymentTargets.Add(new AppDeploymentTarget { Id = target, WebAppId = setup.AppId, Name = "t" + target.ToString("N")[..6], Slug = "t" + target.ToString("N")[..6], ExecutionRunnerId = runner, GenericRuntimeDeployed = true });
         await db.SaveChangesAsync();
         return setup;
     }
@@ -170,5 +202,62 @@ public sealed class RunnerMaintenanceTests
         Assert.That(typeof(AdminAppRunnerPermissionsController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single().Roles,
             Is.EqualTo(UserRole.SystemAdministrator));
         Assert.That(Automaton.Core.Models.ApplicationContractValidator.SupportedPermissions, Does.Contain(AppPermissionApproval.RunnerMaintain));
+    }
+
+    private static readonly (string Name, Func<Setup, Guid, Func<RunnerMaintenanceController, Task<IActionResult>>> Action)[] Operations =
+    [
+        ("logs", (s, r) => c => c.Logs(r, s.TargetOne, 50, default)),
+        ("restart", (s, r) => c => c.Restart(r, s.TargetOne, default)),
+        ("disk", (s, r) => c => c.DiskReport(r, default))
+    ];
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public async Task EveryOperationNeedsTheAdminViewerTokenAndThatMachinesApproval(int index)
+    {
+        var s = await SetUp();
+        await s.Maintenance.SetAsync(s.AppId, s.RunnerOne, true, default);
+        var action = Operations[index].Action;
+        var admin = s.Tokens.Create(s.AppId, s.Admin);
+
+        Assert.That(await s.Call(admin, s.RunnerOne, action(s, s.RunnerOne), app: false), Is.EqualTo(403), "not an app");
+        Assert.That(await s.Call(null, s.RunnerOne, action(s, s.RunnerOne)), Is.EqualTo(403), "no viewer token");
+        Assert.That(await s.Call(s.Tokens.Create(s.AppId, s.Other), s.RunnerOne, action(s, s.RunnerOne)), Is.EqualTo(403), "not an administrator");
+        Assert.That(await s.Call(admin, s.RunnerTwo, action(s, s.RunnerTwo)), Is.EqualTo(403), "approved for runner-01 only");
+        Assert.That(s.Commands.Sent, Is.Empty, "no refused call reached a Runner");
+        Assert.That(await s.Call(admin, s.RunnerOne, action(s, s.RunnerOne)), Is.EqualTo(200));
+        Assert.That(s.Commands.Sent.Single().Actor, Is.EqualTo(s.Admin));
+    }
+
+    [Test]
+    public async Task LogsRestartAndDiskSendOnlyNamedCommandsAndAreAuditLogged()
+    {
+        var s = await SetUp();
+        await s.Maintenance.SetAsync(s.AppId, s.RunnerOne, true, default);
+        s.Audit.Events.Clear();
+        var admin = s.Tokens.Create(s.AppId, s.Admin);
+        foreach (var operation in Operations) await s.Call(admin, s.RunnerOne, operation.Action(s, s.RunnerOne));
+
+        Assert.That(s.Commands.Sent.Select(x => x.Kind), Is.EqualTo(new[] { "app-logs", "restart-runtime", "disk-report" }));
+        Assert.That(s.Audit.Events, Has.Count.EqualTo(3));
+        Assert.That(s.Audit.Events.Select(e => e.Metadata).ToArray(), Has.All.Contain(s.Admin.ToString()).And.All.Contain(s.RunnerOne.ToString()));
+        Assert.That(s.Audit.Events.Select(e => e.Metadata).ToArray(),
+            Has.Some.Contain("app-logs").And.Some.Contain("app-restart").And.Some.Contain("disk-report"));
+    }
+
+    [Test]
+    public async Task AnAppOnAnotherMachineOrAnUnreasonableLineCountIsRefused()
+    {
+        var s = await SetUp();
+        await s.Maintenance.SetAsync(s.AppId, s.RunnerOne, true, default);
+        var admin = s.Tokens.Create(s.AppId, s.Admin);
+        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Logs(s.RunnerOne, s.TargetTwo, 50, default)), Is.EqualTo(404), "target of runner-02");
+        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Restart(s.RunnerOne, Guid.NewGuid(), default)), Is.EqualTo(404));
+        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Logs(s.RunnerOne, s.TargetOne, 0, default)), Is.EqualTo(400));
+        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Logs(s.RunnerOne, s.TargetOne, 5000, default)), Is.EqualTo(400));
+        Assert.That(s.Commands.Sent, Is.Empty);
+        var apps = await s.Maintenance.ListAppsAsync(s.RunnerOne, default);
+        Assert.That(apps.Select(x => x.TargetId), Is.EqualTo(new[] { s.TargetOne }));
     }
 }
