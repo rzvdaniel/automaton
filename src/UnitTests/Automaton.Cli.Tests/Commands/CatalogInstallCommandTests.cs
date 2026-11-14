@@ -126,4 +126,16 @@ public class CatalogInstallCommandTests
             Assert.That(missingSecrets, Is.EqualTo(new[] { "TOKEN" }));
         });
     }
+
+    [Test]
+    public void RunnerHelp_DoesNotPromiseAnUnconditionalPick() =>
+        Assert.That(CatalogInstallCommand.BuildInstall(new ConfigService()).Options.Single(o => o.Name == "runner").Description,
+            Does.Contain("first online Runner").And.Contain("refused"));
+
+    [TestCase("""{"id":"a","executionRunnerId":null}""", true)]
+    [TestCase("""{"id":"a","executionRunnerId":""}""", true)]
+    [TestCase("""{"id":"a","executionRunnerId":"7d0f2f55-6b0e-4c3a-9a55-1d1f4f0c9b11"}""", false)]
+    [TestCase("""{"id":"a"}""", false)]
+    public void NoRunner_FlagsOnlyAnAppAnsweredWithoutARunner(string json, bool flagged) =>
+        Assert.That(CatalogInstallCommand.NoRunner(JsonDocument.Parse(json).RootElement) is not null, Is.EqualTo(flagged));
 }
