@@ -48,14 +48,15 @@ public sealed class AppCatalogUpdateService(
     private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(10);
 
     /// <exception cref="KeyNotFoundException">The app does not exist for this user.</exception>
-    public Task<AppCatalogUpdateModel> GetAsync(Guid appId, CancellationToken cancellationToken) =>
-        GetAsync(appId, fresh: false, cancellationToken);
+    public Task<AppCatalogUpdateModel> GetAsync(Guid appId, CancellationToken cancellationToken, bool refresh = false) =>
+        GetAsync(appId, fresh: false, cancellationToken, refresh);
 
-    private async Task<AppCatalogUpdateModel> GetAsync(Guid appId, bool fresh, CancellationToken cancellationToken)
+    /// <summary>With refresh, the catalog is read again first (at most once a minute per source) so a pin changed minutes ago is seen.</summary>
+    private async Task<AppCatalogUpdateModel> GetAsync(Guid appId, bool fresh, CancellationToken cancellationToken, bool refresh = false)
     {
         var (app, ownerId, source) = await FindAsync(appId, cancellationToken);
         if (source is null) return None(app.InstalledFromCommit);
-        var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken);
+        var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken, refresh);
         if (latest is null || latest == source.Commit) return None(source.Commit);
         var key = $"catalog-update:{appId}:{source.Commit}:{latest}";
         if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return cached;

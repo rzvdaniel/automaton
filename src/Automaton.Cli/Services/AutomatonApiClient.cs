@@ -747,13 +747,14 @@ public class AutomatonApiClient : IDisposable
     // ── Catalog (installing apps) ─────────────────────────────────────────────
 
     /// <summary>One page of the catalog as the signed-in user sees it.</summary>
-    public async Task<JsonElement> GetCatalogPageAsync(string? search, string? category, string? source, bool installed, int page, CancellationToken ct = default)
+    public async Task<JsonElement> GetCatalogPageAsync(string? search, string? category, string? source, bool installed, int page, CancellationToken ct = default, bool refresh = false)
     {
         var query = new List<string> { $"page={page}", "pageSize=100" };
         if (!string.IsNullOrWhiteSpace(search)) query.Add("q=" + Uri.EscapeDataString(search));
         if (!string.IsNullOrWhiteSpace(category)) query.Add("category=" + Uri.EscapeDataString(category));
         if (!string.IsNullOrWhiteSpace(source)) query.Add("source=" + Uri.EscapeDataString(source));
         if (installed) query.Add("installed=true");
+        if (refresh) query.Add("refresh=true");
         using var resp = await _http.GetAsync("api/catalog?" + string.Join('&', query), ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
@@ -786,9 +787,9 @@ public class AutomatonApiClient : IDisposable
     }
 
     /// <summary>Whether the catalog pins a newer commit than the app was installed from, and what would change.</summary>
-    public async Task<JsonElement> GetCatalogUpdateAsync(string appId, CancellationToken ct = default)
+    public async Task<JsonElement> GetCatalogUpdateAsync(string appId, CancellationToken ct = default, bool refresh = false)
     {
-        using var resp = await _http.GetAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update", ct);
+        using var resp = await _http.GetAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update" + (refresh ? "?refresh=true" : ""), ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }
