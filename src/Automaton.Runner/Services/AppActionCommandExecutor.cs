@@ -35,10 +35,19 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "upgrade-status" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable.")).StatusAsync(token),
             "host-cleanup" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
                 .RunAsync(command.Read<HostCleanupRequest>(), token),
+            "app-logs" => await ReadAppLogsAsync(command.Read<ReadAppLogsRequest>(), token),
+            "disk-report" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
+                .DiskReportAsync(token),
             _ => throw new InvalidDataException("Unknown App Action command.")
         };
         return new() { Outcome = "Succeeded", Started = started, Finished = DateTime.UtcNow,
             ActionResult = JsonSerializer.SerializeToElement(response) };
+    }
+    private async Task<ReadAppLogsResult> ReadAppLogsAsync(ReadAppLogsRequest request, CancellationToken token)
+    {
+        if (request.Lines is < 1 or > 200) throw new InvalidDataException("Lines must be from 1 to 200.");
+        var text = await runtime.ReadRuntimeLogsAsync(request.AppId, request.DeploymentTargetId, request.Lines, token);
+        return new(request.AppId, request.DeploymentTargetId, text is not null, text ?? "");
     }
     private AppActionModulesResponse ListModules(AppActionModuleRequest request)
         => deployment.ListModules(request.AppId, request.DeploymentTargetId);

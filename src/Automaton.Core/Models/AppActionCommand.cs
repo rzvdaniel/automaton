@@ -24,3 +24,12 @@ public sealed record HostCleanupRequest(int KeepDays, int JournalLimitMb);
 
 /// <summary>What a host cleanup freed, in bytes, and a short plain-text summary of each step.</summary>
 public sealed record HostCleanupResult(long BytesFreed, string Summary);
+
+/// <summary>Asks a Machine Management Runner for the last <paramref name="Lines"/> lines of one app's container output.</summary>
+public sealed record ReadAppLogsRequest(Guid AppId, Guid DeploymentTargetId, int Lines);
+
+/// <summary>The recent output of one app's container; <paramref name="Running"/> is false when it has no container.</summary>
+public sealed record ReadAppLogsResult(Guid AppId, Guid DeploymentTargetId, bool Running, string Text);
+
+/// <summary>Docker's own disk figures on one machine: what images, containers, volumes and build cache use, in bytes.</summary>
+public sealed record HostDiskReport(long ImagesBytes, long ContainersBytes, long VolumesBytes, long BuildCacheBytes, long ReclaimableBytes);

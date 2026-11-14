@@ -26,6 +26,10 @@ public interface IAppRuntimeProcessManager
     Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
         => Task.FromResult(false);
 
+    /// <summary>The last lines of the app's container output; null when the runtime has no container to read.</summary>
+    Task<string?> ReadLogsAsync(Guid appId, Guid deploymentTargetId, int lines, CancellationToken cancellationToken)
+        => Task.FromResult<string?>(null);
+
     /// <summary>Stops a running runtime but keeps its deployed files, so it can be resumed. False when nothing was running.</summary>
     Task<bool> PauseAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
         => Task.FromResult(false);

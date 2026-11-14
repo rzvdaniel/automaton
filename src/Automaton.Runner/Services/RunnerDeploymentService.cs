@@ -113,6 +113,10 @@ public class RunnerDeploymentService
         finally { gate.Release(); }
     }
 
+    /// <summary>The last lines of an app container's output.</summary>
+    public Task<string?> ReadRuntimeLogsAsync(Guid appId, Guid deploymentTargetId, int lines, CancellationToken cancellationToken)
+        => runtimeProcessManager.ReadLogsAsync(appId, deploymentTargetId, lines, cancellationToken);
+
     /// <summary>Stops a runtime without removing its files, under the same per-target gate as deployments.</summary>
     public async Task<bool> PauseRuntimeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
     {
