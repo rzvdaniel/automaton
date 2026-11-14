@@ -372,4 +372,10 @@ jobs:
           echo "### CLI $cli_version publishing with [Pack CLI and Runner]($url)" >> "$GITHUB_STEP_SUMMARY"
           # Finish only when the package is built and pushed, so a green release means the CLI is on NuGet.
           run_id=${url##*/}
+          # The new run can answer 404 for a moment after dispatch; retry for about a minute.
+          for delay in 2 4 8 16 30; do
+            gh run view "$run_id" --json status > /dev/null 2>&1 && break
+            echo "Run $run_id is not readable yet; retrying in ${delay}s."
+            sleep "$delay"
+          done
           gh run watch "$run_id" --exit-status --interval 20 > /dev/null
