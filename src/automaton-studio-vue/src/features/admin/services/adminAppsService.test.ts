@@ -19,6 +19,6 @@ describe('adminAppsService runner permissions', () => {
   it('approves one machine at a time', async () => {
     const result = await adminAppsService.setRunnerPermission('a1', 'r1', true)
     expect(put).toHaveBeenCalledWith('/api/admin/apps/a1/runner-permissions/r1', { approved: true })
-    expect(result[0].approved).toBe(true)
+    expect(result[0]?.approved).toBe(true)
   })
 })
