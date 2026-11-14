@@ -83,6 +83,11 @@ public sealed class HostCleanupServiceTests
         => Assert.That(RunnerRuntimeContainerManager.RedactValues("db=hunter2secret ok", ["hunter2secret"]), Does.Not.Contain("hunter2secret"));
 
     [Test]
+    public void ShortValuesAreLeftAloneWhenRedactingLogLines()
+        => Assert.That(RunnerRuntimeContainerManager.RedactValues("at 2026-11-14 key=hunter2secret", ["20", "hunter2secret"], 8),
+            Is.EqualTo("at 2026-11-14 key=[REDACTED]"));
+
+    [Test]
     public async Task TheDiskReportReadsDockerUseWithoutChangingAnything()
     {
         var service = Create(_ => (0, "Images|2.5GB|1GB (40%)\nContainers|10MB|0B (0%)\nLocal Volumes|1.2GB|1.2GB (100%)\nBuild Cache|500MB|500MB\nOther|1GB|1GB"));
