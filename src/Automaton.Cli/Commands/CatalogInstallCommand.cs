@@ -129,7 +129,7 @@ public static class CatalogInstallCommand
         => CatalogInstallValues.Declared(application, "settings").TryGetValue(key, out var declared)
            && declared.TryGetProperty("default", out var fallback) && fallback.ValueKind == JsonValueKind.String && fallback.GetString() == value;
 
-    private static void AskForSecrets(List<string> missing, Dictionary<string, string> secrets, bool stdinUsed, bool asJson, string id)
+    internal static void AskForSecrets(List<string> missing, Dictionary<string, string> secrets, bool stdinUsed, bool asJson, string id)
     {
         if (asJson || stdinUsed || Console.IsInputRedirected)
             throw new InvalidOperationException(
@@ -142,7 +142,7 @@ public static class CatalogInstallCommand
         }
     }
 
-    private static string? DeploymentFailure(JsonElement deployment)
+    internal static string? DeploymentFailure(JsonElement deployment)
     {
         var status = Text(deployment, "status");
         var error = Text(deployment, "error");
@@ -175,13 +175,13 @@ public static class CatalogInstallCommand
         return apps;
     }
 
-    private static AutomatonApiClient Connect(ConfigService config)
+    internal static AutomatonApiClient Connect(ConfigService config)
     {
         var (server, apiKey) = config.RequireCredentials(directory: Directory.GetCurrentDirectory());
         return new AutomatonApiClient(server, apiKey);
     }
 
-    private static async Task RunAsync(bool asJson, Func<Task> action)
+    internal static async Task RunAsync(bool asJson, Func<Task> action)
     {
         try { await action(); }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or IOException or InvalidDataException or JsonException or TaskCanceledException)
@@ -192,10 +192,10 @@ public static class CatalogInstallCommand
         }
     }
 
-    private static List<string> Strings(JsonElement item, string property)
+    internal static List<string> Strings(JsonElement item, string property)
         => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Array
             ? value.EnumerateArray().Select(entry => entry.GetString() ?? "").Where(text => text.Length > 0).ToList() : [];
 
-    private static string Text(JsonElement item, string property)
+    internal static string Text(JsonElement item, string property)
         => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(property, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : string.Empty;
 }

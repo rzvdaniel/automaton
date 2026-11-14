@@ -155,6 +155,7 @@ automaton catalog init my-apps  # files for your own apps repository (writes onl
 automaton catalog build         # generate catalog.json from catalog-apps.json
 automaton catalog list          # apps in the server's catalog: id, source, permissions
 automaton catalog install ID --name NAME --runner RUNNER --setting NAME=VALUE --secrets-file FILE --wait
+automaton catalog update APP --check   # is there a newer commit? (exit 2 = yes); without --check it updates and redeploys
 ```
 
 `sync-ai` restores the canonical local guidance files. `pull` downloads app
@@ -163,7 +164,7 @@ public and requires explicit user approval. `listing` sets the app's marketplace
 summary, description, category, tags, cover and screenshots; see
 [Deploy and publish an app](./deploy#marketplace-listing).
 
-`catalog list` and `catalog install` do from the terminal what **Apps → Catalog → Install** does: `list` shows every entry with its id, source and requested permissions (`--search`, `--category`, `--source`, `--installed`, `--json`); `install <id>` prints the pinned commit and the permissions the app requests, creates the app, saves its settings and secrets and deploys it (`--wait` reports whether the deployment succeeded). Give settings as `--setting NAME=VALUE` (repeat the option). Secrets are never arguments: pass `NAME=VALUE` lines in a file only you can read (`--secrets-file`) or on standard input (`--secrets-stdin`), or run the command in a terminal and type each one at a hidden prompt. The command stops before creating anything when a required setting or secret is missing, and says which. Permissions still need a system administrator's approval in Studio. If two catalog sources have the same id, add `--source <id>`.
+`catalog list` and `catalog install` do from the terminal what **Apps → Catalog → Install** does: `list` shows every entry with its id, source and requested permissions (`--search`, `--category`, `--source`, `--installed`, `--json`); `install <id>` prints the pinned commit and the permissions the app requests, creates the app, saves its settings and secrets and deploys it (`--wait` reports whether the deployment succeeded). Give settings as `--setting NAME=VALUE` (repeat the option). Secrets are never arguments: pass `NAME=VALUE` lines in a file only you can read (`--secrets-file`) or on standard input (`--secrets-stdin`), or run the command in a terminal and type each one at a hidden prompt. The command stops before creating anything when a required setting or secret is missing, and says which. Permissions still need a system administrator's approval in Studio. If two catalog sources have the same id, add `--source <id>`. `catalog update <app>` (app id or slug) does what Studio's Update button does: it shows the installed and pinned commits, the compare link and new settings, secrets and permissions, then replaces the files and redeploys (`--wait`, `--json`). Files edited after the install need `--confirm-edited`; new secrets come from `--secrets-file` or `--secrets-stdin`.
 
 `catalog init` and `catalog build` create and maintain an apps repository that servers can use as a catalog source: see [Publish your own app catalog](./apps-repository).
 

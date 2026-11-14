@@ -752,6 +752,23 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    /// <summary>Whether the catalog pins a newer commit than the app was installed from, and what would change.</summary>
+    public async Task<JsonElement> GetCatalogUpdateAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Replaces the app's files with the catalog's newer commit and redeploys; with wait, returns the finished result.</summary>
+    public async Task<JsonElement> UpdateCatalogAppAsync(string appId, bool confirmEdited, bool wait, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update", JsonSerializer.Serialize(new { confirmEdited }, JsonOptions), ct);
+        if (wait) return await WaitForDeploymentResultAsync(appId, resp, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     // ── Projects ──────────────────────────────────────────────────────────────
 
     public async Task<JsonElement> ListProjectsAsync(CancellationToken ct = default)
