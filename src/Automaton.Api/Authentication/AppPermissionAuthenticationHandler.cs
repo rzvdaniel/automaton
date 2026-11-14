@@ -11,6 +11,7 @@ public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOpt
     public const string BackupsReadPolicy = "AppPermission:backups:read";
     public const string ServerReadPolicy = "AppPermission:server:read";
     public const string ServerCleanupPolicy = "AppPermission:server:cleanup";
+    public const string RunnerMaintainPolicy = "AppPermission:runner:maintain";
     public const string NotifyEmailPolicy = "AppPermission:notify:email";
 
     /// <summary>Allows only an app whose approved credential carries the permission; administrators and API keys are refused because the call acts on behalf of an app.</summary>

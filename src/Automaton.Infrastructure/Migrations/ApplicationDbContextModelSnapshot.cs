@@ -1035,6 +1035,36 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("AppPermissionApprovals");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppRunnerPermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("RunnerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunnerId");
+
+                    b.HasIndex("AppId", "RunnerId", "Permission")
+                        .IsUnique();
+
+                    b.ToTable("AppRunnerPermissions");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AppSettingValue", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4338,6 +4368,21 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasOne("Automaton.Api.Entities.WebApp", null)
                         .WithMany()
                         .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppRunnerPermission", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Api.Entities.Runner", null)
+                        .WithMany()
+                        .HasForeignKey("RunnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

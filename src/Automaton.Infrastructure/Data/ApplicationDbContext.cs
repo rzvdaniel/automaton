@@ -55,6 +55,9 @@ namespace Automaton.Api.Data
                 .HasOne<WebApp>().WithMany().HasForeignKey(setting => setting.AppId).OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<ServerCleanupSettings>().Property(item => item.Id).ValueGeneratedNever();
             modelBuilder.Entity<ServerCleanupRun>().HasIndex(run => run.StartedAtUtc);
+            modelBuilder.Entity<AppRunnerPermission>().HasIndex(grant => new { grant.AppId, grant.RunnerId, grant.Permission }).IsUnique();
+            modelBuilder.Entity<AppRunnerPermission>().HasOne<WebApp>().WithMany().HasForeignKey(grant => grant.AppId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<AppRunnerPermission>().HasOne<Runner>().WithMany().HasForeignKey(grant => grant.RunnerId).OnDelete(DeleteBehavior.Cascade);
             if (Database.IsNpgsql()) PostgreSqlModelConfiguration.Apply(modelBuilder);
         }
 
