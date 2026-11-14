@@ -18,7 +18,7 @@ import CodeEditor from '@/features/apps/components/CodeEditor.vue'
 import { getLanguageFromExtension, type FileNode } from '@/features/apps/types/apps.types'
 import type { AdminAppDetails } from '../types/admin.types'
 import { adminAppsService } from '../services/adminAppsService'
-import type { AdminAppPermissionStatus } from '../services/adminAppsService'
+import type { AdminAppPermissionStatus, RunnerMaintenancePermission } from '../services/adminAppsService'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,6 +35,8 @@ const accessStatus = ref('active')
 const moderationReason = ref('')
 const permissions = ref<AdminAppPermissionStatus[]>([])
 const savingPermission = ref<string | null>(null)
+const machines = ref<RunnerMaintenancePermission[]>([])
+const maintainApproved = computed(() => permissions.value.some(item => item.permission === 'runner:maintain' && item.approved))
 const savingApproval = ref<boolean | null>(null)
 
 const appId = computed(() => String(route.params.appId || ''))
@@ -102,8 +104,26 @@ async function loadApp() {
 async function loadPermissions() {
   try {
     permissions.value = await adminAppsService.getPermissions(appId.value)
+    await loadMachines()
   } catch {
     toast.add({ severity: 'error', summary: 'Failed to load app permissions', life: 3000 })
+  }
+}
+
+// runner:maintain also needs an approval for each machine (Runner) the app may maintain.
+async function loadMachines() {
+  machines.value = maintainApproved.value ? await adminAppsService.getRunnerPermissions(appId.value).catch(() => []) : []
+}
+
+async function setMachine(machine: RunnerMaintenancePermission, approved: boolean) {
+  savingPermission.value = machine.runnerId
+  try {
+    machines.value = await adminAppsService.setRunnerPermission(appId.value, machine.runnerId, approved)
+    toast.add({ severity: 'success', summary: approved ? 'Machine approved' : 'Machine revoked', life: 2500 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Machine update failed', life: 3000 })
+  } finally {
+    savingPermission.value = null
   }
 }
 
@@ -123,6 +143,7 @@ async function setPermission(item: AdminAppPermissionStatus, approved: boolean) 
   const summary = approved ? 'Permission approved' : item.approved ? 'Permission revoked' : 'Permission rejected'
   try {
     permissions.value = await adminAppsService.setPermission(appId.value, item.permission, approved)
+    await loadMachines()
     toast.add({ severity: 'success', summary, life: 2500 })
   } catch {
     toast.add({ severity: 'error', summary: 'Permission update failed', life: 3000 })
@@ -426,6 +447,17 @@ onMounted(() => {
                     <Button label="Approve" :aria-label="`Approve ${item.permission}`" size="small" :loading="savingPermission === item.permission && savingApproval === true" :disabled="savingPermission !== null" @click="setPermission(item, true)" />
                     <Button v-if="item.status === 'Pending'" label="Reject" :aria-label="`Reject ${item.permission}`" severity="secondary" outlined size="small" :loading="savingPermission === item.permission && savingApproval === false" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
                   </template>
+                </div>
+              </div>
+              <div v-if="maintainApproved" class="machine-approvals">
+                <p>runner:maintain also needs your approval for each machine. Without it the app cannot run maintenance there.</p>
+                <div v-if="machines.length === 0" class="empty-state">No machine with a Runner yet.</div>
+                <div v-for="machine in machines" :key="machine.runnerId" class="permission-row">
+                  <div class="permission-name"><code>{{ machine.name }}</code> <Tag :value="machine.approved ? 'Approved' : 'Not approved'" :severity="machine.approved ? 'success' : 'warn'" /></div>
+                  <div class="permission-actions">
+                    <Button v-if="machine.approved" label="Revoke" :aria-label="`Revoke maintenance on ${machine.name}`" severity="danger" outlined size="small" :loading="savingPermission === machine.runnerId" :disabled="savingPermission !== null" @click="setMachine(machine, false)" />
+                    <Button v-else label="Approve" :aria-label="`Approve maintenance on ${machine.name}`" size="small" :loading="savingPermission === machine.runnerId" :disabled="savingPermission !== null" @click="setMachine(machine, true)" />
+                  </div>
                 </div>
               </div>
             </template>
