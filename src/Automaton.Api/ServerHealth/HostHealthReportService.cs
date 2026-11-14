@@ -34,6 +34,11 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
             .Where(item => item.ApplicationProfile == RunnerApplicationProfiles.MachineManagement && item.MachineHostHealthJson != null && item.DeletionRequestedAtUtc == null)
             .OrderByDescending(item => item.MachineHostHealthMeasuredAtUtc)
             .Select(item => item.MachineHostHealthJson).FirstOrDefaultAsync(token);
+        return Parse(json);
+    }
+
+    public static MachineHostHealth? Parse(string? json)
+    {
         if (json is null) return null;
         try { return JsonSerializer.Deserialize<MachineHostHealth>(json, Json); }
         catch (JsonException) { return null; }

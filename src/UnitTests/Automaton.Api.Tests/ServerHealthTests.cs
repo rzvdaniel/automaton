@@ -110,6 +110,34 @@ public sealed class ServerHealthTests
     }
 
     [Test]
+    public async Task EachRunnerListsItsOwnHostFigures_AndARunnerThatNeverReportedHasNone()
+    {
+        await using var db = CreateDb();
+        var (_, key) = SeedMachineRunner(db);
+        db.Runners.Add(new Runner
+        {
+            Id = Guid.NewGuid(), Name = "silent", Purpose = RunnerPurposes.Managed, Status = "offline",
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement, InstallationId = "sh_silent", ApiKeyId = Guid.NewGuid()
+        });
+        await db.SaveChangesAsync();
+        await new HostHealthReportService(db).ReportAsync(key, Sample(DateTime.UtcNow.AddMinutes(-3)) with { DiskAvailableBytes = 4_242 }, default);
+        var memory = new MemoryCache(new MemoryCacheOptions());
+        memory.Set(nameof(LatestReleaseClient), (string?)null);
+
+        var health = await Service(db, memory, null).GetAsync(DateTime.UtcNow, default);
+
+        var reported = health.Runners.Single(item => item.Name == "machine");
+        var silent = health.Runners.Single(item => item.Name == "silent");
+        Assert.Multiple(() =>
+        {
+            Assert.That(reported.Host!.DiskAvailableBytes, Is.EqualTo(4_242));
+            Assert.That(reported.HostAgeSeconds, Is.InRange(150, 300));
+            Assert.That(silent.Host, Is.Null);
+            Assert.That(silent.HostAgeSeconds, Is.Null);
+        });
+    }
+
+    [Test]
     public async Task HealthWithoutAReportingRunnerHasNoHostFigures()
     {
         await using var db = CreateDb();
