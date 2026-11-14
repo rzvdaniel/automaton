@@ -33,6 +33,13 @@ export const ApiKeySource = {
 
 export type ApiKeySource = (typeof ApiKeySource)[keyof typeof ApiKeySource]
 
+/** The API sends the source name (e.g. "CliAuthorization"); accept a number too. */
+export function normalizeSource(source: ApiKeySource | string): ApiKeySource | undefined {
+  if (typeof source === 'number') return source
+  const byName = (ApiKeySource as Record<string, ApiKeySource>)[source]
+  return byName ?? (Object.values(ApiKeySource) as number[]).find((v) => String(v) === source) as ApiKeySource | undefined
+}
+
 /**
  * API Key response from server
  * Matches ApiKeyResponse from ApiKeysController.cs
@@ -42,7 +49,7 @@ export interface ApiKey {
   name: string
   keyPrefix: string
   scope: ApiKeyScope | string // the API sends the name, e.g. "Developer"
-  source: ApiKeySource
+  source: ApiKeySource | string // the API sends the name, e.g. "CliAuthorization"
   createdAt: string // ISO date string
   lastUsedAt?: string // ISO date string
   expiresAt?: string // ISO date string
@@ -100,8 +107,8 @@ export function getScopeDisplayName(scope: ApiKeyScope | string): string {
   }
 }
 
-export function getSourceDisplayName(source: ApiKeySource): string {
-  switch (source) {
+export function getSourceDisplayName(source: ApiKeySource | string): string {
+  switch (normalizeSource(source)) {
     case ApiKeySource.Manual:
       return 'Manual'
     case ApiKeySource.CliAuthorization:

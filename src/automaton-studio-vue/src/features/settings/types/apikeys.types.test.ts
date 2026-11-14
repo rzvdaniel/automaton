@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiKeyScope, getScopeDisplayName, getScopeSeverity } from './apikeys.types'
+import { ApiKeyScope, ApiKeySource, getScopeDisplayName, getScopeSeverity, getSourceDisplayName } from './apikeys.types'
 
 describe('API key scope names', () => {
   it.each([
@@ -18,5 +18,17 @@ describe('API key scope names', () => {
     expect(getScopeDisplayName(ApiKeyScope.Developer)).toBe('Developer / CLI')
     expect(getScopeDisplayName('Nope')).toBe('Unknown')
     expect(getScopeSeverity('PermissionsAdmin')).toBe('danger')
+  })
+})
+
+describe('API key source names', () => {
+  it.each([
+    ['Manual', 'Manual'],
+    ['CliAuthorization', 'Automaton CLI authorization'],
+    ['RunnerProvisioning', 'Runner provisioning'],
+    [ApiKeySource.CliAuthorization, 'Automaton CLI authorization'],
+    ['Nope', 'Unknown'],
+  ])('names %s', (source, label) => {
+    expect(getSourceDisplayName(source)).toBe(label)
   })
 })
