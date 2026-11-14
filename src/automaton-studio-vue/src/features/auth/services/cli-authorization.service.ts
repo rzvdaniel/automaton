@@ -12,6 +12,7 @@ export interface CliAuthorizationDetails {
   createdAt: string
   expiresAt: string
   status: string
+  scope?: string
 }
 
 export async function getCliAuthorizationDetails(

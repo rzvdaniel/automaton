@@ -1,5 +1,6 @@
 using Automaton.Api.Constants;
 using Automaton.Api.Services;
+using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -34,13 +35,21 @@ public sealed class CliAuthorizationController : BaseController
         [FromBody] CreateCliAuthorizationRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = ApiKeyScope.Developer;
+        if (!string.IsNullOrWhiteSpace(request.Scope) && !Enum.TryParse(request.Scope, true, out scope)
+            || scope is not (ApiKeyScope.Developer or ApiKeyScope.PermissionsAdmin))
+        {
+            return BadRequest(new { message = "Only the Developer and PermissionsAdmin key types can be requested." });
+        }
+
         var studioUrl = string.IsNullOrWhiteSpace(configurationService.WebsiteUrl)
             ? $"{Request.Scheme}://{Request.Host}"
             : configurationService.WebsiteUrl.TrimEnd('/');
         var result = await authorizationService.CreateAsync(
             request.DeviceName,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
-            cancellationToken);
+            cancellationToken,
+            scope);
 
         var verificationUrl = $"{studioUrl}/cli/authorize?requestId={result.RequestId}&code={Uri.EscapeDataString(result.UserCode)}";
         return Ok(new
@@ -65,6 +74,13 @@ public sealed class CliAuthorizationController : BaseController
         {
             return StatusCode(StatusCodes.Status403Forbidden,
                 new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
+        if (!await authorizationService.MayApproveAsync(
+                requestId, userContextService.GetUserId(), User.FindFirst("api_key_scope") is not null, cancellationToken))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { message = "Only a system administrator signed in to Studio can approve an admin key. No key was created." });
         }
 
         var approved = await authorizationService.ApproveAsync(
@@ -142,6 +158,8 @@ public sealed class CliAuthorizationController : BaseController
 public sealed class CreateCliAuthorizationRequest
 {
     public string? DeviceName { get; set; }
+    /// <summary>Optional: "Developer" (default) or "PermissionsAdmin".</summary>
+    public string? Scope { get; set; }
 }
 
 public sealed class ApproveCliAuthorizationRequest

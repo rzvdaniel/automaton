@@ -92,6 +92,21 @@ describe('agent approval page', () => {
     expect(mocks.cancel).toHaveBeenCalledWith('r1', 'ABCD-1234')
   })
 
+  it('names the admin key, the machine, the code and the expiry for a permissions-admin request', async () => {
+    mocks.details.mockResolvedValue({
+      deviceName: 'e2e-laptop', remoteIp: '10.0.0.1', createdAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2026-01-01T00:05:00Z', status: 'pending', scope: 'PermissionsAdmin',
+    })
+    const { wrapper } = await mountAt(CliAuthorizeView, '/cli/authorize?requestId=r1&code=ABCD-1234')
+    const text = wrapper.text()
+    expect(text).toContain('admin key for app permissions')
+    expect(text).toContain('e2e-laptop')
+    expect(text).toContain('Admin: approve app permissions (30 days)')
+    expect(text).toContain('Request expires')
+    expect(text).toContain('must match your terminal')
+    expect(wrapper.findAll('.cli-code-char').map((c) => c.text()).join('')).toBe('ABCD1234')
+  })
+
   it('says so when the link has no code', async () => {
     const { wrapper } = await mountAt(CliAuthorizeView, '/cli/authorize')
     expect(wrapper.text()).toContain('This authorization link is incomplete. Restart automaton login.')

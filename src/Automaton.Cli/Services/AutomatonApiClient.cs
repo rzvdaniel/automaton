@@ -450,9 +450,9 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    public async Task<CliAuthorizationResponse> CreateCliAuthorizationRequestAsync(string deviceName, CancellationToken ct = default)
+    public async Task<CliAuthorizationResponse> CreateCliAuthorizationRequestAsync(string deviceName, CancellationToken ct = default, string? scope = null)
     {
-        var payload = JsonSerializer.Serialize(new { deviceName }, JsonOptions);
+        var payload = JsonSerializer.Serialize(new { deviceName, scope }, JsonOptions);
         using var resp = await PostJsonAsync("api/cli-auth/requests", payload, ct);
         await EnsureSuccessAsync(resp);
         var json = await ReadJsonAsync(resp, ct);

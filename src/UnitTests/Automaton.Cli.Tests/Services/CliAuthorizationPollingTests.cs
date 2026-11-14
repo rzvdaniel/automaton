@@ -81,6 +81,11 @@ public class CliAuthorizationPollingTests
     private static AutomatonApiClient CreateClient(Func<HttpResponseMessage> respond)
         => new(new HttpClient(new StubHandler(respond)) { BaseAddress = new Uri("https://api.example.test/") });
 
+    [TestCase("automaton.monster", "automaton.monster-permissions")]
+    [TestCase("work-permissions", "work-permissions")]
+    public void PermissionsAdminLoginSavesASeparateProfile(string profile, string expected)
+        => Assert.That(LoginCommand.PermissionsProfileName(profile), Is.EqualTo(expected));
+
     private sealed class StubHandler(Func<HttpResponseMessage> respond) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

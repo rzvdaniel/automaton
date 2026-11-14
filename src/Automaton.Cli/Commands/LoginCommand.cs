@@ -15,6 +15,8 @@ public static class LoginCommand
         var deviceOption = new Option<bool>("--device", "Do not open a browser; display the authorization URL and code");
         var localOption = new Option<bool>("--local", "Store credentials in the current project instead of ~/.automaton/config.json");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var permissionsAdminOption = new Option<bool>("--permissions-admin",
+            "Ask a system administrator to approve in Studio an admin key that only approves app permissions; saved as profile '<profile>-permissions'");
 
         var cmd = new Command("login", "Authorize the Automaton CLI or validate an existing API key")
         {
@@ -22,23 +24,26 @@ public static class LoginCommand
             keyOption,
             deviceOption,
             localOption,
-            jsonOption
+            jsonOption,
+            permissionsAdminOption
         };
 
-        cmd.SetHandler((string? server, string? key, bool device, bool local, bool asJson) =>
-            HandleLoginAsync(config, server, key, device, local, asJson),
-            serverOption, keyOption, deviceOption, localOption, jsonOption);
+        cmd.SetHandler((string? server, string? key, bool device, bool local, bool asJson, bool permissionsAdmin) =>
+            HandleLoginAsync(config, server, key, device, local, asJson, permissionsAdmin),
+            serverOption, keyOption, deviceOption, localOption, jsonOption, permissionsAdminOption);
 
         return cmd;
     }
 
     private static async Task HandleLoginAsync(
-        ConfigService config, string? server, string? key, bool device, bool local, bool asJson)
+        ConfigService config, string? server, string? key, bool device, bool local, bool asJson, bool permissionsAdmin = false)
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
+            if (permissionsAdmin && (local || !string.IsNullOrWhiteSpace(key) || HasKeyArgument()))
+                throw new InvalidOperationException("--permissions-admin saves its own profile and cannot be combined with --local or --key.");
             var cwd = Directory.GetCurrentDirectory();
             var global = !local;
             var existing = config.ResolveExistingConfig(global, cwd);
@@ -47,6 +52,7 @@ public static class LoginCommand
             {
                 var name = config.ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE")
                     ?? ConfigService.ProfileNameFromServer(server);
+                if (permissionsAdmin) name = PermissionsProfileName(name);
                 var profiles = config.LoadProfilesConfig();
                 if (profiles.Profiles.TryGetValue(name, out var saved) && saved.Server != null
                     && !string.Equals(saved.Server.TrimEnd('/'), server, StringComparison.OrdinalIgnoreCase))
@@ -56,7 +62,7 @@ public static class LoginCommand
             }
             await CompletePendingAuthorizationAsync(config, cwd, global, asJson, existing, checks);
             key = ResolveRequestedKey(key);
-            await CompleteLoginAsync(config, cwd, server, key, global, device, asJson, checks);
+            await CompleteLoginAsync(config, cwd, server, key, global, device, asJson, checks, permissionsAdmin);
         }
         catch (Exception ex)
         {
@@ -107,10 +113,18 @@ public static class LoginCommand
         bool global,
         bool device,
         bool asJson,
-        List<CommandDiagnosticCheck> checks)
+        List<CommandDiagnosticCheck> checks,
+        bool permissionsAdmin = false)
         => !string.IsNullOrWhiteSpace(key)
             ? LoginWithExistingKeyAsync(config, cwd, server, key, global, asJson, checks)
-            : LoginWithDeviceAuthorizationAsync(config, cwd, server, global, device, asJson, checks);
+            : LoginWithDeviceAuthorizationAsync(config, cwd, server, global, device, asJson, checks, permissionsAdmin);
+
+    internal static string PermissionsProfileName(string profile)
+        => profile.EndsWith("-permissions", StringComparison.OrdinalIgnoreCase) ? profile : profile + "-permissions";
+
+    private static bool HasKeyArgument()
+        => Environment.GetCommandLineArgs().Any(a => a.Equals("--key", StringComparison.OrdinalIgnoreCase)
+            || a.Equals("-k", StringComparison.OrdinalIgnoreCase));
 
     private static void WriteLoginFailure(
         Exception exception,
@@ -157,11 +171,13 @@ public static class LoginCommand
         bool global,
         bool forceDevice,
         bool asJson,
-        List<CommandDiagnosticCheck> checks)
+        List<CommandDiagnosticCheck> checks,
+        bool permissionsAdmin = false)
     {
         using var client = new AutomatonApiClient(server);
-        var authorization = await client.CreateCliAuthorizationRequestAsync(Environment.MachineName);
-        DisplayAuthorizationRequest(server, authorization, forceDevice, asJson);
+        var authorization = await client.CreateCliAuthorizationRequestAsync(
+            Environment.MachineName, default, permissionsAdmin ? "PermissionsAdmin" : null);
+        DisplayAuthorizationRequest(server, authorization, forceDevice, asJson, permissionsAdmin);
         var apiKey = await PollForApiKeyAsync(client, authorization);
 
         using var authenticatedClient = new AutomatonApiClient(server, apiKey);
@@ -187,11 +203,13 @@ public static class LoginCommand
     }
 
     private static void DisplayAuthorizationRequest(
-        string server, CliAuthorizationResponse authorization, bool forceDevice, bool asJson)
+        string server, CliAuthorizationResponse authorization, bool forceDevice, bool asJson, bool permissionsAdmin = false)
     {
         if (asJson) return;
         AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
-        AnsiConsole.MarkupLine("Authorize Automaton CLI in your browser:");
+        AnsiConsole.MarkupLine(permissionsAdmin
+            ? "A system administrator must approve an [bold]admin key for app permissions[/] in Studio (it can only approve or reject app permissions):"
+            : "Authorize Automaton CLI in your browser:");
         // Plain Console so long URLs and codes are never wrapped at the terminal width.
         Console.WriteLine(authorization.VerificationUrl);
         var browserOpened = !forceDevice && CliBrowserService.TryOpenUrl(authorization.VerificationUrl);
@@ -248,6 +266,10 @@ public static class LoginCommand
         if (state is "expired" or "invalid" or "completed")
         {
             throw new InvalidOperationException("The CLI authorization request is no longer available.");
+        }
+        if (state == "denied")
+        {
+            throw new InvalidOperationException("The approver is no longer a system administrator; no key was created.");
         }
         if (state == "cancelled")
         {
