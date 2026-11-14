@@ -36,6 +36,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "host-cleanup" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
                 .RunAsync(command.Read<HostCleanupRequest>(), token),
             "app-logs" => await ReadAppLogsAsync(command.Read<ReadAppLogsRequest>(), token),
+            "os-update" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable.")).OsUpdateAsync(token),
+            "reboot" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable.")).RebootAsync(token),
             "disk-report" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
                 .DiskReportAsync(token),
             _ => throw new InvalidDataException("Unknown App Action command.")
