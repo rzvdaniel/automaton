@@ -18,6 +18,13 @@ export const ApiKeyScope = {
 
 export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope]
 
+/** The API returns the scope as its name ("Developer"); forms use the number. Accept both. */
+export function normalizeScope(scope: ApiKeyScope | string): ApiKeyScope | undefined {
+  if (typeof scope === 'number') return scope
+  const byName = (ApiKeyScope as Record<string, ApiKeyScope>)[scope]
+  return byName ?? (Object.values(ApiKeyScope) as number[]).find((v) => String(v) === scope) as ApiKeyScope | undefined
+}
+
 export const ApiKeySource = {
   Manual: 1,
   CliAuthorization: 2,
@@ -72,8 +79,8 @@ export interface CreateApiKeyResponse {
 /**
  * Get scope display name
  */
-export function getScopeDisplayName(scope: ApiKeyScope): string {
-  switch (scope) {
+export function getScopeDisplayName(scope: ApiKeyScope | string): string {
+  switch (normalizeScope(scope)) {
     case ApiKeyScope.ReadOnly:
       return 'Read Only'
     case ApiKeyScope.WorkflowExecution:
@@ -87,7 +94,7 @@ export function getScopeDisplayName(scope: ApiKeyScope): string {
     case ApiKeyScope.Developer:
       return 'Developer / CLI'
     case ApiKeyScope.PermissionsAdmin:
-      return 'Admin: app permissions'
+      return 'Admin: approve app permissions'
     default:
       return 'Unknown'
   }
@@ -110,9 +117,9 @@ export function getSourceDisplayName(source: ApiKeySource): string {
  * Get scope color for PrimeVue Tag severity
  */
 export function getScopeSeverity(
-  scope: ApiKeyScope,
+  scope: ApiKeyScope | string,
 ): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
-  switch (scope) {
+  switch (normalizeScope(scope)) {
     case ApiKeyScope.ReadOnly:
       return 'info'
     case ApiKeyScope.WorkflowExecution:
@@ -135,8 +142,8 @@ export function getScopeSeverity(
 /**
  * Get usage instructions based on scope
  */
-export function getUsageInstructions(apiKey: string, scope: ApiKeyScope): string {
-  switch (scope) {
+export function getUsageInstructions(apiKey: string, scope: ApiKeyScope | string): string {
+  switch (normalizeScope(scope)) {
     case ApiKeyScope.Developer:
       return `Use this Developer key with the Automaton CLI:
 
