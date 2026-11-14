@@ -1513,6 +1513,11 @@ namespace Automaton.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("citext");
 
+                    b.Property<int>("RequestedScope")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(7);
+
                     b.Property<string>("UserCode")
                         .IsRequired()
                         .HasMaxLength(32)

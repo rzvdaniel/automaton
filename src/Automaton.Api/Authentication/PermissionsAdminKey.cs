@@ -14,6 +14,9 @@ public static partial class PermissionsAdminKey
 {
     public const string PolicyName = "AppPermissionsAdministration";
     public const int MaximumLifetimeDays = 90;
+    public const int DefaultLifetimeDays = 30;
+    /// <summary>A CLI login request for this key is open for less time than a normal login (10 minutes).</summary>
+    public const int LoginRequestLifetimeMinutes = 5;
 
     /// <summary>Only these paths authenticate a key of this scope; every other request gets 401.</summary>
     [GeneratedRegex(@"^/api/admin/(apps/[0-9a-fA-F-]{36}/(permissions(/[^/]+)?|runner-permissions(/[0-9a-fA-F-]{36})?)|app-permissions/pending)/?\z")]

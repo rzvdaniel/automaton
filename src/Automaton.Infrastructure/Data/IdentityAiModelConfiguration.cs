@@ -79,6 +79,7 @@ internal static class IdentityAiModelConfiguration
                 entity.HasIndex(e => e.ApiKeyId);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.ExpiresAt).IsRequired();
+                entity.Property(e => e.RequestedScope).HasDefaultValue(Automaton.Core.Enums.ApiKeyScope.Developer);
                 entity.HasIndex(e => e.UserCode).IsUnique();
                 entity.HasIndex(e => e.ExpiresAt);
             });
