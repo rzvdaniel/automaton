@@ -60,6 +60,37 @@ public sealed class ServerCleanupService(ApplicationDbContext db, IRunnerActionC
         return queued;
     }
 
+    /// <summary>Queues a cleanup on one server host. Throws when that host is not a machine-management Runner or is offline, or is already cleaning.</summary>
+    public async Task<ServerCleanupRunDto> RunOnRunnerAsync(Guid runnerId, DateTime now, CancellationToken token)
+    {
+        var host = await db.Runners.AsNoTracking()
+            .Where(item => item.Id == runnerId && item.ApplicationProfile == RunnerApplicationProfiles.MachineManagement
+                && item.DeletionRequestedAtUtc == null && item.InstallationId != null && item.InstallationId != "")
+            .Select(item => new { item.Id, item.Name, item.ConnectionId, item.LastHeartbeatAtUtc })
+            .SingleOrDefaultAsync(token) ?? throw new KeyNotFoundException("That machine was not found.");
+        if (!RunnerPresenceEvaluator.IsOnline(host.ConnectionId, host.LastHeartbeatAtUtc, now))
+            throw new InvalidOperationException($"{host.Name} is offline, so it cannot be cleaned up right now.");
+        if (await db.ServerCleanupRuns.AnyAsync(run => run.RunnerId == host.Id && (run.Result == Queued || run.Result == ServerCleanupResults.Running), token))
+            throw new InvalidOperationException($"A cleanup is already running on {host.Name}.");
+        var created = new ServerCleanupRun
+        {
+            Id = Guid.NewGuid(), RunnerId = host.Id, RunnerName = host.Name, StartedAtUtc = now, Result = Queued, Trigger = ServerCleanupTriggers.Manual
+        };
+        db.ServerCleanupRuns.Add(created);
+        await db.SaveChangesAsync(token);
+        return ToDto(created);
+    }
+
+    /// <summary>One run of one host, or null.</summary>
+    public async Task<ServerCleanupRunDto?> FindRunAsync(Guid runnerId, Guid runId, CancellationToken token)
+    {
+        var run = await db.ServerCleanupRuns.AsNoTracking().SingleOrDefaultAsync(item => item.Id == runId && item.RunnerId == runnerId, token);
+        return run is null ? null : ToDto(run);
+    }
+
+    private static ServerCleanupRunDto ToDto(ServerCleanupRun run)
+        => new(run.Id, run.RunnerName, run.StartedAtUtc, run.FinishedAtUtc, run.Result, run.BytesFreed, run.Trigger, run.Message);
+
     /// <summary>One scheduler pass: queue the nightly run when it is due, then execute queued runs and close stale ones.</summary>
     public async Task ProcessAsync(DateTime now, CancellationToken token)
     {

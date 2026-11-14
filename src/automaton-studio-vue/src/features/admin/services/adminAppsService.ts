@@ -82,6 +82,24 @@ class AdminAppsService {
       `/api/admin/apps/${appId}/permissions/${encodeURIComponent(permission)}`, { approved })
     return data
   }
+
+  /** Every machine with a Runner and whether the app may run maintenance (runner:maintain) on it. */
+  async getRunnerPermissions(appId: string): Promise<RunnerMaintenancePermission[]> {
+    const { data } = await apiClient.get<RunnerMaintenancePermission[]>(`/api/admin/apps/${appId}/runner-permissions`)
+    return data
+  }
+
+  async setRunnerPermission(appId: string, runnerId: string, approved: boolean): Promise<RunnerMaintenancePermission[]> {
+    const { data } = await apiClient.put<RunnerMaintenancePermission[]>(
+      `/api/admin/apps/${appId}/runner-permissions/${runnerId}`, { approved })
+    return data
+  }
+}
+
+export interface RunnerMaintenancePermission {
+  runnerId: string
+  name: string
+  approved: boolean
 }
 
 export const adminAppsService = new AdminAppsService()

@@ -54,6 +54,7 @@ public partial class ApplicationDbContext
     public virtual DbSet<AppSettingValue> AppSettingValues { get; set; }
     public virtual DbSet<ServerCleanupSettings> ServerCleanupSettings { get; set; }
     public virtual DbSet<ServerCleanupRun> ServerCleanupRuns { get; set; }
+    public virtual DbSet<AppRunnerPermission> AppRunnerPermissions { get; set; }
     public virtual DbSet<SecretVersion> SecretVersions { get; set; }
     public virtual DbSet<ExecutionSecretGrant> ExecutionSecretGrants { get; set; }
     public virtual DbSet<Setting> Settings { get; set; }
