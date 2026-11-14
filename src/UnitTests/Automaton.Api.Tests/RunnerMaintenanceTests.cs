@@ -201,8 +201,8 @@ public sealed class RunnerMaintenanceTests
     {
         var policy = typeof(RunnerMaintenanceController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();
         Assert.That(policy.Policy, Is.EqualTo(AppPermissionAuthenticationOptions.RunnerMaintainPolicy));
-        Assert.That(typeof(AdminAppRunnerPermissionsController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single().Roles,
-            Is.EqualTo(UserRole.SystemAdministrator));
+        Assert.That(typeof(AdminAppRunnerPermissionsController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single().Policy,
+            Is.EqualTo(Automaton.Api.Authentication.PermissionsAdminKey.PolicyName), "the policy requires the SysAdmin role");
         Assert.That(Automaton.Core.Models.ApplicationContractValidator.SupportedPermissions, Does.Contain(AppPermissionApproval.RunnerMaintain));
     }
 

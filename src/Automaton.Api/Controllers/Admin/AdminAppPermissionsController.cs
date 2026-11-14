@@ -1,4 +1,4 @@
-using Automaton.Api.Enums;
+using Automaton.Api.Authentication;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +7,7 @@ namespace Automaton.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/apps/{appId:guid}/permissions")]
-[Authorize(Roles = UserRole.SystemAdministrator)]
+[Authorize(Policy = PermissionsAdminKey.PolicyName)]
 public sealed class AdminAppPermissionsController(AppPermissionService permissions) : ControllerBase
 {
     [HttpGet]

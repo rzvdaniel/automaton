@@ -43,6 +43,70 @@ public sealed class ApiKeyAuthenticationHandlerTests
         Assert.That(result.Principal.IsInRole("SysAdmin"), Is.False);
     }
 
+    private static readonly string AppId = Guid.NewGuid().ToString();
+
+    [TestCase("/api/admin/apps/{0}/permissions")]
+    [TestCase("/api/admin/apps/{0}/permissions/runner:maintain")]
+    [TestCase("/api/admin/apps/{0}/runner-permissions")]
+    [TestCase("/api/admin/app-permissions/pending")]
+    public async Task PermissionsAdminKey_AuthenticatesOnTheApprovalPathsWithOnlyTheSysAdminRole(string path)
+    {
+        await using var setup = await AuthenticationSetup.CreateAsync("SysAdmin", ApiKeyScope.PermissionsAdmin);
+
+        var result = await setup.AuthenticateAsync(string.Format(path, AppId));
+
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(result.Principal!.IsInRole("SysAdmin"), Is.True);
+        Assert.That(result.Principal.FindFirst("api_key_scope")!.Value, Is.EqualTo("PermissionsAdmin"));
+    }
+
+    [TestCase("/api/apps")]
+    [TestCase("/api/admin/users")]
+    [TestCase("/api/admin/backups")]
+    [TestCase("/api/admin/apps/{0}")]
+    [TestCase("/api/admin/apps/{0}/permissions/../files")]
+    [TestCase("/api/admin/apps/{0}/permissions/a/b")]
+    [TestCase("/api/api-keys")]
+    public async Task PermissionsAdminKey_IsRefusedEverywhereElse(string path)
+    {
+        await using var setup = await AuthenticationSetup.CreateAsync("SysAdmin", ApiKeyScope.PermissionsAdmin);
+
+        var result = await setup.AuthenticateAsync(string.Format(path, AppId));
+
+        Assert.That(result.Succeeded, Is.False);
+    }
+
+    [TestCase("User")]
+    [TestCase("Admin")]
+    public async Task PermissionsAdminKey_StopsWorkingWhenItsOwnerIsNoLongerASystemAdministrator(string role)
+    {
+        await using var setup = await AuthenticationSetup.CreateAsync(role, ApiKeyScope.PermissionsAdmin);
+
+        var result = await setup.AuthenticateAsync($"/api/admin/apps/{AppId}/permissions");
+
+        Assert.That(result.Succeeded, Is.False);
+    }
+
+    [Test]
+    public async Task PermissionsAdminKey_IsRefusedInTheQueryString()
+    {
+        await using var setup = await AuthenticationSetup.CreateAsync("SysAdmin", ApiKeyScope.PermissionsAdmin);
+
+        var result = await setup.AuthenticateAsync($"/api/admin/apps/{AppId}/permissions", viaQuery: true);
+
+        Assert.That(result.Succeeded, Is.False);
+    }
+
+    [Test]
+    public async Task PermissionsAdminKey_ExpiredKeyIsRefused()
+    {
+        await using var setup = await AuthenticationSetup.CreateAsync("SysAdmin", ApiKeyScope.PermissionsAdmin, DateTime.UtcNow.AddMinutes(-1));
+
+        var result = await setup.AuthenticateAsync($"/api/admin/apps/{AppId}/permissions");
+
+        Assert.That(result.Succeeded, Is.False);
+    }
+
     private sealed class AuthenticationSetup : IAsyncDisposable
     {
         private readonly ServiceProvider services;
@@ -58,14 +122,14 @@ public sealed class ApiKeyAuthenticationHandlerTests
             this.apiKey = apiKey;
         }
 
-        public static async Task<AuthenticationSetup> CreateAsync(string role)
+        public static async Task<AuthenticationSetup> CreateAsync(string role, ApiKeyScope scope = ApiKeyScope.Developer, DateTime? expiresAt = null)
         {
             var provider = CreateServiceProvider();
             var db = provider.GetRequiredService<ApplicationDbContext>();
             var userManager = provider.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = provider.GetRequiredService<RoleManager<ApplicationRole>>();
             var user = await CreateUserAsync(userManager, roleManager, role);
-            var (apiKeyService, apiKey) = await CreateApiKeyAsync(db, user.Id);
+            var (apiKeyService, apiKey) = await CreateApiKeyAsync(db, user.Id, scope, expiresAt);
             return new AuthenticationSetup(provider, db, apiKeyService, apiKey);
         }
 
@@ -100,21 +164,25 @@ public sealed class ApiKeyAuthenticationHandlerTests
 
         private static async Task<(ApiKeyService Service, string ApiKey)> CreateApiKeyAsync(
             ApplicationDbContext db,
-            Guid userId)
+            Guid userId,
+            ApiKeyScope scope,
+            DateTime? expiresAt)
         {
             var apiKeyService = new ApiKeyService(
                 db,
                 NullLogger<ApiKeyService>.Instance,
                 authorizationService: null!,
                 new NoOpAuditEventService());
-            var created = await apiKeyService.CreateApiKeyAsync(userId, "test", ApiKeyScope.Developer);
+            var created = await apiKeyService.CreateApiKeyAsync(userId, "test", scope, expiresAt: expiresAt);
             return (apiKeyService, created.apiKey);
         }
 
-        public async Task<AuthenticateResult> AuthenticateAsync()
+        public async Task<AuthenticateResult> AuthenticateAsync(string path = "/api/apps", bool viaQuery = false)
         {
             var context = new DefaultHttpContext();
-            context.Request.Headers["X-API-Key"] = apiKey;
+            context.Request.Path = path;
+            if (viaQuery) context.Request.QueryString = new QueryString($"?api_key={apiKey}");
+            else context.Request.Headers["X-API-Key"] = apiKey;
             var handler = new ApiKeyAuthenticationHandler(
                 new SingleOptionsMonitor<ApiKeyAuthenticationSchemeOptions>(new()),
                 NullLoggerFactory.Instance,

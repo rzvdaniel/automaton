@@ -41,6 +41,15 @@ public class AuditEventService : IAuditEventService
         _logger = Serilog.Log.ForContext<AuditEventService>();
     }
 
+    /// <summary>Names the admin-scoped CLI key when one made the change, so the audit log never shows it as a Studio action.</summary>
+    private string ViaKeySuffix()
+    {
+        var user = _httpContextAccessor.HttpContext?.User;
+        return user?.FindFirst("api_key_scope")?.Value == nameof(Automaton.Core.Enums.ApiKeyScope.PermissionsAdmin)
+            ? $" (via CLI key {user.FindFirst("api_key_id")?.Value})"
+            : string.Empty;
+    }
+
     public async Task WriteAsync(
         AuditEventWriteRequest request,
         CancellationToken cancellationToken = default)
@@ -66,7 +75,7 @@ public class AuditEventService : IAuditEventService
                 UserName = _userContextService.GetUserName(),
                 Outcome = request.Outcome,
                 EventType = eventType,
-                Message = request.Message,
+                Message = request.Message + ViaKeySuffix(),
                 MetadataJson = metadataJson,
                 IpAddress = ipAddress,
                 CreatedAtUtc = DateTime.UtcNow

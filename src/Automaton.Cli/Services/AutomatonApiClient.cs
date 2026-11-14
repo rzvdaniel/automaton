@@ -361,6 +361,39 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    /// <summary>Apps with permissions waiting for an administrator (needs an admin-scoped key or an administrator login).</summary>
+    public async Task<JsonElement> GetPendingPermissionsAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/admin/app-permissions/pending", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Approves or rejects one app permission as an administrator.</summary>
+    public async Task<JsonElement> SetAppPermissionApprovalAsync(string appId, string permission, bool approved, CancellationToken ct = default)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new { approved }, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/permissions/{Uri.EscapeDataString(permission)}", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>The machines an app may maintain (runner:maintain) as an administrator sees them.</summary>
+    public async Task<JsonElement> GetRunnerPermissionsAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> SetRunnerPermissionApprovalAsync(string appId, string runnerId, bool approved, CancellationToken ct = default)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new { approved }, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions/{Uri.EscapeDataString(runnerId)}", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     /// <summary>Who can open the app: audience (me, people, team, server, internet) and the chosen people.</summary>
     public async Task<JsonElement> GetSharingAsync(string appId, CancellationToken ct = default)
     {

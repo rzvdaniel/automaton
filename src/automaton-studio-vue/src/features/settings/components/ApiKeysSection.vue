@@ -49,12 +49,17 @@ const createForm = ref<CreateApiKeyRequest>({
 })
 
 // Advanced key types. Developer / CLI is the default and does not require a choice.
-const advancedScopeOptions = [
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+const permissionsAdminDays = 30
+const advancedScopeOptions = computed(() => [
   { label: 'Developer / CLI — Recommended', value: ApiKeyScope.Developer },
   { label: 'Read Only', value: ApiKeyScope.ReadOnly },
   { label: 'Workflow Execution', value: ApiKeyScope.WorkflowExecution },
   { label: 'Web App (Experimental)', value: ApiKeyScope.WebApp },
-]
+  ...(isSystemAdministrator.value
+    ? [{ label: `Admin: approve app permissions (expires in ${permissionsAdminDays} days)`, value: ApiKeyScope.PermissionsAdmin }]
+    : []),
+])
 
 // Load API keys
 async function loadApiKeys() {
@@ -116,7 +121,11 @@ async function createApiKey() {
 
   createLoading.value = true
   try {
-    const response = await apiKeysService.create(createForm.value)
+    const request: CreateApiKeyRequest = { ...createForm.value }
+    if (request.scope === ApiKeyScope.PermissionsAdmin) {
+      request.expiresAt = new Date(Date.now() + permissionsAdminDays * 86_400_000).toISOString()
+    }
+    const response = await apiKeysService.create(request)
     newApiKeyData.value = response
     showCreateDialog.value = false
     showSuccessDialog.value = true

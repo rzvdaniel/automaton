@@ -257,6 +257,14 @@ internal static class ApiAuthorizationRegistration
                 .RequireAssertion(context => context.User.FindFirst("api_key_scope")?.Value
                     is null or nameof(Automaton.Core.Enums.ApiKeyScope.Developer)));
 
+            // The admin-scoped CLI key: a system administrator's login, or a PermissionsAdmin key of one. A key of any
+            // other scope carries the admin role too, so the scope is checked here.
+            options.AddPolicy(PermissionsAdminKey.PolicyName, policy => policy
+                .AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+                .RequireAuthenticatedUser()
+                .RequireRole(UserRole.SystemAdministrator)
+                .RequireAssertion(context => PermissionsAdminKey.IsAllowed(context.User)));
+
             options.AddPolicy(CatalogSourcesAccess.PolicyName, policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
                     .RequireAuthenticatedUser()
