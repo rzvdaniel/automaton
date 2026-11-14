@@ -20,7 +20,7 @@ import tempfile
 from html import escape
 from pathlib import Path
 
-HINT = ('<p id="proof-hint" style="color:#666">Screenshots are links: the preview blocks a plain click, '
+HINT = ('<p id="proof-hint" style="color:#666">Links: the preview blocks a plain click, '
         'so right-click a link and choose Open in new tab.</p>')
 LIMIT = 1024 * 1024  # text plus a handful of 20-100 KB screenshots
 
@@ -49,7 +49,10 @@ def embed_images(html: str, base: Path) -> str:
             from PIL import Image
         except ImportError:
             sys.exit("Embedding screenshots needs Pillow: pip install pillow")
-        image = Image.open(base / src).convert("RGB")
+        try:
+            image = Image.open(base / src).convert("RGB")
+        except OSError as error:
+            sys.exit(f"Cannot read screenshot {src}: {error}")
         image.thumbnail((1000, 4000))
         buffer = io.BytesIO()
         image.save(buffer, "WEBP", quality=70)
