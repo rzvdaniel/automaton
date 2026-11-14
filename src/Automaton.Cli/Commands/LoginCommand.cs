@@ -195,7 +195,10 @@ public static class LoginCommand
             });
 
         await CompleteAuthorizationAsync(config, cwd, global, asJson, checks);
-        var displayName = await LoadAuthenticatedDisplayNameAsync(authenticatedClient, asJson, checks);
+        // The admin key is refused on the profile endpoint by design, so do not ask for it.
+        var displayName = permissionsAdmin
+            ? "system administrator (permissions key)"
+            : await LoadAuthenticatedDisplayNameAsync(authenticatedClient, asJson, checks);
         checks.Add(new CommandDiagnosticCheck(
             CommandDiagnosticCheckNames.Authentication, true, "browser/device authorization completed"));
         AddProfileCheck(checks, displayName);

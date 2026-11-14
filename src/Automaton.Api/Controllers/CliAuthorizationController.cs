@@ -77,7 +77,7 @@ public sealed class CliAuthorizationController : BaseController
         }
 
         if (!await authorizationService.MayApproveAsync(
-                requestId, userContextService.GetUserId(), User.FindFirst("api_key_scope") is not null, cancellationToken))
+                requestId, request.UserCode, userContextService.GetUserId(), User.FindFirst("api_key_scope") is not null, cancellationToken))
         {
             return StatusCode(StatusCodes.Status403Forbidden,
                 new { message = "Only a system administrator signed in to Studio can approve an admin key. No key was created." });

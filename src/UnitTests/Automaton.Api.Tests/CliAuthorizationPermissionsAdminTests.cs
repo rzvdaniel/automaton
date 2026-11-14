@@ -48,7 +48,7 @@ public sealed class CliAuthorizationPermissionsAdminTests
         var created = await service.CreateAsync("e2e-box", "10.0.0.9", default, ApiKeyScope.PermissionsAdmin);
         Assert.That(created.ExpiresAt - DateTime.UtcNow, Is.LessThan(TimeSpan.FromMinutes(6)));
 
-        Assert.That(await service.MayApproveAsync(created.RequestId, admin, false, default), Is.True);
+        Assert.That(await service.MayApproveAsync(created.RequestId, created.UserCode, admin, false, default), Is.True);
         Assert.That(await service.ApproveAsync(created.RequestId, created.UserCode, admin, default), Is.True);
         var poll = await service.PollAsync(created.RequestId, created.Verifier, default);
 
@@ -70,10 +70,20 @@ public sealed class CliAuthorizationPermissionsAdminTests
         var user = Guid.NewGuid();
         var created = await service.CreateAsync("e2e-box", null, default, ApiKeyScope.PermissionsAdmin);
 
-        Assert.That(await service.MayApproveAsync(created.RequestId, user, false, default), Is.False);
+        Assert.That(await service.MayApproveAsync(created.RequestId, created.UserCode, user, false, default), Is.False);
         Assert.That((await service.PollAsync(created.RequestId, created.Verifier, default)).Status, Is.EqualTo("pending"));
         Assert.That(await db.ApiKeys.CountAsync(), Is.Zero);
         Assert.That(audit.Events.Single().Outcome, Is.EqualTo("Denied"));
+    }
+
+    [Test]
+    public async Task WrongCode_IsNotTold_ItIsAnAdminRequest_AndNothingIsAudited()
+    {
+        var (service, _, audit, _) = Create();
+        var created = await service.CreateAsync("e2e-box", null, default, ApiKeyScope.PermissionsAdmin);
+
+        Assert.That(await service.MayApproveAsync(created.RequestId, "WRONG-CODE", Guid.NewGuid(), false, default), Is.True);
+        Assert.That(audit.Events, Is.Empty);
     }
 
     [Test]
@@ -84,13 +94,13 @@ public sealed class CliAuthorizationPermissionsAdminTests
         admins.Add(admin);
         var created = await service.CreateAsync("e2e-box", null, default, ApiKeyScope.PermissionsAdmin);
 
-        Assert.That(await service.MayApproveAsync(created.RequestId, admin, true, default), Is.False);
+        Assert.That(await service.MayApproveAsync(created.RequestId, created.UserCode, admin, true, default), Is.False);
     }
 
     [Test]
     public async Task ApproverLosingAdminRoleBeforePoll_GetsNoKey()
     {
-        var (service, db, _, admins) = Create();
+        var (service, db, audit, admins) = Create();
         var admin = Guid.NewGuid();
         admins.Add(admin);
         var created = await service.CreateAsync("e2e-box", null, default, ApiKeyScope.PermissionsAdmin);
@@ -99,6 +109,7 @@ public sealed class CliAuthorizationPermissionsAdminTests
 
         Assert.That((await service.PollAsync(created.RequestId, created.Verifier, default)).Status, Is.EqualTo("denied"));
         Assert.That(await db.ApiKeys.CountAsync(), Is.Zero);
+        Assert.That(audit.Events.Single().Outcome, Is.EqualTo("Denied"));
     }
 
     [Test]
@@ -122,7 +133,7 @@ public sealed class CliAuthorizationPermissionsAdminTests
         var user = Guid.NewGuid();
         var created = await service.CreateAsync("e2e-box", null, default);
 
-        Assert.That(await service.MayApproveAsync(created.RequestId, user, false, default), Is.True);
+        Assert.That(await service.MayApproveAsync(created.RequestId, created.UserCode, user, false, default), Is.True);
         await service.ApproveAsync(created.RequestId, created.UserCode, user, default);
         await service.PollAsync(created.RequestId, created.Verifier, default);
         var key = await db.ApiKeys.SingleAsync();

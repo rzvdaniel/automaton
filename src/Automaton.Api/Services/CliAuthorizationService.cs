@@ -153,6 +153,7 @@ public class CliAuthorizationService
             // The approver lost the role (or was locked out) between approval and the CLI's poll: no key.
             request.CancelledAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteRefusedAuditAsync(request, request.UserId.Value, false, cancellationToken);
             if (transaction is not null)
                 await transaction.CommitAsync(cancellationToken);
             return CliAuthorizationPollResult.Denied;
@@ -232,16 +233,23 @@ public class CliAuthorizationService
     /// Whether this user may approve the request. An admin key request needs a system administrator signed in to Studio
     /// (never an API key), re-read from the database; a refusal is audited and nothing is created.
     /// </summary>
-    public async Task<bool> MayApproveAsync(Guid requestId, Guid userId, bool viaApiKey, CancellationToken cancellationToken)
+    public async Task<bool> MayApproveAsync(Guid requestId, string userCode, Guid userId, bool viaApiKey, CancellationToken cancellationToken)
     {
         var request = await dbContext.CliAuthorizationRequests.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
-        if (request is null || request.RequestedScope != ApiKeyScope.PermissionsAdmin)
+        // An unknown, expired, finished or wrongly-coded request is left to ApproveAsync (generic 400), so this reveals nothing.
+        if (request is null || request.RequestedScope != ApiKeyScope.PermissionsAdmin || request.ExpiresAt <= DateTime.UtcNow
+            || request.CompletedAt.HasValue || !string.Equals(request.UserCode, userCode.Trim(), StringComparison.OrdinalIgnoreCase))
             return true;
         if (!viaApiKey && await IsActiveAdministratorAsync(userId))
             return true;
 
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        await WriteRefusedAuditAsync(request, userId, viaApiKey, cancellationToken);
+        return false;
+    }
+
+    private Task WriteRefusedAuditAsync(CliAuthorizationRequest request, Guid userId, bool viaApiKey, CancellationToken cancellationToken)
+        => auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             Action = AuditActions.Created,
             EntityType = AuditEntityTypes.ApiKey,
@@ -252,8 +260,6 @@ public class CliAuthorizationService
             ActorUserId = userId,
             Metadata = new { RequestId = request.Id, request.DeviceName, request.RemoteIp, Scope = request.RequestedScope, ViaApiKey = viaApiKey }
         }, cancellationToken);
-        return false;
-    }
 
     public async Task<ApiKeyScope?> GetRequestedScopeAsync(Guid requestId, CancellationToken cancellationToken)
         => await dbContext.CliAuthorizationRequests.AsNoTracking()

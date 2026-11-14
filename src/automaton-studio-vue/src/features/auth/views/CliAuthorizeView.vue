@@ -81,7 +81,7 @@ function formatDate(value?: string) {
   <AuthCard
     :title="isAdminKey ? 'Give an admin key for app permissions?' : 'Let your AI agent in?'"
     :lead="approved ? undefined : isAdminKey
-      ? 'A command-line session is asking for an admin key. Approve only if you started it yourself: the machine name and code below must match your terminal.'
+      ? 'A command-line session is asking for an admin key. Approve only if you just ran automaton login --permissions-admin yourself; otherwise press Deny. The machine name and code below must match your terminal.'
       : 'An AI agent is asking to use Automaton as you. Check that this code matches the one it shows.'"
   >
     <Message v-if="error" severity="error" :closable="false" class="mb-4">{{ error }}</Message>
@@ -120,7 +120,7 @@ function formatDate(value?: string) {
       </p>
       </template>
       <div v-if="details" class="cli-details">
-        <div><span>Machine name</span><span>{{ details.deviceName }}</span></div>
+        <div><span>{{ isAdminKey ? 'Machine name (chosen by the requester)' : 'Machine name' }}</span><span>{{ details.deviceName }}</span></div>
         <div><span>Requested from</span><span>{{ details.remoteIp || 'Not available' }}</span></div>
         <div><span>Requested time</span><span>{{ formatDate(details.createdAt) }}</span></div>
         <div><span>Credential</span><span>{{ isAdminKey ? 'Admin: approve app permissions (30 days)' : 'Developer / CLI' }}</span></div>
