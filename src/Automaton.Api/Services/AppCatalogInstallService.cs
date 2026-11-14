@@ -116,11 +116,11 @@ public sealed partial class AppCatalogInstallService(
         };
         dbContext.WebApps.Add(entity);
         dbContext.WebAppUsers.Add(new WebAppUser { WebAppId = id, UserId = UserId });
-        if (request.RunnerId.HasValue)
-        {
-            try { await runnerAssignmentPolicy.AssignAsync(entity, request.RunnerId.Value, UserId); }
-            catch (InvalidOperationException exception) { throw new ArgumentException(exception.Message, nameof(request), exception); }
-        }
+        // No Runner named: use the default one, as Studio does, and refuse rather than leave an app that cannot run.
+        var runnerId = request.RunnerId ?? await runnerAssignmentPolicy.FindDefaultRunnerIdAsync(UserId, cancellationToken)
+            ?? throw new ArgumentException("No online Runner is available to run this app. Connect a Runner first, or name one with a Runner id. Nothing was installed.", nameof(request));
+        try { await runnerAssignmentPolicy.AssignAsync(entity, runnerId, UserId); }
+        catch (InvalidOperationException exception) { throw new ArgumentException(exception.Message, nameof(request), exception); }
         await dbContext.SaveChangesAsync(cancellationToken);
 
         try

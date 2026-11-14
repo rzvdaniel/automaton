@@ -18,6 +18,9 @@ public interface IAppRunnerAuthorizationPolicy
         Guid runnerId,
         Guid userId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>The Runner an install without a named Runner uses: the first online Runner the user can see that can run applications (what Studio preselects), or null.</summary>
+    Task<Guid?> FindDefaultRunnerIdAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public sealed class AppRunnerAuthorizationPolicy(
@@ -93,4 +96,17 @@ public sealed class AppRunnerAuthorizationPolicy(
         return runner;
     }
 
+    public async Task<Guid?> FindDefaultRunnerIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var candidates = await authorizationService.GetRunnersQueryByContext(null, userId)
+            .AsNoTracking()
+            .Where(item => item.DeletionRequestedAtUtc == null)
+            .OrderBy(item => item.Name)
+            .ToListAsync(cancellationToken);
+        return candidates.FirstOrDefault(item =>
+            string.Equals(item.Status, nameof(RunnerStatus.Online), StringComparison.OrdinalIgnoreCase)
+            && RunnerPurposes.Normalize(item.Purpose) == RunnerPurposes.Managed
+            && RunnerApplicationProfiles.Normalize(item.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement
+            && RunnerCapabilities.CanExecuteApplications(item.CapabilitiesJson, item.Purpose))?.Id;
+    }
 }

@@ -46,7 +46,7 @@ public static class CatalogInstallCommand
         var id = new Argument<string>("id", "The app id from automaton catalog list");
         var source = new Option<string?>("--source", "Catalog source id, when two sources have an app with this id");
         var name = new Option<string?>("--name", "Name of your install (default: the app's name)");
-        var runner = new Option<string?>("--runner", "Runner id or name to run it on (default: the server picks)");
+        var runner = new Option<string?>("--runner", "Runner id or name to run it on (default: the first online Runner you can use; the install is refused when there is none)");
         var setting = new Option<string[]>("--setting", "NAME=VALUE for a setting the app declares; repeat for more (settings are not secret)") { AllowMultipleArgumentsPerToken = false };
         var secretsFile = new Option<string?>("--secrets-file", "File with NAME=VALUE lines for the app's secrets (never pass a secret as an argument)");
         var secretsStdin = new Option<bool>("--secrets-stdin", "Read the secrets as NAME=VALUE lines from standard input");
@@ -106,6 +106,7 @@ public static class CatalogInstallCommand
         string? runnerId = runnerReference is null ? null : RunnerReferenceResolver.Pick(await client.ListRunnersAsync(null), runnerReference, "id", "name");
         var app = await client.InstallCatalogAppAsync(repo, folder, commit, name, runnerId);
         var appId = Text(app, "id");
+        if (NoRunner(app) is { } noRunner) throw new InvalidOperationException($"{noRunner}\nThe app was created (app id {appId}) but was not deployed; assign a Runner in Studio, then deploy it.");
         try
         {
             foreach (var (key, value) in settings.Concat(secrets).Where(item => application.ValueKind != JsonValueKind.Object || !IsDefault(application, item.Key, item.Value)))
@@ -141,6 +142,11 @@ public static class CatalogInstallCommand
             secrets[name] = value.Length > 0 ? value : throw new InvalidOperationException($"The value for {name} is empty. Nothing was installed.");
         }
     }
+
+    /// <summary>A message when the server answered with an app that has no Runner (it would never run), otherwise null.</summary>
+    internal static string? NoRunner(JsonElement app)
+        => app.ValueKind == JsonValueKind.Object && app.TryGetProperty("executionRunnerId", out var runner) && (runner.ValueKind == JsonValueKind.Null || runner.ToString().Length == 0)
+            ? "The server installed the app without a Runner, so it cannot run." : null;
 
     internal static string? DeploymentFailure(JsonElement deployment)
     {

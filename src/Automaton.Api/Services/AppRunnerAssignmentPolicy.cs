@@ -66,6 +66,9 @@ public sealed class AppRunnerAssignmentPolicy(
         target.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    public Task<Guid?> FindDefaultRunnerIdAsync(Guid userId, CancellationToken cancellationToken = default)
+        => runnerAuthorizationPolicy.FindDefaultRunnerIdAsync(userId, cancellationToken);
+
     public async Task<Runner> GetAssignedRunnerAsync(
         Guid appId,
         Guid userId,
