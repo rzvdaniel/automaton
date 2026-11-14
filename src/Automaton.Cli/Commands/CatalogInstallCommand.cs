@@ -14,8 +14,9 @@ public static class CatalogInstallCommand
         var category = new Option<string?>("--category", "Only this category");
         var source = new Option<string?>("--source", "Only this catalog source id (see automaton catalog sources list)");
         var installed = new Option<bool>("--installed", "Only apps you already installed");
+        var refresh = new Option<bool>("--refresh", "Read the catalog sources again now instead of the server's copy (up to 10 minutes old); at most once a minute");
         var json = new Option<bool>("--json", "Print the result as JSON (for agents)");
-        var command = new Command("list", "List the apps in the catalog with their source, id and requested permissions.\nExample: automaton catalog list --search flow") { search, category, source, installed, json };
+        var command = new Command("list", "List the apps in the catalog with their source, id and requested permissions.\nExample: automaton catalog list --search flow") { search, category, source, installed, refresh, json };
         command.SetHandler(async context =>
         {
             var parsed = context.ParseResult;
@@ -23,7 +24,7 @@ public static class CatalogInstallCommand
             await RunAsync(asJson, async () =>
             {
                 using var client = Connect(config);
-                var apps = await AllAsync(client, parsed.GetValueForOption(search), parsed.GetValueForOption(category), parsed.GetValueForOption(source), parsed.GetValueForOption(installed));
+                var apps = await AllAsync(client, parsed.GetValueForOption(search), parsed.GetValueForOption(category), parsed.GetValueForOption(source), parsed.GetValueForOption(installed), parsed.GetValueForOption(refresh));
                 if (asJson) { CliJson.Write(new { success = true, apps }); return; }
                 RenderList(apps, AnsiConsole.Console);
             });
@@ -75,7 +76,7 @@ public static class CatalogInstallCommand
         var settings = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ParseSettings(settingArguments));
         var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin));
         using var client = Connect(config);
-        var entry = Pick(await AllAsync(client, null, null, sourceId, false), id, sourceId);
+        var entry = Pick(await AllAsync(client, null, null, sourceId, false, refresh: true), id, sourceId);
         if (entry.TryGetProperty("requiresNewerServer", out var newer) && newer.ValueKind == JsonValueKind.True)
             throw new InvalidOperationException($"{Text(entry, "name")} needs a newer server (version {Text(entry, "minServerVersion")} or later). Nothing was installed.");
         var repo = Text(entry, "repo"); var folder = Text(entry, "folder"); var commit = Text(entry, "commit");
@@ -160,12 +161,12 @@ public static class CatalogInstallCommand
         };
     }
 
-    private static async Task<IReadOnlyList<JsonElement>> AllAsync(AutomatonApiClient client, string? search, string? category, string? source, bool installed)
+    private static async Task<IReadOnlyList<JsonElement>> AllAsync(AutomatonApiClient client, string? search, string? category, string? source, bool installed, bool refresh = false)
     {
         var apps = new List<JsonElement>();
         for (var page = 1; page <= 100; page++)
         {
-            var result = await client.GetCatalogPageAsync(search, category, source, installed, page);
+            var result = await client.GetCatalogPageAsync(search, category, source, installed, page, refresh: refresh && page == 1);
             if (result.TryGetProperty("unavailable", out var unavailable) && unavailable.ValueKind == JsonValueKind.True && apps.Count == 0)
                 throw new InvalidOperationException(Text(result, "message") is { Length: > 0 } message ? message : "The catalog is not available right now.");
             var items = result.TryGetProperty("apps", out var list) && list.ValueKind == JsonValueKind.Array ? list.EnumerateArray().Select(item => item.Clone()).ToList() : [];

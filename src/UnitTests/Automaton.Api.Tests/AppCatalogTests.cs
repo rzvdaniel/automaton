@@ -46,6 +46,42 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task PinnedCommit_ReadsTheCachedPin_UnlessAFreshReadIsAsked()
+    {
+        await using var db = CreateDb();
+        var catalog = CatalogJson;
+        var handler = new FakeHandler(_ => Respond(catalog, null));
+        var service = CreateService(db, handler);
+        await service.GetAsync(Guid.NewGuid(), refresh: false, default);
+        var newer = "fedcba9876543210fedcba9876543210fedcba98";
+        catalog = CatalogJson.Replace(Commit, newer);
+
+        var cached = await service.PinnedCommitAsync("owner/apps", "maintenance/backup", default);
+        var fresh = await service.PinnedCommitAsync("owner/apps", "maintenance/backup", default, refresh: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cached, Is.EqualTo(Commit));
+            Assert.That(fresh, Is.EqualTo(newer));
+        });
+    }
+
+    [Test]
+    public async Task Refresh_ReadsTheSourceAtMostOncePerMinimumGap()
+    {
+        await using var db = CreateDb();
+        var reads = 0;
+        var handler = new FakeHandler(_ => { reads++; return Respond(CatalogJson, null); });
+        var service = new AppCatalogService(db, new FakeFactory(handler), Config(null, "60"), NullLogger<AppCatalogService>.Instance, new CatalogSourceStore(db, new FakeProtector()));
+
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+        await service.PinnedCommitAsync("owner/apps", "maintenance/backup", default, refresh: true);
+
+        Assert.That(reads, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task Get_FiltersAndPagesOnTheServer_AndCountsTheWholeCatalog()
     {
         await using var db = CreateDb();

@@ -87,6 +87,15 @@ describe('CatalogPanel', () => {
     expect(getCatalog).toHaveBeenLastCalledWith(true, expect.objectContaining({ page: 1 }))
   })
 
+  it('loads the list without a refresh, and the Refresh button asks the server to read the catalog again', async () => {
+    getCatalog.mockResolvedValue({ apps: [entry], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(getCatalog).toHaveBeenLastCalledWith(false, expect.objectContaining({ page: 1 }))
+    await wrapper.findAll('button').find((b) => b.text() === 'Refresh')!.trigger('click')
+    expect(getCatalog).toHaveBeenLastCalledWith(true, expect.objectContaining({ page: 1 }))
+  })
+
   it('marks entries that need a newer server instead of offering Install', async () => {
     getCatalog.mockResolvedValue({ apps: [{ ...entry, requiresNewerServer: true }], fetchedAt: null, stale: false, unavailable: false, message: null })
     const wrapper = mountPanel()

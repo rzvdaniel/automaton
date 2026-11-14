@@ -42,9 +42,9 @@ public class CatalogController(AppCatalogService catalog, AppCatalogInstallServi
 
     /// <summary>Whether the catalog pins a newer commit than the one this app was installed from, and what would change.</summary>
     [HttpGet("apps/{appId:guid}/update")]
-    public async Task<ActionResult<AppCatalogUpdateModel>> GetUpdate(Guid appId, CancellationToken cancellationToken)
+    public async Task<ActionResult<AppCatalogUpdateModel>> GetUpdate(Guid appId, [FromQuery] bool refresh = false, CancellationToken cancellationToken = default)
     {
-        try { return Ok(await updater.GetAsync(appId, cancellationToken)); }
+        try { return Ok(await updater.GetAsync(appId, cancellationToken, refresh)); }
         catch (KeyNotFoundException) { return NotFound(); }
         catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
     }

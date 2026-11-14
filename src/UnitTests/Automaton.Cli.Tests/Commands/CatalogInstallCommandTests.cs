@@ -26,7 +26,7 @@ public class CatalogInstallCommandTests
     [Test]
     public void List_FiltersByTextCategorySourceAndInstalled() =>
         Assert.That(CatalogInstallCommand.BuildList(new ConfigService()).Options.Select(o => o.Name),
-            Is.EquivalentTo(new[] { "search", "category", "source", "installed", "json" }));
+            Is.EquivalentTo(new[] { "search", "category", "source", "installed", "refresh", "json" }));
 
     [Test]
     public void ParseLines_SkipsCommentsAndBlanks_KeepsEverythingAfterTheFirstEquals_AndHandlesCrlf()

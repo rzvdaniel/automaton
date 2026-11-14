@@ -4,7 +4,7 @@ using Automaton.Cli.Services;
 
 namespace Automaton.Cli.Commands;
 
-/// <summary>automaton catalog update: update an app installed from the catalog to the commit the catalog pins now, without Studio.</summary>
+/// <summary>automaton catalog update: update an app installed from the catalog to the commit the catalog pins now, without Studio. It reads the catalog again first, so a pin merged minutes ago counts.</summary>
 public static class CatalogUpdateCommand
 {
     /// <summary>Exit code of --check when an update exists (0: up to date, 1: error).</summary>
@@ -41,7 +41,7 @@ public static class CatalogUpdateCommand
         var app = await client.GetAppByIdOrSlugAsync(appReference);
         var appId = CatalogInstallCommand.Text(app, "id");
         var name = CatalogInstallCommand.Text(app, "name");
-        var update = await client.GetCatalogUpdateAsync(appId);
+        var update = await client.GetCatalogUpdateAsync(appId, refresh: true);
         var installed = CatalogInstallCommand.Text(update, "installedCommit");
         var latest = CatalogInstallCommand.Text(update, "latestCommit");
         var compare = CatalogInstallCommand.Text(update, "compareUrl");

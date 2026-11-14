@@ -95,7 +95,7 @@ public sealed class AppCatalogService(
         string? failure = null;
         // A forced refresh still waits out a short pause, so a signed-in user cannot make the server hammer GitHub.
         var age = cached is null ? TimeSpan.MaxValue : DateTime.UtcNow - cached.FetchedAt;
-        if (cached is null || age > FreshFor || (refresh && age > TimeSpan.FromSeconds(configuration.GetValue("Catalog:MinimumRefreshSeconds", 30))))
+        if (cached is null || age > FreshFor || (refresh && age > TimeSpan.FromSeconds(configuration.GetValue("Catalog:MinimumRefreshSeconds", 60))))
         {
             var (updated, error) = await FetchAsync(source, cached, cancellationToken);
             failure = error;
@@ -115,12 +115,12 @@ public sealed class AppCatalogService(
     }
 
     /// <summary>The commit the enabled catalogs pin for an app today, or null when no catalog lists that repository and folder.</summary>
-    public async Task<string?> PinnedCommitAsync(string repo, string? folder, CancellationToken cancellationToken)
+    public async Task<string?> PinnedCommitAsync(string repo, string? folder, CancellationToken cancellationToken, bool refresh = false)
     {
         var key = InstalledKey(repo, folder);
         foreach (var source in await sources.EnabledAsync(cancellationToken))
         {
-            var (entry, _) = await LoadSourceAsync(source, false, cancellationToken);
+            var (entry, _) = await LoadSourceAsync(source, refresh, cancellationToken);
             var app = entry?.Document.Apps.FirstOrDefault(item => InstalledKey(entry.Document.Repo, item.Folder) == key);
             if (app is not null) return app.Commit;
         }
