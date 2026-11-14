@@ -33,3 +33,9 @@ public sealed record ReadAppLogsResult(Guid AppId, Guid DeploymentTargetId, bool
 
 /// <summary>Docker's own disk figures on one machine: what images, containers, volumes and build cache use, in bytes.</summary>
 public sealed record HostDiskReport(long ImagesBytes, long ContainersBytes, long VolumesBytes, long BuildCacheBytes, long ReclaimableBytes);
+
+/// <summary>What installing the OS security updates on one machine did: whether it succeeded, a short tail of the installer's output and whether the machine now needs a restart.</summary>
+public sealed record HostOsUpdateResult(bool Succeeded, string Summary, bool RestartRequired);
+
+/// <summary>The Runner accepted a restart of the machine; it happens a minute later, so the answer can still be delivered.</summary>
+public sealed record HostRebootResult(bool Scheduled);

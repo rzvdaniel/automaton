@@ -61,6 +61,38 @@ internal sealed partial class HostCleanupService(HostCleanupService.DockerRunner
         return new(freed, string.Join(' ', steps));
     }
 
+    /// <summary>
+    /// Installs the pending security updates (only the origins Ubuntu's unattended-upgrades is set to, so no other updates) on the
+    /// host. The fixed argument list runs in the host's namespaces through a short-lived privileged container; no shell, no input.
+    /// </summary>
+    public async Task<HostOsUpdateResult> OsUpdateAsync(CancellationToken token)
+    {
+        var image = await OwnImageAsync(token);
+        var update = await run(HostCommand(image, "unattended-upgrade", "-v"), token);
+        var restart = await run(HostCommand(image, "test", "-e", "/var/run/reboot-required"), token);
+        return new(update.ExitCode == 0, Tail(update.Output), restart.ExitCode == 0);
+    }
+
+    /// <summary>Schedules a restart of the host one minute from now (so this answer is delivered first); the Runner container restarts with Docker.</summary>
+    public async Task<HostRebootResult> RebootAsync(CancellationToken token)
+    {
+        var image = await OwnImageAsync(token);
+        var result = await run(HostCommand(image, "shutdown", "-r", "+1", "Restart requested from Server Console"), token);
+        if (result.ExitCode != 0) throw new InvalidOperationException("The restart could not be scheduled: " + Tail(result.Output));
+        return new(true);
+    }
+
+    private async Task<string> OwnImageAsync(CancellationToken token)
+    {
+        var own = await run(["inspect", "--format", "{{.Image}}", Environment.MachineName], token);
+        if (own.ExitCode != 0) throw new InvalidOperationException("This Runner cannot inspect its own container, so it cannot reach the host.");
+        return own.Output.Trim();
+    }
+
+    internal static IReadOnlyList<string> HostCommand(string image, params string[] command)
+        => ["run", "--rm", "--privileged", "--pid=host", "--user", "root", "--entrypoint", "nsenter", image,
+            "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", .. command];
+
     /// <summary>What Docker uses on this machine, from <c>docker system df</c>; read-only.</summary>
     public async Task<HostDiskReport> DiskReportAsync(CancellationToken token)
     {

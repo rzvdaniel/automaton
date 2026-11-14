@@ -126,6 +126,34 @@ public sealed class RunnerMaintenanceService(ApplicationDbContext db, ServerClea
         return await SendAsync<HostDiskReport>(runnerId, viewerId, "disk-report", new { }, ReadTimeout, token);
     }
 
+    private static readonly TimeSpan UpdateTimeout = TimeSpan.FromMinutes(20);
+    // One OS update or restart at a time per machine, across requests.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> Busy = new();
+
+    /// <summary>Installs the security updates on one machine after the admin typed its name; audit-logged before it runs.</summary>
+    public Task<HostOsUpdateResult> OsUpdateAsync(Guid appId, Guid viewerId, Guid runnerId, string? confirm, CancellationToken token)
+        => HostOperationAsync<HostOsUpdateResult>(appId, viewerId, runnerId, confirm, "os-update", UpdateTimeout, token);
+
+    /// <summary>Restarts one machine (a minute later) after the admin typed its name; audit-logged before it runs.</summary>
+    public Task<HostRebootResult> RebootAsync(Guid appId, Guid viewerId, Guid runnerId, string? confirm, CancellationToken token)
+        => HostOperationAsync<HostRebootResult>(appId, viewerId, runnerId, confirm, "reboot", ReadTimeout, token);
+
+    private async Task<T> HostOperationAsync<T>(Guid appId, Guid viewerId, Guid runnerId, string? confirm, string kind, TimeSpan timeout, CancellationToken token)
+    {
+        var runner = await HostRunners().Where(item => item.Id == runnerId).Select(item => new { item.Name }).SingleOrDefaultAsync(token)
+            ?? throw new KeyNotFoundException("That machine was not found.");
+        if (!string.Equals(confirm, runner.Name, StringComparison.Ordinal)) throw new ArgumentException("Type the machine's name to confirm.");
+        if (!Busy.TryAdd(runnerId, true)) throw new InvalidOperationException("Another update or restart is already running on this machine.");
+        try
+        {
+            await audit.WriteAsync(AuditActions.Requested, AuditEntityTypes.Runner, runnerId,
+                $"{(kind == "reboot" ? "Restart" : "OS security update")} of machine {runner.Name} requested by an app for a system administrator, confirmed by typing its name",
+                new { appId, viewerId, runnerId, runner = runner.Name, operation = kind }, cancellationToken: token);
+            return await SendAsync<T>(runnerId, viewerId, kind, new { }, timeout, token);
+        }
+        finally { Busy.TryRemove(runnerId, out _); }
+    }
+
     private async Task<T> SendAsync<T>(Guid runnerId, Guid viewerId, string kind, object payload, TimeSpan timeout, CancellationToken token)
     {
         try

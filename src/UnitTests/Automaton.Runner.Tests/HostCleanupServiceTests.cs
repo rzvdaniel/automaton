@@ -97,4 +97,26 @@ public sealed class HostCleanupServiceTests
         Assert.That(calls.Single(), Is.EqualTo(new[] { "system", "df", "--format", "{{.Type}}|{{.Size}}|{{.Reclaimable}}" }));
         Assert.ThrowsAsync<InvalidOperationException>(() => Create(_ => (1, "no docker")).DiskReportAsync(default));
     }
+
+    [Test]
+    public async Task OsUpdateAndRebootRunOnlyFixedHostCommandsThroughTheHostNamespaces()
+    {
+        var service = Create(args => args[0] == "inspect" ? (0, "img123") : (0, "ok"));
+        var update = await service.OsUpdateAsync(default);
+        await service.RebootAsync(default);
+
+        Assert.That(update.RestartRequired, Is.True);
+        var host = calls.Where(c => c[0] == "run").ToArray();
+        Assert.That(host, Has.Length.EqualTo(3));
+        Assert.That(host.Select(c => string.Join(' ', c.SkipWhile(a => a != "--").Skip(1))),
+            Is.EqualTo(new[] { "unattended-upgrade -v", "test -e /var/run/reboot-required", "shutdown -r +1 Restart requested from Server Console" }));
+        Assert.That(host.Select(c => c.Contains("nsenter") && c.Contains("--pid=host") && !c.Contains("sh") && !c.Contains("-c")), Has.All.True);
+    }
+
+    [Test]
+    public void OsUpdateReportsFailureAndRebootRefusesWhenItCannotReachTheHost()
+    {
+        Assert.ThrowsAsync<InvalidOperationException>(() => Create(_ => (1, "no")).RebootAsync(default));
+        Assert.That(Create(a => a[0] == "inspect" ? (0, "i") : (1, "boom")).OsUpdateAsync(default).Result.Succeeded, Is.False);
+    }
 }

@@ -44,6 +44,8 @@ public sealed class RunnerMaintenanceTests
             {
                 "app-logs" => new ReadAppLogsResult(Guid.Empty, Guid.Empty, true, "line one\nline two"),
                 "disk-report" => new HostDiskReport(1, 2, 3, 4, 5),
+                "os-update" => new HostOsUpdateResult(true, "done", false),
+                "reboot" => new HostRebootResult(true),
                 _ => new RestartAppRuntimeResult(Guid.Empty, Guid.Empty, true)
             };
             return Task.FromResult(System.Text.Json.JsonSerializer.SerializeToElement(answer));
@@ -259,5 +261,32 @@ public sealed class RunnerMaintenanceTests
         Assert.That(s.Commands.Sent, Is.Empty);
         var apps = await s.Maintenance.ListAppsAsync(s.RunnerOne, default);
         Assert.That(apps.Select(x => x.TargetId), Is.EqualTo(new[] { s.TargetOne }));
+    }
+
+    private static Func<RunnerMaintenanceController, Task<IActionResult>> Machine(string op, Guid runner, string? confirm)
+        => c => op == "reboot" ? c.Reboot(runner, new(confirm), default) : c.OsUpdate(runner, new(confirm), default);
+
+    [TestCase("os-update")]
+    [TestCase("reboot")]
+    public async Task OsUpdateAndRebootNeedTheAdminViewerThatMachinesApprovalAndItsTypedName(string op)
+    {
+        var s = await SetUp();
+        await s.Maintenance.SetAsync(s.AppId, s.RunnerOne, true, default);
+        var admin = s.Tokens.Create(s.AppId, s.Admin);
+        var name = (await s.Db.Runners.FindAsync(s.RunnerOne))!.Name;
+
+        Assert.That(await s.Call(admin, s.RunnerOne, Machine(op, s.RunnerOne, name), app: false), Is.EqualTo(403), "not an app");
+        Assert.That(await s.Call(null, s.RunnerOne, Machine(op, s.RunnerOne, name)), Is.EqualTo(403), "no viewer token, as a schedule would have");
+        Assert.That(await s.Call(s.Tokens.Create(s.AppId, s.Other), s.RunnerOne, Machine(op, s.RunnerOne, name)), Is.EqualTo(403), "not an administrator");
+        Assert.That(await s.Call(admin, s.RunnerTwo, Machine(op, s.RunnerTwo, name)), Is.EqualTo(403), "approved for runner-01 only");
+        foreach (var wrong in new string?[] { null, "", name.ToUpperInvariant() == name ? name.ToLowerInvariant() : name.ToUpperInvariant(), name + " ", "yes" })
+            Assert.That(await s.Call(admin, s.RunnerOne, Machine(op, s.RunnerOne, wrong)), Is.EqualTo(400), $"confirm '{wrong}'");
+        Assert.That(s.Commands.Sent, Is.Empty, "no refused call reached a Runner");
+        Assert.That(s.Audit.Events.Where(e => e.Metadata.Contains(op)), Is.Empty, "refused calls ran nothing");
+
+        s.Audit.Events.Clear();
+        Assert.That(await s.Call(admin, s.RunnerOne, Machine(op, s.RunnerOne, name)), Is.EqualTo(op == "reboot" ? 202 : 200));
+        Assert.That(s.Commands.Sent.Single(), Is.EqualTo((s.RunnerOne, s.Admin, op)));
+        Assert.That(s.Audit.Events.Single().Metadata, Does.Contain(op).And.Contain(s.Admin.ToString()).And.Contain(s.RunnerOne.ToString()));
     }
 }

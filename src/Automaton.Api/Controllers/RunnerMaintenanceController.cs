@@ -39,6 +39,17 @@ public sealed class RunnerMaintenanceController(RunnerMaintenanceService mainten
     public Task<IActionResult> DiskReport(Guid runnerId, CancellationToken token)
         => ChangeAsync(runnerId, async (appId, viewer) => Ok(await maintenance.DiskReportAsync(appId, viewer, runnerId, token)), token);
 
+    /// <summary>Body of the two machine-level operations: the machine's name, typed again for this one call.</summary>
+    public sealed record ConfirmRequest(string? Confirm);
+
+    [HttpPost("os-update")]
+    public Task<IActionResult> OsUpdate(Guid runnerId, [FromBody] ConfirmRequest? body, CancellationToken token)
+        => ChangeAsync(runnerId, async (appId, viewer) => Ok(await maintenance.OsUpdateAsync(appId, viewer, runnerId, body?.Confirm, token)), token);
+
+    [HttpPost("reboot")]
+    public Task<IActionResult> Reboot(Guid runnerId, [FromBody] ConfirmRequest? body, CancellationToken token)
+        => ChangeAsync(runnerId, async (appId, viewer) => Accepted(await maintenance.RebootAsync(appId, viewer, runnerId, body?.Confirm, token)), token);
+
     /// <summary>Every operation needs the machine approved for the app and the viewer token of a system administrator.</summary>
     private async Task<IActionResult> ChangeAsync(Guid runnerId, Func<Guid, Guid, Task<IActionResult>> operation, CancellationToken token)
     {
