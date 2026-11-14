@@ -310,7 +310,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         return true;
     }
 
-    // Short values (a setting such as "20" or "7") are not credentials and would turn every digit of a log line into [REDACTED].
+    // Shorter values are shown as they are. Short values (a setting such as "20" or "7") are not credentials and would turn every digit of a log line into [REDACTED].
     private const int LogRedactionMinimumLength = 8;
 
     /// <summary>Reads the last lines of the running app container's output; null when it has no container.</summary>
