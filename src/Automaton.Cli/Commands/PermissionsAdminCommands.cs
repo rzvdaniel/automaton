@@ -56,10 +56,7 @@ internal static class PermissionsAdminCommands
                 var permissionName = parsed.GetValueForArgument(permission).Trim();
                 var appId = await ResolveAppAsync(client, parsed.GetValueForArgument(app).Trim());
                 var runnerReference = parsed.GetValueForOption(runner);
-                if (permissionName == RunnerMaintain && string.IsNullOrWhiteSpace(runnerReference))
-                    throw new InvalidOperationException("runner:maintain is decided one machine at a time: add --runner <machine>.");
-                if (permissionName != RunnerMaintain && !string.IsNullOrWhiteSpace(runnerReference))
-                    throw new InvalidOperationException("--runner applies only to runner:maintain.");
+                CheckRunnerOption(permissionName, runnerReference);
 
                 JsonElement result;
                 if (permissionName == RunnerMaintain)
@@ -77,16 +74,32 @@ internal static class PermissionsAdminCommands
         return command;
     }
 
+    internal static void CheckRunnerOption(string permission, string? runner)
+    {
+        if (permission == RunnerMaintain && string.IsNullOrWhiteSpace(runner))
+            throw new InvalidOperationException("runner:maintain is decided one machine at a time: add --runner <machine>.");
+        if (permission != RunnerMaintain && !string.IsNullOrWhiteSpace(runner))
+            throw new InvalidOperationException("--runner applies only to runner:maintain.");
+    }
+
     /// <summary>The admin-scoped key cannot list apps, so a name is looked up in the pending list.</summary>
     private static async Task<string> ResolveAppAsync(AutomatonApiClient client, string reference)
     {
         if (Guid.TryParse(reference, out _)) return reference;
-        var pending = (await client.GetPendingPermissionsAsync()).GetProperty("items").EnumerateArray()
+        var list = await client.GetPendingPermissionsAsync();
+        if (list.TryGetProperty("total", out var total) && total.GetInt32() > list.GetProperty("items").GetArrayLength())
+            Console.Error.WriteLine("Note: more apps are waiting than this list shows; use the app id if a name is not found.");
+        return PickApp(list.GetProperty("items"), reference);
+    }
+
+    internal static string PickApp(JsonElement items, string reference)
+    {
+        var pending = items.EnumerateArray()
             .Where(item => string.Equals(CatalogInstallCommand.Text(item, "name"), reference, StringComparison.OrdinalIgnoreCase)).ToList();
         return pending.Count switch
         {
             1 => CatalogInstallCommand.Text(pending[0], "id"),
-            0 => throw new InvalidOperationException($"No app named '{reference}' has permissions waiting. Use its app id."),
+            0 => throw new InvalidOperationException($"No app named '{reference}' has permissions waiting. Use its app id (needed to revoke an approved permission)."),
             _ => throw new InvalidOperationException($"More than one waiting app is named '{reference}'; use its app id.")
         };
     }

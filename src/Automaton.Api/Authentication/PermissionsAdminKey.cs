@@ -16,7 +16,7 @@ public static partial class PermissionsAdminKey
     public const int MaximumLifetimeDays = 90;
 
     /// <summary>Only these paths authenticate a key of this scope; every other request gets 401.</summary>
-    [GeneratedRegex(@"^/api/admin/(apps/[0-9a-fA-F-]{36}/(permissions(/[^/]+)?|runner-permissions(/[0-9a-fA-F-]{36})?)|app-permissions/pending)/?$")]
+    [GeneratedRegex(@"^/api/admin/(apps/[0-9a-fA-F-]{36}/(permissions(/[^/]+)?|runner-permissions(/[0-9a-fA-F-]{36})?)|app-permissions/pending)/?\z")]
     private static partial Regex AllowedPath();
 
     public static bool IsAllowedPath(string path) => AllowedPath().IsMatch(path);

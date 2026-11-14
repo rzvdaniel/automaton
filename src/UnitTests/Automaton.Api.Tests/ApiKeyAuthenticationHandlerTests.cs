@@ -88,6 +88,16 @@ public sealed class ApiKeyAuthenticationHandlerTests
     }
 
     [Test]
+    public async Task PermissionsAdminKey_IsRefusedInTheQueryString()
+    {
+        await using var setup = await AuthenticationSetup.CreateAsync("SysAdmin", ApiKeyScope.PermissionsAdmin);
+
+        var result = await setup.AuthenticateAsync($"/api/admin/apps/{AppId}/permissions", viaQuery: true);
+
+        Assert.That(result.Succeeded, Is.False);
+    }
+
+    [Test]
     public async Task PermissionsAdminKey_ExpiredKeyIsRefused()
     {
         await using var setup = await AuthenticationSetup.CreateAsync("SysAdmin", ApiKeyScope.PermissionsAdmin, DateTime.UtcNow.AddMinutes(-1));
@@ -167,11 +177,12 @@ public sealed class ApiKeyAuthenticationHandlerTests
             return (apiKeyService, created.apiKey);
         }
 
-        public async Task<AuthenticateResult> AuthenticateAsync(string path = "/api/apps")
+        public async Task<AuthenticateResult> AuthenticateAsync(string path = "/api/apps", bool viaQuery = false)
         {
             var context = new DefaultHttpContext();
             context.Request.Path = path;
-            context.Request.Headers["X-API-Key"] = apiKey;
+            if (viaQuery) context.Request.QueryString = new QueryString($"?api_key={apiKey}");
+            else context.Request.Headers["X-API-Key"] = apiKey;
             var handler = new ApiKeyAuthenticationHandler(
                 new SingleOptionsMonitor<ApiKeyAuthenticationSchemeOptions>(new()),
                 NullLoggerFactory.Instance,
