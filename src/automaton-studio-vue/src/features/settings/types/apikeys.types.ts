@@ -13,6 +13,7 @@ export const ApiKeyScope = {
   FullAccess: 4,
   WebApp: 5,
   Developer: 7,
+  PermissionsAdmin: 8,
 } as const
 
 export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope]
@@ -85,6 +86,8 @@ export function getScopeDisplayName(scope: ApiKeyScope): string {
       return 'Web App'
     case ApiKeyScope.Developer:
       return 'Developer / CLI'
+    case ApiKeyScope.PermissionsAdmin:
+      return 'Admin: app permissions'
     default:
       return 'Unknown'
   }
@@ -122,6 +125,8 @@ export function getScopeSeverity(
       return 'warn'
     case ApiKeyScope.Developer:
       return 'success'
+    case ApiKeyScope.PermissionsAdmin:
+      return 'danger'
     default:
       return 'secondary'
   }
@@ -138,6 +143,13 @@ export function getUsageInstructions(apiKey: string, scope: ApiKeyScope): string
 automaton login --key ${apiKey}
 automaton deploy
 automaton publish`
+
+    case ApiKeyScope.PermissionsAdmin:
+      return `Use this admin key only on a machine you control. It can approve and reject app permissions and does nothing else. It expires and stops working if you are no longer a system administrator.
+
+export AUTOMATON_API_KEY="${apiKey}"
+automaton permissions list --pending
+automaton permissions approve <app> <permission>`
 
     case ApiKeyScope.Runner:
     case ApiKeyScope.FullAccess:

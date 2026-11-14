@@ -1,4 +1,4 @@
-using Automaton.Api.Enums;
+using Automaton.Api.Authentication;
 using Automaton.Api.ServerCleanup;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +8,7 @@ namespace Automaton.Api.Controllers.Admin;
 /// <summary>A system administrator approves <c>runner:maintain</c> for an app one machine at a time.</summary>
 [ApiController]
 [Route("api/admin/apps/{appId:guid}/runner-permissions")]
-[Authorize(Roles = UserRole.SystemAdministrator)]
+[Authorize(Policy = PermissionsAdminKey.PolicyName)]
 public sealed class AdminAppRunnerPermissionsController(RunnerMaintenanceService maintenance) : ControllerBase
 {
     [HttpGet]

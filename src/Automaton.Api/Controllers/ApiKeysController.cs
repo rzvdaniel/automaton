@@ -1,5 +1,7 @@
+using Automaton.Api.Authentication;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
+using Automaton.Api.Enums;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -48,7 +50,18 @@ public class ApiKeysController : BaseController
     [HttpPost]
     public async Task<IActionResult> CreateApiKey([FromBody] CreateApiKeyRequest request)
     {
-        if (!UserCreatableScopes.Contains(request.Scope))
+        if (request.Scope == ApiKeyScope.PermissionsAdmin)
+        {
+            if (!User.IsInRole(UserRole.SystemAdministrator))
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only a system administrator can create this key." });
+            // A key can never mint a key: the creator must be signed in to Studio.
+            if (User.FindFirst("api_key_scope") is not null)
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Sign in to Studio to create this key." });
+            var limit = DateTime.UtcNow.AddDays(PermissionsAdminKey.MaximumLifetimeDays);
+            if (request.ExpiresAt is not { } expiry || expiry <= DateTime.UtcNow || expiry > limit)
+                return BadRequest(new { message = $"This key must expire within {PermissionsAdminKey.MaximumLifetimeDays} days." });
+        }
+        else if (!UserCreatableScopes.Contains(request.Scope))
         {
             return BadRequest(new { message = "This API key type cannot be created manually." });
         }
