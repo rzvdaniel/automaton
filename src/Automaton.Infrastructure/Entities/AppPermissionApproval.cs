@@ -6,6 +6,7 @@ namespace Automaton.Api.Entities;
 public sealed class AppPermissionApproval
 {
     public const string BackupsRead = "backups:read";
+    public const string BackupsRun = "backups:run";
     public const string ServerRead = "server:read";
     public const string NotifyEmail = "notify:email";
     public const string ServerCleanup = "server:cleanup";

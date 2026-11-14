@@ -277,6 +277,8 @@ internal static class ApiAuthorizationRegistration
 
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.BackupsReadPolicy, AppPermissionApproval.BackupsRead);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.BackupsRunPolicy, AppPermissionApproval.BackupsRun);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.ServerReadPolicy, AppPermissionApproval.ServerRead);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
