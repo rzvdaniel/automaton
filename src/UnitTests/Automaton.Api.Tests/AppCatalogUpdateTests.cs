@@ -41,6 +41,37 @@ public class AppCatalogUpdateTests
     }
 
     [Test]
+    public void IsEdited_IgnoresFieldsTheServerWrites_ButNotRealEdits()
+    {
+        var original = new[] { ("automaton.json", "{\"name\":\"Tool\",\"application\":{\"kind\":\"web\"}}"), ("index.html", "hi") };
+        var published = ("automaton.json", "{\"appId\":\"x\",\"name\":\"Mine\",\"slug\":\"mine\",\"application\":{\"kind\":\"web\"}}");
+        var codeEdit = ("automaton.json", "{\"name\":\"Tool\",\"application\":{\"kind\":\"static\"}}");
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(published, ("index.html", "hi"), (".automatonignore", "bin/"))), Is.False);
+            Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(codeEdit, ("index.html", "hi"))), Is.True);
+            Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(published, ("index.html", "changed"))), Is.True);
+        });
+    }
+
+    [Test]
+    public void KeepServerWrittenFiles_CarriesNameSlugAndIgnoreFileIntoTheNewVersion()
+    {
+        var old = Folder(("automaton.json", "{\"appId\":\"x\",\"name\":\"Mine\",\"slug\":\"mine\",\"application\":{\"kind\":\"web\"}}"), (".automatonignore", "bin/"));
+        var staging = Folder(("automaton.json", "{\"name\":\"Tool\",\"application\":{\"kind\":\"static\"}}"));
+        AppCatalogUpdateService.KeepServerWrittenFiles(old, staging);
+        var merged = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(staging, "automaton.json")))!;
+        Assert.Multiple(() =>
+        {
+            Assert.That((string?)merged["slug"], Is.EqualTo("mine"));
+            Assert.That((string?)merged["name"], Is.EqualTo("Mine"));
+            Assert.That((string?)merged["appId"], Is.EqualTo("x"));
+            Assert.That((string?)merged["application"]!["kind"], Is.EqualTo("static"));
+            Assert.That(File.ReadAllText(Path.Combine(staging, ".automatonignore")), Is.EqualTo("bin/"));
+        });
+    }
+
+    [Test]
     public void Added_ListsOnlyNamesTheNewVersionAdds() =>
         Assert.That(AppCatalogUpdateService.Added(["A", "B"], ["B", "C"]), Is.EqualTo(new[] { "C" }));
 
