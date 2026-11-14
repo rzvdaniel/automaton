@@ -16,7 +16,7 @@ Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_templ
 `gh pr create --body-file`. The merge gate refuses a PR without "How verified", "Risk" and "How to revert".
 
 - **How verified** is evidence, not a claim: the commands and what came back. For a bug, name the test that failed
-  before the fix. For a Studio or website change, link a screenshot (push it to the `pr-screenshots` branch).
+  before the fix. For a Studio or website change, include a screenshot in the proof (see automaton-verify-release).
 - **Check after release** is what the verifier will run on the test server, written so an agent that never saw your
   work can follow it: who signs in, what they do, what they see. It comes from the issue's "Done when".
 
