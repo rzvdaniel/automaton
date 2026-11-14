@@ -107,9 +107,9 @@ publish it on the **issue** the PR closes with the helper, then comment its link
 python3 .agents/skills/automaton-verify-release/proof.py <issue> proof.html
 ```
 
-The page lists each done criterion from the issue, the evidence for it (the command and what came back, or a link
-to a screenshot) and pass, fail or not checked with the reason. Keep it plain: one `<table>` (criterion, result,
-evidence), inline `<style>` only, no scripts, no embedded images. Running `proof.py` again replaces the issue's `proof`.
+The page lists each done criterion from the issue, the evidence for it (the command and what came back, or a
+screenshot) and pass, fail or not checked with the reason. Keep it plain: one `<table>` (criterion, result,
+evidence), inline `<style>` only, no scripts. Running `proof.py` again replaces the issue's `proof`.
 
 Then label the issue (see Labels below) and swap the label when a fix-forward release passes its re-check.
 
@@ -118,19 +118,15 @@ response body, page text) for functional checks and screenshots only for visual 
 the full page, unless the whole layout is the point. Look at each screenshot once to confirm it shows the right
 thing, then post it.
 
-Screenshots: push them to the orphan branch `pr-screenshots` under `pr-<N>/` (create it with
-`git switch --orphan pr-screenshots` if it does not exist; never merge or delete it). Link them, do not embed them:
-`https://raw.githubusercontent.com/rzvdaniel/automaton/pr-screenshots/pr-<N>/name.png`. The same links work in the
-proof, PR comments and issue comments (in Markdown, `![name](link)` also shows the image there). The artifact preview
-does not load images from other sites, so in the proof they are plain links (it also blocks a plain click: right-click,
-Open in new tab; `proof.py` adds that hint). Also list the screenshot links in the close-out comment on the issue,
-where a normal click opens them.
+Screenshots go in the proof itself: save them next to the page and reference them as `<img src="shots/name.png"
+alt="...">`; `proof.py` shrinks each to a small WebP and embeds it (needs Pillow), so it shows right in the issue
+with no other hosting. Keep the page under 1 MB (a handful of viewport shots). Nothing goes to a git branch.
 The repository is public: use only `e2e-` test data and no passwords, tokens or keys in the shot.
 
 After every test-server upgrade, also run the Studio smoke checks (`src/automaton-studio-vue/smoke/README.md`:
 `npm run smoke` with `AUTOMATON_TEST_STUDIO_URL` set to the server's real Studio domain). They are read-only,
-sign in as the administrator and a regular user, and leave a screenshot of each page in `smoke-results/`; attach the
-ones your change affects to the PR. A failure is a finding to fix or report, not something to skip.
+sign in as the administrator and a regular user, and leave a screenshot of each page in `smoke-results/`; put the
+ones your change affects in the proof. A failure is a finding to fix or report, not something to skip.
 
 Name everything you create `e2e-<issue>-...` (apps, projects, API keys), so agents checking different issues do not
 collide. Remove it when done: `python .agents/tools/test-server-cleanup.py` lists it, `--apply` removes it. Test
