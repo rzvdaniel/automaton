@@ -68,6 +68,21 @@ public sealed class HostCleanupServiceTests
     }
 
     [Test]
+    public async Task TheExecutorRoutesTheDiskReportAndRefusesAnUnreasonableLogRequest()
+    {
+        var executor = new AppActionCommandExecutor(null!, null!, null!, hostCleanup: Create(_ => (0, "Images|1GB|1GB (100%)")));
+        var result = await executor.ExecuteAsync(AppActionCommand.Create("disk-report", new { }), default);
+        Assert.That(result.ActionResult!.Value.GetProperty("ImagesBytes").GetInt64(), Is.EqualTo(1_000_000_000L));
+        foreach (var lines in new[] { 0, 201 })
+            Assert.ThrowsAsync<InvalidDataException>(() => executor.ExecuteAsync(
+                AppActionCommand.Create("app-logs", new ReadAppLogsRequest(Guid.NewGuid(), Guid.NewGuid(), lines)), default));
+    }
+
+    [Test]
+    public void LogTextIsRedactedOfSecretValues()
+        => Assert.That(RunnerRuntimeContainerManager.RedactValues("db=hunter2secret ok", ["hunter2secret"]), Does.Not.Contain("hunter2secret"));
+
+    [Test]
     public async Task TheDiskReportReadsDockerUseWithoutChangingAnything()
     {
         var service = Create(_ => (0, "Images|2.5GB|1GB (40%)\nContainers|10MB|0B (0%)\nLocal Volumes|1.2GB|1.2GB (100%)\nBuild Cache|500MB|500MB\nOther|1GB|1GB"));

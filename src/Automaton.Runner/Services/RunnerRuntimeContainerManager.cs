@@ -316,7 +316,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
         var id = metadata?.ContainerId;
         if (string.IsNullOrWhiteSpace(id)) return null;
-        var text = await GetLogsAsync(appId, deploymentTargetId, id, cancellationToken);
+        // The app's own secrets never leave the machine in log text, as on a failed start.
+        var secrets = secretSource is null ? null : await secretSource.GetAsync(appId, deploymentTargetId, cancellationToken);
+        var text = RedactValues(await GetLogsAsync(appId, deploymentTargetId, id, cancellationToken), secrets?.Values);
         var all = text.Split('\n');
         return string.Join('\n', all.Length <= lines ? all : all[^lines..]).TrimEnd();
     }

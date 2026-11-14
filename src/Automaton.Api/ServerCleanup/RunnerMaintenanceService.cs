@@ -103,9 +103,8 @@ public sealed class RunnerMaintenanceService(ApplicationDbContext db, ServerClea
     {
         if (lines is < 1 or > MaximumLogLines) throw new ArgumentException($"Lines must be from 1 to {MaximumLogLines}.");
         var target = await FindTargetAsync(runnerId, targetId, token);
-        var result = await SendAsync<ReadAppLogsResult>(runnerId, viewerId, "app-logs", new ReadAppLogsRequest(target.WebAppId, target.Id, lines), ReadTimeout, token);
-        await AuditAsync(appId, viewerId, runnerId, target, "app-logs", $"Logs of app {target.AppName} read on a machine by an app for a system administrator", token);
-        return result;
+        await AuditAsync(appId, viewerId, runnerId, target, "app-logs", $"Logs of app {target.AppName} requested on a machine by an app for a system administrator", token);
+        return await SendAsync<ReadAppLogsResult>(runnerId, viewerId, "app-logs", new ReadAppLogsRequest(target.WebAppId, target.Id, lines), ReadTimeout, token);
     }
 
     /// <summary>Restarts one app's container on this machine and waits until it is back; audit-logged.</summary>
@@ -122,10 +121,9 @@ public sealed class RunnerMaintenanceService(ApplicationDbContext db, ServerClea
     public async Task<HostDiskReport> DiskReportAsync(Guid appId, Guid viewerId, Guid runnerId, CancellationToken token)
     {
         if (!await HostRunners().AnyAsync(item => item.Id == runnerId, token)) throw new KeyNotFoundException("That machine was not found.");
-        var report = await SendAsync<HostDiskReport>(runnerId, viewerId, "disk-report", new { }, ReadTimeout, token);
-        await audit.WriteAsync(AuditActions.Requested, AuditEntityTypes.Runner, runnerId, "Docker disk report read on a machine by an app for a system administrator",
+        await audit.WriteAsync(AuditActions.Requested, AuditEntityTypes.Runner, runnerId, "Docker disk report requested on a machine by an app for a system administrator",
             new { appId, viewerId, runnerId, operation = "disk-report" }, cancellationToken: token);
-        return report;
+        return await SendAsync<HostDiskReport>(runnerId, viewerId, "disk-report", new { }, ReadTimeout, token);
     }
 
     private async Task<T> SendAsync<T>(Guid runnerId, Guid viewerId, string kind, object payload, TimeSpan timeout, CancellationToken token)
