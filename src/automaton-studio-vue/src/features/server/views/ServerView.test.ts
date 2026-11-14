@@ -20,6 +20,9 @@ const cleanupBody = (): ServerCleanup => ({
   runs: [{
     id: 'c1', runnerName: 'runner-01', startedAtUtc: '2026-11-13T05:12:00Z', finishedAtUtc: '2026-11-13T05:13:00Z',
     result: 'Succeeded', bytesFreed: 1.8 * 1024 ** 3, trigger: 'Scheduled', message: null,
+  }, {
+    id: 'c2', runnerName: 'Renamed Twice', startedAtUtc: '2026-11-13T05:12:00Z', finishedAtUtc: '2026-11-13T05:12:01Z',
+    result: 'Failed', bytesFreed: 0, trigger: 'Scheduled', message: 'Runner too old',
   }],
 })
 
@@ -90,6 +93,11 @@ describe('ServerView', () => {
     expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('2026-11-13 05:12 UTC')
     expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('freed 1.8 GB')
     expect(wrapper.get('[data-testid="cleanup-next"]').text()).toContain('2026-11-14 05:00 UTC')
+    const rows = wrapper.findAll('[data-testid="cleanup-run-row"]')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.text()).toContain('runner-01')
+    expect(rows[1]?.text()).toContain('Renamed Twice')
+    expect(rows[1]?.text()).toContain('Runner too old')
     wrapper.unmount()
   })
 

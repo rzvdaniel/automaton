@@ -78,6 +78,20 @@ onMounted(load)
         </template>
         <template v-else>No run yet.</template>
       </p>
+      <table v-if="cleanup.runs.length" class="w-full mb-3" data-testid="cleanup-runs">
+        <thead>
+          <tr><th class="text-left">Started</th><th class="text-left">Machine</th><th class="text-left">Result</th><th class="text-left">Freed</th><th class="text-left">Message</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="run in cleanup.runs" :key="run.id" data-testid="cleanup-run-row">
+            <td>{{ utc(run.startedAtUtc) }}</td>
+            <td>{{ run.runnerName }}</td>
+            <td>{{ run.result }}</td>
+            <td>{{ freed(run.bytesFreed) }}</td>
+            <td class="studio-muted">{{ run.message ?? '' }}</td>
+          </tr>
+        </tbody>
+      </table>
       <p data-testid="cleanup-next">Next run {{ utc(cleanup.nextRunAtUtc) }}.</p>
       <form class="flex align-items-end flex-wrap gap-3" @submit.prevent="save">
         <label class="flex flex-column gap-1">Time (UTC)
