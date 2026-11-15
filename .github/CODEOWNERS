@@ -27,6 +27,11 @@
 /src/Automaton.Api/Services/AppSecretService.cs                @rzvdaniel
 /src/Automaton.Api/Services/ExecutionSecretGrantService.cs     @rzvdaniel
 /src/Automaton.Api/Services/DataProtectionSecretProtector.cs   @rzvdaniel
+# Hard to undo: a revert does not remove the schema, and Runners that already upgraded keep the behavior
+/src/Automaton.Infrastructure/Migrations/                      @rzvdaniel
+/src/Automaton.Runner/                                         @rzvdaniel
+/src/Automaton.RuntimeHost/                                    @rzvdaniel
+/src/Automaton.Messaging/                                      @rzvdaniel
 # --- security pass ---
 # Below this marker: medium tier, but the review must include a security pass (a "Security:" section).
 # Release scripts that people run as root or pipe into a shell.

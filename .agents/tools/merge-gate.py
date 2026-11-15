@@ -23,6 +23,9 @@ PEOPLE_DOCS = ("docs/", "src/Automaton.Api/Documentation/Admin/")
 TRUSTED = {"OWNER", "MEMBER", "COLLABORATOR"}
 CLOSING = re.compile(r"\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+", re.I)
 GREEN = {"SUCCESS", "SKIPPED", "NEUTRAL"}
+# A pull request that deletes more than this many lines of src/ (or removes a project) is high: a revert brings the
+# code back but not what ran in between.
+REMOVAL_LINES = 500
 
 
 def _patterns(lines) -> list[str]:
@@ -60,6 +63,15 @@ def path_tier(paths: list[str], patterns: list[str]) -> str:
     return "low" if paths and all(is_low(path) for path in paths) else "medium"
 
 
+def removal(files: list[dict]) -> str:
+    """Why the files delete too much of src/ (a reason, or "" when they do not). Each file: path, status, deletions."""
+    projects = [item["path"] for item in files if item["status"] == "removed" and item["path"].endswith(".csproj")]
+    if projects:
+        return "removes a project: " + ", ".join(projects)
+    lines = sum(item["deletions"] for item in files if item["path"].startswith("src/"))
+    return f"deletes {lines} lines of src/ (more than {REMOVAL_LINES})" if lines > REMOVAL_LINES else ""
+
+
 def read_review(review: dict) -> dict:
     """The verdict, the tier the reviewer chose and whether a security pass is recorded."""
     body = review.get("body") or ""
@@ -93,6 +105,9 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
 
     # A tier a reviewer raised stays raised: a later, shorter review cannot lower it.
     tier = path_tier(paths, patterns)
+    big = removal(pr.get("files", []))
+    if big:
+        tier = "high"
     raised = {read_review(item)["tier"] for item in reviews}
     if "high" in raised:
         tier = "high"
@@ -125,6 +140,9 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     if needs_security:
         rows.append(("PASS", "security", "security pass recorded") if review and review["security"] and review["commit"] == head
                     else ("FAIL", "security", "this change needs a 'Security:' section in the review of the final commit"))
+
+    if big:
+        rows.append(("PASS", "removal", big + "; high tier"))
 
     body = pr.get("body") or ""
     missing = [part for part in ("How verified", "Risk", "How to revert")
@@ -167,9 +185,13 @@ def main() -> int:
     pr = json.loads(gh("pr", "view", args[0], "--json", fields, *repo))
     slug = repo[1] if repo else "{owner}/{repo}"
     # Every changed file, with the old path of a rename: a file moved out of a protected folder still counts.
-    files = gh("api", "--paginate", f"repos/{slug}/pulls/{pr['number']}/files?per_page=100",
-               "-q", ".[] | .filename, (.previous_filename // empty)")
-    pr["paths"] = files.splitlines()
+    rows = gh("api", "--paginate", f"repos/{slug}/pulls/{pr['number']}/files?per_page=100",
+              "-q", '.[] | [.filename, (.previous_filename // ""), .status, .deletions] | @tsv')
+    pr["files"], pr["paths"] = [], []
+    for row in rows.splitlines():
+        name, old, status, deletions = row.split("\t")
+        pr["files"].append({"path": name, "status": status, "deletions": int(deletions)})
+        pr["paths"] += [name] + ([old] if old else [])
     # The owner's paths come from the base branch, so a pull request cannot shorten its own list.
     try:
         owners = gh("api", f"repos/{slug}/contents/.github/CODEOWNERS?ref={pr['baseRefName']}",

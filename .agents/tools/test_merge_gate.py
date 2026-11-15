@@ -50,6 +50,35 @@ class Tier(unittest.TestCase):
             self.assertEqual(gate.path_tier(["README.md", path], PATTERNS), "medium", path)
 
 
+REAL = gate.owner_patterns(open(os.path.join(os.path.dirname(__file__), "..", "..", ".github", "CODEOWNERS")).read())
+
+
+def file(path, status="modified", deletions=0):
+    return {"path": path, "status": status, "deletions": deletions}
+
+
+class HardToUndo(unittest.TestCase):
+    def test_migrations_and_runner_are_high(self):
+        for path in ("src/Automaton.Infrastructure/Migrations/2026_X.cs", "src/Automaton.Runner/Program.cs",
+                     "src/Automaton.RuntimeHost/a.cs", "src/Automaton.Messaging/a.cs"):
+            self.assertEqual(gate.path_tier([path], REAL), "high", path)
+
+    def test_studio_and_api_services_stay_medium(self):
+        for path in ("src/automaton-studio-vue/src/a.vue", "src/Automaton.Api/Services/AppService.cs",
+                     "src/Automaton.Infrastructure/Data/Db.cs"):
+            self.assertEqual(gate.path_tier([path], REAL), "medium", path)
+
+    def test_large_removal_is_high(self):
+        big = [file("src/Automaton.Api/a.cs", deletions=501)]
+        self.assertEqual(gate.check(dict(pr(["src/Automaton.Api/a.cs"]), files=big), REAL)[0], "high")
+        small = [file("src/Automaton.Api/a.cs", deletions=500), file("docs/x.md", deletions=900)]
+        self.assertEqual(gate.check(dict(pr(["src/Automaton.Api/a.cs"]), files=small), REAL)[0], "medium")
+
+    def test_removed_project_is_high(self):
+        gone = [file("src/Automaton.Old/Old.csproj", "removed", 20)]
+        self.assertEqual(gate.check(dict(pr(["src/Automaton.Old/Old.csproj"]), files=gone), REAL)[0], "high")
+
+
 class Gate(unittest.TestCase):
     def test_low_passes_without_review(self):
         self.assertEqual(failed(gate.check(pr(["README.md"]), PATTERNS)), [])
