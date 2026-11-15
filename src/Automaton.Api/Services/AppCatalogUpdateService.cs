@@ -6,6 +6,7 @@ using Automaton.Api.Models;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Automaton.Api.Services;
 
@@ -224,9 +225,16 @@ public sealed class AppCatalogUpdateService(
             .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
             .Where(path => !path.StartsWith(".git/", StringComparison.Ordinal) && !path.StartsWith("node_modules/", StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
-        foreach (var (entry, relative) in AppCatalogInstallService.AppFiles(installed, source))
+        var files = AppCatalogInstallService.AppFiles(installed, source).ToList();
+        var notStored = NotStored(files);
+        foreach (var (entry, relative) in files)
         {
-            if (!onDisk.Remove(relative)) return true;
+            if (!onDisk.Remove(relative))
+            {
+                // Files the deploy rules leave out (AGENTS.md, the app's .automatonignore entries) are not kept on the server.
+                if (notStored(relative)) continue;
+                return true;
+            }
             using var stream = entry.Open();
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
@@ -239,6 +247,42 @@ public sealed class AppCatalogUpdateService(
         }
         onDisk.Remove(IgnoreFile);
         return onDisk.Count > 0;
+    }
+
+    /// <summary>True for archive files the deploy rules leave out of the stored source: AGENTS.md, CLAUDE.md and the app's .automatonignore entries; a later "!" line brings a file back.</summary>
+    private static Func<string, bool> NotStored(IEnumerable<(System.IO.Compression.ZipArchiveEntry Entry, string Path)> files)
+    {
+        var rules = new List<(Matcher Matcher, bool Negation)>();
+        Matcher Of(string pattern)
+        {
+            var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+            var line = pattern.StartsWith("./") ? pattern[2..] : pattern.TrimStart('/');
+            var glob = line.EndsWith('/') ? line + "**" : line;
+            matcher.AddInclude(glob);
+            if (!line.Contains('/') || line.TrimEnd('/').IndexOf('/') < 0) matcher.AddInclude("**/" + glob);
+            return matcher;
+        }
+        rules.Add((Of("AGENTS.md"), false));
+        rules.Add((Of("CLAUDE.md"), false));
+        var ignore = files.FirstOrDefault(file => file.Path == IgnoreFile).Entry;
+        if (ignore is not null)
+        {
+            using var reader = new StreamReader(ignore.Open());
+            foreach (var raw in reader.ReadToEnd().Split('\n'))
+            {
+                var line = raw.Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+                var negation = line[0] == '!';
+                rules.Add((Of(negation ? line[1..].Trim() : line), negation));
+            }
+        }
+        return path =>
+        {
+            var skipped = false;
+            foreach (var (matcher, negation) in rules)
+                if (matcher.Match(path).HasMatches) skipped = !negation;
+            return skipped;
+        };
     }
 
     private const string ManifestFile = "automaton.json";
