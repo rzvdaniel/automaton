@@ -58,11 +58,33 @@ public sealed class AppCatalogUpdateService(
         if (source is null) return None(app.InstalledFromCommit);
         var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken, refresh);
         if (latest is null || latest == source.Commit) return None(source.Commit);
-        var key = $"catalog-update:{appId}:{source.Commit}:{latest}";
+        // The edited flag changes when the app's files do, so the key includes their fingerprint (#1149).
+        var key = $"catalog-update:{appId}:{source.Commit}:{latest}:{SourceFingerprint(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId))}";
         if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return cached;
         var model = await CompareAsync(app, ownerId, source, latest, cancellationToken);
         cache.Set(key, model, CacheFor);
         return model;
+    }
+
+    /// <summary>Changes whenever a file of the app is added, removed, resized or rewritten.</summary>
+    internal static string SourceFingerprint(string directory)
+    {
+        if (!Directory.Exists(directory)) return "none";
+        long count = 0, length = 0, newest = 0;
+        try
+        {
+            foreach (var file in new DirectoryInfo(directory).EnumerateFiles("*", SearchOption.AllDirectories))
+            {
+                count++;
+                length += file.Length;
+                newest = Math.Max(newest, file.LastWriteTimeUtc.Ticks);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return "unreadable-" + Guid.NewGuid().ToString("N"); // files changed during the scan: never reuse a cached answer
+        }
+        return $"{count}-{length}-{newest}";
     }
 
     private async Task<AppCatalogUpdateModel> CompareAsync(WebApp app, Guid ownerId, GitAppSource source, string latest, CancellationToken cancellationToken)

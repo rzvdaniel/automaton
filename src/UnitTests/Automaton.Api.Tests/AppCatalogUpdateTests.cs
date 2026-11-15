@@ -28,6 +28,37 @@ public class AppCatalogUpdateTests
     private static readonly GitAppSource Source = new("owner/repo", "tool", new string('a', 40));
 
     [Test]
+    public void SourceFingerprint_ChangesWhenAFileIsEdited_AddedOrRemoved_SoACachedAnswerIsNotReused()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "e2e-1149-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var file = Path.Combine(directory, "index.html");
+            File.WriteAllText(file, "hi");
+            var untouched = AppCatalogUpdateService.SourceFingerprint(directory);
+            Assert.That(AppCatalogUpdateService.SourceFingerprint(directory), Is.EqualTo(untouched));
+
+            File.WriteAllText(file, "hi");
+            File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddMinutes(1));
+            var rewritten = AppCatalogUpdateService.SourceFingerprint(directory);
+            File.WriteAllText(Path.Combine(directory, "extra.txt"), "x");
+            var added = AppCatalogUpdateService.SourceFingerprint(directory);
+            File.Delete(Path.Combine(directory, "extra.txt"));
+            File.Delete(file);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(rewritten, Is.Not.EqualTo(untouched), "same size, new time");
+                Assert.That(added, Is.Not.EqualTo(rewritten));
+                Assert.That(AppCatalogUpdateService.SourceFingerprint(directory), Is.Not.EqualTo(added));
+                Assert.That(AppCatalogUpdateService.SourceFingerprint(directory + "-missing"), Is.EqualTo("none"));
+            });
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
     public void IsEdited_IsFalseForUntouchedFiles_AndTrueForChangedAddedOrMissingFiles()
     {
         var original = new[] { ("automaton.json", "{}"), ("index.html", "hi") };
