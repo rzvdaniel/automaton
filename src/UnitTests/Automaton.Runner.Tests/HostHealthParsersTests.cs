@@ -41,7 +41,7 @@ public class HostHealthParsersTests
     {
         var app = Guid.NewGuid();
         var usage = HostHealthParsers.ParseDockerAppUsage($$$"""
-            {"Images":[{"Id":"a","Size":500,"Containers":2},{"Id":"b","Size":70,"Containers":0},{"Id":"c","Size":30,"Containers":0}],
+            {"Images":[{"Id":"a","Size":500,"Containers":2},{"Id":"b","Size":70,"Containers":0,"SharedSize":20},{"Id":"c","Size":30,"Containers":0,"SharedSize":-1}],
              "Containers":[{"ImageID":"a","SizeRw":10,"Labels":{"com.automaton.app-id":"{{{app}}}"}},
                            {"ImageID":"a","SizeRw":5,"Labels":{"com.automaton.app-id":"{{{app}}}"}},
                            {"ImageID":"a","SizeRw":99,"Labels":{}}]}
@@ -50,7 +50,7 @@ public class HostHealthParsersTests
         Assert.Multiple(() =>
         {
             Assert.That(usage!.Value.Apps, Is.EqualTo(new Dictionary<Guid, (long, long)> { [app] = (15, 500) }));
-            Assert.That(usage.Value.UnusedImages, Is.EqualTo(100));
+            Assert.That(usage.Value.UnusedImages, Is.EqualTo(80), "unique size only: (70 - 20) + 30");
             Assert.That(HostHealthParsers.ParseDockerAppUsage("nope"), Is.Null);
         });
     }

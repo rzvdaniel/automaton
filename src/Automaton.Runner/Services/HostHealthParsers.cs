@@ -121,7 +121,8 @@ internal static partial class HostHealthParsers
         {
             var size = Math.Max(0, Number(image, "Size"));
             if (image.TryGetProperty("Id", out var id) && id.GetString() is { } key) sizes[key] = size;
-            if (Number(image, "Containers") == 0) unused += size;
+            // Like `docker system df`: what only unused images hold, not layers they share with images in use.
+            if (Number(image, "Containers") == 0) unused += Math.Max(0, size - Math.Max(0, Number(image, "SharedSize")));
         }
         return (sizes, unused);
     }
