@@ -21,7 +21,7 @@ public class AppCatalogUpdateTests
     private static string Folder(params (string Path, string Text)[] files)
     {
         var dir = Directory.CreateTempSubdirectory().FullName;
-        foreach (var (path, text) in files) File.WriteAllText(Path.Combine(dir, path), text);
+        foreach (var (path, text) in files) { Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(dir, path))!); File.WriteAllText(Path.Combine(dir, path), text); }
         return dir;
     }
 
@@ -95,6 +95,14 @@ public class AppCatalogUpdateTests
             Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(("automaton.json", "{}"), (".automatonignore", "# t\n"), ("index.html", "hi"))), Is.False);
             Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(("automaton.json", "{}"), (".automatonignore", "# t\n"))), Is.True);
         });
+    }
+
+    [Test]
+    public void IsEdited_CountsAMissingFileThatANegatedIgnoreLineKeeps()
+    {
+        var original = new[] { ("automaton.json", "{}"), (".automatonignore", "src/\n!src/server.js\n"), ("src/server.js", "x"), ("src/other.js", "y") };
+        Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(("automaton.json", "{}"), (".automatonignore", "src/\n"))), Is.True);
+        Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(("automaton.json", "{}"), (".automatonignore", "src/\n"), ("src/server.js", "x"))), Is.False);
     }
 
     [Test]
