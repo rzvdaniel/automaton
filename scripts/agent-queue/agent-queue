@@ -81,7 +81,10 @@ worker)
   flock -n 9 || die "a worker is already running"
   shopt -s nullglob
   # a dead worker leaves its task in running/: we hold the lock, so nobody is running it; start it again
-  for f in "$Q"/running/*.task; do mv "$f" "$Q/pending/"; done
+  for f in "$Q"/running/*.task; do
+    printf '\n\nNote from agent-queue: the worker died during the previous run. Continue from the current git and GitHub state; do not redo finished steps.\n' >> "$f"
+    mv "$f" "$Q/pending/"
+  done
   rm -f "$Q"/running/.cancel-* "$Q"/running/.requeue-* "$Q"/running/.pid-* "$Q"/.requeue-*
   while true; do
     [[ -e $Q/PAUSE ]] && { sleep 10; continue; }
