@@ -22,7 +22,8 @@ public sealed class RuntimeTunnelService(
     RuntimeTunnelRequestSender requestSender,
     IOptions<PublishedAppsConfig> publishedAppsOptions,
     ApiInstanceIdentityService apiInstanceIdentityService,
-    ILogger<RuntimeTunnelService> logger) : ITunnelForwarder
+    ILogger<RuntimeTunnelService> logger,
+    RuntimeTunnelTargetCache targetCache) : ITunnelForwarder
 {
     private readonly PublishedAppsConfig publishedAppsConfig = publishedAppsOptions.Value;
 
@@ -46,16 +47,9 @@ public sealed class RuntimeTunnelService(
         string path,
         CancellationToken cancellationToken)
     {
-        var target = await dbContext.AppDeploymentTargets
-            .Include(target => target.ExecutionRunner)
-            .Include(target => target.WebApp)
-            .SingleOrDefaultAsync(target =>
-                target.Id == deploymentTargetId &&
-                target.WebAppId == appId &&
-                target.ExecutionRunnerId != null &&
-                target.WebApp.DeletionClaimId == null &&
-                target.GenericRuntimeDeployed,
-                cancellationToken);
+        var lookup = await targetCache.GetOrLoadAsync(
+            appId, deploymentTargetId, () => LoadAsync(appId, deploymentTargetId));
+        var target = lookup.Target;
 
         if (target?.ExecutionRunner is not { } runner)
         {
@@ -76,10 +70,7 @@ public sealed class RuntimeTunnelService(
         if (target.WebApp.IsPaused)
             return new ResolvedTunnelTarget(null, false, PausedPage());
 
-        var isHostedRunner = await dbContext.HostedRunners.AnyAsync(hostedRunner =>
-            hostedRunner.RunnerId == runner.Id,
-            cancellationToken);
-        if (isHostedRunner)
+        if (lookup.IsHostedRunner)
         {
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
@@ -113,6 +104,26 @@ public sealed class RuntimeTunnelService(
         }
 
         return new ResolvedTunnelTarget(runner, UsesMachineStaticSite(target, runner, request.Host.Host), null);
+    }
+
+    private sealed record TargetLookup(AppDeploymentTarget? Target, bool IsHostedRunner);
+
+    // Shared by every request waiting on the same lookup, so it must not depend on any one request's cancellation.
+    private async Task<TargetLookup> LoadAsync(Guid appId, Guid deploymentTargetId)
+    {
+        var target = await dbContext.AppDeploymentTargets
+            .AsNoTracking()
+            .Include(target => target.ExecutionRunner)
+            .Include(target => target.WebApp)
+            .SingleOrDefaultAsync(target =>
+                target.Id == deploymentTargetId &&
+                target.WebAppId == appId &&
+                target.ExecutionRunnerId != null &&
+                target.WebApp.DeletionClaimId == null &&
+                target.GenericRuntimeDeployed);
+        var isHostedRunner = target?.ExecutionRunner is { } runner &&
+            await dbContext.HostedRunners.AnyAsync(hostedRunner => hostedRunner.RunnerId == runner.Id);
+        return new TargetLookup(target, isHostedRunner);
     }
 
     private const string PausedHtml =

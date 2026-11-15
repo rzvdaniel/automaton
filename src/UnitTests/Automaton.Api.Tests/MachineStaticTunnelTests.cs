@@ -261,7 +261,7 @@ public sealed class MachineStaticTunnelTests
             Options.Create(new RuntimeTunnelConfig()), NullLogger<RuntimeTunnelRequestSender>.Instance);
         var service = new RuntimeTunnelService(db, sender,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
-            identity, NullLogger<RuntimeTunnelService>.Instance);
+            identity, NullLogger<RuntimeTunnelService>.Instance, new RuntimeTunnelTargetCache(TimeSpan.Zero, TimeProvider.System));
         return (service, hub);
     }
 

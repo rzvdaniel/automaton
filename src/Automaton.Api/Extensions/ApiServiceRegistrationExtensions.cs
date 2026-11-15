@@ -590,6 +590,7 @@ internal static class ApiAppExecutionRegistration
             .Validate(options => options.MaximumConcurrentOperations > 0, "Deployment dispatch concurrency must be positive.")
             .ValidateOnStart();
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
+        services.AddSingleton<RuntimeTunnelTargetCache>();
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
         services.AddScoped<ITunnelForwarder>(provider => provider.GetRequiredService<RuntimeTunnelService>());
