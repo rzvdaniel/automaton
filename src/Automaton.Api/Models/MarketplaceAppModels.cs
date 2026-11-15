@@ -30,6 +30,8 @@ public class MarketplaceAppCardDto
 public class MarketplaceAppDetailsDto : MarketplaceAppCardDto
 {
     public bool CanRemix { get; set; }
+    /// <summary>Where the app was installed from in a catalog; null when it was not installed from one.</summary>
+    public MarketplaceCatalogOriginDto? CatalogOrigin { get; set; }
     public List<MarketplaceAppCardDto> RelatedApps { get; set; } = new();
     public List<MarketplaceAppCardDto> ForksAndRemixes { get; set; } = new();
 }
@@ -40,4 +42,12 @@ public class MarketplaceAppScreenshotDto
     public string ImageUrl { get; set; } = string.Empty;
     public string? Caption { get; set; }
     public int SortOrder { get; set; }
+}
+
+public class MarketplaceCatalogOriginDto
+{
+    /// <summary>The catalog repository, owner/name.</summary>
+    public string Catalog { get; set; } = string.Empty;
+    /// <summary>The app's folder inside the catalog.</summary>
+    public string AppPath { get; set; } = string.Empty;
 }

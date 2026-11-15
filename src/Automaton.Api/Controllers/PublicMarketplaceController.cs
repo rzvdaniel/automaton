@@ -23,14 +23,17 @@ public class PublicMarketplaceController : ControllerBase
     private readonly AppsService _appsService;
     private readonly PublicMarketplaceCreatorAppsQuery _creatorAppsQuery;
     private readonly PublicMarketplaceCatalogQuery _catalogQuery;
+    private readonly AppCatalogService? _catalogs;
 
     public PublicMarketplaceController(
         ApplicationDbContext dbContext,
         AppFileStorageService appFileStorageService,
         AppsService appsService,
         PublicMarketplaceCreatorAppsQuery creatorAppsQuery,
-        PublicMarketplaceCatalogQuery catalogQuery)
+        PublicMarketplaceCatalogQuery catalogQuery,
+        AppCatalogService? catalogs = null)
     {
+        _catalogs = catalogs;
         _dbContext = dbContext;
         _appFileStorageService = appFileStorageService;
         _appsService = appsService;
@@ -77,6 +80,8 @@ public class PublicMarketplaceController : ControllerBase
             return NotFound(new { message = "App not found or not published" });
         }
 
+        app.CatalogOrigin = await LoadCatalogOriginAsync(app.Id);
+
         var ownerUserId = await _dbContext.WebAppUsers
             .AsNoTracking()
             .Where(wu => wu.WebAppId == app.Id)
@@ -114,6 +119,24 @@ public class PublicMarketplaceController : ControllerBase
         app.ForksAndRemixes = app.ForksAndRemixes.Where(fork => fork.HasWebPage).ToList();
 
         return Ok(app);
+    }
+
+    /// <summary>The catalog repository and folder an app was installed from, only when a public catalog lists them; any other install source is not shown.</summary>
+    private async Task<MarketplaceCatalogOriginDto?> LoadCatalogOriginAsync(Guid appId)
+    {
+        var source = await _dbContext.WebApps
+            .AsNoTracking()
+            .Where(a => a.Id == appId)
+            .Select(a => new { a.InstalledFromRepo, a.InstalledFromFolder })
+            .FirstOrDefaultAsync();
+        if (_catalogs == null || string.IsNullOrEmpty(source?.InstalledFromRepo) || string.IsNullOrEmpty(source.InstalledFromFolder))
+        {
+            return null;
+        }
+
+        return await _catalogs.IsPublicCatalogAppAsync(source.InstalledFromRepo, source.InstalledFromFolder, HttpContext.RequestAborted)
+            ? new MarketplaceCatalogOriginDto { Catalog = source.InstalledFromRepo, AppPath = source.InstalledFromFolder }
+            : null;
     }
 
     private async Task<MarketplaceAppDetailsDto?> LoadAppDetailsAsync(Guid appId, Guid? currentUserId)

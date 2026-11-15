@@ -41,6 +41,16 @@ describe('AppMarketplaceDetailView', () => {
     vue.unmount()
   })
 
+  it('shows the own-server card for catalog apps only', async () => {
+    const base = { id: 'x', name: 'Harbour', canLaunch: false, canRemix: false, viewCount: 0, forkCount: 0, isForkable: false, hasApplicationSource: false, screenshots: [], relatedApps: [], forksAndRemixes: [] }
+    const a = await mountPage({ ...base, catalogOrigin: { catalog: 'rzvdaniel/automaton-apps', appPath: 'wallpapers/harbour' } })
+    expect(a.container.querySelector('.own-server')?.textContent).toContain('install Harbour from the Automaton catalog')
+    a.vue.unmount()
+    const b = await mountPage({ ...base, catalogOrigin: null })
+    expect(b.container.querySelector('.own-server')).toBeNull()
+    b.vue.unmount()
+  })
+
   it('shows tags as chips, two-column facts and a caption for the selected screenshot', async () => {
     const { container, vue } = await mountPage({
       id: 'x', name: 'Harbour', canLaunch: false, canRemix: false, viewCount: 2, forkCount: 0, isForkable: false, category: 'Games',

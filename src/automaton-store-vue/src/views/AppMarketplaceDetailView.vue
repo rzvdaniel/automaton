@@ -274,6 +274,16 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
+        <section v-if="app.catalogOrigin" class="band" aria-labelledby="own-server-title">
+          <div class="wrap">
+            <div class="own-server">
+              <h2 id="own-server-title">Run it on your own server</h2>
+              <p>{{ app.name }} is in the Automaton catalog ({{ app.catalogOrigin.catalog }}, {{ app.catalogOrigin.appPath }}). Ask your AI:</p>
+              <code>install {{ app.name }} from the Automaton catalog</code>
+            </div>
+          </div>
+        </section>
+
         <section v-if="app.forksAndRemixes?.length" class="band" aria-labelledby="forks-title">
           <div class="wrap list-block">
             <div class="section-head">
@@ -563,5 +573,21 @@ onBeforeUnmount(() => {
   .hero {
     gap: 28px;
   }
+}
+.own-server {
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: #15171c;
+  color: #f1f1ee;
+}
+.own-server h2 {
+  margin: 0 0 0.5rem;
+}
+.own-server code {
+  display: block;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: #0b0c0f;
+  font: 0.85rem var(--mono);
 }
 </style>
