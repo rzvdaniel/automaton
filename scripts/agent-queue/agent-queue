@@ -21,7 +21,7 @@ case $cmd in
 add)
   name=${1:?usage: agent-queue add <name> [prompt-file]}; valid "$name"
   ls "$Q"/pending/*-"$name".task "$Q"/running/*-"$name".task >/dev/null 2>&1 && die "$name is already queued or running"
-  seq=$(printf '%s%04d' "$(date +%Y%m%d%H%M%S)" $((RANDOM % 10000)))
+  seq=$(date +%s%N)
   if [[ -n ${2:-} ]]; then cp "$2" "$Q/pending/$seq-$name.task.tmp"; else cat > "$Q/pending/$seq-$name.task.tmp"; fi
   [[ -s $Q/pending/$seq-$name.task.tmp ]] || { rm -f "$Q/pending/$seq-$name.task.tmp"; die "empty prompt"; }
   mv "$Q/pending/$seq-$name.task.tmp" "$Q/pending/$seq-$name.task"
@@ -95,7 +95,7 @@ worker)
     if [[ -e $Q/running/.cancel-$n ]]; then rm -f "$Q/running/.cancel-$n"; mv "$Q/running/$b" "$Q/cancelled/$b"; st=cancelled
     elif [[ -e $Q/running/.requeue-$n ]]; then
       rm -f "$Q/running/.requeue-$n"; rm -f "$Q/running/$b"
-      cp "$Q/.requeue-$n" "$Q/pending/$(date +%Y%m%d%H%M%S)0000-$n.task"; rm -f "$Q/.requeue-$n"; st=requeued
+      cp "$Q/.requeue-$n" "$Q/pending/$(date +%s%N)-$n.task"; rm -f "$Q/.requeue-$n"; st=requeued
     elif (( rc == 0 )); then mv "$Q/running/$b" "$Q/done/$b"; st=done
     else mv "$Q/running/$b" "$Q/failed/$b"; st="failed($rc)"; fi
     echo "$(date -Is) end $n $st" >> "$Q/worker.log"

@@ -11,10 +11,10 @@ sleep 1; echo "end $1" >> "$AGENT_QUEUE_HOME/order"
 F
 chmod +x "$t/fake"; export AGENT_QUEUE_RUNNER=$t/fake
 fail() { echo "FAIL: $*"; exit 1; }
-echo one | "$d/agent-queue" add a; echo two | "$d/agent-queue" add b
+for x in a b c d; do echo $x | "$d/agent-queue" add $x; done
 "$d/agent-queue" add a </dev/null 2>/dev/null && fail "duplicate accepted" || true
 AGENT_QUEUE_ONCE=1 "$d/agent-queue" worker
-[[ $(tr '\n' ' ' < "$t/q/order") == "start a end a start b end b " ]] || fail "order: $(cat "$t/q/order")"
+[[ $(tr '\n' ' ' < "$t/q/order") == "start a end a start b end b start c end c start d end d " ]] || fail "order: $(cat "$t/q/order")"
 echo stall | "$d/agent-queue" add s
 ( AGENT_QUEUE_ONCE=1 "$d/agent-queue" worker & ) ; sleep 3
 [[ $("$d/agent-queue" status) == *"s (log idle"* ]] || fail "status shows no running task"
