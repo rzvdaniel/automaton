@@ -6,6 +6,7 @@ using Automaton.Api.Models;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Automaton.Api.Services;
 
@@ -224,9 +225,16 @@ public sealed class AppCatalogUpdateService(
             .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
             .Where(path => !path.StartsWith(".git/", StringComparison.Ordinal) && !path.StartsWith("node_modules/", StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
-        foreach (var (entry, relative) in AppCatalogInstallService.AppFiles(installed, source))
+        var files = AppCatalogInstallService.AppFiles(installed, source).ToList();
+        var notStored = NotStoredMatcher(files);
+        foreach (var (entry, relative) in files)
         {
-            if (!onDisk.Remove(relative)) return true;
+            if (!onDisk.Remove(relative))
+            {
+                // Files the deploy rules leave out (AGENTS.md, the app's .automatonignore entries) are not kept on the server.
+                if (notStored.Match(relative).HasMatches) continue;
+                return true;
+            }
             using var stream = entry.Open();
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
@@ -239,6 +247,25 @@ public sealed class AppCatalogUpdateService(
         }
         onDisk.Remove(IgnoreFile);
         return onDisk.Count > 0;
+    }
+
+    private static Microsoft.Extensions.FileSystemGlobbing.Matcher NotStoredMatcher(IEnumerable<(System.IO.Compression.ZipArchiveEntry Entry, string Path)> files)
+    {
+        var matcher = new Microsoft.Extensions.FileSystemGlobbing.Matcher(StringComparison.Ordinal);
+        matcher.AddInclude("AGENTS.md");
+        matcher.AddInclude("CLAUDE.md");
+        var ignore = files.FirstOrDefault(file => file.Path == IgnoreFile).Entry;
+        if (ignore is null) return matcher;
+        using var reader = new StreamReader(ignore.Open());
+        foreach (var raw in reader.ReadToEnd().Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line[0] is '#' or '!') continue;
+            line = line.TrimStart('/');
+            matcher.AddInclude(line.EndsWith('/') ? line + "**" : line);
+            if (!line.Contains('/')) matcher.AddInclude("**/" + (line.EndsWith('/') ? line + "**" : line));
+        }
+        return matcher;
     }
 
     private const string ManifestFile = "automaton.json";

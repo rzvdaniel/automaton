@@ -87,6 +87,17 @@ public class AppCatalogUpdateTests
     }
 
     [Test]
+    public void IsEdited_IgnoresFilesTheServerDoesNotStore()
+    {
+        var original = new[] { ("automaton.json", "{}"), (".automatonignore", "# t\ntest/\n"), ("AGENTS.md", "guide"), ("test/a.js", "x"), ("index.html", "hi") };
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(("automaton.json", "{}"), (".automatonignore", "# t\n"), ("index.html", "hi"))), Is.False);
+            Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(("automaton.json", "{}"), (".automatonignore", "# t\n"))), Is.True);
+        });
+    }
+
+    [Test]
     public void IsEdited_IgnoresFieldsTheServerWrites_ButNotRealEdits()
     {
         var original = new[] { ("automaton.json", "{\"name\":\"Tool\",\"application\":{\"kind\":\"web\"}}"), ("index.html", "hi") };
