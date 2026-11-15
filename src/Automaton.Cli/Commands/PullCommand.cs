@@ -333,11 +333,11 @@ public static class PullCommand
         AnsiConsole.MarkupLine($"[green]✓[/] Downloaded [bold]{written}[/] file(s)");
     }
 
-    private static async Task DownloadFileAsync(SourceDownload download, Func<string, Task<string>> readFile)
+    internal static async Task DownloadFileAsync(SourceDownload download, Func<string, Task<string>> readFile)
     {
         var content = await readFile(download.RemotePath);
         Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
-        await File.WriteAllTextAsync(download.LocalPath, content, Encoding.UTF8);
+        await File.WriteAllTextAsync(download.LocalPath, content, new UTF8Encoding(false));
     }
 
     private static List<string> GetOverwritePaths(IEnumerable<SourceDownload> downloads)
