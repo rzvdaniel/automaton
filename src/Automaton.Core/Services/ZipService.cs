@@ -257,7 +257,10 @@ public static class ZipService
 
         foreach (var pattern in MandatoryIgnorePatterns)
         {
-            if (includeAutomatonConfig && pattern.Equals("automaton.json", StringComparison.OrdinalIgnoreCase))
+            // The stored source keeps automaton.json and .automatonignore so a later pull, redeploy or update still has them;
+            // the runtime artifact never does.
+            if (includeAutomatonConfig
+                && (pattern.Equals("automaton.json", StringComparison.OrdinalIgnoreCase) || pattern.Equals(IgnoreFileName, StringComparison.OrdinalIgnoreCase)))
             {
                 continue;
             }
