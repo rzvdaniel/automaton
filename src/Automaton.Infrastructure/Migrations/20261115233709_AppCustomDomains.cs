@@ -18,6 +18,7 @@ namespace Automaton.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     WebAppId = table.Column<Guid>(type: "uuid", nullable: false),
                     Host = table.Column<string>(type: "citext", maxLength: 253, nullable: false),
+                    VerificationToken = table.Column<string>(type: "citext", maxLength: 64, nullable: false),
                     IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
                     VerifiedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)

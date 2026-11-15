@@ -24,6 +24,11 @@ public sealed class CustomDomainTests
     {
         public Dictionary<string, IPAddress[]> Records { get; } = new() { ["localhost"] = [ServerIp] };
 
+        public Dictionary<string, string[]> Txt { get; } = new();
+
+        public Task<IReadOnlyList<string>> ResolveTxtAsync(string host, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(Txt.TryGetValue(host, out var found) ? found : []);
+
         public Task<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<IPAddress>>(Records.TryGetValue(host, out var found) ? found : []);
     }
@@ -65,6 +70,13 @@ public sealed class CustomDomainTests
             CreateService(setup.Db, setup.RouteRoot, "letsencrypt"));
     }
 
+    private static async Task ProveAsync(Setup setup, string host)
+    {
+        var domain = await setup.Db.AppCustomDomains.SingleAsync(d => d.Host == host);
+        setup.Resolver.Txt["_automaton-challenge." + host] = ["automaton-verify=" + domain.VerificationToken];
+        setup.Resolver.Records[host] = [ServerIp];
+    }
+
     private static string Routes(Setup setup) => File.ReadAllText(Path.Combine(setup.RouteRoot, "managed-runtime-routes.yml"));
 
     [Test]
@@ -77,8 +89,25 @@ public sealed class CustomDomainTests
         Assert.That(state.TargetAddresses, Is.EqualTo(new[] { "203.0.113.10" }));
 
         var domainId = state.Domains.Single().Id;
+        setup.Resolver.Txt[state.Domains.Single().ChallengeHost] = [state.Domains.Single().ChallengeValue];
         var ex = Assert.ThrowsAsync<InvalidOperationException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
         Assert.That(ex!.Message, Does.Contain("does not point at this server"));
+        Assert.That(File.Exists(Path.Combine(setup.RouteRoot, "managed-runtime-routes.yml")), Is.False);
+    }
+
+    [Test]
+    public async Task DnsPointingHere_IsNotEnough_WithoutTheOwnersTxtRecord()
+    {
+        var setup = await CreateAsync();
+        var domainId = (await Service(setup).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
+        setup.Resolver.Records["blog.example.test"] = [ServerIp];
+
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
+        Assert.That(ex!.Message, Does.Contain("_automaton-challenge.blog.example.test"));
+
+        // Someone else's token (a squatter's) does not prove this claim either.
+        setup.Resolver.Txt["_automaton-challenge.blog.example.test"] = ["automaton-verify=0000"];
+        Assert.ThrowsAsync<InvalidOperationException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
         Assert.That(File.Exists(Path.Combine(setup.RouteRoot, "managed-runtime-routes.yml")), Is.False);
     }
 
@@ -87,7 +116,7 @@ public sealed class CustomDomainTests
     {
         var setup = await CreateAsync();
         var domainId = (await Service(setup).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
-        setup.Resolver.Records["blog.example.test"] = [ServerIp];
+        await ProveAsync(setup, "blog.example.test");
 
         var state = await Service(setup).VerifyAsync(AppId, domainId, default);
 
@@ -109,7 +138,7 @@ public sealed class CustomDomainTests
     {
         var setup = await CreateAsync();
         var domainId = (await Service(setup).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
-        setup.Resolver.Records["blog.example.test"] = [ServerIp];
+        await ProveAsync(setup, "blog.example.test");
         await Service(setup).VerifyAsync(AppId, domainId, default);
 
         var state = await Service(setup).RemoveAsync(AppId, domainId, default);
@@ -126,8 +155,8 @@ public sealed class CustomDomainTests
         var setup = await CreateAsync();
         var first = (await Service(setup).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
         var second = (await Service(setup).AddAsync(AppId, "www.example.test", default)).Domains.Last().Id;
-        setup.Resolver.Records["blog.example.test"] = [ServerIp];
-        setup.Resolver.Records["www.example.test"] = [ServerIp];
+        await ProveAsync(setup, "blog.example.test");
+        await ProveAsync(setup, "www.example.test");
         await Service(setup).VerifyAsync(AppId, first, default);
         await Service(setup).VerifyAsync(AppId, second, default);
         Assert.That(Routes(setup), Does.Contain($"domain-{second:N}-redirect"));
@@ -145,7 +174,7 @@ public sealed class CustomDomainTests
     {
         var setup = await CreateAsync();
         var domainId = (await Service(setup).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
-        setup.Resolver.Records["blog.example.test"] = [ServerIp];
+        await ProveAsync(setup, "blog.example.test");
         await Service(setup).VerifyAsync(AppId, domainId, default);
         setup.Db.WebApps.Single().IsPublished = false;
         await setup.Db.SaveChangesAsync();

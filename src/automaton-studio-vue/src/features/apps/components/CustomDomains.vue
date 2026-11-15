@@ -51,7 +51,7 @@ async function add() {
           <span v-else class="domains__badge domains__badge--wait">Waiting for DNS</span>
         </div>
         <p v-if="!domain.verified" class="domains__hint" data-testid="custom-domain-dns">
-          Create a <code>CNAME</code> record for <code>{{ domain.host }}</code> pointing to <code>{{ state.target }}</code>
+          Create a <code>TXT</code> record named <code data-testid="custom-domain-txt">{{ domain.challengeHost }}</code> with the value <code>{{ domain.challengeValue }}</code> to prove the domain is yours. Then create a <code>CNAME</code> record for <code>{{ domain.host }}</code> pointing to <code>{{ state.target }}</code>
           <template v-if="state.targetAddresses.length"> (or an <code>A</code> record to {{ state.targetAddresses.join(', ') }})</template>,
           then check it. A certificate is issued once DNS points here.
         </p>

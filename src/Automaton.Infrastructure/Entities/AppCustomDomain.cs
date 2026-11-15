@@ -12,6 +12,9 @@ public class AppCustomDomain
     /// <summary>Lower-case host name; unique across the server.</summary>
     public string Host { get; set; } = string.Empty;
 
+    /// <summary>Secret the owner publishes in a DNS TXT record to prove they control the domain.</summary>
+    public string VerificationToken { get; set; } = string.Empty;
+
     public bool IsPrimary { get; set; }
     public DateTimeOffset? VerifiedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

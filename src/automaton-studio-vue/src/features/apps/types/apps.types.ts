@@ -675,6 +675,9 @@ export interface AppCustomDomain {
   host: string
   isPrimary: boolean
   verified: boolean
+  /** The TXT record that proves you own the domain: this name, this value. */
+  challengeHost: string
+  challengeValue: string
 }
 
 /** An app's own domains and the address their DNS must point at. */

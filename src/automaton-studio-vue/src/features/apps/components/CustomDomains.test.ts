@@ -21,8 +21,8 @@ const stubs = {
     template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)">`,
   },
 }
-const waiting = { target: 'apps.test', targetAddresses: ['203.0.113.10'], domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: false, verified: false }] }
-const verified = { ...waiting, domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: true, verified: true }] }
+const waiting = { target: 'apps.test', targetAddresses: ['203.0.113.10'], domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: false, verified: false, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }] }
+const verified = { ...waiting, domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: true, verified: true, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }] }
 
 function open() {
   return mount(CustomDomains, { props: { appId: 'app-1' }, global: { stubs } })
@@ -37,6 +37,8 @@ describe('CustomDomains', () => {
     await flushPromises()
     const dns = wrapper.get('[data-testid="custom-domain-dns"]').text()
     expect(dns).toContain('CNAME')
+    expect(dns).toContain('_automaton-challenge.blog.example.com')
+    expect(dns).toContain('automaton-verify=abc')
     expect(dns).toContain('apps.test')
     expect(dns).toContain('203.0.113.10')
   })

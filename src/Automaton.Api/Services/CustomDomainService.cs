@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using DnsClient;
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -11,10 +13,27 @@ namespace Automaton.Api.Services;
 public interface ICustomDomainResolver
 {
     Task<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<string>> ResolveTxtAsync(string host, CancellationToken cancellationToken);
 }
 
 public sealed class DnsCustomDomainResolver : ICustomDomainResolver
 {
+    private static readonly LookupClient Client = new(new LookupClientOptions { UseCache = false, Timeout = TimeSpan.FromSeconds(5), Retries = 1 });
+
+    public async Task<IReadOnlyList<string>> ResolveTxtAsync(string host, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await Client.QueryAsync(host, QueryType.TXT, cancellationToken: cancellationToken);
+            return response.Answers.TxtRecords().SelectMany(record => record.Text).ToList();
+        }
+        catch (DnsResponseException)
+        {
+            return [];
+        }
+    }
+
     public async Task<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
     {
         try
@@ -28,8 +47,10 @@ public sealed class DnsCustomDomainResolver : ICustomDomainResolver
     }
 }
 
+/// <param name="ChallengeHost">The TXT record name that proves ownership; its value is <paramref name="ChallengeValue"/>.</param>
 public sealed record AppCustomDomainDto(
-    Guid Id, string Host, bool IsPrimary, bool Verified, DateTimeOffset? VerifiedAt);
+    Guid Id, string Host, bool IsPrimary, bool Verified, DateTimeOffset? VerifiedAt,
+    string ChallengeHost, string ChallengeValue);
 
 /// <param name="Target">The address the domain's CNAME record must point to (an A record may use <paramref name="TargetAddresses"/>).</param>
 public sealed record AppCustomDomainsState(
@@ -48,6 +69,9 @@ public sealed class CustomDomainService(
 {
     private readonly PublishedAppsConfig config = options.Value;
 
+    private const string ChallengePrefix = "_automaton-challenge.";
+    private const string ChallengeValuePrefix = "automaton-verify=";
+
     public async Task<AppCustomDomainsState> GetAsync(Guid appId, CancellationToken cancellationToken)
     {
         await LoadManagedAppAsync(appId, cancellationToken);
@@ -65,7 +89,11 @@ public sealed class CustomDomainService(
         if (await dbContext.AppCustomDomains.AnyAsync(domain => domain.Host == normalized, cancellationToken))
             throw new InvalidOperationException("This domain is already used by an app.");
 
-        dbContext.AppCustomDomains.Add(new AppCustomDomain { Id = Guid.NewGuid(), WebAppId = appId, Host = normalized });
+        dbContext.AppCustomDomains.Add(new AppCustomDomain
+        {
+            Id = Guid.NewGuid(), WebAppId = appId, Host = normalized,
+            VerificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant()
+        });
         await dbContext.SaveChangesAsync(cancellationToken);
         return await BuildStateAsync(appId, cancellationToken);
     }
@@ -75,6 +103,12 @@ public sealed class CustomDomainService(
     {
         await LoadManagedAppAsync(appId, cancellationToken);
         var domain = await FindAsync(appId, domainId, cancellationToken);
+
+        // A claim on a name is proven by a TXT record only the name's DNS owner can create; pointing DNS here is not enough.
+        var proof = await resolver.ResolveTxtAsync(ChallengePrefix + domain.Host, cancellationToken);
+        if (!proof.Any(text => string.Equals(text.Trim(), ChallengeValuePrefix + domain.VerificationToken, StringComparison.Ordinal)))
+            throw new InvalidOperationException(
+                $"The TXT record {ChallengePrefix}{domain.Host} with the value {ChallengeValuePrefix}{domain.VerificationToken} was not found. Create it, wait for it to spread, and check again.");
 
         var targets = await ResolveTargetAddressesAsync(cancellationToken);
         var actual = await resolver.ResolveAsync(domain.Host, cancellationToken);
@@ -168,7 +202,8 @@ public sealed class CustomDomainService(
             config.PublicBaseUrlHost,
             addresses.Select(address => address.ToString()).ToList(),
             domains.Select(domain => new AppCustomDomainDto(
-                domain.Id, domain.Host, domain.IsPrimary, domain.VerifiedAt is not null, domain.VerifiedAt)).ToList());
+                domain.Id, domain.Host, domain.IsPrimary, domain.VerifiedAt is not null, domain.VerifiedAt,
+                ChallengePrefix + domain.Host, ChallengeValuePrefix + domain.VerificationToken)).ToList());
     }
 
     private async Task<AppCustomDomain> FindAsync(Guid appId, Guid domainId, CancellationToken cancellationToken) =>

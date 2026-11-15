@@ -72,6 +72,7 @@ internal static class ApplicationModelConfiguration
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Host).IsRequired().HasMaxLength(253);
+            entity.Property(e => e.VerificationToken).IsRequired().HasMaxLength(64);
             entity.HasIndex(e => e.Host).IsUnique();
             entity.HasIndex(e => e.WebAppId);
             // A domain goes away with its app.
