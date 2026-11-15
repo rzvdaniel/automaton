@@ -12,7 +12,8 @@ F
 chmod +x "$t/fake"; export AGENT_QUEUE_RUNNER=$t/fake
 fail() { echo "FAIL: $*"; exit 1; }
 for x in a b c d; do echo $x | "$d/agent-queue" add $x; done
-"$d/agent-queue" add a </dev/null 2>/dev/null && fail "duplicate accepted" || true
+echo again | "$d/agent-queue" add a 2>/dev/null && fail "duplicate accepted" || true
+echo x | "$d/agent-queue" add x-e; echo y | "$d/agent-queue" add e; "$d/agent-queue" cancel e >/dev/null; [[ -n $(ls "$t"/q/pending/*-x-e.task) && -z $(ls "$t"/q/pending/*-e.task 2>/dev/null | grep -v x-e) ]] || fail "cancel e hit x-e"; "$d/agent-queue" cancel x-e >/dev/null
 AGENT_QUEUE_ONCE=1 "$d/agent-queue" worker
 [[ $(tr '\n' ' ' < "$t/q/order") == "start a end a start b end b start c end c start d end d " ]] || fail "order: $(cat "$t/q/order")"
 echo stall | "$d/agent-queue" add s

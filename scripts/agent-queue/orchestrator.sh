@@ -20,10 +20,10 @@ fi
   tries=$(grep -c " retry $name\$" "$Q/orchestrator/orchestrator.log" 2>/dev/null || true)
   if (( ${tries:-0} < MAX_RETRIES )); then
     log "stalled $name ($idle idle), retry $name"
-    "$AQ" requeue "$name" "The previous run stalled after $idle without output. Continue from the current git and GitHub state; do not redo finished steps."
+    "$AQ" requeue "$name" "The previous run stalled after $idle without output. Continue from the current git and GitHub state; do not redo finished steps." || true
   else
     log "stalled $name ($idle idle), retries used, failing it"
-    "$AQ" cancel "$name"
+    "$AQ" cancel "$name" || true
   fi
 done
 if [[ ${ORCH_REPORT:-} == 1 ]]; then
