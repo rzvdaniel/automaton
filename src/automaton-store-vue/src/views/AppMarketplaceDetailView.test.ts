@@ -36,6 +36,26 @@ describe('AppMarketplaceDetailView', () => {
     expect(container.querySelector('.hero.plain')).not.toBeNull()
     expect(container.querySelector('.gallery')).toBeNull()
     expect(container.querySelector('.title .app-mark')?.textContent).toBe('N')
+    expect(container.querySelector('.feats')).toBeNull()
+    expect(container.textContent).not.toContain('Run it on your own server')
+    vue.unmount()
+  })
+
+  it('shows tags as chips, two-column facts and a caption for the selected screenshot', async () => {
+    const { container, vue } = await mountPage({
+      id: 'x', name: 'Harbour', canLaunch: false, canRemix: false, viewCount: 2, forkCount: 0, isForkable: false, category: 'Games',
+      tags: 'Weather, Sound', hasApplicationSource: false, relatedApps: [], forksAndRemixes: [],
+      screenshots: [
+        { id: 'a', imageUrl: 'https://img.test/a.png', caption: 'Day', sortOrder: 1 },
+        { id: 'b', imageUrl: 'https://img.test/b.png', caption: 'Night', sortOrder: 2 },
+      ],
+    })
+    expect([...container.querySelectorAll('.feat')].map((e) => e.textContent)).toEqual(['Weather', 'Sound'])
+    expect(container.querySelector('.facts')?.textContent).toContain('Games')
+    expect(container.querySelector('.cap')?.textContent).toBe('1 / 2 · Day')
+    container.querySelectorAll<HTMLButtonElement>('.thumb')[1]!.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(container.querySelector('.cap')?.textContent).toBe('2 / 2 · Night')
     vue.unmount()
   })
 })

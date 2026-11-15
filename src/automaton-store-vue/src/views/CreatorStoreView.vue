@@ -141,8 +141,8 @@ onMounted(loadCreatorApps)
 .app-grid {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 18px;
 }
 .state {
   display: grid;
@@ -152,10 +152,5 @@ onMounted(loadCreatorApps)
   border-radius: 16px;
   border: 1px dashed var(--line);
   color: var(--ink-soft);
-}
-@media (max-width: 900px) {
-  .app-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 </style>

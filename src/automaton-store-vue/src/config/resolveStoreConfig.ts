@@ -73,3 +73,12 @@ export function buildPublishedAppUrl(publicAppsBaseUrl: string, slug: string | n
   const namespaced = (base.pathname && base.pathname !== '/') || !host.startsWith('apps.')
   return `${trimTrailingSlash(publicAppsBaseUrl)}${namespaced ? '/apps' : ''}/${encodedSlug}/`
 }
+
+// The server's own name for headlines: the store host without its "store." prefix.
+export function serverHostName(origin: string) {
+  try {
+    return new URL(origin).hostname.replace(/^store\./, '')
+  } catch {
+    return ''
+  }
+}
