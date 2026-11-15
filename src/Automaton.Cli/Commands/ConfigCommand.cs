@@ -82,6 +82,12 @@ public static class ConfigCommand
             }
             else
             {
+                if (!config.CanSaveGlobalConfig(updated))
+                {
+                    AnsiConsole.MarkupLine(MissingGlobalProfileMessage);
+                    Environment.ExitCode = 1;
+                    return;
+                }
                 config.SaveGlobalConfig(updated);
                 AnsiConsole.MarkupLine(SavedMessage(sourcePath));
             }
@@ -90,6 +96,9 @@ public static class ConfigCommand
 
         return cmd;
     }
+
+    internal const string MissingGlobalProfileMessage =
+        "[red]Error:[/] Pass --server with --global, or choose a profile with --profile; there is no profile to save the key into.";
 
     internal static string SavedMessage(string path) => $"[green]✓[/] Configuration saved to {Markup.Escape(path)}";
 
