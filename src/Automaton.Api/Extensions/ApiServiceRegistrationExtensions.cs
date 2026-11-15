@@ -290,6 +290,8 @@ internal static class ApiAuthorizationRegistration
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.ServerReadPolicy, AppPermissionApproval.ServerRead);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.AppsReadStatusPolicy, AppPermissionApproval.AppsReadStatus);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.ServerCleanupPolicy, AppPermissionApproval.ServerCleanup);
             AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.RunnerMaintainPolicy, AppPermissionApproval.RunnerMaintain);
@@ -633,6 +635,7 @@ internal static class ApiRunnerRegistration
         services.AddMemoryCache();
         services.AddScoped<Automaton.Api.ServerHealth.HostHealthReportService>();
         services.AddScoped<Automaton.Api.ServerHealth.ServerHealthService>();
+        services.AddScoped<Automaton.Api.Services.AppStatusReadService>();
         services.AddScoped<Automaton.Api.ServerHealth.AppDiskUsageService>();
         services.AddSingleton<Automaton.Api.ServerHealth.LatestReleaseClient>();
         services.AddSingleton<Automaton.Api.ServerHealth.CertificateExpiryProbe>();

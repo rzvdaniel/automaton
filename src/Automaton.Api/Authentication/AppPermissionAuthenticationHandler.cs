@@ -11,6 +11,7 @@ public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOpt
     public const string BackupsReadPolicy = "AppPermission:backups:read";
     public const string BackupsRunPolicy = "AppPermission:backups:run";
     public const string ServerReadPolicy = "AppPermission:server:read";
+    public const string AppsReadStatusPolicy = "AppPermission:apps:read-status";
     public const string ServerCleanupPolicy = "AppPermission:server:cleanup";
     public const string RunnerMaintainPolicy = "AppPermission:runner:maintain";
     public const string NotifyEmailPolicy = "AppPermission:notify:email";
