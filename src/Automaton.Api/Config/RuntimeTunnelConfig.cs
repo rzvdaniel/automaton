@@ -11,6 +11,9 @@ public sealed class RuntimeTunnelConfig
     /// <summary>Streaming responses (Server-Sent Events, large downloads) and WebSockets one app may hold open at once.</summary>
     public int MaxLongLivedPerApp { get; set; } = 20;
 
+    /// <summary>How long a streaming response (a large file) waits for a free slot before the app answers 503.</summary>
+    public int StreamSlotWaitSeconds { get; set; } = 10;
+
     /// <summary>A streaming response or WebSocket with no traffic for this long is closed.</summary>
     public int StreamIdleTimeoutSeconds { get; set; } = 300;
 }

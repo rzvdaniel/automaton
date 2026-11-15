@@ -131,7 +131,8 @@ public sealed class RuntimeTunnelRequestSender(
             catch (Exception exception) { logger.LogDebug(exception, "Could not cancel tunnel stream {RequestId}", response.RequestId); }
         });
 
-        var lease = limiter.TryAcquire(appId, config.MaxLongLivedPerApp);
+        var lease = await limiter.TryAcquireAsync(
+            appId, config.MaxLongLivedPerApp, TimeSpan.FromSeconds(config.StreamSlotWaitSeconds), cancellationToken);
         if (lease is null)
         {
             await cancel();

@@ -20,6 +20,18 @@ public sealed class TunnelLongLivedLimiter
         return new Lease(this, appId);
     }
 
+    /// <summary>Like <see cref="TryAcquire"/>, but waits up to <paramref name="wait"/> for a slot, so a burst of large files queues instead of failing.</summary>
+    public async Task<IDisposable?> TryAcquireAsync(Guid appId, int limit, TimeSpan wait, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + wait;
+        while (true)
+        {
+            var lease = TryAcquire(appId, limit);
+            if (lease is not null || DateTime.UtcNow >= deadline) return lease;
+            await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
+        }
+    }
+
     private void Release(Guid appId)
         => counts.AddOrUpdate(appId, 0, (_, current) => Math.Max(0, current - 1));
 
