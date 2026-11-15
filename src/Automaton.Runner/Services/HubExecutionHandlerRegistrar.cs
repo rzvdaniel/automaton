@@ -105,7 +105,7 @@ internal sealed class HubExecutionHandlerRegistrar
             request.Method, request.Path, request.RequestId);
         try
         {
-            using var slot = sessions.TryEnter(request.RuntimeAppId);
+            using var slot = await sessions.TryEnterAsync(request.RuntimeAppId, CancellationToken.None);
             if (slot is null)
             {
                 await TrySendAsync(connection, CreateBusyResponse(request));

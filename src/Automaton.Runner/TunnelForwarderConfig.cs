@@ -14,4 +14,11 @@ public class TunnelForwarderConfig
     // Requests, streams and WebSockets one app may have in flight on this Runner at once. More get a 503 so one
     // busy app cannot take the whole Runner.
     public int MaxConcurrentRequestsPerApp { get; set; } = 64;
+
+    // A request over the cap above waits this long for a free slot before it gets the 503, so a page that loads
+    // many files at once is queued, not refused. 0 refuses at once.
+    public int SlotWaitSeconds { get; set; } = 10;
+
+    // How many requests of one app may wait at once; more get the 503 immediately.
+    public int MaxWaitingPerApp { get; set; } = 100;
 }

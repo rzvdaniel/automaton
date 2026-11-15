@@ -78,6 +78,25 @@ public class TunnelStreamingTests
     }
 
     [Test]
+    public async Task Sessions_QueueABurstInsteadOfRefusingIt()
+    {
+        var sessions = new RunnerTunnelSessions(
+            new TunnelForwarderConfig { MaxConcurrentRequestsPerApp = 2, MaxWaitingPerApp = 3, SlotWaitSeconds = 1 }, Serilog.Log.Logger);
+        var app = Guid.NewGuid();
+        var held = new[] { sessions.TryEnter(app), sessions.TryEnter(app) };
+
+        var waiting = Enumerable.Range(0, 3).Select(_ => sessions.TryEnterAsync(app, CancellationToken.None)).ToList();
+        await Task.Delay(100);
+        var overflow = await sessions.TryEnterAsync(app, CancellationToken.None);
+        Assert.That(overflow, Is.Null, "more waiters than the cap are refused at once");
+
+        foreach (var lease in held) lease!.Dispose();
+        var leases = await Task.WhenAll(waiting);
+        Assert.That(leases.Count(lease => lease is not null), Is.EqualTo(2), "the two freed slots go to waiters, the third keeps waiting or times out");
+        foreach (var lease in leases) lease?.Dispose();
+    }
+
+    [Test]
     public async Task Sessions_LimitConcurrentWorkPerApp()
     {
         var sessions = new RunnerTunnelSessions(
