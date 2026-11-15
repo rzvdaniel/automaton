@@ -95,7 +95,7 @@ describe('AppSettingValues', () => {
 
   it('restarts the app from the card', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    vi.mocked(appsService.restart).mockResolvedValue({ restarted: 1 })
+    vi.mocked(appsService.restart).mockResolvedValue({ restarted: 1, confirmed: true })
     const wrapper = mountSettings()
     await flushPromises()
 

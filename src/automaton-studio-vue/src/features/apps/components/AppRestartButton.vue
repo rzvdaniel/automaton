@@ -13,11 +13,13 @@ const busy = ref(false)
 async function restart() {
   busy.value = true
   try {
-    const { restarted } = await appsService.restart(props.appId)
+    const { restarted, confirmed } = await appsService.restart(props.appId)
     toast.add({
-      severity: restarted > 0 ? 'success' : 'info',
+      severity: restarted > 0 && confirmed ? 'success' : 'info',
       summary: restarted > 0 ? 'Restarting' : 'Nothing to restart',
-      detail: restarted > 0 ? 'The app restarts with its current settings and secrets.' : 'The app is not running. Settings and secrets apply the next time it starts.',
+      detail: restarted > 0
+        ? (confirmed ? 'The app restarts with its current settings and secrets.' : 'The connection dropped before the answer. The server carries on with the restart; reload in a minute to check.')
+        : 'The app is not running. Settings and secrets apply the next time it starts.',
       life: 4000,
     })
   } catch (failure) {

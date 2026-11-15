@@ -3,7 +3,7 @@
  * Connects to ASP.NET backend apps endpoints
  */
 import apiClient from '@/shared/services/api/axios-instance'
-import { APP_ACTION_TIMEOUT_MS } from '../utils/app-action-error'
+import { APP_ACTION_TIMEOUT_MS, DROPPED_CALL_POLLS, DROPPED_CALL_POLL_MS, isConnectionDropped } from '../utils/app-action-error'
 import type {
   InstallSource,
   CatalogQuery,
@@ -240,20 +240,43 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}`)
   }
 
-  /** Pause (stop, schedules off, paused page) or resume an app. POST /api/apps/{id}/pause and /resume */
+  /**
+   * Pause (stop, schedules off, paused page) or resume an app. POST /api/apps/{id}/pause and /resume
+   * A browser can drop a long request (Chromium aborts every request in flight when the machine's network interfaces change,
+   * which a container start can trigger) while the server carries on; then Studio reads the app until it shows the new state.
+   */
   async setPaused(id: string, paused: boolean): Promise<AppPauseState> {
-    return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })).data
+    try {
+      return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })).data
+    } catch (failure) {
+      if (!isConnectionDropped(failure)) throw failure
+      for (let attempt = 0; attempt < DROPPED_CALL_POLLS; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, DROPPED_CALL_POLL_MS))
+        const app = await this.get(id).catch(() => null)
+        if (app && !!app.isPaused === paused) return { appId: id, paused, schedulesChanged: 0, warnings: [] }
+      }
+      throw failure
+    }
+  }
+
+  /**
+   * Restart the running app so it loads changed settings and secrets. POST /api/apps/{id}/restart; 409 while paused.
+   * `confirmed` is false when the connection dropped before the answer: the server carries on with the restart.
+   */
+  async restart(id: string): Promise<{ restarted: number, confirmed: boolean }> {
+    try {
+      const { data } = await apiClient.post<{ restarted: number }>(`/api/apps/${id}/restart`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })
+      return { restarted: data.restarted, confirmed: true }
+    } catch (failure) {
+      if (!isConnectionDropped(failure)) throw failure
+      return { restarted: 1, confirmed: false }
+    }
   }
 
   /** Disk the app uses, or null until a Runner has measured it. GET /api/apps/{id}/disk (204 while unmeasured). */
   async getDisk(id: string): Promise<AppDiskUsage | null> {
     const response = await apiClient.get<AppDiskUsage | ''>(`/api/apps/${id}/disk`)
     return response.status === 204 || !response.data ? null : response.data
-  }
-
-  /** Restart the running app so it loads changed settings and secrets. POST /api/apps/{id}/restart; 409 while paused. */
-  async restart(id: string): Promise<{ restarted: number }> {
-    return (await apiClient.post<{ restarted: number }>(`/api/apps/${id}/restart`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })).data
   }
 
   /** Who can open the app. GET /api/apps/{id}/sharing */
