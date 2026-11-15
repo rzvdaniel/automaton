@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
                   <img :src="resolveMarketplaceAssetUrl(image.imageUrl)" alt="" loading="lazy" />
                 </button>
               </div>
-              <p class="cap">{{ selectedIndex + 1 }} / {{ gallery.length }} · {{ selectedImage.caption }}</p>
+              <p class="cap">{{ gallery.length > 1 ? `${selectedIndex + 1} / ${gallery.length} · ` : '' }}{{ selectedImage.caption }}</p>
             </div>
           </div>
         </div>
@@ -321,7 +321,7 @@ onBeforeUnmount(() => {
       <figure>
         <img :src="resolveMarketplaceAssetUrl(selectedImage.imageUrl)" :alt="selectedImage.caption" />
         <figcaption>
-          <span>{{ selectedIndex + 1 }} / {{ gallery.length }} · {{ selectedImage.caption }}</span>
+          <span>{{ gallery.length > 1 ? `${selectedIndex + 1} / ${gallery.length} · ` : '' }}{{ selectedImage.caption }}</span>
           <span class="lightbox-actions">
             <button v-if="gallery.length > 1" class="btn small" type="button" aria-label="Previous screenshot" @click="showImage(selectedIndex - 1)">←</button>
             <button v-if="gallery.length > 1" class="btn small" type="button" aria-label="Next screenshot" @click="showImage(selectedIndex + 1)">→</button>

@@ -54,6 +54,15 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
   border-color: var(--signal);
   transform: translateY(-2px);
 }
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: border-color 0.15s ease;
+  }
+  .tile:hover,
+  .tile:focus-within {
+    transform: none;
+  }
+}
 .cover {
   display: block;
   width: 100%;
