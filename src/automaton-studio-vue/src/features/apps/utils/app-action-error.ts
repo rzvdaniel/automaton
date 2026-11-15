@@ -15,7 +15,7 @@ export function appActionErrorMessage(failure: unknown, fallback: string): strin
 }
 
 /** After the browser drops a Pause or Resume call, Studio reads the app this often, this many times, for its new state. */
-export const DROPPED_CALL_POLLS = 15
+export const DROPPED_CALL_POLLS = 75
 export const DROPPED_CALL_POLL_MS = 2000
 
 /** The browser gave up on the connection (no answer at all), as opposed to the server answering with an error. */

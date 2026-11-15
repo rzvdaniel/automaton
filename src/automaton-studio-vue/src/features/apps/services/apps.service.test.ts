@@ -65,7 +65,7 @@ describe('AppsService long-running actions', () => {
     apiClient.get.mockResolvedValue({ data: { isPaused: false } })
     const result = appsService.setPaused('a', true)
     const settled = result.catch((failure) => failure)
-    await vi.advanceTimersByTimeAsync(60_000)
+    await vi.advanceTimersByTimeAsync(160_000)
     expect(await settled).toMatchObject({ code: 'ERR_NETWORK' })
     vi.useRealTimers()
   })
