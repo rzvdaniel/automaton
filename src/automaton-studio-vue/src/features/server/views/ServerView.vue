@@ -121,7 +121,7 @@ onBeforeUnmount(() => clearInterval(timer))
       <p v-if="installConsoleError" class="mt-2 mb-0" data-testid="server-console-install-error">{{ installConsoleError }}</p>
     </Message>
 
-    <CleanupSection v-if="isSystemAdministrator" />
+    <CleanupSection v-if="isSystemAdministrator" :console-id="serverConsole" :installing="installingConsole" @install="installServerConsole" />
 
     <section>
       <div class="flex align-items-center justify-content-between flex-wrap gap-2">

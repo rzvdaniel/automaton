@@ -1,111 +1,51 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { isAxiosError } from 'axios'
 import { serverCleanupService } from '../services/server-cleanup.service'
 import { formatGiB } from '../utils/format'
-import type { ServerCleanup, ServerCleanupSettings } from '../types/server.types'
+import type { ServerCleanup } from '../types/server.types'
 
 const cleanup = ref<ServerCleanup | null>(null)
-const form = ref<ServerCleanupSettings>({ timeUtc: '05:00', keepDays: 7, journalLimitMb: 200 })
 const loadError = ref<string | null>(null)
-const actionError = ref<string | null>(null)
-const busy = ref(false)
+defineProps<{ consoleId: string | null; installing?: boolean }>()
+const emit = defineEmits<{ install: [] }>()
 
 const lastRun = computed(() => cleanup.value?.runs[0] ?? null)
-
-function utc(value: string): string {
-  return `${new Date(value).toISOString().slice(0, 16).replace('T', ' ')} UTC`
-}
+const failed = computed(() => lastRun.value?.result.toLowerCase() === 'failed')
 
 function freed(bytes: number): string {
   return bytes < 1024 ** 3 ? `${Math.round(bytes / 1024 ** 2)} MB` : formatGiB(bytes)
-}
-
-function errorText(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const message = (error.response?.data as { error?: string } | undefined)?.error
-    if (message) return message
-  }
-  return fallback
 }
 
 async function load() {
   try {
     const next = await serverCleanupService.get()
     cleanup.value = next
-    form.value = { ...next.settings }
     loadError.value = null
   } catch {
     loadError.value = 'The cleanup could not be loaded.'
   }
 }
 
-async function act(action: () => Promise<unknown>, fallback: string) {
-  busy.value = true
-  actionError.value = null
-  try {
-    await action()
-    await load()
-  } catch (error) {
-    actionError.value = errorText(error, fallback)
-  } finally {
-    busy.value = false
-  }
-}
-
-const save = () => act(() => serverCleanupService.saveSettings(form.value), 'The settings could not be saved.')
-const runNow = () => act(() => serverCleanupService.run(), 'The cleanup could not be started.')
-
 onMounted(load)
 </script>
 
 <template>
   <section class="mb-4" data-testid="cleanup-section">
-    <div class="flex align-items-center justify-content-between flex-wrap gap-2">
-      <h2 class="studio-section">Cleanup</h2>
-      <Button label="Run now" outlined class="btn-small" :disabled="busy" data-testid="cleanup-run" @click="runNow" />
-    </div>
     <Message v-if="loadError" severity="warn" :closable="false">{{ loadError }}</Message>
-    <div v-else-if="cleanup" class="studio-card">
-      <p class="mt-0" data-testid="cleanup-last">
-        <template v-if="lastRun">
-          Last run {{ utc(lastRun.startedAtUtc) }}: {{ lastRun.result }}, freed {{ freed(lastRun.bytesFreed) }}.
-          <span v-if="lastRun.message" class="studio-muted" data-testid="cleanup-message">{{ lastRun.message }}</span>
-        </template>
-        <template v-else>No run yet.</template>
-      </p>
-      <table v-if="cleanup.runs.length" class="w-full mb-3" data-testid="cleanup-runs">
-        <thead>
-          <tr><th class="text-left">Started</th><th class="text-left">Machine</th><th class="text-left">Result</th><th class="text-left">Freed</th><th class="text-left">Message</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="run in cleanup.runs" :key="run.id" data-testid="cleanup-run-row">
-            <td>{{ utc(run.startedAtUtc) }}</td>
-            <td>{{ run.runnerName }}</td>
-            <td>{{ run.result }}</td>
-            <td>{{ freed(run.bytesFreed) }}</td>
-            <td class="studio-muted">{{ run.message ?? '' }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <p data-testid="cleanup-next">Next run {{ utc(cleanup.nextRunAtUtc) }}.</p>
-      <form class="flex align-items-end flex-wrap gap-3" @submit.prevent="save">
-        <label class="flex flex-column gap-1">Time (UTC)
-          <InputText v-model="form.timeUtc" placeholder="05:00" data-testid="cleanup-time" />
-        </label>
-        <label class="flex flex-column gap-1">Keep unused images and cache (days)
-          <InputNumber v-model="form.keepDays" :min="1" :max="365" :use-grouping="false" input-id="cleanup-days" />
-        </label>
-        <label class="flex flex-column gap-1">Journal limit (MB)
-          <InputNumber v-model="form.journalLimitMb" :min="50" :max="100000" :use-grouping="false" input-id="cleanup-journal" />
-        </label>
-        <Button type="submit" label="Save" :disabled="busy" data-testid="cleanup-save" />
-      </form>
-    </div>
-    <Message v-if="actionError" severity="error" :closable="false" class="mt-2" data-testid="cleanup-error">{{ actionError }}</Message>
+    <p v-else-if="cleanup" class="m-0" :class="{ 'text-red-500': failed }" data-testid="cleanup-line">
+      <strong>Cleanup:</strong> nightly at {{ cleanup.settings.timeUtc }}
+      <template v-if="lastRun">
+        &middot; <span data-testid="cleanup-last">{{ failed ? `last run failed: ${lastRun.message ?? lastRun.result}` : `last run freed ${freed(lastRun.bytesFreed)}` }}</span>
+      </template>
+      <template v-else> &middot; <span data-testid="cleanup-last">no run yet</span></template>
+      &middot;
+      <RouterLink v-if="consoleId" :to="`/apps/${consoleId}`" data-testid="cleanup-manage">Manage in Server Console</RouterLink>
+      <Button
+        v-else label="Install Server Console" class="btn-small" :loading="installing"
+        data-testid="cleanup-install" @click="emit('install')"
+      />
+    </p>
   </section>
 </template>
