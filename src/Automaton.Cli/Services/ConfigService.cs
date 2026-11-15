@@ -339,7 +339,8 @@ public class ConfigService
 
     /// <summary>The profile a global save goes to: the chosen one, the current one, else the one named by the server; null when none applies.</summary>
     public string? GlobalProfileName(CliProfilesConfig profiles, GlobalConfig config)
-        => ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE") ?? profiles.Current
+        => new[] { ProfileOverride, Environment.GetEnvironmentVariable("AUTOMATON_PROFILE"), profiles.Current }
+            .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))
             ?? (IsHttpServer(config.Server) ? ProfileNameFromServer(config.Server) : null);
 
     /// <summary>True when <see cref="SaveGlobalConfig"/> has a profile to write to.</summary>
