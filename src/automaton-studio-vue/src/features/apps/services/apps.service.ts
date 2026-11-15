@@ -22,6 +22,7 @@ import type {
   AppTagSettings,
   AppScreenshot,
   PublishAppRequest,
+  AppCustomDomains,
   AppSharing,
   AppPauseState,
   AppDiskUsage,
@@ -281,6 +282,28 @@ class AppsService {
   async getDisk(id: string): Promise<AppDiskUsage | null> {
     const response = await apiClient.get<AppDiskUsage | ''>(`/api/apps/${id}/disk`)
     return response.status === 204 || !response.data ? null : response.data
+  }
+
+  /** The app's own domains. GET /api/apps/{id}/domains */
+  async getCustomDomains(id: string): Promise<AppCustomDomains> {
+    return (await apiClient.get<AppCustomDomains>(`/api/apps/${id}/domains`)).data
+  }
+
+  async addCustomDomain(id: string, host: string): Promise<AppCustomDomains> {
+    return (await apiClient.post<AppCustomDomains>(`/api/apps/${id}/domains`, { host })).data
+  }
+
+  /** Checks the domain's DNS; it routes once it points at this server. */
+  async verifyCustomDomain(id: string, domainId: string): Promise<AppCustomDomains> {
+    return (await apiClient.post<AppCustomDomains>(`/api/apps/${id}/domains/${domainId}/verify`)).data
+  }
+
+  async setPrimaryCustomDomain(id: string, domainId: string): Promise<AppCustomDomains> {
+    return (await apiClient.put<AppCustomDomains>(`/api/apps/${id}/domains/${domainId}/primary`)).data
+  }
+
+  async removeCustomDomain(id: string, domainId: string): Promise<AppCustomDomains> {
+    return (await apiClient.delete<AppCustomDomains>(`/api/apps/${id}/domains/${domainId}`)).data
   }
 
   /** Who can open the app. GET /api/apps/{id}/sharing */

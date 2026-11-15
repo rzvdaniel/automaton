@@ -19,6 +19,7 @@ vi.mock('../services/apps.service', () => ({
     uploadScreenshot: vi.fn(),
     deleteScreenshot: vi.fn(),
     removeThumbnail: vi.fn(),
+    getCustomDomains: vi.fn().mockResolvedValue({ target: 'apps.test', targetAddresses: [], domains: [] }),
   },
 }))
 

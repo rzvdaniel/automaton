@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { appsService } from '../services/apps.service'
 import type { AppScreenshot, AppSharing, MyTeam, SharingAudience } from '../types/apps.types'
+import CustomDomains from './CustomDomains.vue'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const props = defineProps<{
@@ -332,6 +333,8 @@ async function copyAddress() {
           </div>
         </div>
       </section>
+
+      <CustomDomains v-if="sharing?.audience === 'internet' && selected === 'internet'" :app-id="appId" />
     </div>
 
     <template #footer>

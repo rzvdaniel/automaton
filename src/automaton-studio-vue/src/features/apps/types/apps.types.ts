@@ -670,6 +670,20 @@ export interface AppSharing {
   listed?: boolean
 }
 
+export interface AppCustomDomain {
+  id: string
+  host: string
+  isPrimary: boolean
+  verified: boolean
+}
+
+/** An app's own domains and the address their DNS must point at. */
+export interface AppCustomDomains {
+  target: string
+  targetAddresses: string[]
+  domains: AppCustomDomain[]
+}
+
 /** A team (project) the signed-in person belongs to. */
 export interface MyTeam {
   id: string

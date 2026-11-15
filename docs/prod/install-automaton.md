@@ -131,6 +131,12 @@ To go back: `sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode 
 
 The domain and email still cannot be changed. Credentials, the database and Docker volumes are never touched. If `traefik.yml` or `dynamic/installation.yml` was written by hand (an adopted installation), the command refuses without changing anything. The command can be repeated safely: it restarts Traefik and checks HTTPS each time, so a switch that failed its check can be retried. Keep your DNS records set to *DNS only*.
 
+## Apps' own domains
+
+An owner of a public app can add a domain such as `blog.example.com` in the app's Share dialog (Studio) or at `/api/apps/{id}/domains`. Studio shows the DNS record to create (a CNAME to the apps domain, or an A record to this server). After the owner checks it and DNS points here, Traefik requests a Let's Encrypt certificate over HTTP-01 (port 80 must be reachable) and the app answers at the domain; the `<slug>.apps.<domain>` address then redirects to the primary domain. Removing the domain, or making the app non-public, removes its route, so the certificate is no longer renewed.
+
+Settings under `PublishedApps` in `appsettings.Production.json`: `CustomDomainCertificateResolver` (the installer sets `letsencrypt`, an HTTP-01 resolver, in both TLS modes) and `AllowedCustomDomains` (a list of domains; when not empty an app's domain must equal or be under one of them). Domains under the server's apps domain are refused. Servers installed before this feature need `letsencrypt` added to `certificatesResolvers` in `traefik.yml` and the setting added by hand, or `--switch-tls` rerun.
+
 ## Update an installed server
 
 **Servers installed before PostgreSQL (MySQL-based).** Releases that use PostgreSQL are not applied to a MySQL server. `update.sh` and the installer stop with a message and change nothing; move the data first with `migrate-to-postgresql.sh`, which copies and verifies it and can roll back; see [Migrate a server from MySQL to PostgreSQL](migrate-to-postgresql.md) (issue #587). Stay on your current release until you have.
