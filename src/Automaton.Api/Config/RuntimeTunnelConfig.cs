@@ -14,6 +14,9 @@ public sealed class RuntimeTunnelConfig
     /// <summary>How long a streaming response (a large file) waits for a free slot before the app answers 503.</summary>
     public int StreamSlotWaitSeconds { get; set; } = 10;
 
+    /// <summary>How many streaming responses of one app may wait for a slot at once; more get 503 immediately.</summary>
+    public int MaxStreamSlotWaitersPerApp { get; set; } = 40;
+
     /// <summary>A streaming response or WebSocket with no traffic for this long is closed.</summary>
     public int StreamIdleTimeoutSeconds { get; set; } = 300;
 }

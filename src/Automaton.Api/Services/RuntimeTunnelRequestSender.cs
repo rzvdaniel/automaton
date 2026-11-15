@@ -131,8 +131,19 @@ public sealed class RuntimeTunnelRequestSender(
             catch (Exception exception) { logger.LogDebug(exception, "Could not cancel tunnel stream {RequestId}", response.RequestId); }
         });
 
-        var lease = await limiter.TryAcquireAsync(
-            appId, config.MaxLongLivedPerApp, TimeSpan.FromSeconds(config.StreamSlotWaitSeconds), cancellationToken);
+        IDisposable? lease;
+        try
+        {
+            lease = await limiter.TryAcquireAsync(
+                appId, config.MaxLongLivedPerApp, config.MaxStreamSlotWaitersPerApp,
+                TimeSpan.FromSeconds(config.StreamSlotWaitSeconds), cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // The browser left while waiting: stop the Runner's stream too, or it keeps one of the app's slots.
+            await cancel();
+            throw;
+        }
         if (lease is null)
         {
             await cancel();

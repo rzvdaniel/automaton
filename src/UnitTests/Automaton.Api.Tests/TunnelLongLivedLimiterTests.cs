@@ -12,7 +12,7 @@ public sealed class TunnelLongLivedLimiterTests
         var app = Guid.NewGuid();
         var held = limiter.TryAcquire(app, 1)!;
 
-        var waiting = limiter.TryAcquireAsync(app, 1, TimeSpan.FromSeconds(5), CancellationToken.None);
+        var waiting = limiter.TryAcquireAsync(app, 1, 10, TimeSpan.FromSeconds(5), CancellationToken.None);
         await Task.Delay(100);
         Assert.That(waiting.IsCompleted, Is.False);
         held.Dispose();
@@ -27,7 +27,38 @@ public sealed class TunnelLongLivedLimiterTests
         var app = Guid.NewGuid();
         using var held = limiter.TryAcquire(app, 1);
 
-        Assert.That(await limiter.TryAcquireAsync(app, 1, TimeSpan.FromMilliseconds(100), CancellationToken.None), Is.Null);
+        Assert.That(await limiter.TryAcquireAsync(app, 1, 10, TimeSpan.FromMilliseconds(100), CancellationToken.None), Is.Null);
+        Assert.That(limiter.Count(app), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task Requests_beyond_the_waiting_cap_fail_at_once()
+    {
+        var limiter = new TunnelLongLivedLimiter();
+        var app = Guid.NewGuid();
+        using var held = limiter.TryAcquire(app, 1);
+        var waiter = limiter.TryAcquireAsync(app, 1, 1, TimeSpan.FromSeconds(5), CancellationToken.None);
+        await Task.Delay(100);
+
+        Assert.That(await limiter.TryAcquireAsync(app, 1, 1, TimeSpan.FromSeconds(5), CancellationToken.None), Is.Null);
+        held!.Dispose();
+        Assert.That(await waiter, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task A_cancelled_wait_frees_its_place_in_the_queue()
+    {
+        var limiter = new TunnelLongLivedLimiter();
+        var app = Guid.NewGuid();
+        using var held = limiter.TryAcquire(app, 1);
+        using var cts = new CancellationTokenSource();
+        var cancelled = limiter.TryAcquireAsync(app, 1, 1, TimeSpan.FromSeconds(5), cts.Token);
+        await Task.Delay(100);
+        cts.Cancel();
+        Assert.ThrowsAsync<TaskCanceledException>(async () => await cancelled);
+
+        var next = limiter.TryAcquireAsync(app, 1, 1, TimeSpan.FromMilliseconds(100), CancellationToken.None);
+        Assert.That(await next, Is.Null);
         Assert.That(limiter.Count(app), Is.EqualTo(1));
     }
 }
