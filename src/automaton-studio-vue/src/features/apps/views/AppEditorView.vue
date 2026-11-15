@@ -5,13 +5,14 @@ import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
+import AppActions from '../components/AppActions.vue'
 import AppActivity from '../components/AppActivity.vue'
 import AppMark from '../components/AppMark.vue'
 import AppOverview from '../components/AppOverview.vue'
 import AppSettingsPage from '../components/AppSettingsPage.vue'
 import ShareDialog from '../components/ShareDialog.vue'
 import {
-  APP_TABS,
+  appTabs,
   opensAdvanced,
   resolveAppViewFromQuery,
   withoutAuthoringQuery,
@@ -48,6 +49,7 @@ let poll: ReturnType<typeof setInterval> | null = null
 let unsubscribeBackendRuntimeLogs: (() => void) | null = null
 
 const app = computed(() => editorStore.currentApp)
+const tabs = computed(() => appTabs(actions.value.length > 0))
 const kind = computed(() => (app.value ? appKindOf(app.value) : 'web'))
 const liveTarget = computed(() => getLiveTarget(deploymentTargets.value))
 const lastRun = computed(() => [...executions.value].sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0] ?? null)
@@ -316,7 +318,7 @@ async function handleSharingChanged() {
 
         <div class="tabs" role="tablist" aria-label="App sections">
           <button
-            v-for="tab in APP_TABS"
+            v-for="tab in tabs"
             :key="tab.key"
             type="button"
             role="tab"
@@ -328,7 +330,7 @@ async function handleSharingChanged() {
         </div>
 
         <AppOverview
-          v-if="activeView === 'overview'"
+          v-if="activeView === 'overview' || (activeView === 'actions' && actions.length === 0)"
           :app="app"
           :targets="deploymentTargets"
           :executions="executions"
@@ -342,6 +344,17 @@ async function handleSharingChanged() {
           @share="showShareDialog = true"
           @paused-changed="editorStore.refreshApp(appId)"
         />
+        <AppActions
+          v-else-if="activeView === 'actions' && actions.length > 0"
+          :app-id="app.id"
+          :paused="!!app.isPaused"
+          :can-update="app.canUpdate !== false"
+          :actions="actions"
+          :schedules="schedules"
+          :executions="executions"
+          @navigate="handleNavigation"
+          @changed="loadWhatItDoes"
+        />
         <AppActivity
           v-else-if="activeView === 'activity'"
           :app-id="app.id"
@@ -353,7 +366,7 @@ async function handleSharingChanged() {
           :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
         />
         <AppSettingsPage
-          v-else
+          v-else-if="activeView === 'settings'"
           :app="app"
           :targets="deploymentTargets"
           :open-advanced="advancedOpen"
