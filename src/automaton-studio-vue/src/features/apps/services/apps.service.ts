@@ -45,6 +45,7 @@ export type CatalogUpdate = {
   deployFailed?: boolean
   deployError?: string | null
   runningCommit?: string | null
+  hasPreviousVersion?: boolean
 }
 
 export type DeployAppResult = {
