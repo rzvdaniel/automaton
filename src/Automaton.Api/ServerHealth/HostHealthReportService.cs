@@ -50,13 +50,22 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
         if ((DateTime.UtcNow - measured).Duration() > MaximumClockSkew)
             throw new ArgumentException("The host health timestamp is outside the accepted clock-skew window.");
         long?[] sizes = [report.MemoryTotalBytes, report.MemoryAvailableBytes, report.DiskTotalBytes, report.DiskAvailableBytes,
-            report.DockerImagesBytes, report.DockerContainersBytes, report.DockerVolumesBytes, report.DockerBuildCacheBytes, report.UptimeSeconds];
+            report.DockerImagesBytes, report.DockerContainersBytes, report.DockerVolumesBytes, report.DockerBuildCacheBytes, report.DockerUnusedImagesBytes, report.UptimeSeconds];
         if (sizes.Any(value => value < 0) || report.UpdatesPending < 0 || report.SecurityUpdates < 0)
             throw new ArgumentException("Host health values must not be negative.");
+        ValidateApps(report.AppDisk);
         if (report.MemoryAvailableBytes > report.MemoryTotalBytes || report.DiskAvailableBytes > report.DiskTotalBytes)
             throw new ArgumentException("Available space cannot exceed the total.");
         if (Length(report.OsName) > 200 || Length(report.OsVersion) > 100 || Length(report.RunnerVersion) > 80)
             throw new ArgumentException("A host health text value is too long.");
+    }
+
+    private static void ValidateApps(IReadOnlyList<AppDiskUsage>? apps)
+    {
+        if (apps is null) return;
+        if (apps.Count > 2000 || apps.Any(app => app.AppId == Guid.Empty
+            || new[] { app.FilesBytes, app.DataBytes, app.LogsBytes, app.ContainerBytes, app.ImageBytes }.Any(value => value < 0)))
+            throw new ArgumentException("App disk values must not be negative, and at most 2000 apps are accepted.");
     }
 
     private static int Length(string? value) => value?.Length ?? 0;

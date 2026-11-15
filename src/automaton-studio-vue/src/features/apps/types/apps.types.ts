@@ -638,6 +638,19 @@ export interface SharedPerson {
   displayName: string
 }
 
+/** Disk an app uses on its Runner's machine; a part the Runner could not measure is null. */
+export interface AppDiskUsage {
+  appId: string
+  appName?: string | null
+  filesBytes?: number | null
+  dataBytes?: number | null
+  logsBytes?: number | null
+  containerBytes?: number | null
+  imageBytes?: number | null
+  totalBytes: number
+  measuredAtUtc?: string | null
+}
+
 /** The answer to pausing or resuming an app. */
 export interface AppPauseState {
   appId: string

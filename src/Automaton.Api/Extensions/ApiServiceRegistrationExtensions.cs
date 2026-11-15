@@ -633,6 +633,7 @@ internal static class ApiRunnerRegistration
         services.AddMemoryCache();
         services.AddScoped<Automaton.Api.ServerHealth.HostHealthReportService>();
         services.AddScoped<Automaton.Api.ServerHealth.ServerHealthService>();
+        services.AddScoped<Automaton.Api.ServerHealth.AppDiskUsageService>();
         services.AddSingleton<Automaton.Api.ServerHealth.LatestReleaseClient>();
         services.AddSingleton<Automaton.Api.ServerHealth.CertificateExpiryProbe>();
         services.Configure<MachineContainerResourceOptions>(applicationBuilder.Configuration.GetSection(MachineContainerResourceOptions.SectionName));

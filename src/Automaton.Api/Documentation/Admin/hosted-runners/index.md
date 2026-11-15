@@ -38,6 +38,10 @@ Good to know:
 - Removing someone from the project stops their deploys to its Runner straight away. Apps they created stay theirs, but cannot deploy until they are assigned a Runner they can use.
 - A project for one person to experiment in, or one everyone can deploy to, is just another project you can create. Automaton doesn't create these for you.
 
+## Disk use per app
+
+Every few minutes the Machine Management Runner measures the disk each app uses on its machine: the app's files, its data folder, its logs, the writable layer of its containers, and the Docker images those containers use (an image shared by several apps counts in full for each). An app's overview page shows the total and the breakdown to people who may update the app. `GET api/apps/{id}/disk` returns it (204 until the first measurement), and `GET api/server/health` lists the apps of each Runner, largest first, with the size of unused Docker images. Files an app's own user keeps private are not readable by the Runner, so the data figure can be lower than `du` as root. Nothing is cleaned up automatically.
+
 ## Upgrade a Machine Management Runner
 
 A Runner on an old image shows **Update available** on its card, with an **Upgrade** button, a banner on **Runners**, and a count in **Admin → Installation**. The owner clicks **Upgrade → Upgrade now**: the Runner replaces itself on the server's current image, reconnects with its identity and apps, and Studio reports that it reconnected or that it was rolled back to the previous container. Once the new Runner is connected it removes the old Runner image and the stopped upgrade helper container; a failed upgrade keeps the helper, whose log Studio shows. The upgrade is refused while a deploy or an Action runs on the Runner, and for an offline Runner; use **Run it manually** (a host command) for those and for a Runner too old to upgrade itself. With a Developer API key, `automaton runners upgrade <runner> --wait` does the same and exits non-zero on failure; `automaton server update --runners` waits for the update, names every Runner with its state and upgrades the ones left on an old image.

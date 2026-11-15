@@ -7,7 +7,7 @@ namespace Automaton.Runner.Console.Services;
 /// Reads host figures from the Runner container (/proc is host-wide), the Docker API on the mounted socket, and a
 /// short-lived read-only helper container for the few host files the Runner cannot see. Nothing here is exposed to apps.
 /// </summary>
-public sealed class HostHealthCollector
+public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
 {
     private const string DockerSocket = "/var/run/docker.sock";
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(60);
@@ -23,7 +23,7 @@ public sealed class HostHealthCollector
         var load = HostHealthParsers.ParseLoad(Read("/proc/loadavg"));
         var memory = HostHealthParsers.ParseMemory(Read("/proc/meminfo"));
         var disk = ReadDisk();
-        var docker = HostHealthParsers.ParseDockerDiskUsage(await DockerDiskUsageAsync(token));
+        var (docker, dockerApps, apps) = await ReadDockerAsync(token);
         var files = HostFiles.From(await ReadHostFilesAsync(token));
 
         return new MachineHostHealth(
@@ -31,7 +31,17 @@ public sealed class HostHealthCollector
             cpus, cpuPercent, load?.Load1, load?.Load5, load?.Load15, memory?.Total, memory?.Available,
             disk?.Total, disk?.Available, docker?.Images, docker?.Containers, docker?.Volumes, docker?.BuildCache,
             files.Pending, files.Security, files.RebootRequired, files.RebootSince,
-            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString());
+            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps);
+    }
+
+    private async Task<(
+        (long Images, long Containers, long Volumes, long BuildCache)? Totals,
+        (Dictionary<Guid, (long Container, long Image)> Apps, long UnusedImages)? Apps,
+        IReadOnlyList<AppDiskUsage> Disk)> ReadDockerAsync(CancellationToken token)
+    {
+        var json = await DockerDiskUsageAsync(token);
+        var perApp = HostHealthParsers.ParseDockerAppUsage(json);
+        return (HostHealthParsers.ParseDockerDiskUsage(json), perApp, appDisk.Measure(perApp?.Apps));
     }
 
     private static async Task<(int? Cpus, double? Percent)> ReadCpuAsync(CancellationToken token)

@@ -85,6 +85,50 @@ internal static partial class HostHealthParsers
         catch (InvalidOperationException) { return null; }
     }
 
+    /// <summary>
+    /// From Docker's <c>/system/df</c>: per-app writable-layer and image bytes of containers labelled with an app id, and the
+    /// size of images no container uses.
+    /// </summary>
+    public static (Dictionary<Guid, (long Container, long Image)> Apps, long UnusedImages)? ParseDockerAppUsage(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json ?? "");
+            var root = document.RootElement;
+            var (imageSizes, unused) = ReadImages(root);
+            var perApp = new Dictionary<Guid, (long Container, HashSet<string> Images)>();
+            foreach (var container in Items(root, "Containers"))
+            {
+                if (!container.TryGetProperty("Labels", out var labels) || labels.ValueKind != JsonValueKind.Object
+                    || !labels.TryGetProperty("com.automaton.app-id", out var label)
+                    || !Guid.TryParse(label.GetString(), out var appId)) continue;
+                var entry = perApp.GetValueOrDefault(appId, (0, []));
+                if (container.TryGetProperty("ImageID", out var imageId) && imageId.GetString() is { } image) entry.Images.Add(image);
+                perApp[appId] = (entry.Container + Math.Max(0, Number(container, "SizeRw")), entry.Images);
+            }
+            return (perApp.ToDictionary(item => item.Key,
+                item => (item.Value.Container, item.Value.Images.Sum(image => imageSizes.GetValueOrDefault(image)))), unused);
+        }
+        catch (JsonException) { return null; }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    private static (Dictionary<string, long> Sizes, long Unused) ReadImages(JsonElement root)
+    {
+        var sizes = new Dictionary<string, long>(StringComparer.Ordinal);
+        long unused = 0;
+        foreach (var image in Items(root, "Images"))
+        {
+            var size = Math.Max(0, Number(image, "Size"));
+            if (image.TryGetProperty("Id", out var id) && id.GetString() is { } key) sizes[key] = size;
+            if (Number(image, "Containers") == 0) unused += size;
+        }
+        return (sizes, unused);
+    }
+
+    private static IEnumerable<JsonElement> Items(JsonElement root, string name)
+        => root.TryGetProperty(name, out var list) && list.ValueKind == JsonValueKind.Array ? list.EnumerateArray() : [];
+
     private static long Number(JsonElement item, string name)
         => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number) ? number : 0;
 
