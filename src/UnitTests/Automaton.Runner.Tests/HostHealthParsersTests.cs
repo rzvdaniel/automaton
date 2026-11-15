@@ -37,6 +37,25 @@ public class HostHealthParsersTests
     }
 
     [Test]
+    public void DockerAppUsage_GroupsContainersAndImagesByAppAndSumsUnusedImages()
+    {
+        var app = Guid.NewGuid();
+        var usage = HostHealthParsers.ParseDockerAppUsage($$$"""
+            {"Images":[{"Id":"a","Size":500,"Containers":2},{"Id":"b","Size":70,"Containers":0},{"Id":"c","Size":30,"Containers":0}],
+             "Containers":[{"ImageID":"a","SizeRw":10,"Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"ImageID":"a","SizeRw":5,"Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"ImageID":"a","SizeRw":99,"Labels":{}}]}
+            """);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(usage!.Value.Apps, Is.EqualTo(new Dictionary<Guid, (long, long)> { [app] = (15, 500) }));
+            Assert.That(usage.Value.UnusedImages, Is.EqualTo(100));
+            Assert.That(HostHealthParsers.ParseDockerAppUsage("nope"), Is.Null);
+        });
+    }
+
+    [Test]
     public void DockerDiskUsage_SumsLayersContainersVolumesAndUnsharedBuildCache()
     {
         var usage = HostHealthParsers.ParseDockerDiskUsage("""

@@ -15,6 +15,8 @@ import {
   statusSentence,
   type Segment,
 } from '../utils/app-overview'
+import { describeDisk } from '../utils/app-disk'
+import type { AppDiskUsage } from '../types/apps.types'
 import AppRestartButton from './AppRestartButton.vue'
 import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
 import { getLiveTarget } from '../utils/deployment-target-actions'
@@ -41,11 +43,16 @@ const secretNames = ref<string[] | null>(null)
 const update = ref<CatalogUpdate | null>(null)
 const updateBusy = ref(false)
 const permissions = ref<AppPermissionStatus[]>([])
+const disk = ref<AppDiskUsage | null>(null)
 
 watch(() => props.app.id, async (id) => {
   secretNames.value = null
   permissions.value = []
   update.value = null
+  disk.value = null
+  if (props.app.canUpdate !== false) {
+    appsService.getDisk(id).then((result) => { if (props.app.id === id) disk.value = result }).catch(() => {})
+  }
   // Ask even without a recorded source: the server links apps installed before update tracking during this call (#1080).
   if (props.app.canUpdate !== false) {
     appsService.getCatalogUpdate(id).then((result) => { if (props.app.id === id && result.available) update.value = result }).catch(() => {})
@@ -245,6 +252,7 @@ const source = computed(() => {
           <Button label="Settings ›" size="small" severity="secondary" outlined @click="emit('navigate', 'settings')" />
         </div>
         <div v-if="dataDirectory && kind !== 'site' && kind !== 'tool'" class="row"><span>Data folder</span><span class="mono hint">{{ dataDirectory }}</span></div>
+        <div v-if="disk" class="row" data-testid="disk-use"><span>Disk</span><span class="mono hint">{{ describeDisk(disk) }}</span></div>
         <button v-if="secretCount > 0" type="button" class="row row--link" @click="emit('navigate', 'settings')">
           <span>{{ secretCount }} {{ secretCount === 1 ? 'secret' : 'secrets' }}</span>
           <span class="end">

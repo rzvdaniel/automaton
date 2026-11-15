@@ -25,4 +25,18 @@ public sealed record MachineHostHealth(
     int? SecurityUpdates,
     bool? RebootRequired,
     DateTime? RebootRequiredSinceUtc,
-    string? RunnerVersion);
+    string? RunnerVersion,
+    long? DockerUnusedImagesBytes = null,
+    IReadOnlyList<AppDiskUsage>? AppDisk = null);
+
+/// <summary>
+/// Disk one app uses on a Runner's machine. Values the Runner cannot read are null.
+/// <c>ImageBytes</c> is the size of the Docker images its containers use (an image shared with other apps counts in full for each).
+/// </summary>
+public sealed record AppDiskUsage(
+    Guid AppId,
+    long? FilesBytes,
+    long? DataBytes,
+    long? LogsBytes,
+    long? ContainerBytes,
+    long? ImageBytes);

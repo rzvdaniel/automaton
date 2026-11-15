@@ -24,6 +24,7 @@ import type {
   PublishAppRequest,
   AppSharing,
   AppPauseState,
+  AppDiskUsage,
   MyTeam,
   SharingAudience,
   ExportAppResponse,
@@ -242,6 +243,12 @@ class AppsService {
   /** Pause (stop, schedules off, paused page) or resume an app. POST /api/apps/{id}/pause and /resume */
   async setPaused(id: string, paused: boolean): Promise<AppPauseState> {
     return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })).data
+  }
+
+  /** Disk the app uses, or null until a Runner has measured it. GET /api/apps/{id}/disk (204 while unmeasured). */
+  async getDisk(id: string): Promise<AppDiskUsage | null> {
+    const response = await apiClient.get<AppDiskUsage | ''>(`/api/apps/${id}/disk`)
+    return response.status === 204 || !response.data ? null : response.data
   }
 
   /** Restart the running app so it loads changed settings and secrets. POST /api/apps/{id}/restart; 409 while paused. */
