@@ -22,6 +22,7 @@ internal sealed class RunnerTunnelSessions(TunnelForwarderConfig config, ILogger
     private readonly ConcurrentDictionary<string, StreamState> streams = new();
     private readonly ConcurrentDictionary<string, SocketSession> sockets = new();
     private readonly ConcurrentDictionary<Guid, int> activePerApp = new();
+    private readonly ConcurrentDictionary<Guid, int> waitingPerApp = new();
 
     /// <summary>Takes one of the app's slots, or null when the app already has its share in flight.</summary>
     public IDisposable? TryEnter(Guid? appId)
@@ -35,6 +36,37 @@ internal sealed class RunnerTunnelSessions(TunnelForwarderConfig config, ILogger
         }
         return new Lease(this, id);
     }
+
+    /// <summary>Like <see cref="TryEnter"/>, but a busy app's request waits a few seconds for a slot (up to a cap of waiters) before it is refused.</summary>
+    public async Task<IDisposable?> TryEnterAsync(Guid? appId, CancellationToken cancellationToken)
+    {
+        var lease = TryEnter(appId);
+        if (lease is not null || appId is not { } id || config.SlotWaitSeconds <= 0) return lease;
+
+        if (waitingPerApp.AddOrUpdate(id, 1, (_, current) => current + 1) > config.MaxWaitingPerApp)
+        {
+            EndWait(id);
+            return null;
+        }
+
+        try
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(config.SlotWaitSeconds);
+            while (true)
+            {
+                lease = TryEnter(id);
+                if (lease is not null || DateTime.UtcNow >= deadline) return lease;
+                await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
+            }
+        }
+        finally
+        {
+            EndWait(id);
+        }
+    }
+
+    private void EndWait(Guid appId)
+        => waitingPerApp.AddOrUpdate(appId, 0, (_, current) => Math.Max(0, current - 1));
 
     public void Acknowledge(string requestId)
     {
