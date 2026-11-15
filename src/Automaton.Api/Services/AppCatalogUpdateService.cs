@@ -71,11 +71,18 @@ public sealed class AppCatalogUpdateService(
     {
         if (!Directory.Exists(directory)) return "none";
         long count = 0, length = 0, newest = 0;
-        foreach (var file in new DirectoryInfo(directory).EnumerateFiles("*", SearchOption.AllDirectories))
+        try
         {
-            count++;
-            length += file.Length;
-            newest = Math.Max(newest, file.LastWriteTimeUtc.Ticks);
+            foreach (var file in new DirectoryInfo(directory).EnumerateFiles("*", SearchOption.AllDirectories))
+            {
+                count++;
+                length += file.Length;
+                newest = Math.Max(newest, file.LastWriteTimeUtc.Ticks);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return "unreadable-" + Guid.NewGuid().ToString("N"); // files changed during the scan: never reuse a cached answer
         }
         return $"{count}-{length}-{newest}";
     }
