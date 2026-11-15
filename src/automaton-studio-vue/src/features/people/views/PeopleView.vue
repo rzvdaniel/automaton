@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EmailNotConfiguredNotice from '@/features/install/components/EmailNotConfiguredNotice.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -101,6 +102,8 @@ onMounted(load)
       <Button v-if="isAdmin" label="Create with password" outlined class="btn-small" @click="showCreate = true" />
       <Button v-if="canInvite" label="Invite people" class="btn-main" @click="showInvite = true" />
     </PageHead>
+
+    <EmailNotConfiguredNotice />
 
     <Message v-if="failed" severity="error" :closable="false">
       People could not be loaded.

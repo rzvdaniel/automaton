@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import Message from 'primevue/message'
+import Button from 'primevue/button'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { installService } from '../services/install.service'
 
@@ -32,9 +32,18 @@ watch(() => route.fullPath, () => { if (notConfigured.value) void check() })
 </script>
 
 <template>
-  <Message v-if="notConfigured" severity="warn" :closable="false" class="mb-4" data-testid="email-not-configured">
-    Email is not set up on this server, so password reset emails and email invitations will not reach anyone.
-    <RouterLink to="/settings#server">Set it up in Settings</RouterLink>
-    or read <a :href="docsUrl" target="_blank" rel="noopener">how to set up email</a>.
-  </Message>
+  <div v-if="notConfigured" class="email-notice" role="status" data-testid="email-not-configured">
+    <i class="pi pi-envelope email-notice__icon" aria-hidden="true" />
+    <p class="email-notice__text">
+      Email is not set up on this server, so password reset emails and invitations will not reach anyone.
+      <a :href="docsUrl" target="_blank" rel="noopener">How email works</a>
+    </p>
+    <Button as="RouterLink" to="/settings#server" label="Set up email" size="small" outlined data-testid="email-setup-action" />
+  </div>
 </template>
+
+<style scoped>
+.email-notice { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; }
+.email-notice__icon { color: var(--p-text-muted-color); }
+.email-notice__text { flex: 1 1 260px; margin: 0; font-size: 0.9rem; }
+</style>
