@@ -91,7 +91,7 @@ onMounted(async () => {
         <div class="wrap">
           <p class="eyebrow">Public apps · this server</p>
           <h1>
-            Apps running on<template v-if="hostName"> <em>{{ hostName }}</em></template><template v-else> this server</template>
+            Apps running on{{ ' ' }}<em v-if="hostName">{{ hostName }}</em><template v-else>this server</template>
           </h1>
           <p class="lede">Open any of them in your browser. Every one runs on this server, and you can run the same apps on your own.</p>
         </div>

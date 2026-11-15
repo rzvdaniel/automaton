@@ -41,6 +41,16 @@ describe('AppMarketplaceDetailView', () => {
     vue.unmount()
   })
 
+  it('hides the image counter when the gallery has a single image', async () => {
+    const { container, vue } = await mountPage({
+      id: 'x', name: 'Solo', canLaunch: false, canRemix: false, viewCount: 0, forkCount: 0, isForkable: false,
+      hasApplicationSource: false, relatedApps: [], forksAndRemixes: [],
+      screenshots: [{ id: 'a', imageUrl: 'https://img.test/a.png', caption: 'Only', sortOrder: 1 }],
+    })
+    expect(container.querySelector('.cap')?.textContent).not.toContain('1 / 1')
+    vue.unmount()
+  })
+
   it('shows the own-server card for catalog apps only', async () => {
     const base = { id: 'x', name: 'Harbour', canLaunch: false, canRemix: false, viewCount: 0, forkCount: 0, isForkable: false, hasApplicationSource: false, screenshots: [], relatedApps: [], forksAndRemixes: [] }
     const a = await mountPage({ ...base, catalogOrigin: { catalog: 'rzvdaniel/automaton-apps', appPath: 'wallpapers/harbour' } })
