@@ -37,7 +37,7 @@ public sealed class PublicMarketplaceVisibilityTests
     }
 
     [Test]
-    public async Task GetAppDetails_ExposesCatalogOriginOnlyForCatalogInstalledApps()
+    public async Task GetAppDetails_HidesCatalogOriginWhenNoPublicCatalogListsTheApp()
     {
         await using var db = CreateDbContext();
         var installed = CreatePrivateMediaPreview();
@@ -54,9 +54,7 @@ public sealed class PublicMarketplaceVisibilityTests
 
         Assert.Multiple(() =>
         {
-            var origin = (a?.Value as MarketplaceAppDetailsDto)?.CatalogOrigin;
-            Assert.That(origin?.Catalog, Is.EqualTo("rzvdaniel/automaton-apps"));
-            Assert.That(origin?.AppPath, Is.EqualTo("wallpapers/harbour"));
+            Assert.That((a?.Value as MarketplaceAppDetailsDto)?.CatalogOrigin, Is.Null);
             Assert.That((b?.Value as MarketplaceAppDetailsDto)?.CatalogOrigin, Is.Null);
         });
     }

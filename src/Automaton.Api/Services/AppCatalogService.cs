@@ -127,6 +127,13 @@ public sealed class AppCatalogService(
         return null;
     }
 
+    /// <summary>True when an enabled public catalog source lists this repository and folder.</summary>
+    public async Task<bool> IsPublicCatalogAppAsync(string repo, string folder, CancellationToken cancellationToken)
+    {
+        var key = InstalledKey(repo, folder);
+        return (await PublicEntriesAsync(cancellationToken)).Any(entry => InstalledKey(entry.Repo, entry.App.Folder) == key);
+    }
+
     /// <summary>The apps of the enabled public catalog sources (a private source's history cannot be read without its token).</summary>
     internal async Task<IReadOnlyList<(CatalogSourceStore.SourceRef Source, string Repo, CatalogApp App)>> PublicEntriesAsync(CancellationToken cancellationToken)
     {

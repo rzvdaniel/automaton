@@ -67,6 +67,20 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task IsPublicCatalogAppAsync_IsTrueOnlyForARepoAndFolderTheCatalogLists()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(CatalogJson, null)));
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await service.IsPublicCatalogAppAsync("Owner/Apps", "maintenance/backup", default), Is.True);
+            Assert.That(await service.IsPublicCatalogAppAsync("someone/else", "maintenance/backup", default), Is.False);
+            Assert.That(await service.IsPublicCatalogAppAsync("owner/apps", "other", default), Is.False);
+        });
+    }
+
+    [Test]
     public async Task Refresh_ReadsTheSourceAtMostOncePerMinimumGap()
     {
         await using var db = CreateDb();
