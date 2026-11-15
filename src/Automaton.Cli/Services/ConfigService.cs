@@ -330,13 +330,20 @@ public class ConfigService
     public void SaveGlobalConfig(GlobalConfig config)
     {
         var profiles = LoadProfilesConfig();
-        var name = ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE")
-            ?? profiles.Current ?? ProfileNameFromServer(config.Server);
+        var name = GlobalProfileName(profiles, config);
         if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("A profile name or server is required.");
         profiles.Profiles[name] = config;
         profiles.Current ??= name;
         SaveProfilesConfig(profiles);
     }
+
+    /// <summary>The profile a global save goes to: the chosen one, the current one, else the one named by the server; null when none applies.</summary>
+    public string? GlobalProfileName(CliProfilesConfig profiles, GlobalConfig config)
+        => ProfileOverride ?? Environment.GetEnvironmentVariable("AUTOMATON_PROFILE") ?? profiles.Current
+            ?? (IsHttpServer(config.Server) ? ProfileNameFromServer(config.Server) : null);
+
+    /// <summary>True when <see cref="SaveGlobalConfig"/> has a profile to write to.</summary>
+    public bool CanSaveGlobalConfig(GlobalConfig config) => GlobalProfileName(LoadProfilesConfig(), config) is not null;
 
     public CliProfilesConfig LoadProfilesConfig()
     {
