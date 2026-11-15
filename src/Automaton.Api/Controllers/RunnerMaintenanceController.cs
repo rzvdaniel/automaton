@@ -50,6 +50,25 @@ public sealed class RunnerMaintenanceController(RunnerMaintenanceService mainten
     public Task<IActionResult> Reboot(Guid runnerId, [FromBody] ConfirmRequest? body, CancellationToken token)
         => ChangeAsync(runnerId, async (appId, viewer) => Accepted(await maintenance.RebootAsync(appId, viewer, runnerId, body?.Confirm, token)), token);
 
+    /// <summary>Upgrades this Runner to the server's configured image (409 when it is offline, busy or already current).</summary>
+    [HttpPost("upgrade")]
+    public Task<IActionResult> Upgrade(Guid runnerId, [FromServices] RunnerUpgradeService upgrade, CancellationToken token)
+        => ChangeAsync(runnerId, async (appId, viewer) =>
+        {
+            var started = await upgrade.StartAsync(runnerId, token, trusted: true);
+            await maintenance.AuditUpgradeAsync(appId, viewer, runnerId, token);
+            return Accepted(started);
+        }, token);
+
+    /// <summary>How a started upgrade is going: in progress, reconnected or rolled back.</summary>
+    [HttpGet("upgrade")]
+    public async Task<IActionResult> UpgradeStatus(Guid runnerId, [FromServices] RunnerUpgradeService upgrade, CancellationToken token)
+    {
+        if (!Guid.TryParse(User.FindFirst("app_id")?.Value, out var appId) || !await maintenance.IsApprovedAsync(appId, runnerId, token)) return StatusCode(StatusCodes.Status403Forbidden);
+        try { return Ok(await upgrade.StatusAsync(runnerId, token, trusted: true)); }
+        catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
+    }
+
     /// <summary>Every operation needs the machine approved for the app and the viewer token of a system administrator.</summary>
     private async Task<IActionResult> ChangeAsync(Guid runnerId, Func<Guid, Guid, Task<IActionResult>> operation, CancellationToken token)
     {
