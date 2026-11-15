@@ -67,10 +67,14 @@ async function runNow(key: string) {
   try {
     let run = await appsService.runAction(props.appId, key, {})
     started.value = { ...started.value, [key]: run }
-    for (let i = 0; i < 100 && !stopped && isActiveRun(run.status); i++) {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      run = await appsService.getActionExecution(props.appId, run.id)
-      started.value = { ...started.value, [key]: run }
+    try {
+      for (let i = 0; i < 100 && !stopped && isActiveRun(run.status); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        run = await appsService.getActionExecution(props.appId, run.id)
+        started.value = { ...started.value, [key]: run }
+      }
+    } catch {
+      // The run started; the page's own refresh shows how it ended.
     }
     emit('changed')
   } catch (error) {
