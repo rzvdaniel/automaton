@@ -804,6 +804,44 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("ApiKeyUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppCustomDomain", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("citext");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("VerificationToken")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Host")
+                        .IsUnique();
+
+                    b.HasIndex("WebAppId");
+
+                    b.ToTable("AppCustomDomains");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AppDeploymentTarget", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4319,6 +4357,15 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasOne("Automaton.Api.Entities.ApiKey", null)
                         .WithMany("ApiKeyUsers")
                         .HasForeignKey("ApiKeyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppCustomDomain", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -55,6 +55,15 @@ public class PublishedAppsConfig
     /// <summary>Optional Traefik ACME resolver for per-host certificates on standalone installations.</summary>
     public string? CertificateResolver { get; set; }
 
+    /// <summary>
+    /// Traefik ACME resolver that uses the HTTP-01 challenge, for apps' own domains. Falls back to
+    /// <see cref="CertificateResolver"/> when empty (a DNS-challenge resolver cannot serve a domain this server does not control).
+    /// </summary>
+    public string? CustomDomainCertificateResolver { get; set; }
+
+    /// <summary>When not empty, an app's own domain must be one of these domains or a subdomain of one.</summary>
+    public List<string> AllowedCustomDomains { get; set; } = [];
+
     public string RuntimeTunnelServiceName { get; set; } = "api-live-edge";
 
 }

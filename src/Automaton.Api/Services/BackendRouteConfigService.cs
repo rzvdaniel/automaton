@@ -28,7 +28,11 @@ public class BackendRouteConfigService
         string RuntimeServiceName,
         string? Slug,
         bool RequiresAuthentication,
-        IReadOnlyList<string> OpenPaths);
+        IReadOnlyList<string> OpenPaths,
+        IReadOnlyList<CustomDomainRoute>? CustomDomains = null);
+
+    // A verified domain of a public app. The primary one (if any) is the app's address; the others redirect to it.
+    private sealed record CustomDomainRoute(Guid Id, string Host, bool IsPrimary);
 
     public BackendRouteConfigService(
         ApplicationDbContext dbContext,
@@ -133,6 +137,15 @@ public class BackendRouteConfigService
             })
             .ToListAsync(cancellationToken);
 
+        var domainAppIds = candidates.Where(candidate => candidate.Slug != null).Select(candidate => candidate.WebAppId).Distinct().ToList();
+        var domains = domainAppIds.Count == 0
+            ? []
+            : await dbContext.AppCustomDomains.AsNoTracking()
+                .Where(domain => domainAppIds.Contains(domain.WebAppId) && domain.VerifiedAt != null)
+                .OrderBy(domain => domain.CreatedAt)
+                .Select(domain => new { domain.WebAppId, Route = new CustomDomainRoute(domain.Id, domain.Host, domain.IsPrimary) })
+                .ToListAsync(cancellationToken);
+
         return candidates
             .Where(candidate => SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(
                 candidate.Purpose,
@@ -144,7 +157,10 @@ public class BackendRouteConfigService
                 publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
                 candidate.Slug,
                 candidate.RequiresAuthentication,
-                ReadOpenPaths(candidate.ApplicationContractJson)))
+                ReadOpenPaths(candidate.ApplicationContractJson),
+                candidate.Slug is null
+                    ? null
+                    : domains.Where(domain => domain.WebAppId == candidate.WebAppId).Select(domain => domain.Route).ToList()))
             .ToList();
     }
 
@@ -272,10 +288,58 @@ public class BackendRouteConfigService
             var key = $"slug-{route.AppId:N}";
             var host = PublishedAppHostNames.BuildPublishedAppHost(
                 route.Slug!, publishedAppsConfig.PublicBaseUrlHost);
-            AppendRuntimeRouter(builder, route, key, host, "/", 50, route.RequiresAuthentication);
-        }
+            var primary = PrimaryDomain(route);
+            if (primary is null)
+            {
+                AppendRuntimeRouter(builder, route, key, host, "/", 50, route.RequiresAuthentication);
+            }
+            else
+            {
+                AppendRedirectRouter(builder, route, key, host, primary, publishedAppsConfig.CertificateResolver);
+            }
 
+            foreach (var domain in route.CustomDomains ?? [])
+            {
+                var domainKey = $"domain-{domain.Id:N}";
+                if (primary is null || domain.Id == primary.Id)
+                {
+                    // The route reuses the app's public-address rewrite and sign-in middlewares.
+                    AppendRuntimeRouter(builder, route, key, domain.Host, "/", 50, route.RequiresAuthentication,
+                        routerName: domainKey, resolver: CustomDomainResolver());
+                }
+                else
+                {
+                    AppendRedirectRouter(builder, route, domainKey, domain.Host, primary, CustomDomainResolver());
+                }
+            }
+        }
     }
+
+    private static CustomDomainRoute? PrimaryDomain(RouteTarget route)
+        => route.CustomDomains?.FirstOrDefault(domain => domain.IsPrimary);
+
+    private string? CustomDomainResolver()
+        => string.IsNullOrWhiteSpace(publishedAppsConfig.CustomDomainCertificateResolver)
+            ? publishedAppsConfig.CertificateResolver
+            : publishedAppsConfig.CustomDomainCertificateResolver;
+
+    private void AppendRedirectRouter(
+        StringBuilder builder, RouteTarget route, string key, string host, CustomDomainRoute primary, string? resolver)
+    {
+        builder.AppendLine($"    {key}-redirect:");
+        builder.AppendLine("      entryPoints:");
+        builder.AppendLine("        - websecure");
+        builder.AppendLine(TlsLine(resolver));
+        builder.AppendLine($"      rule: \"Host(`{host}`)\"");
+        builder.AppendLine("      priority: 50");
+        builder.AppendLine("      service: \"noop@internal\"");
+        builder.AppendLine($"      middlewares: [\"redirect-{route.AppId:N}\"]");
+    }
+
+    private static string TlsLine(string? resolver)
+        => string.IsNullOrWhiteSpace(resolver)
+            ? "      tls: {}"
+            : $"      tls: {{ certResolver: {System.Text.Json.JsonSerializer.Serialize(resolver)} }}";
 
     private void AppendMiddlewares(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
     {
@@ -311,6 +375,14 @@ public class BackendRouteConfigService
         {
             var key = $"slug-{route.AppId:N}";
             AppendRuntimeRewrite(builder, route, key, "^/(.*)$");
+            if (PrimaryDomain(route) is { } primary)
+            {
+                builder.AppendLine($"    redirect-{route.AppId:N}:");
+                builder.AppendLine("      redirectRegex:");
+                builder.AppendLine("        regex: \"^https?://[^/]+/(.*)$\"");
+                builder.AppendLine($"        replacement: \"https://{primary.Host}/${{1}}\"");
+                builder.AppendLine("        permanent: false");
+            }
         }
 
     }
@@ -324,14 +396,14 @@ public class BackendRouteConfigService
         int priority,
         bool authenticated,
         string? pathRule = null,
-        string? rewriteKey = null)
+        string? rewriteKey = null,
+        string? routerName = null,
+        string? resolver = null)
     {
-        builder.AppendLine($"    {key}-runtime:");
+        builder.AppendLine($"    {routerName ?? key}-runtime:");
         builder.AppendLine("      entryPoints:");
         builder.AppendLine("        - websecure");
-        builder.AppendLine(string.IsNullOrWhiteSpace(publishedAppsConfig.CertificateResolver)
-            ? "      tls: {}"
-            : $"      tls: {{ certResolver: {System.Text.Json.JsonSerializer.Serialize(publishedAppsConfig.CertificateResolver)} }}");
+        builder.AppendLine(TlsLine(resolver ?? publishedAppsConfig.CertificateResolver));
         builder.AppendLine($"      rule: \"Host(`{host}`) && {pathRule ?? $"PathPrefix(`{pathPrefix}`)"}\"");
         builder.AppendLine($"      priority: {priority}");
         builder.AppendLine($"      service: \"{route.RuntimeServiceName}\"");

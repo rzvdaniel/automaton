@@ -545,6 +545,8 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppQueryService>();
         services.AddScoped<AppPublicationService>();
         services.AddScoped<AppSharingService>();
+        services.AddSingleton<ICustomDomainResolver, DnsCustomDomainResolver>();
+        services.AddScoped<CustomDomainService>();
         services.AddScoped<IAppRuntimeCommandQueue, RunnerExecutionAppCommandQueue>();
         services.AddScoped<AppPauseService>();
         services.AddScoped<AppRestartService>();

@@ -14,6 +14,7 @@ internal static class ApplicationModelConfiguration
         ConfigureMarketplaceCategory(modelBuilder);
         ConfigureWebAppUser(modelBuilder);
         ConfigureAppShare(modelBuilder);
+        ConfigureAppCustomDomain(modelBuilder);
         ConfigureWebAppStar(modelBuilder);
         ConfigureWebAppScreenshot(modelBuilder);
         ConfigureAppVersion(modelBuilder);
@@ -62,6 +63,20 @@ internal static class ApplicationModelConfiguration
             // A share goes away with the app or the person it names.
             entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.WebAppId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureAppCustomDomain(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AppCustomDomain>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Host).IsRequired().HasMaxLength(253);
+            entity.Property(e => e.VerificationToken).IsRequired().HasMaxLength(64);
+            entity.HasIndex(e => e.Host).IsUnique();
+            entity.HasIndex(e => e.WebAppId);
+            // A domain goes away with its app.
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.WebAppId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 
