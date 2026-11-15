@@ -3887,6 +3887,10 @@ namespace Automaton.Infrastructure.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("DeployedFromCommit")
+                        .HasMaxLength(40)
+                        .HasColumnType("citext");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");

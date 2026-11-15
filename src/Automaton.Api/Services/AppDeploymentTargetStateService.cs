@@ -205,6 +205,11 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
             if (genericRuntimeDeployed.HasValue)
                 target.GenericRuntimeDeployed = genericRuntimeDeployed.Value;
             target.LastSuccessfulDeploymentAt = now;
+            if (target.IsDefault)
+            {
+                var app = await dataContext.WebApps.FirstOrDefaultAsync(x => x.Id == appId, cancellationToken);
+                if (app is not null) app.DeployedFromCommit = app.InstalledFromCommit;
+            }
         }
         await dataContext.SaveChangesAsync(cancellationToken);
     }

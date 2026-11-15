@@ -1,3 +1,4 @@
+using Automaton.Api.Services;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
@@ -28,6 +29,33 @@ public sealed class AppDeploymentFailureSummaryTests
             {
                 Assert.That(failedSummary.LastDeploymentError, Does.Contain("1024 MB"));
                 Assert.That(recoveredSummary.LastDeploymentError, Is.Null);
+            });
+        }
+    }
+
+    [Test]
+    public async Task SuccessfulDeployRecordsTheCommitThatNowRuns_AndAFailedOneKeepsThePreviousOne()
+    {
+        var (fixture, targetId) = await CreateFailedDeploymentFixtureAsync();
+        await using (fixture)
+        {
+            var state = new AppDeploymentTargetStateService(fixture.Db);
+            var app = await fixture.Db.WebApps.SingleAsync(x => x.Id == fixture.App.Id);
+            app.InstalledFromCommit = new string('a', 40);
+            var target = await fixture.Db.AppDeploymentTargets.SingleAsync(x => x.Id == targetId);
+            target.Status = DeploymentTargetStatus.Deploying;
+            await fixture.Db.SaveChangesAsync();
+            await state.MarkCompletedAsync(fixture.App.Id, targetId, success: true);
+
+            app.InstalledFromCommit = new string('b', 40);
+            target.Status = DeploymentTargetStatus.Deploying;
+            await fixture.Db.SaveChangesAsync();
+            await state.MarkCompletedAsync(fixture.App.Id, targetId, success: false);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(app.DeployedFromCommit, Is.EqualTo(new string('a', 40)));
+                Assert.That(app.InstalledFromCommit, Is.EqualTo(new string('b', 40)));
             });
         }
     }

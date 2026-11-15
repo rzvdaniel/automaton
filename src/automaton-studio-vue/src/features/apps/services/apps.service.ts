@@ -42,6 +42,9 @@ export type CatalogUpdate = {
   newSecrets: string[]
   newSettings: string[]
   newPermissions: string[]
+  deployFailed?: boolean
+  deployError?: string | null
+  runningCommit?: string | null
 }
 
 export type DeployAppResult = {

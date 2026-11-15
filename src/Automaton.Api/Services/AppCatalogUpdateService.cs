@@ -18,7 +18,10 @@ public sealed record AppCatalogUpdateModel(
     bool Edited,
     IReadOnlyList<string> NewSecrets,
     IReadOnlyList<string> NewSettings,
-    IReadOnlyList<string> NewPermissions);
+    IReadOnlyList<string> NewPermissions,
+    bool DeployFailed = false,
+    string? DeployError = null,
+    string? RunningCommit = null);
 
 public sealed class AppCatalogUpdateRequest
 {
@@ -56,14 +59,37 @@ public sealed class AppCatalogUpdateService(
     {
         var (app, ownerId, source) = await FindAsync(appId, cancellationToken);
         if (source is null) return None(app.InstalledFromCommit);
+        var failure = await LastFailedDeployAsync(appId, cancellationToken);
+        var running = app.DeployedFromCommit ?? app.InstalledFromCommit;
         var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken, refresh);
-        if (latest is null || latest == source.Commit) return None(source.Commit);
+        // The last deploy failed: the app still runs the previous version, so it is not up to date, and an update retries the deploy.
+        if (latest is null || latest == source.Commit)
+            return failure is null ? None(source.Commit) with { RunningCommit = running }
+                : new AppCatalogUpdateModel(true, source.Commit, source.Commit, null, false, [], [], [], true, failure, running);
         // The edited flag changes when the app's files do, so the key includes their fingerprint (#1149).
         var key = $"catalog-update:{appId}:{source.Commit}:{latest}:{SourceFingerprint(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId))}";
-        if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return cached;
+        if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return WithDeploy(cached, failure, running);
         var model = await CompareAsync(app, ownerId, source, latest, cancellationToken);
         cache.Set(key, model, CacheFor);
-        return model;
+        return WithDeploy(model, failure, running);
+    }
+
+    private static AppCatalogUpdateModel WithDeploy(AppCatalogUpdateModel model, string? failure, string? running) =>
+        model with { DeployFailed = failure is not null, DeployError = failure, RunningCommit = running };
+
+    /// <summary>The reason of the app's last deploy when the live target is in the Failed state and that deploy failed; otherwise null.</summary>
+    private async Task<string?> LastFailedDeployAsync(Guid appId, CancellationToken cancellationToken)
+    {
+        var failed = await dbContext.AppDeploymentTargets.AsNoTracking()
+            .AnyAsync(t => t.WebAppId == appId && t.IsDefault && t.Status == DeploymentTargetStatus.Failed, cancellationToken);
+        if (!failed) return null;
+        var latest = await dbContext.DeploymentOperations.AsNoTracking()
+            .Where(o => o.WebAppId == appId && (o.TargetSlug == null ||
+                dbContext.AppDeploymentTargets.Any(t => t.WebAppId == appId && t.IsDefault && t.Slug == o.TargetSlug)))
+            .OrderByDescending(o => o.CreatedAtUtc)
+            .Select(o => new { o.Status, o.ErrorMessage })
+            .FirstOrDefaultAsync(cancellationToken);
+        return latest?.Status == DeploymentOperationStatuses.Failed ? latest.ErrorMessage ?? "The deploy failed." : null;
     }
 
     /// <summary>Changes whenever a file of the app is added, removed, resized or rewritten.</summary>
@@ -116,6 +142,10 @@ public sealed class AppCatalogUpdateService(
         if (!update.Available || source is null) throw new InvalidOperationException("This app has no update.");
         if (update.Edited && !request.ConfirmEdited)
             throw new InvalidOperationException("This app was edited after it was installed. Confirm that the update replaces your changes.");
+
+        // Same commit as installed: the files are in place and only the deploy failed, so retry it.
+        if (update.LatestCommit == source.Commit)
+            return await deployment.AcceptAsync(appId, userId, ownerId, null, false, cancellationToken);
 
         var target = source with { Commit = update.LatestCommit! };
         using (var package = await installer.DownloadAsync(target, cancellationToken))

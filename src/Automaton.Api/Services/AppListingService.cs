@@ -86,6 +86,11 @@ internal sealed class AppListingService(
                         Status = target.Status,
                         GenericRuntimeDeployed = target.GenericRuntimeDeployed,
                         LastSuccessfulDeploymentAt = target.LastSuccessfulDeploymentAt,
+                        LastDeploymentError = target.Status != DeploymentTargetStatus.Failed ? null : dataContext.DeploymentOperations
+                            .Where(o => o.WebAppId == app.Id && (o.TargetSlug == null || o.TargetSlug == target.Slug))
+                            .OrderByDescending(o => o.CreatedAtUtc)
+                            .Select(o => o.Status == DeploymentOperationStatuses.Failed ? o.ErrorMessage ?? "The deploy failed." : null)
+                            .FirstOrDefault(),
                         IsHostedRunner = target.ExecutionRunnerId.HasValue && dataContext.HostedRunners
                             .Any(hosted => hosted.RunnerId == target.ExecutionRunnerId && hosted.DeletedAt == null),
                         Runner = target.ExecutionRunner == null ? null : new AppListTargetRunnerRow
@@ -149,6 +154,7 @@ internal sealed class AppListingService(
                 target.Runner.ConnectionId, target.Runner.LastHeartbeatAtUtc, now) == RunnerStatus.Online,
             GenericRuntimeDeployed = target.GenericRuntimeDeployed,
             LastSuccessfulDeploymentAtUtc = target.LastSuccessfulDeploymentAt?.UtcDateTime,
+            LastDeploymentError = target.LastDeploymentError,
             IsStaticHosting = target.Runner == null && target.GenericRuntimeDeployed,
             RoutePath = PublishedAppHostNames.BuildPrivateTargetPath(appId, Guid.Empty, isDefault: true)
         };
@@ -189,6 +195,7 @@ internal sealed class AppListingService(
         public DeploymentTargetStatus Status { get; init; }
         public bool GenericRuntimeDeployed { get; init; }
         public DateTimeOffset? LastSuccessfulDeploymentAt { get; init; }
+        public string? LastDeploymentError { get; init; }
         public bool IsHostedRunner { get; init; }
         public AppListTargetRunnerRow? Runner { get; init; }
     }

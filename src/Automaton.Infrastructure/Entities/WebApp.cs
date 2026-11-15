@@ -131,6 +131,9 @@ public class WebApp
     /// <summary>The pinned commit the app's files were fetched at.</summary>
     public string? InstalledFromCommit { get; set; }
 
+    /// <summary>The commit of <see cref="InstalledFromCommit"/> at the last successful deploy: what the app runs now. Null until a deploy succeeds after the install.</summary>
+    public string? DeployedFromCommit { get; set; }
+
     /// <summary>
     /// Total tokens used in AI chat sessions for this app
     /// </summary>
