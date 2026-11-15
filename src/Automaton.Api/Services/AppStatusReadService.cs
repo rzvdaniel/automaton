@@ -33,6 +33,7 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
                     .OrderByDescending(o => o.CreatedAtUtc)
                     .Select(o => o.Status == DeploymentOperationStatuses.Failed ? o.ErrorMessage ?? "The deploy failed." : null)
                     .FirstOrDefaultAsync(token);
+            error = Summarize(error);
             var run = await db.AppModuleExecutions.AsNoTracking()
                 .Where(execution => execution.AppId == app.Id)
                 .OrderByDescending(execution => execution.CreatedAtUtc)
@@ -45,6 +46,14 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
                 app.Live?.LastSuccessfulDeploymentAt?.UtcDateTime, error, run, next));
         }
         return result;
+    }
+
+    /// <summary>The first line of a deploy error, cut short, so build output, paths and stack traces stay on the server.</summary>
+    internal static string? Summarize(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error)) return null;
+        var line = error.Split('\n', 2)[0].Trim();
+        return line.Length > 200 ? line[..200] + "…" : line;
     }
 }
 

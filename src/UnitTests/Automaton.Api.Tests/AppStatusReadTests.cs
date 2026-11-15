@@ -38,6 +38,32 @@ public sealed class AppStatusReadTests
     }
 
     [Test]
+    public async Task AFailedLiveDeployReportsOnlyTheFirstLineOfItsError()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        var target = fixture.Db.AppDeploymentTargets.Single(t => t.WebAppId == fixture.App.Id && t.IsDefault);
+        target.Status = DeploymentTargetStatus.Failed;
+        fixture.Db.DeploymentOperations.Add(new DeploymentOperation
+        {
+            Id = Guid.NewGuid(), WebAppId = fixture.App.Id, OwnerUserId = fixture.UserId, TargetSlug = target.Slug, PackagePath = "p",
+            Status = DeploymentOperationStatuses.Failed, ErrorMessage = "Build failed\nTOKEN=abc /srv/path trace", CreatedAtUtc = DateTime.UtcNow
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var item = (await new AppStatusReadService(fixture.Db).ListAsync(default)).Single(i => i.Id == fixture.App.Id);
+
+        Assert.That(item.LiveStatus, Is.EqualTo("Failed"));
+        Assert.That(item.LastDeploymentError, Is.EqualTo("Build failed"));
+    }
+
+    [Test]
+    public void ALongErrorIsCutAndAnEmptyOneIsNull()
+    {
+        Assert.That(AppStatusReadService.Summarize(new string('x', 500))!.Length, Is.EqualTo(201));
+        Assert.That(AppStatusReadService.Summarize("  "), Is.Null);
+    }
+
+    [Test]
     public async Task OnlyAnApprovedAppOrAnAdministratorPassesThePolicy()
     {
         var services = new ServiceCollection().AddLogging().AddAuthorization(options =>
