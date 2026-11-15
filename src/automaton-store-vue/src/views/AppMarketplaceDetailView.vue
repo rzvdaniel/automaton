@@ -167,7 +167,10 @@ onBeforeUnmount(() => {
     <main>
       <section class="band">
         <div class="wrap top-area">
-          <RouterLink class="back" to="/"><span aria-hidden="true">←</span> All public apps</RouterLink>
+          <p class="eyebrow crumbs">
+            <RouterLink class="back" to="/"><span aria-hidden="true">←</span> All apps</RouterLink>
+            <template v-if="app?.category"> · {{ app.category }}</template>
+          </p>
 
           <p v-if="loading" class="state">Loading app…</p>
 
@@ -181,7 +184,6 @@ onBeforeUnmount(() => {
               <div class="badges">
                 <span class="badge">{{ app.hasWebPage === false ? 'Installable' : app.canLaunch ? 'Live app' : 'Media preview' }}</span>
                 <span v-if="app.isFeatured" class="badge signal">Featured</span>
-                <span v-if="app.category" class="badge">{{ app.category }}</span>
               </div>
               <div class="title">
                 <AppMark :id="app.id" :name="app.name" :image-url="app.thumbnailUrl" :size="56" />
@@ -203,6 +205,31 @@ onBeforeUnmount(() => {
               <p v-if="!launchUrl && app.hasWebPage === false" class="note">This app has no web page: people install it from Studio on their own server.</p>
               <p v-else-if="!launchUrl" class="note">This app has a private runtime. Its screenshots show what it does.</p>
               <p v-if="shareMessage" class="note" role="status">{{ shareMessage }}</p>
+              <div v-if="tags.length" class="feats">
+                <span v-for="tag in tags" :key="tag" class="feat">{{ tag }}</span>
+              </div>
+              <dl class="facts">
+                <div>
+                  <dt>Opened</dt>
+                  <dd>{{ count(app.viewCount, 'time') }}</dd>
+                </div>
+                <div v-if="app.category">
+                  <dt>Category</dt>
+                  <dd>{{ app.category }}</dd>
+                </div>
+                <div v-if="app.canRemix">
+                  <dt>Forks</dt>
+                  <dd>{{ count(app.forkCount, 'fork') }}</dd>
+                </div>
+                <div v-if="formatDate(app.publishedAt)">
+                  <dt>Published</dt>
+                  <dd>{{ formatDate(app.publishedAt) }}</dd>
+                </div>
+                <div v-if="formatDate(app.updatedAt)">
+                  <dt>Updated</dt>
+                  <dd>{{ formatDate(app.updatedAt) }}</dd>
+                </div>
+              </dl>
             </div>
 
             <div v-if="selectedImage" class="gallery">
@@ -230,6 +257,7 @@ onBeforeUnmount(() => {
                   <img :src="resolveMarketplaceAssetUrl(image.imageUrl)" alt="" loading="lazy" />
                 </button>
               </div>
+              <p class="cap">{{ selectedIndex + 1 }} / {{ gallery.length }} · {{ selectedImage.caption }}</p>
             </div>
           </div>
         </div>
@@ -242,38 +270,7 @@ onBeforeUnmount(() => {
               <h2 id="about-title">About</h2>
               <p v-if="description">{{ description }}</p>
               <p v-else>The creator has not written a description yet. Open the app to see what it does.</p>
-              <div v-if="tags.length" class="tags">
-                <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
-              </div>
             </div>
-
-            <dl class="facts">
-              <template v-if="creatorName">
-                <dt>Creator</dt>
-                <dd>
-                  <RouterLink v-if="app.creatorPublicUsername" :to="`/creators/${app.creatorPublicUsername}`">{{ creatorName }}</RouterLink>
-                  <template v-else>{{ creatorName }}</template>
-                </dd>
-              </template>
-              <template v-if="app.category">
-                <dt>Category</dt>
-                <dd>{{ app.category }}</dd>
-              </template>
-              <dt>Opened</dt>
-              <dd>{{ count(app.viewCount, 'time') }}</dd>
-              <template v-if="app.canRemix">
-                <dt>Forks</dt>
-                <dd>{{ count(app.forkCount, 'fork') }}</dd>
-              </template>
-              <template v-if="formatDate(app.publishedAt)">
-                <dt>Published</dt>
-                <dd>{{ formatDate(app.publishedAt) }}</dd>
-              </template>
-              <template v-if="formatDate(app.updatedAt)">
-                <dt>Updated</dt>
-                <dd>{{ formatDate(app.updatedAt) }}</dd>
-              </template>
-            </dl>
           </div>
         </section>
 
@@ -332,14 +329,15 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 16px;
 }
+.crumbs {
+  text-transform: uppercase;
+}
 .site .back {
-  justify-self: start;
-  color: var(--ink-soft);
+  color: inherit;
   text-decoration: none;
-  font-size: 0.95rem;
 }
 .site .back:hover {
-  color: var(--ink);
+  text-decoration: underline;
 }
 
 .state {
@@ -354,8 +352,8 @@ onBeforeUnmount(() => {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: 32px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 34px;
   align-items: start;
 }
 .hero.plain {
@@ -417,10 +415,10 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   max-width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--panel);
   cursor: zoom-in;
@@ -432,25 +430,24 @@ onBeforeUnmount(() => {
   display: block;
 }
 .thumbs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 96px), 1fr));
   gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
 }
 .thumb {
-  flex: none;
-  width: 104px;
   aspect-ratio: 16 / 10;
   padding: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1.5px solid var(--line);
+  border: 2px solid transparent;
   background: var(--panel);
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.75;
 }
-.thumb.active,
 .thumb:hover {
+  opacity: 1;
+}
+.thumb.active {
   opacity: 1;
   border-color: var(--signal);
 }
@@ -467,39 +464,46 @@ onBeforeUnmount(() => {
 }
 
 .about {
-  padding-block: 32px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 32px;
-  align-items: start;
+  padding-block: 26px 32px;
+  border-top: 1px solid var(--line);
 }
-.tags {
+.feats {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 6px;
 }
-.tag {
-  font: 500 0.82rem var(--mono);
-  padding: 5px 10px;
+.feat {
+  font: 500 0.82rem var(--body);
+  padding: 5px 11px;
   border-radius: 999px;
-  background: var(--panel);
-  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--signal) 16%, var(--paper));
+  color: var(--signal-ink);
 }
 .facts {
+  margin-top: 8px;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  border-top: 1px solid var(--ink);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
 }
-.facts dt,
-.facts dd {
-  padding: 8px 0;
+.facts div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 .facts dt {
-  font: 500 0.82rem var(--mono);
+  font: 0.7rem var(--mono);
   color: var(--ink-soft);
-  padding-right: 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.facts dd {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.cap {
+  font: 0.78rem var(--mono);
+  color: var(--ink-soft);
 }
 
 .list-block {
@@ -510,8 +514,8 @@ onBeforeUnmount(() => {
 .rows {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 18px;
 }
 
 .lightbox {
@@ -553,9 +557,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .hero,
-  .about,
-  .rows {
+  .hero {
     grid-template-columns: minmax(0, 1fr);
   }
   .hero {

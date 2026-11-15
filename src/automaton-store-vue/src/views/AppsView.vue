@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import MarketplaceAppRow from '@/components/MarketplaceAppRow.vue'
 import StoreFooter from '@/components/StoreFooter.vue'
 import StoreHeader from '@/components/StoreHeader.vue'
-import { publicAppConfig } from '@/config/publicAppConfig'
+import { serverHostName } from '@/config/resolveStoreConfig'
 import { useMarketplaceApps } from '@/composables/useMarketplaceApps'
 import { useSiteTheme } from '@/composables/useSiteTheme'
 import type { MarketplaceAppCard } from '@/types/marketplace'
@@ -20,6 +20,7 @@ const { apps, categories, loading, error, loadApps, loadCategories } = useMarket
 useSiteTheme()
 
 const publishDocsUrl = 'https://automaton.monster/docs/deploy#marketplace-listing'
+const hostName = serverHostName(window.location.origin)
 
 // Older links used ?category=Featured or "Live Apps" to mean every app; keep them working.
 const activeCategory = computed(() => {
@@ -88,8 +89,11 @@ onMounted(async () => {
     <main>
       <section class="band intro">
         <div class="wrap">
-          <h1>{{ publicAppConfig.storeTitle }}</h1>
-          <p class="lede">Apps published on this server.</p>
+          <p class="eyebrow">Public apps · this server</p>
+          <h1>
+            Apps running on<template v-if="hostName"> <em>{{ hostName }}</em></template><template v-else> this server</template>
+          </h1>
+          <p class="lede">Open any of them in your browser. Every one runs on this server, and you can run the same apps on your own.</p>
         </div>
       </section>
 
@@ -154,12 +158,11 @@ onMounted(async () => {
       </section>
 
       <section class="band" aria-label="List your app">
-        <div class="wrap publish">
-          <p>
-            Want your app here? Publish it from
-            <a v-if="publicAppConfig.studioUrl" :href="publicAppConfig.studioUrl">Studio</a><template v-else>Studio</template>
-            (<a :href="publishDocsUrl" target="_blank" rel="noopener">how publishing works</a>).
-          </p>
+        <div class="wrap">
+          <div class="publish">
+            <p><strong>Want your app here?</strong> Publish it from Studio, or let your AI do it.</p>
+            <a class="btn small" :href="publishDocsUrl" target="_blank" rel="noopener">How publishing works</a>
+          </div>
         </div>
       </section>
     </main>
@@ -170,13 +173,18 @@ onMounted(async () => {
 
 <style scoped>
 .intro .wrap {
-  padding-block: 28px 12px;
+  padding-block: 36px 12px;
   display: grid;
-  gap: 4px;
+  gap: 10px;
 }
 .intro h1 {
-  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-size: clamp(1.9rem, 4.4vw, 3rem);
   font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.intro h1 em {
+  font-style: normal;
+  color: var(--signal-ink);
 }
 
 .toolbar {
@@ -191,7 +199,7 @@ onMounted(async () => {
   max-width: 560px;
   padding: 9px 16px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--card);
 }
 .search:focus-within {
@@ -249,19 +257,19 @@ onMounted(async () => {
   gap: 18px;
 }
 .count {
-  font: 600 0.75rem/1 var(--body);
-  letter-spacing: 0.14em;
+  font: 500 0.75rem/1 var(--mono);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
 .app-grid {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 18px;
 }
 .app-grid.single {
-  grid-template-columns: minmax(0, 560px);
+  grid-template-columns: minmax(0, 360px);
 }
 .state {
   display: grid;
@@ -283,12 +291,18 @@ onMounted(async () => {
 }
 
 .publish {
-  padding-block: 8px 56px;
-  color: var(--ink-soft);
+  margin-bottom: 56px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-@media (max-width: 900px) {
-  .app-grid,
+@media (max-width: 560px) {
   .app-grid.single {
     grid-template-columns: minmax(0, 1fr);
   }
