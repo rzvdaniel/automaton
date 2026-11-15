@@ -19,6 +19,7 @@ import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
 import CliSteps from '../components/CliSteps.vue'
 import SetupChecks from '@/features/install/components/SetupChecks.vue'
+import EmailNotConfiguredNotice from '@/features/install/components/EmailNotConfiguredNotice.vue'
 import SmtpSettingsForm from '@/features/install/components/SmtpSettingsForm.vue'
 const {
   theme: themePreference,
@@ -488,6 +489,7 @@ const passwordLoading = computed(() => passwordSaving.value)
               <RouterLink to="/server">Server</RouterLink>.
             </p>
           </div>
+          <EmailNotConfiguredNotice />
           <Card><template #title>Configuration status</template><template #content><SetupChecks /></template></Card>
           <Card><template #title>Outgoing email</template><template #content><SmtpSettingsForm /></template></Card>
         </section>

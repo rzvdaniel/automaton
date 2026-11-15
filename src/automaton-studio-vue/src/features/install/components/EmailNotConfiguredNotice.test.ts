@@ -31,6 +31,7 @@ describe('EmailNotConfiguredNotice', () => {
     const notice = wrapper.get('[data-testid=email-not-configured]')
     expect(notice.text()).toContain('Email is not set up')
     expect(notice.html()).toContain('https://automaton.monster/docs/install-server#set-up-email')
+    expect(notice.find('[data-testid=email-setup-action]').exists()).toBe(true)
   })
 
   it('shows nothing once email is configured, or when an older server does not say', async () => {
