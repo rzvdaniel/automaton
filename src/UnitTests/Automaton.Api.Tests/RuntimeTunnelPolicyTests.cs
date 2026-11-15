@@ -272,7 +272,8 @@ public class RuntimeTunnelPolicyTests
             requestSender,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             identity,
-            NullLogger<RuntimeTunnelService>.Instance);
+            NullLogger<RuntimeTunnelService>.Instance,
+            new RuntimeTunnelTargetCache(TimeSpan.Zero, TimeProvider.System));
     }
 
     private static ApplicationDbContext CreateDbContext() => new(

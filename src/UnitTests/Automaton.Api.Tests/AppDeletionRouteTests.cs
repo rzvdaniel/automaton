@@ -98,7 +98,7 @@ public sealed class AppDeletionRouteTests
 
     private static RuntimeTunnelService CreateTunnel(Automaton.Api.Data.ApplicationDbContext db)
         => new(db, null!, Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.test" }),
-            null!, NullLogger<RuntimeTunnelService>.Instance);
+            null!, NullLogger<RuntimeTunnelService>.Instance, new RuntimeTunnelTargetCache(TimeSpan.Zero, TimeProvider.System));
 
     private static WebApp AddDeployedApp(Automaton.Api.Data.ApplicationDbContext db, Guid runnerId)
     {

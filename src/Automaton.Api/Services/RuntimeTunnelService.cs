@@ -23,7 +23,7 @@ public sealed class RuntimeTunnelService(
     IOptions<PublishedAppsConfig> publishedAppsOptions,
     ApiInstanceIdentityService apiInstanceIdentityService,
     ILogger<RuntimeTunnelService> logger,
-    RuntimeTunnelTargetCache? targetCache = null) : ITunnelForwarder
+    RuntimeTunnelTargetCache targetCache) : ITunnelForwarder
 {
     private readonly PublishedAppsConfig publishedAppsConfig = publishedAppsOptions.Value;
 
@@ -47,7 +47,7 @@ public sealed class RuntimeTunnelService(
         string path,
         CancellationToken cancellationToken)
     {
-        var lookup = await (targetCache ?? new RuntimeTunnelTargetCache()).GetOrLoadAsync(
+        var lookup = await targetCache.GetOrLoadAsync(
             appId, deploymentTargetId, () => LoadAsync(appId, deploymentTargetId));
         var target = lookup.Target;
 

@@ -14,6 +14,7 @@ public sealed class RuntimeTunnelTargetCache
     private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), Entry> entries = new();
     private readonly TimeSpan timeToLive;
     private readonly TimeProvider time;
+    private DateTimeOffset nextSweep = DateTimeOffset.MinValue;
 
     public RuntimeTunnelTargetCache() : this(DefaultTimeToLive, TimeProvider.System) { }
 
@@ -27,7 +28,7 @@ public sealed class RuntimeTunnelTargetCache
     {
         var key = (appId, targetId);
         var now = time.GetUtcNow();
-        if (entries.Count > 1024) Sweep(now);
+        if (entries.Count > 1024 && now >= nextSweep) Sweep(now);
 
         var entry = entries.AddOrUpdate(
             key,
@@ -49,6 +50,7 @@ public sealed class RuntimeTunnelTargetCache
 
     private void Sweep(DateTimeOffset now)
     {
+        nextSweep = now + timeToLive;
         foreach (var pair in entries)
             if (pair.Value.ExpiresAt <= now) entries.TryRemove(pair);
     }
