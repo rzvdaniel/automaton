@@ -90,40 +90,42 @@ describe('ServerView', () => {
 
     const wrapper = mountView(['Admin', 'SysAdmin'])
     await flushPromises()
-    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('2026-11-13 05:12 UTC')
-    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('freed 1.8 GB')
-    expect(wrapper.get('[data-testid="cleanup-next"]').text()).toContain('2026-11-14 05:00 UTC')
-    const rows = wrapper.findAll('[data-testid="cleanup-run-row"]')
-    expect(rows).toHaveLength(2)
-    expect(rows[0]?.text()).toContain('runner-01')
-    expect(rows[1]?.text()).toContain('Renamed Twice')
-    expect(rows[1]?.text()).toContain('Runner too old')
+    expect(wrapper.get('[data-testid="cleanup-line"]').text()).toContain('nightly at 05:00')
+    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toBe('last run freed 1.8 GB')
+    expect(wrapper.find('[data-testid="cleanup-line"]').classes()).not.toContain('text-red-500')
+    expect(wrapper.find('[data-testid="cleanup-run"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cleanup-save"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('saves the settings and runs the cleanup now, then reloads', async () => {
+  it('links the cleanup line to Server Console when it is installed', async () => {
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1' } as never)
     const wrapper = mountView(['SysAdmin'])
     await flushPromises()
-    await wrapper.get('[data-testid="cleanup-time"]').setValue('06:30')
-    await wrapper.get('[data-testid="cleanup-section"] form').trigger('submit')
-    await flushPromises()
-    expect(serverCleanupService.saveSettings).toHaveBeenCalledWith({ timeUtc: '06:30', keepDays: 7, journalLimitMb: 200 })
-    expect(serverCleanupService.get).toHaveBeenCalledTimes(2)
-
-    await wrapper.get('[data-testid="cleanup-run"]').trigger('click')
-    await flushPromises()
-    expect(serverCleanupService.run).toHaveBeenCalled()
-    expect(serverCleanupService.get).toHaveBeenCalledTimes(3)
+    expect(wrapper.get('[data-testid="cleanup-manage"]').attributes('href')).toBe('/apps/sc1')
+    expect(wrapper.find('[data-testid="cleanup-install"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('shows the server error inline when Run now fails', async () => {
-    vi.mocked(serverCleanupService.run).mockRejectedValue({ isAxiosError: true, response: { status: 409, data: { error: 'No Runner is online.' } } })
+  it('turns the cleanup line red with the error when the last run failed', async () => {
+    const body = cleanupBody()
+    body.runs = [body.runs[1]!]
+    vi.mocked(serverCleanupService.get).mockResolvedValue(body)
     const wrapper = mountView(['SysAdmin'])
     await flushPromises()
-    await wrapper.get('[data-testid="cleanup-run"]').trigger('click')
+    expect(wrapper.get('[data-testid="cleanup-line"]').classes()).toContain('text-red-500')
+    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('Runner too old')
+    wrapper.unmount()
+  })
+
+  it('offers to install Server Console from the cleanup line when it is missing', async () => {
+    vi.mocked(serverConsoleService.get).mockRejectedValue(new Error('none'))
+    const wrapper = mountView(['SysAdmin'])
     await flushPromises()
-    expect(wrapper.get('[data-testid="cleanup-error"]').text()).toContain('No Runner is online.')
+    expect(wrapper.find('[data-testid="cleanup-manage"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="cleanup-install"]').trigger('click')
+    await flushPromises()
+    expect(serverConsoleService.install).toHaveBeenCalled()
     wrapper.unmount()
   })
 
