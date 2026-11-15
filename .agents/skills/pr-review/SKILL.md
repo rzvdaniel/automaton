@@ -14,7 +14,7 @@ The change sets how much review it gets, not its author.
 | --- | --- | --- |
 | Low | Only documentation for people: Markdown under `docs/`, the Admin docs, the root `README.md`. Skills, `AGENTS.md`, templates and guidance shipped to users' agents steer agents and are medium. | Green CI. The author re-reads the diff against the code it describes. |
 | Medium | Everything else | Green CI and one independent review. Paths below the "security pass" marker in [`.github/CODEOWNERS`](../../../.github/CODEOWNERS) (workflows, install and update scripts) also need a security pass. |
-| High | Touches a path above that marker (sign-in, tokens, authorization, secrets, the review rules), or the reviewer finds that it drops or rewrites data, lets more people do something, changes how people sign in, or touches production | Green CI, the review and a separate security pass. The merge gate lets it merge; the release report lists it as risky for the owner. |
+| High | Touches a path above that marker (sign-in, tokens, authorization, secrets, the review rules, EF migrations, the Runner, RuntimeHost and Messaging projects), deletes more than 500 lines of `src/` or removes a project (`merge-gate.py` checks this), or the reviewer finds that it drops or rewrites data, lets more people do something, changes how people sign in, or touches production | Green CI, the review and a separate security pass. The merge gate lets it merge; the release report lists it as risky for the owner. |
 
 The reviewer may raise the tier, never lower it. No tier waits for the owner before merge: the safety stop is the
 production deploy, which needs the owner's approval (environment `production`). Every release carries a report
