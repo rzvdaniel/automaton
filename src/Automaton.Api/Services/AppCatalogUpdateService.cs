@@ -21,7 +21,8 @@ public sealed record AppCatalogUpdateModel(
     IReadOnlyList<string> NewPermissions,
     bool DeployFailed = false,
     string? DeployError = null,
-    string? RunningCommit = null);
+    string? RunningCommit = null,
+    bool HasPreviousVersion = false);
 
 public sealed class AppCatalogUpdateRequest
 {
@@ -60,23 +61,23 @@ public sealed class AppCatalogUpdateService(
         var (app, ownerId, source) = await FindAsync(appId, cancellationToken);
         if (source is null) return None(app.InstalledFromCommit);
         var (failure, hasDeployed) = await DeployStateAsync(dbContext, appId, cancellationToken);
-        // Apps deployed before DeployedFromCommit existed ran the installed commit; one that never deployed runs nothing.
-        var running = app.DeployedFromCommit ?? (hasDeployed ? app.InstalledFromCommit : null);
+        // Apps deployed before DeployedFromCommit existed have no recorded commit: say "previous version", never guess one.
+        var running = app.DeployedFromCommit;
         var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken, refresh);
         // The last deploy failed: the app still runs the previous version, so it is not up to date, and an update retries the deploy.
         if (latest is null || latest == source.Commit)
-            return failure is null ? None(source.Commit) with { RunningCommit = running }
-                : new AppCatalogUpdateModel(true, source.Commit, source.Commit, null, false, [], [], [], true, failure, running);
+            return failure is null ? None(source.Commit) with { RunningCommit = running, HasPreviousVersion = hasDeployed }
+                : new AppCatalogUpdateModel(true, source.Commit, source.Commit, null, false, [], [], [], true, failure, running, hasDeployed);
         // The edited flag changes when the app's files do, so the key includes their fingerprint (#1149).
         var key = $"catalog-update:{appId}:{source.Commit}:{latest}:{SourceFingerprint(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId))}";
-        if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return WithDeploy(cached, failure, running);
+        if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return WithDeploy(cached, failure, running, hasDeployed);
         var model = await CompareAsync(app, ownerId, source, latest, cancellationToken);
         cache.Set(key, model, CacheFor);
-        return WithDeploy(model, failure, running);
+        return WithDeploy(model, failure, running, hasDeployed);
     }
 
-    private static AppCatalogUpdateModel WithDeploy(AppCatalogUpdateModel model, string? failure, string? running) =>
-        model with { DeployFailed = failure is not null, DeployError = failure, RunningCommit = running };
+    private static AppCatalogUpdateModel WithDeploy(AppCatalogUpdateModel model, string? failure, string? running, bool hasDeployed) =>
+        model with { DeployFailed = failure is not null, DeployError = failure, RunningCommit = running, HasPreviousVersion = hasDeployed };
 
     /// <summary>The reason of the app's last deploy when the live target is Failed and that deploy failed (else null), and whether a deploy ever succeeded.</summary>
     internal static async Task<(string? Error, bool HasDeployed)> DeployStateAsync(ApplicationDbContext dbContext, Guid appId, CancellationToken cancellationToken)

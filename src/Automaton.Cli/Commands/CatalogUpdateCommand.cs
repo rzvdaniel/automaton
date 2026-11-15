@@ -64,7 +64,7 @@ public static class CatalogUpdateCommand
 
         if (!asJson)
         {
-            if (deployFailed) DescribeFailure(name, deployError, running, retryOnly ? installed : null, appReference);
+            if (deployFailed) DescribeFailure(name, deployError, running, Flag(update, "hasPreviousVersion"), retryOnly ? installed : null, appReference);
             if (!retryOnly) Describe(name, installed, latest, compare, edited, newSettings, newSecrets, newPermissions);
         }
         if (check)
@@ -149,9 +149,9 @@ public static class CatalogUpdateCommand
 
     private static bool Flag(JsonElement item, string property) => item.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.True;
 
-    private static void DescribeFailure(string name, string error, string running, string? retryCommit, string app) =>
+    private static void DescribeFailure(string name, string error, string running, bool hasPrevious, string? retryCommit, string app) =>
         Console.WriteLine($"The last deploy of {name} failed: {(error.Length > 0 ? error : "no reason recorded")}\n" +
-            $"{(running.Length > 0 ? $"It still runs {Short(running)}." : "Nothing is running yet.")}{(retryCommit is null ? "" : $" Retry the deploy of {Short(retryCommit)} with: automaton catalog update {app}")}");
+            $"{(running.Length > 0 ? $"It still runs {Short(running)}." : hasPrevious ? "It still runs the previous version." : "Nothing is running yet.")}{(retryCommit is null ? "" : $" Retry the deploy of {Short(retryCommit)} with: automaton catalog update {app}")}");
 
     private static void Describe(string name, string installed, string latest, string compare, bool edited, List<string> settings, List<string> secrets, List<string> permissions)
     {
