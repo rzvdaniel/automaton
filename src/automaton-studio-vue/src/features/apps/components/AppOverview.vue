@@ -241,10 +241,10 @@ const source = computed(() => {
         <div v-if="pages.length === 0 && kind === 'site'" class="row"><span><strong>Pages</strong> <span class="hint">· files served as they are</span></span></div>
         <div v-else-if="pages.length === 0 && kind === 'web'" class="row"><span><strong>Web pages</strong> <span class="hint">· served at its address</span></span></div>
         <div v-if="kind === 'web' && healthPath" class="row"><span><strong>{{ healthPath }}</strong> <span class="hint">· health check</span></span></div>
-        <div v-for="action in actions" :key="action.key" class="row">
+        <button v-for="action in actions" :key="action.key" type="button" class="row row--link" :data-testid="`overview-action-${action.key}`" @click="emit('navigate', 'actions')">
           <span><strong>{{ action.name || action.key }}</strong><span v-if="action.description" class="hint"> · {{ action.description }}</span><span v-else-if="kind !== 'tool'" class="hint"> · action</span></span>
-          <span class="mono hint">{{ scheduleFor(action.key) }}</span>
-        </div>
+          <span class="mono hint">{{ scheduleFor(action.key) }} <i class="pi pi-chevron-right chevron" aria-hidden="true"></i></span>
+        </button>
         <p v-if="kind === 'tool' && actions.length === 0" class="hint">No actions are listed. They show once the app is deployed and its Runner is online.</p>
       </section>
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   APP_TABS,
+  appTabs,
   DEFAULT_APP_VIEW,
   opensAdvanced,
   resolveAppView,
@@ -14,8 +15,14 @@ describe('app page navigation', () => {
     expect(APP_TABS.map((tab) => tab.label)).toEqual(['Overview', 'Activity', 'Settings'])
   })
 
+  it('adds an Actions tab after Activity only when the app has Actions', () => {
+    expect(appTabs(true).map((tab) => tab.label)).toEqual(['Overview', 'Activity', 'Actions', 'Settings'])
+    expect(appTabs(false).map((tab) => tab.label)).toEqual(['Overview', 'Activity', 'Settings'])
+    expect(resolveAppView('actions')).toBe('actions')
+  })
+
   it('keeps every earlier ?view= link working', () => {
-    for (const view of ['logs', 'deployments', 'actions']) expect(resolveAppView(view)).toBe('activity')
+    for (const view of ['logs', 'deployments']) expect(resolveAppView(view)).toBe('activity')
     for (const view of ['runtime', 'targets', 'contract', 'more']) expect(resolveAppView(view)).toBe('settings')
     expect(resolveAppView('settings')).toBe('settings')
   })

@@ -1,6 +1,6 @@
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 
-export const APP_VIEW_KEYS = ['overview', 'activity', 'settings'] as const
+export const APP_VIEW_KEYS = ['overview', 'activity', 'actions', 'settings'] as const
 
 export type AppViewKey = (typeof APP_VIEW_KEYS)[number]
 
@@ -11,18 +11,25 @@ export interface AppTab {
 
 export const DEFAULT_APP_VIEW: AppViewKey = 'overview'
 
-/** The three tabs of the app page. */
-export const APP_TABS: ReadonlyArray<AppTab> = [
+const ALL_TABS: ReadonlyArray<AppTab> = [
   { key: 'overview', label: 'Overview' },
   { key: 'activity', label: 'Activity' },
+  { key: 'actions', label: 'Actions' },
   { key: 'settings', label: 'Settings' },
 ]
+
+/** The tabs of the app page: Actions, after Activity, only when the app has Actions. */
+export function appTabs(hasActions: boolean): ReadonlyArray<AppTab> {
+  return hasActions ? ALL_TABS : ALL_TABS.filter((tab) => tab.key !== 'actions')
+}
+
+/** The three tabs every app has. */
+export const APP_TABS: ReadonlyArray<AppTab> = appTabs(false)
 
 /** Earlier `?view=` values and the tab each one now lives in. */
 const LEGACY_VIEWS: Record<string, AppViewKey> = {
   logs: 'activity',
   deployments: 'activity',
-  actions: 'activity',
   runtime: 'settings',
   targets: 'settings',
   contract: 'settings',
