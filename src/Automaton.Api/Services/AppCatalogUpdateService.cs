@@ -76,7 +76,7 @@ public sealed class AppCatalogUpdateService(
         return WithDeploy(model, failure, running, hasDeployed);
     }
 
-    private static AppCatalogUpdateModel WithDeploy(AppCatalogUpdateModel model, string? failure, string? running, bool hasDeployed) =>
+    internal static AppCatalogUpdateModel WithDeploy(AppCatalogUpdateModel model, string? failure, string? running, bool hasDeployed) =>
         model with { DeployFailed = failure is not null, DeployError = failure, RunningCommit = running, HasPreviousVersion = hasDeployed };
 
     /// <summary>The reason of the app's last deploy when the live target is Failed and that deploy failed (else null), and whether a deploy ever succeeded.</summary>

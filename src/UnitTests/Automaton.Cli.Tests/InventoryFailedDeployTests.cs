@@ -18,3 +18,21 @@ public sealed class InventoryFailedDeployTests
         });
     }
 }
+
+[TestFixture]
+public sealed class CatalogUpdateFailureTextTests
+{
+    [Test]
+    public void FailureText_NamesTheRunningCommit_ThePreviousVersion_OrNothingRunning()
+    {
+        var recorded = CatalogUpdateCommand.FailureText("App", "boom", "1234567890", true, "abcdefg123", "app");
+        var legacy = CatalogUpdateCommand.FailureText("App", "boom", "", true, null, "app");
+        var never = CatalogUpdateCommand.FailureText("App", "boom", "", false, null, "app");
+        Assert.Multiple(() =>
+        {
+            Assert.That(recorded, Does.Contain("It still runs 1234567.").And.Contain("Retry the deploy of abcdefg with: automaton catalog update app"));
+            Assert.That(legacy, Does.Contain("It still runs the previous version.").And.Not.Contain("Retry"));
+            Assert.That(never, Does.Contain("Nothing is running yet."));
+        });
+    }
+}

@@ -28,6 +28,21 @@ public class AppCatalogUpdateTests
     private static readonly GitAppSource Source = new("owner/repo", "tool", new string('a', 40));
 
     [Test]
+    public void WithDeploy_CarriesTheFailureAndOnlyTheCommitTheServerRecorded()
+    {
+        var none = new AppCatalogUpdateModel(false, "a", null, null, false, [], [], []);
+        var legacy = AppCatalogUpdateService.WithDeploy(none, "boom", null, hasDeployed: true);
+        var recorded = AppCatalogUpdateService.WithDeploy(none, "boom", "b", hasDeployed: true);
+        Assert.Multiple(() =>
+        {
+            Assert.That(legacy.DeployFailed, Is.True);
+            Assert.That(legacy.RunningCommit, Is.Null, "an unrecorded commit is not guessed");
+            Assert.That(legacy.HasPreviousVersion, Is.True);
+            Assert.That(recorded.RunningCommit, Is.EqualTo("b"));
+        });
+    }
+
+    [Test]
     public void SourceFingerprint_ChangesWhenAFileIsEdited_AddedOrRemoved_SoACachedAnswerIsNotReused()
     {
         var directory = Path.Combine(Path.GetTempPath(), "e2e-1149-" + Guid.NewGuid().ToString("N"));
