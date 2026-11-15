@@ -172,7 +172,7 @@ const source = computed(() => {
       <div class="row">
         <span>
           <span class="pill pill--bad">{{ retryOnly ? 'Last deploy failed' : 'Update available' }}</span>
-          <span v-if="update.deployFailed" class="hint" data-testid="update-deploy-error"> · {{ update.deployError }}. Still running {{ update.runningCommit?.slice(0, 7) ?? 'the previous version' }}.</span>
+          <span v-if="update.deployFailed" class="hint" data-testid="update-deploy-error"> · {{ update.deployError?.replace(/\.$/, '') }}.<template v-if="update.runningCommit"> Still running {{ update.runningCommit.slice(0, 7) }}.</template></span>
           <span v-if="!retryOnly" class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
           <a v-if="update.compareUrl" class="link" :href="update.compareUrl" target="_blank" rel="noopener noreferrer"> What changed</a>
           <template v-if="update.newSettings.length || update.newSecrets.length || update.newPermissions.length">

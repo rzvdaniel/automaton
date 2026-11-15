@@ -34,6 +34,32 @@ public sealed class AppDeploymentFailureSummaryTests
     }
 
     [Test]
+    public async Task DeployState_ReportsTheFailureAndWhetherAnythingEverDeployed()
+    {
+        var (fixture, targetId) = await CreateFailedDeploymentFixtureAsync();
+        await using (fixture)
+        {
+            var neverDeployed = await AppCatalogUpdateService.DeployStateAsync(fixture.Db, fixture.App.Id, CancellationToken.None);
+            var target = await fixture.Db.AppDeploymentTargets.SingleAsync(x => x.Id == targetId);
+            target.LastSuccessfulDeploymentAt = DateTimeOffset.UtcNow.AddDays(-1);
+            await fixture.Db.SaveChangesAsync();
+            var afterEarlierSuccess = await AppCatalogUpdateService.DeployStateAsync(fixture.Db, fixture.App.Id, CancellationToken.None);
+            target.Status = DeploymentTargetStatus.Running;
+            await fixture.Db.SaveChangesAsync();
+            var recovered = await AppCatalogUpdateService.DeployStateAsync(fixture.Db, fixture.App.Id, CancellationToken.None);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(neverDeployed.Error, Does.Contain("1024 MB"));
+                Assert.That(neverDeployed.HasDeployed, Is.False);
+                Assert.That(afterEarlierSuccess.Error, Does.Contain("1024 MB"));
+                Assert.That(afterEarlierSuccess.HasDeployed, Is.True);
+                Assert.That(recovered.Error, Is.Null);
+            });
+        }
+    }
+
+    [Test]
     public async Task SuccessfulDeployRecordsTheCommitThatNowRuns_AndAFailedOneKeepsThePreviousOne()
     {
         var (fixture, targetId) = await CreateFailedDeploymentFixtureAsync();

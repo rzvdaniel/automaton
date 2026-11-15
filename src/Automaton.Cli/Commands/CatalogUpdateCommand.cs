@@ -151,7 +151,7 @@ public static class CatalogUpdateCommand
 
     private static void DescribeFailure(string name, string error, string running, string? retryCommit, string app) =>
         Console.WriteLine($"The last deploy of {name} failed: {(error.Length > 0 ? error : "no reason recorded")}\n" +
-            $"It still runs {(running.Length > 0 ? Short(running) : "the previous version")}.{(retryCommit is null ? "" : $" Retry the deploy of {Short(retryCommit)} with: automaton catalog update {app}")}");
+            $"{(running.Length > 0 ? $"It still runs {Short(running)}." : "Nothing is running yet.")}{(retryCommit is null ? "" : $" Retry the deploy of {Short(retryCommit)} with: automaton catalog update {app}")}");
 
     private static void Describe(string name, string installed, string latest, string compare, bool edited, List<string> settings, List<string> secrets, List<string> permissions)
     {

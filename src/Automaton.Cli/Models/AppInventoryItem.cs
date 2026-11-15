@@ -5,4 +5,4 @@ internal sealed record AppInventoryItem(
 
 internal sealed record AppInventoryRunner(string Name);
 
-internal sealed record AppInventoryTarget(string Status, string? LastDeploymentError = null);
+internal sealed record AppInventoryTarget(string Status, string? LastDeploymentError = null, DateTime? LastSuccessfulDeploymentAtUtc = null);

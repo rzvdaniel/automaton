@@ -59,8 +59,9 @@ public sealed class AppCatalogUpdateService(
     {
         var (app, ownerId, source) = await FindAsync(appId, cancellationToken);
         if (source is null) return None(app.InstalledFromCommit);
-        var failure = await LastFailedDeployAsync(appId, cancellationToken);
-        var running = app.DeployedFromCommit ?? app.InstalledFromCommit;
+        var (failure, hasDeployed) = await DeployStateAsync(dbContext, appId, cancellationToken);
+        // Apps deployed before DeployedFromCommit existed ran the installed commit; one that never deployed runs nothing.
+        var running = app.DeployedFromCommit ?? (hasDeployed ? app.InstalledFromCommit : null);
         var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken, refresh);
         // The last deploy failed: the app still runs the previous version, so it is not up to date, and an update retries the deploy.
         if (latest is null || latest == source.Commit)
@@ -77,19 +78,22 @@ public sealed class AppCatalogUpdateService(
     private static AppCatalogUpdateModel WithDeploy(AppCatalogUpdateModel model, string? failure, string? running) =>
         model with { DeployFailed = failure is not null, DeployError = failure, RunningCommit = running };
 
-    /// <summary>The reason of the app's last deploy when the live target is in the Failed state and that deploy failed; otherwise null.</summary>
-    private async Task<string?> LastFailedDeployAsync(Guid appId, CancellationToken cancellationToken)
+    /// <summary>The reason of the app's last deploy when the live target is Failed and that deploy failed (else null), and whether a deploy ever succeeded.</summary>
+    internal static async Task<(string? Error, bool HasDeployed)> DeployStateAsync(ApplicationDbContext dbContext, Guid appId, CancellationToken cancellationToken)
     {
-        var failed = await dbContext.AppDeploymentTargets.AsNoTracking()
-            .AnyAsync(t => t.WebAppId == appId && t.IsDefault && t.Status == DeploymentTargetStatus.Failed, cancellationToken);
-        if (!failed) return null;
+        var target = await dbContext.AppDeploymentTargets.AsNoTracking()
+            .Where(t => t.WebAppId == appId && t.IsDefault)
+            .Select(t => new { t.Status, t.LastSuccessfulDeploymentAt })
+            .FirstOrDefaultAsync(cancellationToken);
+        var hasDeployed = target?.LastSuccessfulDeploymentAt is not null;
+        if (target?.Status != DeploymentTargetStatus.Failed) return (null, hasDeployed);
         var latest = await dbContext.DeploymentOperations.AsNoTracking()
             .Where(o => o.WebAppId == appId && (o.TargetSlug == null ||
                 dbContext.AppDeploymentTargets.Any(t => t.WebAppId == appId && t.IsDefault && t.Slug == o.TargetSlug)))
             .OrderByDescending(o => o.CreatedAtUtc)
             .Select(o => new { o.Status, o.ErrorMessage })
             .FirstOrDefaultAsync(cancellationToken);
-        return latest?.Status == DeploymentOperationStatuses.Failed ? latest.ErrorMessage ?? "The deploy failed." : null;
+        return (latest?.Status == DeploymentOperationStatuses.Failed ? latest.ErrorMessage ?? "The deploy failed." : null, hasDeployed);
     }
 
     /// <summary>Changes whenever a file of the app is added, removed, resized or rewritten.</summary>

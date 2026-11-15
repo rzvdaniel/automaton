@@ -146,7 +146,8 @@ internal static class InventoryCommands
             publicUrl = app.CanLaunchPublicly && !string.IsNullOrWhiteSpace(app.PublicUrl)
                 ? CliAppUrlBuilder.BuildPublishedUrl(server, app.PublicUrl)
                 : null,
-            error = app.IsPaused ? null : app.LiveEnvironment?.LastDeploymentError
+            error = app.LiveEnvironment?.LastDeploymentError,
+            hasRunningVersion = app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc is not null
         }).ToArray();
         if (asJson)
         {
@@ -155,11 +156,13 @@ internal static class InventoryCommands
         }
         Console.WriteLine("ID\tName\tRunner\tStatus\tPublic URL");
         foreach (var app in apps)
-        {
             Console.WriteLine($"{app.Id}\t{app.Name}\t{app.runner ?? "-"}\t{app.status}\t{app.publicUrl ?? "-"}");
-            if (app.error is { Length: > 0 }) Console.WriteLine($"\t  Last deploy failed: {app.error} (still running the previous version)");
-        }
+        foreach (var app in apps.Where(app => app.error is { Length: > 0 }))
+            Console.WriteLine(DescribeFailedDeploy(app.Name, app.error!, app.hasRunningVersion));
     }
+
+    internal static string DescribeFailedDeploy(string name, string error, bool hasRunningVersion) =>
+        $"\n{name}: the last deploy failed: {error.TrimEnd('.')}.{(hasRunningVersion ? " The app still runs the previous version." : "")}";
 
     private static async Task WriteInstallationAsync(AutomatonApiClient client, string server, bool asJson, CancellationToken cancellationToken)
     {
