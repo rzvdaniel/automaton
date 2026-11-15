@@ -558,12 +558,12 @@ onMounted(() => {
 /* Phone width: each key is a stacked card (label left, value right) instead of a table wider than the screen. */
 @media (max-width: 640px) {
   .keys-table :deep(thead) { display: none; }
-  .keys-table :deep(tbody tr) {
+  .keys-table :deep(tbody tr:not(.p-datatable-empty-message)) {
     display: block;
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--p-content-border-color);
   }
-  .keys-table :deep(tbody td) {
+  .keys-table :deep(tbody tr:not(.p-datatable-empty-message) td) {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -573,7 +573,7 @@ onMounted(() => {
     border: 0;
     text-align: right;
   }
-  .keys-table :deep(tbody td::before) {
+  .keys-table :deep(tbody tr:not(.p-datatable-empty-message) td::before) {
     flex: none;
     color: var(--p-text-muted-color);
     font-size: 0.8125rem;
