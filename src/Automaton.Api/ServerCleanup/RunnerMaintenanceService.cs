@@ -90,6 +90,11 @@ public sealed class RunnerMaintenanceService(ApplicationDbContext db, ServerClea
         return run;
     }
 
+    /// <summary>Records who started a Runner upgrade.</summary>
+    public Task AuditUpgradeAsync(Guid appId, Guid viewerId, Guid runnerId, CancellationToken token)
+        => audit.WriteAsync(AuditActions.Requested, AuditEntityTypes.Runner, runnerId, "Runner upgrade requested by an app for a system administrator",
+            new { appId, viewerId, runnerId, operation = "runner-upgrade" }, cancellationToken: token);
+
     /// <summary>The apps with a deployment target on one machine, for the admin to pick one.</summary>
     public async Task<IReadOnlyList<RunnerAppDto>> ListAppsAsync(Guid runnerId, CancellationToken token)
         => await db.AppDeploymentTargets.AsNoTracking()
