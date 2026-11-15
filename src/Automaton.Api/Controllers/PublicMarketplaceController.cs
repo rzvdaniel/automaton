@@ -162,7 +162,10 @@ public class PublicMarketplaceController : ControllerBase
                     a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
-                IsFeatured = a.IsFeatured
+                IsFeatured = a.IsFeatured,
+                CatalogOrigin = a.InstalledFromRepo != null && a.InstalledFromFolder != null && a.InstalledFromFolder != ""
+                    ? new MarketplaceCatalogOriginDto { Catalog = a.InstalledFromRepo, AppPath = a.InstalledFromFolder }
+                    : null
             })
             .FirstOrDefaultAsync();
     }

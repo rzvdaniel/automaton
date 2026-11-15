@@ -33,6 +33,7 @@ export type MarketplaceAppScreenshot = {
 
 export type MarketplaceAppDetails = MarketplaceAppCard & {
   canRemix: boolean
+  catalogOrigin?: { catalog: string; appPath: string } | null
   relatedApps: MarketplaceAppCard[]
   forksAndRemixes: MarketplaceAppCard[]
 }
