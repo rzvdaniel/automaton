@@ -45,11 +45,15 @@ public static class CatalogUpdateCommand
         var installed = CatalogInstallCommand.Text(update, "installedCommit");
         var latest = CatalogInstallCommand.Text(update, "latestCommit");
         var compare = CatalogInstallCommand.Text(update, "compareUrl");
-        var available = update.TryGetProperty("available", out var flag) && flag.ValueKind == JsonValueKind.True;
-        var edited = update.TryGetProperty("edited", out var editedFlag) && editedFlag.ValueKind == JsonValueKind.True;
+        var available = Flag(update, "available");
+        var edited = Flag(update, "edited");
         var newSecrets = CatalogInstallCommand.Strings(update, "newSecrets");
         var newSettings = CatalogInstallCommand.Strings(update, "newSettings");
         var newPermissions = CatalogInstallCommand.Strings(update, "newPermissions");
+        var deployFailed = Flag(update, "deployFailed");
+        var deployError = CatalogInstallCommand.Text(update, "deployError");
+        var running = CatalogInstallCommand.Text(update, "runningCommit");
+        var retryOnly = deployFailed && installed == latest;
 
         if (!available)
         {
@@ -58,10 +62,14 @@ public static class CatalogUpdateCommand
             return;
         }
 
-        if (!asJson) Describe(name, installed, latest, compare, edited, newSettings, newSecrets, newPermissions);
+        if (!asJson)
+        {
+            if (deployFailed) DescribeFailure(name, deployError, running, retryOnly ? installed : null, appReference);
+            if (!retryOnly) Describe(name, installed, latest, compare, edited, newSettings, newSecrets, newPermissions);
+        }
         if (check)
         {
-            if (asJson) CliJson.Write(new { success = true, appId, updateAvailable = true, installedCommit = installed, latestCommit = latest, compareUrl = compare, edited, newSettings, newSecrets, newPermissions });
+            if (asJson) WriteCheck(update, appId, retryOnly);
             Environment.ExitCode = UpdateAvailableExitCode;
             return;
         }
@@ -69,11 +77,11 @@ public static class CatalogUpdateCommand
         if (edited && !confirmEdited)
             throw new InvalidOperationException($"{name} was edited after it was installed; the update replaces those changes. Add --confirm-edited to go on. Nothing was changed.");
 
-        await ApplyAsync(client, app, name, update, confirmEdited, secrets, secretsStdin, wait, asJson, appReference);
+        await ApplyAsync(client, app, name, update, confirmEdited, secrets, secretsStdin, wait, asJson, appReference, retryOnly);
     }
 
     private static async Task ApplyAsync(AutomatonApiClient client, JsonElement app, string name, JsonElement update, bool confirmEdited,
-        Dictionary<string, string> secrets, bool secretsStdin, bool wait, bool asJson, string appReference)
+        Dictionary<string, string> secrets, bool secretsStdin, bool wait, bool asJson, string appReference, bool retry = false)
     {
         var appId = CatalogInstallCommand.Text(app, "id");
         var installed = CatalogInstallCommand.Text(update, "installedCommit");
@@ -91,7 +99,7 @@ public static class CatalogUpdateCommand
             if (failure is not null) throw new InvalidOperationException(failure);
             var operationId = CatalogInstallCommand.Text(deployment, "operationId");
             if (asJson) CliJson.Write(new { success = true, appId, updated = true, installedCommit = installed, latestCommit = latest, deployed = wait, operationId = operationId.Length > 0 ? operationId : null });
-            else Console.WriteLine(wait ? $"Updated and deployed {name} to {Short(latest)}." : $"Updating {name} to {Short(latest)}; deployment started. Check it with: automaton apps show {appId}");
+            else Console.WriteLine(retry ? (wait ? $"Redeployed {name} at {Short(latest)}." : $"Retrying the deploy of {name} at {Short(latest)}. Check it with: automaton apps show {appId}") : wait ? $"Updated and deployed {name} to {Short(latest)}." : $"Updating {name} to {Short(latest)}; deployment started. Check it with: automaton apps show {appId}");
         }
         catch (Exception exception) when (exception is not OutOfMemoryException && secrets.Count > 0)
         {
@@ -122,6 +130,28 @@ public static class CatalogUpdateCommand
             secrets[name] = value.Length > 0 ? value : throw new InvalidOperationException($"The value for {name} is empty. Nothing was changed.");
         }
     }
+
+    private static void WriteCheck(JsonElement update, string appId, bool retry)
+    {
+        var running = CatalogInstallCommand.Text(update, "runningCommit");
+        var deployFailed = Flag(update, "deployFailed");
+        CliJson.Write(new
+        {
+            success = true, appId, updateAvailable = true,
+            installedCommit = CatalogInstallCommand.Text(update, "installedCommit"), latestCommit = CatalogInstallCommand.Text(update, "latestCommit"),
+            compareUrl = CatalogInstallCommand.Text(update, "compareUrl"), edited = Flag(update, "edited"),
+            newSettings = CatalogInstallCommand.Strings(update, "newSettings"), newSecrets = CatalogInstallCommand.Strings(update, "newSecrets"),
+            newPermissions = CatalogInstallCommand.Strings(update, "newPermissions"),
+            deployFailed, deployError = deployFailed ? CatalogInstallCommand.Text(update, "deployError") : null,
+            runningCommit = running.Length > 0 ? running : null, retry
+        });
+    }
+
+    private static bool Flag(JsonElement item, string property) => item.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.True;
+
+    private static void DescribeFailure(string name, string error, string running, string? retryCommit, string app) =>
+        Console.WriteLine($"The last deploy of {name} failed: {(error.Length > 0 ? error : "no reason recorded")}\n" +
+            $"{(running.Length > 0 ? $"It still runs {Short(running)}." : "Nothing is running yet.")}{(retryCommit is null ? "" : $" Retry the deploy of {Short(retryCommit)} with: automaton catalog update {app}")}");
 
     private static void Describe(string name, string installed, string latest, string compare, bool edited, List<string> settings, List<string> secrets, List<string> permissions)
     {

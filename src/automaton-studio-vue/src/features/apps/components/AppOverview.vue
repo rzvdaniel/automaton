@@ -41,6 +41,7 @@ const toast = useToast()
 
 const secretNames = ref<string[] | null>(null)
 const update = ref<CatalogUpdate | null>(null)
+const retryOnly = computed(() => !!update.value?.deployFailed && update.value.installedCommit === update.value.latestCommit)
 const updateBusy = ref(false)
 const permissions = ref<AppPermissionStatus[]>([])
 const disk = ref<AppDiskUsage | null>(null)
@@ -170,8 +171,9 @@ const source = computed(() => {
     <section v-if="update" class="card" aria-label="Update available" data-testid="update-card">
       <div class="row">
         <span>
-          <span class="pill pill--bad">Update available</span>
-          <span class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
+          <span class="pill pill--bad">{{ retryOnly ? 'Last deploy failed' : 'Update available' }}</span>
+          <span v-if="update.deployFailed" class="hint" data-testid="update-deploy-error"> · {{ update.deployError?.replace(/\.$/, '') }}.<template v-if="update.runningCommit"> Still running {{ update.runningCommit.slice(0, 7) }}.</template></span>
+          <span v-if="!retryOnly" class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
           <a v-if="update.compareUrl" class="link" :href="update.compareUrl" target="_blank" rel="noopener noreferrer"> What changed</a>
           <template v-if="update.newSettings.length || update.newSecrets.length || update.newPermissions.length">
             <br><span class="hint">New:
@@ -183,7 +185,7 @@ const source = computed(() => {
           <br><span v-if="update.edited" class="hint">You edited this app, so updating replaces your changes. </span>
           <span class="hint">Its data, settings, secrets, sharing and schedules are kept.</span>
         </span>
-        <Button :label="update.edited ? 'Replace my changes and update' : 'Update'" icon="pi pi-download" size="small" :loading="updateBusy" @click="applyUpdate" />
+        <Button :label="retryOnly ? 'Retry deploy' : update.edited ? 'Replace my changes and update' : 'Update'" icon="pi pi-download" size="small" :loading="updateBusy" @click="applyUpdate" />
       </div>
     </section>
 

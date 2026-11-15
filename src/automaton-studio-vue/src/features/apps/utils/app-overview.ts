@@ -167,7 +167,7 @@ export function statusSentence(input: StatusInput): Segment[] {
 
   if (input.failed) {
     const reason = input.deployError ? `: ${input.deployError}` : '.'
-    return [{ text: 'The last deploy failed', strong: true }, { text: reason }]
+    return [{ text: 'The last deploy failed', strong: true }, { text: reason }, ...(input.lastDeployedAt ? [{ text: ' The app still runs the previous version.' }] : [])]
   }
   if (!input.host) return [{ text: 'Not live yet', strong: true }, { text: '. Deploy it from your AI or with the CLI.' }]
 
