@@ -92,8 +92,12 @@ public class AppCatalogUpdateTests
         var original = new[] { ("automaton.json", "{\"name\":\"Tool\",\"application\":{\"kind\":\"web\"}}"), ("index.html", "hi") };
         var published = ("automaton.json", "{\"appId\":\"x\",\"name\":\"Mine\",\"slug\":\"mine\",\"application\":{\"kind\":\"web\"}}");
         var codeEdit = ("automaton.json", "{\"name\":\"Tool\",\"application\":{\"kind\":\"static\"}}");
+        var installed = ("automaton.json", "{\"appId\":\"x\",\"name\":\"apps-e2e\",\"slug\":\"tool\",\"environment\":{},\"useShell\":false,\"singlePageApp\":false,\"application\":{\"kind\":\"web\"}}");
+        var enabled = ("automaton.json", "{\"name\":\"Tool\",\"useShell\":true,\"application\":{\"kind\":\"web\"}}");
         Assert.Multiple(() =>
         {
+            Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(installed, ("index.html", "hi"))), Is.False);
+            Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(enabled, ("index.html", "hi"))), Is.True);
             Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(published, ("index.html", "hi"), (".automatonignore", "bin/"))), Is.False);
             Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(codeEdit, ("index.html", "hi"))), Is.True);
             Assert.That(AppCatalogUpdateService.IsEdited(Archive(original), Source, Folder(published, ("index.html", "changed"))), Is.True);
