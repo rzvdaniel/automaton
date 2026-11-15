@@ -5,6 +5,7 @@ namespace Automaton.Runner.Console.Services;
 /// <summary>
 /// Measures the disk each app uses on this Runner's machine: its files and logs under the Runner workspace, its data
 /// directory, and the Docker figures for its containers and images. The walk is not free, so a result is reused for a while.
+/// Only the host health loop calls it, one call at a time, so the cache needs no lock.
 /// </summary>
 public sealed class AppDiskMeasurer(RunnerWorkspaceService workspace)
 {

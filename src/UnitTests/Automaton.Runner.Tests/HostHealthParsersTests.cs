@@ -90,4 +90,22 @@ public class HostHealthParsersTests
     [Test]
     public void MissingUpdateNotifierFile_MeansUnknownNotZero()
         => Assert.That(HostHealthParsers.ParseUpdatesAvailable(""), Is.EqualTo(((int?)null, (int?)null)));
+
+    [Test]
+    public void DirectorySize_CountsFilesBelowThePath_AndIsZeroForAMissingOne()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "e2e-disk-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "sub"));
+        File.WriteAllBytes(Path.Combine(root, "a.bin"), new byte[100]);
+        File.WriteAllBytes(Path.Combine(root, "sub", "b.bin"), new byte[23]);
+        try
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(AppDiskMeasurer.DirectorySize(root), Is.EqualTo(123));
+                Assert.That(AppDiskMeasurer.DirectorySize(Path.Combine(root, "missing")), Is.Zero);
+            });
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
 }
