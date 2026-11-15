@@ -260,7 +260,22 @@ public sealed class AppCatalogUpdateService(
         var b = ParseManifest(current);
         if (a is null || b is null) return false;
         foreach (var field in ServerWrittenFields) { a.Remove(field); b.Remove(field); }
+        DropDefaults(a);
+        DropDefaults(b);
         return System.Text.Json.Nodes.JsonNode.DeepEquals(a, b);
+    }
+
+    /// <summary>Removes false, null and empty-object values: the server writes these defaults when it re-serialises the manifest, so a missing one equals a default one.</summary>
+    private static void DropDefaults(System.Text.Json.Nodes.JsonObject node)
+    {
+        foreach (var (key, value) in node.ToList())
+        {
+            if (value is System.Text.Json.Nodes.JsonObject child) DropDefaults(child);
+            if (value is null
+                || value is System.Text.Json.Nodes.JsonObject { Count: 0 }
+                || value is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<bool>(out var flag) && !flag)
+                node.Remove(key);
+        }
     }
 
     /// <summary>Carries the name, slug and other publish fields of the installed manifest, and .automatonignore, into the freshly extracted files.</summary>
