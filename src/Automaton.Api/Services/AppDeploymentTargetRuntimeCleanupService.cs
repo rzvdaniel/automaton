@@ -45,7 +45,7 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
 
         try
         {
-            var result = await gateway.SendAsync<CleanupAppDeploymentTargetResult>(runner!.Id,
+            var result = await gateway.SendBoundedAsync<CleanupAppDeploymentTargetResult>(runner!.Id,
                 deleteApplicationStorage ? "cleanup-app-resources" : "cleanup-target-resources",
                 new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id, deleteApplicationStorage,
                     UnpublishStaticSite: target.IsDefault || deleteApplicationStorage), cancellationToken);
@@ -60,6 +60,15 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
         catch (AppDeploymentTargetConflictException)
         {
             throw;
+        }
+        catch (RunnerNotRespondingException)
+        {
+            // A Runner that stopped recently still looks online; answer now instead of waiting on it. The cleanup
+            // command stays queued, so the Runner performs it when it returns.
+            await RecordCleanupFailureAsync(
+                target,
+                "The Runner did not answer in time and may be offline. The cleanup is queued and runs when the Runner returns; delete the app again after that.",
+                CancellationToken.None);
         }
         catch (InvalidOperationException exception) when (!string.IsNullOrWhiteSpace(exception.Message))
         {

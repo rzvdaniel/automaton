@@ -14,6 +14,9 @@ public sealed class AppActionRunnerGateway(
     public Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         => SendAsync<T>(runnerId, kind, payload, limit: null, token);
 
+    public Task<T> SendBoundedAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
+        => SendQuickAsync<T>(runnerId, kind, payload, token);
+
     // A Runner that stopped recently still looks online for a while, so read commands wait only a bounded time
     // instead of holding the caller's request open. Commands that change something (restore, delete, cleanup) keep
     // waiting: a timeout would report a failure for work the Runner may still complete.
