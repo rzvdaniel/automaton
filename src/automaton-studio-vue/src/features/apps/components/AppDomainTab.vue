@@ -10,7 +10,7 @@ import type { AppCustomDomain, AppCustomDomains, DomainCheckStep } from '../type
 const props = defineProps<{ appId: string; appName: string; isPublic: boolean; publicHost: string }>()
 const emit = defineEmits<{ share: [] }>()
 
-interface Check { phase: 'checking' | 'live' | 'failed'; steps: DomainCheckStep[]; message: string }
+interface Check { phase: 'checking' | 'done' | 'failed'; steps: DomainCheckStep[]; message: string }
 
 const state = ref<AppCustomDomains | null>(null)
 const host = ref('')
@@ -58,7 +58,7 @@ async function check(domain: AppCustomDomain) {
   try {
     const result = await appsService.verifyCustomDomain(props.appId, domain.id)
     state.value = result
-    checks.value[domain.id] = { phase: 'live', steps: result.check ?? [], message: '' }
+    checks.value[domain.id] = { phase: 'done', steps: result.check ?? [], message: '' }
   } catch (caught) {
     const data = (caught as { response?: { data?: { message?: string; steps?: DomainCheckStep[] } } })?.response?.data
     checks.value[domain.id] = { phase: 'failed', steps: data?.steps ?? [], message: data?.message ?? 'The check could not be run. Try again.' }
@@ -97,7 +97,8 @@ async function copy(key: string, value: string) {
 
 function chip(domain: AppCustomDomain): { label: string; severity: 'success' | 'warn' | 'secondary' } {
   if (checks.value[domain.id]?.phase === 'checking') return { label: 'Checking…', severity: 'secondary' }
-  if (domain.verified) return { label: domain.isPrimary ? 'Live · primary address' : 'Live · redirects to the primary', severity: 'success' }
+  if (domain.live) return { label: domain.isPrimary ? 'Live · primary address' : 'Live · redirects to the primary', severity: 'success' }
+  if (domain.verified) return { label: 'Verified · waiting for the certificate', severity: 'warn' }
   return checks.value[domain.id]?.phase === 'failed' ? { label: 'Not pointing here yet', severity: 'warn' } : { label: 'Waiting for DNS', severity: 'warn' }
 }
 
@@ -123,7 +124,7 @@ const aRecord = computed(() => state.value?.targetAddresses?.[0] ?? '')
           <strong class="mono">{{ domain.host }}</strong>
           <Tag :value="chip(domain).label" :severity="chip(domain).severity" rounded />
           <span class="spacer"></span>
-          <Button v-if="domain.verified && !domain.isPrimary" label="Make primary" size="small" text :disabled="busy" @click="run(() => appsService.setPrimaryCustomDomain(appId, domain.id))" />
+          <Button v-if="domain.live && !domain.isPrimary" label="Make primary" size="small" text :disabled="busy" @click="run(() => appsService.setPrimaryCustomDomain(appId, domain.id))" />
           <Button label="Remove" size="small" severity="danger" text :disabled="busy" data-testid="custom-domain-remove" @click="run(() => appsService.removeCustomDomain(appId, domain.id))" />
         </div>
 
@@ -163,8 +164,11 @@ const aRecord = computed(() => state.value?.targetAddresses?.[0] ?? '')
             <span><strong>{{ step.title }}</strong><br><span class="hint">{{ step.detail }}</span></span>
           </li>
         </ul>
-        <Message v-if="checks[domain.id]?.phase === 'live'" severity="success" :closable="false" data-testid="check-live">
-          <strong>{{ domain.host }} is live.</strong> Visitors to {{ publicHost }} are now redirected here.
+        <Message v-if="checks[domain.id]?.phase === 'done' && domain.live" severity="success" :closable="false" data-testid="check-live">
+          <strong>{{ domain.host }} is live.</strong> <template v-if="domain.isPrimary">Visitors to {{ publicHost }} are now redirected here.</template>
+        </Message>
+        <Message v-else-if="checks[domain.id]?.phase === 'done'" severity="info" :closable="false" data-testid="check-waiting">
+          <strong>DNS is right.</strong> The certificate is being issued; the domain goes live once the app answers there. Check again in a minute.
         </Message>
         <Message v-else-if="checks[domain.id]?.phase === 'failed'" severity="warn" :closable="false" data-testid="check-failed">
           <strong>Not there yet.</strong> {{ checks[domain.id]!.message }} The app keeps its current address until then.

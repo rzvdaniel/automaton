@@ -32,7 +32,8 @@ public class InternalRuntimeControllerTests
             {
                 RuntimeProxyAuthKey = "expected-proxy-key"
             }),
-            StudioConfiguration())
+            StudioConfiguration(),
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()))
         {
             ControllerContext = new ControllerContext
             {
@@ -160,6 +161,29 @@ public class InternalRuntimeControllerTests
 
         Assert.That(result, Is.InstanceOf<NoContentResult>());
     }
+
+    [Test]
+    public async Task AuthorizeRuntimeRequest_ASavedAccessChangeEndsTheBriefReuseAtOnce()
+    {
+        var appId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        await SeedRestrictedAppAsync(dbContext, appId, userId);
+        var request = CreateAuthorizedRequest(appId, userId);
+        var controller = CreateController(dbContext, request.HttpContext, request.CookieService);
+        Task<IActionResult> Ask() => controller.AuthorizeRuntimeRequest(
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
+            CancellationToken.None);
+
+        Assert.That(await Ask(), Is.InstanceOf<NoContentResult>());
+        Assert.That(await Ask(), Is.InstanceOf<NoContentResult>());
+
+        dbContext.WebAppUsers.RemoveRange(dbContext.WebAppUsers);
+        await dbContext.SaveChangesAsync();
+        Assert.That(await Ask(), Is.Not.InstanceOf<NoContentResult>());
+    }
+
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -221,7 +245,8 @@ public class InternalRuntimeControllerTests
             new ViewerTokenService(Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("viewer-tests")),
             NullLogger<InternalRuntimeController>.Instance,
             Options.Create(new PublishedAppsConfig { RuntimeProxyAuthKey = "expected-proxy-key" }),
-            StudioConfiguration())
+            StudioConfiguration(),
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

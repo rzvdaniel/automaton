@@ -33,7 +33,17 @@ public sealed class CustomDomainTests
             Task.FromResult<IReadOnlyList<IPAddress>>(Records.TryGetValue(host, out var found) ? found : []);
     }
 
-    private sealed record Setup(ApplicationDbContext Db, string RouteRoot, FakeResolver Resolver, Guid UserId);
+    private sealed class FakeProbe : ICustomDomainLiveProbe
+    {
+        public bool Serving { get; set; } = true;
+
+        public Task<bool> IsServingAsync(string host, CancellationToken cancellationToken) => Task.FromResult(Serving);
+    }
+
+    private sealed record Setup(ApplicationDbContext Db, string RouteRoot, FakeResolver Resolver, Guid UserId)
+    {
+        public FakeProbe Probe { get; } = new();
+    }
 
     private static async Task<Setup> CreateAsync(bool isPublic = true)
     {
@@ -67,6 +77,7 @@ public sealed class CustomDomainTests
             new ResourceAuthorizationService(setup.Db, user),
             Options.Create(new PublishedAppsConfig { AllowedCustomDomains = allowed ?? [] }),
             setup.Resolver,
+            setup.Probe,
             CreateService(setup.Db, setup.RouteRoot, "letsencrypt"),
             restarter);
     }
@@ -112,6 +123,38 @@ public sealed class CustomDomainTests
         setup.Resolver.Txt["_automaton-challenge.blog.example.test"] = ["automaton-verify=0000"];
         Assert.ThrowsAsync<DomainCheckException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
         Assert.That(File.Exists(Path.Combine(setup.RouteRoot, "managed-runtime-routes.yml")), Is.False);
+    }
+
+    [Test]
+    public async Task VerifiedDomain_NotServing_DoesNotBecomePrimaryOrRedirect_UntilItIsLive()
+    {
+        var setup = await CreateAsync();
+        setup.Probe.Serving = false;
+        var domainId = (await Service(setup).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
+        await ProveAsync(setup, "blog.example.test");
+
+        var state = await Service(setup).VerifyAsync(AppId, domainId, default);
+        Assert.That(state.Domains.Single().Status, Is.EqualTo("Verified"));
+        Assert.That(state.Check!.Last().Status, Is.EqualTo("skipped"), "no certificate step passes before the app answers");
+        Assert.That(state.Domains.Single().IsPrimary, Is.False);
+        Assert.That(Routes(setup), Does.Contain("blog.example.test"));
+        Assert.That(Routes(setup), Does.Not.Contain("redirectregex").And.Not.Contain("redirect"));
+
+        setup.Probe.Serving = true;
+        await Service(setup).CheckAllLiveAsync(default);
+        var live = (await Service(setup).GetAsync(AppId, default)).Domains.Single();
+        Assert.That(live.Status, Is.EqualTo("Live"));
+        Assert.That(live.IsPrimary, Is.True);
+        Assert.That(Routes(setup), Does.Contain("redirect"));
+
+        setup.Probe.Serving = false;
+        await Service(setup).CheckAllLiveAsync(default);
+        Assert.That((await Service(setup).GetAsync(AppId, default)).Domains.Single().IsPrimary, Is.True, "one failed probe is tolerated");
+        await Service(setup).CheckAllLiveAsync(default);
+        await Service(setup).CheckAllLiveAsync(default);
+        var dropped = (await Service(setup).GetAsync(AppId, default)).Domains.Single();
+        Assert.That(dropped.IsPrimary, Is.False);
+        Assert.That(Routes(setup), Does.Not.Contain("redirect"));
     }
 
     private sealed class CountingRestarter : IAppRuntimeRestarter

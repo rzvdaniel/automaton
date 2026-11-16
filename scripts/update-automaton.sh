@@ -302,9 +302,18 @@ if ! python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-studio-p
     echo "Studio route configuration failed; services were not changed. Fix the reported configuration file, or restore it from $backup/config.tar.gz, then rerun the update." >&2
     exit 1
 fi
+echo 'Adding the custom-domain certificate resolver if missing.'
+if ! resolver_output=$(python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-custom-domain-resolver); then
+    echo "Custom-domain resolver configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
+    exit 1
+fi
+printf '%s\n' "$resolver_output" | grep -v '^RESULT=' || true
+restart_traefik=false
+if [[ "$resolver_output" == *'RESULT=changed'* ]]; then restart_traefik=true; fi
 old_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
 new_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$bundle/release.env" | cut -d= -f2-)
 recreate=()
+[[ "$restart_traefik" != true ]] || recreate=(--force-recreate)  # API reads the settings file only at startup.
 if [[ "$old_runner_image" != "$new_runner_image" ]]; then
     [[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }
     # Only new Runner installations use this image; running Runners are not changed.
@@ -321,6 +330,10 @@ echo "Updating ${application_services[*]}."
 if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${application_services[@]}"; then
     echo "Update did not reach healthy state. Previous manifest and recovery backup remain at $backup. Do not retry until the database and running services are assessed." >&2
     exit 1
+fi
+if [[ "$restart_traefik" == true ]]; then
+    echo 'Restarting Traefik to load the new certificate resolver.'
+    "${new_compose[@]}" restart traefik || { echo 'Traefik restart failed; restart it by hand.' >&2; exit 1; }
 fi
 if ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]' \
     || ! api_health=$(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://api.$domain/health") \

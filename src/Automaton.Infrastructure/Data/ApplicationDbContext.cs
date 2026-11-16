@@ -64,9 +64,11 @@ namespace Automaton.Api.Data
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
             PrepareDeploymentTargets();
+            var changesAccess = ChangesRuntimeAccess();
             using var admission = OpenRunnerAssignmentAdmission();
             var result = base.SaveChanges(acceptAllChangesOnSuccess);
             admission?.Commit();
+            if (changesAccess) RuntimeAccessVersion.Bump();
             return result;
         }
 
@@ -75,11 +77,26 @@ namespace Automaton.Api.Data
             CancellationToken cancellationToken = default)
         {
             await PrepareDeploymentTargetsAsync(cancellationToken);
+            var changesAccess = ChangesRuntimeAccess();
             await using var admission = await OpenRunnerAssignmentAdmissionAsync(cancellationToken);
             var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
             if (admission is not null) await admission.CommitAsync(cancellationToken);
+            if (changesAccess) RuntimeAccessVersion.Bump();
             return result;
         }
+
+        // Who may open an app's address is reused briefly by the proxy's sign-in check; a change to any of these ends that reuse.
+        private static readonly HashSet<string> RuntimeAccessEntities = new(StringComparer.Ordinal)
+        {
+            nameof(WebApp), nameof(WebAppUser), nameof(AppShare), nameof(Project), nameof(ProjectMember), nameof(ProjectApp),
+            nameof(OrganizationAppAssignment), nameof(OrganizationMember), nameof(Organization),
+            nameof(ApplicationUserRole), nameof(ApplicationRole), nameof(ApplicationUser)
+        };
+
+        private bool ChangesRuntimeAccess()
+            => ChangeTracker.Entries().Any(entry =>
+                entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                && RuntimeAccessEntities.Contains(entry.Metadata.ClrType.Name));
 
         private void PrepareDeploymentTargets()
         {

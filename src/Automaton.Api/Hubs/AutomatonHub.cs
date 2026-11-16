@@ -182,6 +182,30 @@ public class AutomatonHub : Hub
         Guid deploymentTargetId)
         => $"app-runtime-logs:{appId:D}:{deploymentTargetId:D}";
 
+    /// <summary>
+    /// Runner → API: where the reverse proxy can reach this Runner's runtime gateway, and the secret it must send (#1181).
+    /// The address is probed first; a Runner that is not reachable keeps being served through the tunnel.
+    /// </summary>
+    public async Task ReportRuntimeGateway(string url, string secret)
+    {
+        var runner = GetRunner();
+        var services = Context.GetHttpContext()!.RequestServices;
+        try { await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Rejected runtime gateway report for runner {RunnerId}", runner.Id);
+            Context.Abort();
+            return;
+        }
+
+        var registry = services.GetRequiredService<RunnerGatewayRegistry>();
+        if (await registry.ReportAsync(runner.Id, url, secret, Context.ConnectionAborted))
+        {
+            logger.LogInformation("Runner {RunnerId} reported a reachable runtime gateway; refreshing app routes", runner.Id);
+            await services.GetRequiredService<BackendRouteConfigService>().RefreshAsync(CancellationToken.None);
+        }
+    }
+
     public async Task Heartbeat()
     {
         var runner = GetRunner();
