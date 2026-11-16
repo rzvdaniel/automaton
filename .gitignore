@@ -93,6 +93,9 @@ appsettings*.json
 # Ignore files created by Claude AI, except the shared slash-command skills
 .claude/*
 !.claude/skills/
+!.claude/agents/
+!.claude/hooks/
+!.claude/settings.json
 # App file storage
 AppData/
 # Runner data

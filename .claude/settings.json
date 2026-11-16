@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/agent-type-guard.mjs" }
+        ]
+      }
+    ]
+  }
+}

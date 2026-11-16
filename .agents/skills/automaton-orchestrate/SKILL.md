@@ -64,17 +64,18 @@ It does **not** write product code (exception: skills, docs and small chores the
 
 ## Delegating to an agent
 
-1. **Write the task.** The goal; the issues in order; the skills to follow; its lane and what it must not touch;
+1. **Pick the agent type.** Where the tool has agent types, delegate implementation to one whose definition carries `AGENTS.md` and `automaton-implement-issue`, and reviews to one that carries `pr-review` (the project defines them, see the configuration); never a generic agent with a hand-written step list. A headless queue gets the same rules as a fixed preamble on every task.
+2. **Write the task.** The goal; the issues in order; the skills to follow; its lane and what it must not touch;
    whether it works in a batch (stop at merge) or alone (deliver too); where it may test; owner-only steps it must
    name and not wait on; that it ends with the handoff from `automaton-implement-issue`.
-2. **Start it the way the configuration says** (each agent type has its start command and log location).
-3. **Reaching a running agent.** Message it if your tool can; otherwise put instructions in the issue comments it
+3. **Start it the way the configuration says** (each agent type has its start command and log location).
+4. **Reaching a running agent.** Message it if your tool can; otherwise put instructions in the issue comments it
    reads or in a queued task file. Queue a task behind a running one with a small script that waits for the running
    process (take the process id from a precise pattern, never one that matches your own command line).
-4. **Status check** (short): which agents are alive and when each last worked; open PRs and their merge gate; `main`
+5. **Status check** (short): which agents are alive and when each last worked; open PRs and their merge gate; `main`
    green or red; the latest release and the version of each environment; issues labelled `agent:blocked` or
    `agent:human-review`.
-5. **After each task:** read the handoff, check the evidence, re-queue gaps.
+6. **After each task:** read the handoff, check the evidence, re-queue gaps.
 
 ## Closing issues
 
