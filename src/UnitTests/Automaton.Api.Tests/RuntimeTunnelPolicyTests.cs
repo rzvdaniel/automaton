@@ -185,6 +185,39 @@ public class RuntimeTunnelPolicyTests
             "runner-deployment-diagnostic-20260804.apps.automaton.monster", target, config), Is.False);
     }
 
+    [Test]
+    public void IsExpectedAppHost_AcceptsVerifiedCustomDomainOfPublicApp()
+    {
+        var appId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId);
+        target.WebApp = new WebApp
+        {
+            Id = appId,
+            Name = "Blog",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            IsPublished = true,
+            RuntimeVisibility = AppRuntimeVisibilities.Public,
+            AccessStatus = AppAccessStatuses.Active,
+            PublicUrl = "blog"
+        };
+        var config = new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" };
+        string[] verified = ["blog.example.com"];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RuntimeTunnelService.IsExpectedAppHost("Blog.Example.com", target, config, verified), Is.True);
+            Assert.That(RuntimeTunnelService.IsExpectedAppHost("other.example.com", target, config, verified), Is.False);
+            Assert.That(RuntimeTunnelService.IsExpectedAppHost("blog.example.com", target, config), Is.False);
+        });
+
+        target.WebApp.RuntimeVisibility = AppRuntimeVisibilities.Private;
+        Assert.That(RuntimeTunnelService.IsExpectedAppHost("blog.example.com", target, config, verified), Is.False);
+    }
+
 
     [Test]
     public void RunnerPresenceEvaluator_RejectsOfflineRunner()
