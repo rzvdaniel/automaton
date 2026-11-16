@@ -192,6 +192,35 @@ class InstallationConfigurationTests(unittest.TestCase):
         return {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*')
                 if p.is_file() and p.relative_to(self.root).as_posix() not in skip}
 
+    def test_ensure_custom_domain_resolver_migrates_cloudflare_installation_once(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        traefik_path = self.root / 'traefik.yml'
+        traefik = json.loads(traefik_path.read_text())
+        del traefik['certificatesResolvers']['letsencrypt']
+        traefik_path.write_text(json.dumps(traefik))
+        settings_path = self.root / 'appsettings.Production.json'
+        settings = json.loads(settings_path.read_text())
+        del settings['PublishedApps']['CustomDomainCertificateResolver']
+        settings_path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_custom_domain_resolver(self.root), 'changed')
+        fresh = Path(self.temporary.name) / 'fresh'
+        module.configure(fresh, 'example.com', 'owner@example.com', 'cloudflare')
+        self.assertEqual(json.loads(traefik_path.read_text()), json.loads((fresh / 'traefik.yml').read_text()))
+        self.assertEqual(json.loads(settings_path.read_text())['PublishedApps']['CustomDomainCertificateResolver'], 'letsencrypt')
+        before = self.snapshot()
+        self.assertEqual(module.ensure_custom_domain_resolver(self.root), 'unchanged')
+        self.assertEqual(before, self.snapshot())
+
+    def test_ensure_custom_domain_resolver_skips_hand_written_traefik_and_http_mode(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        (self.root / 'traefik.yml').write_text('entryPoints: {}\n')
+        before = self.snapshot()
+        self.assertEqual(module.ensure_custom_domain_resolver(self.root), 'skipped')
+        self.assertEqual(before, self.snapshot())
+        other = Path(self.temporary.name) / 'http'
+        module.configure(other, 'example.com', 'owner@example.com')
+        self.assertEqual(module.ensure_custom_domain_resolver(other), 'unchanged')
+
     def test_switch_to_cloudflare_rewrites_only_tls_files(self):
         self.configure()
         touched = ('traefik.yml', 'dynamic/installation.yml', 'dynamic/store.yml', 'dynamic/studio-paths.yml',
