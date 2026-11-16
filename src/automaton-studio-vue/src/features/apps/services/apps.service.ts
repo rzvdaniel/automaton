@@ -433,6 +433,11 @@ class AppsService {
     return data
   }
 
+  /** Cancels the app's active deployment; the target becomes Failed so it can be redeployed or deleted. */
+  async cancelDeployment(id: string, targetSlug?: string): Promise<void> {
+    await apiClient.post(`/api/apps/${id}/deploy/cancel`, null, { params: targetSlug ? { targetSlug } : undefined })
+  }
+
   async getDeploymentOperation(id: string, operationId: string): Promise<DeploymentOperation> {
     const { data } = await apiClient.get<DeploymentOperation>(`/api/apps/${id}/deploy-operations/${operationId}`)
     return data

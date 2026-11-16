@@ -54,10 +54,11 @@ public sealed class DeploymentOperationDispatcher(
         foreach (var id in activeOperations.Where(item => item.Value.IsCompleted).Select(item => item.Key).ToList())
             activeOperations.Remove(id);
         var available = options.Value.MaximumConcurrentOperations - activeOperations.Count;
-        if (available <= 0) return;
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var service = scope.ServiceProvider.GetRequiredService<DeploymentOperationService>();
+        await service.FailTimedOutOperationsAsync(stoppingToken);
+        if (available <= 0) return;
         var ids = await service.GetDispatchableOwnedOperationIdsAsync(available, activeOperations.Keys, stoppingToken);
         foreach (var id in ids)
             activeOperations.Add(id, ExecuteOperationAsync(id, stoppingToken));
