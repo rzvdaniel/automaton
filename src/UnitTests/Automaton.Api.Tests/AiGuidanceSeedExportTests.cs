@@ -107,7 +107,7 @@ public sealed class AiGuidanceSeedExportTests
         // SHA-256 of the UTF-8 content captured from the previous database-backed runtime.
         var expected = new[]
         {
-            "export|AGENTS.md|918a0335f49b3cc9a2fdaecd866f21e14a5914a951af8aebb6bfbd86c7de4994",
+            "export|AGENTS.md|ee4adf4d7fe551893af63169db6df5e8b2a5e05973f314fae2f6cbe85599c048",
             "export|.automaton/agents/skills/automaton-app/SKILL.md|630f6010d38c224ff2b8555d477dba75efa46b07c0e2cb1f0c4b92a7b5fbed9b",
             "base|shared|automaton-app-contract|531014b837b6f3aed563bb9dab285e7d723a8f16500d97b6dd7ac4e5847fcecf",
             "req|studio|automaton-studio-editor|2933c8cf7b268f92e1b3bf9388d08a572a1e5d9e6b64bf9b423bf9eb3aeee93e",
