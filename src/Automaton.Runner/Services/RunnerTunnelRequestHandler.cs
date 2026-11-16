@@ -106,7 +106,9 @@ internal sealed class RunnerTunnelRequestHandler
         var destination = headers[TunnelHeaders.Destination].ToString();
         var pathAndQuery = context.Request.Path.ToUriComponent() + context.Request.QueryString.Value;
         if (destination == TunnelDestinations.FastApi)
-            return new Route(destination, new Uri(new Uri(config.FastApiUrl), pathAndQuery), null);
+            return pathAndQuery.StartsWith("//", StringComparison.Ordinal) || pathAndQuery.Contains("://", StringComparison.Ordinal)
+                ? null
+                : new Route(destination, new Uri(new Uri(config.FastApiUrl), pathAndQuery), null);
 
         if (destination is not (TunnelDestinations.RuntimeGateway or TunnelDestinations.StaticSite)
             || !Guid.TryParse(headers[TunnelHeaders.AppId].ToString(), out var appId)

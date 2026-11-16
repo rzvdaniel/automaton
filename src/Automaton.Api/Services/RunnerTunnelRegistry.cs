@@ -19,14 +19,26 @@ public sealed class RunnerTunnelRegistry
 
     public int ConnectionCount(Guid runnerId) => connections.TryGetValue(runnerId, out var list) ? Count(list) : 0;
 
-    /// <summary>Registers an accepted tunnel socket. Dispose the result when the socket ends.</summary>
-    public IDisposable Add(Guid runnerId, TunnelConnectionStream stream, out Task closed)
+    /// <summary>
+    /// Registers an accepted tunnel socket. Dispose the result when the socket ends. Returns null (and registers
+    /// nothing) when the Runner already has <paramref name="maxConnections"/> open.
+    /// </summary>
+    public IDisposable? Add(Guid runnerId, TunnelConnectionStream stream, out Task closed, int maxConnections = int.MaxValue)
     {
-        var connection = new Connection(stream);
-        var list = connections.GetOrAdd(runnerId, _ => []);
-        lock (list) list.Add(connection);
         closed = stream.Closed;
-        return new Registration(this, runnerId, connection);
+        while (true)
+        {
+            var list = connections.GetOrAdd(runnerId, _ => []);
+            lock (list)
+            {
+                // Remove() may have dropped this (then empty) list from the dictionary meanwhile: start over.
+                if (!connections.TryGetValue(runnerId, out var current) || !ReferenceEquals(current, list)) continue;
+                if (list.Count(connection => !connection.Stream.Closed.IsCompleted) >= maxConnections) return null;
+                var connection = new Connection(stream);
+                list.Add(connection);
+                return new Registration(this, runnerId, connection);
+            }
+        }
     }
 
     /// <summary>The least busy connection of the Runner, or null when it has none. Dispose the lease when the request ends.</summary>
@@ -52,7 +64,11 @@ public sealed class RunnerTunnelRegistry
     {
         if (connections.TryGetValue(runnerId, out var list))
         {
-            lock (list) list.Remove(connection);
+            lock (list)
+            {
+                list.Remove(connection);
+                if (list.Count == 0) connections.TryRemove(new KeyValuePair<Guid, List<Connection>>(runnerId, list));
+            }
         }
         connection.Dispose();
     }

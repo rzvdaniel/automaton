@@ -46,7 +46,13 @@ public static class RunnerTunnelEndpoint
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         await using var stream = new TunnelConnectionStream(
             WebSocketStream.Create(socket, WebSocketMessageType.Binary, ownsWebSocket: true));
-        using var registration = registry.Add(runnerId, stream, out var closed);
+        using var registration = registry.Add(runnerId, stream, out var closed, MaxConnectionsPerRunner);
+        if (registration is null)
+        {
+            // Lost a race with other connections of the same Runner: tell it to back off.
+            await socket.CloseOutputAsync(WebSocketCloseStatus.PolicyViolation, "too many tunnel connections", CancellationToken.None);
+            return Results.Empty;
+        }
         logger.LogInformation("Runner {RunnerId} opened a tunnel connection ({Count} open)", runnerId, registry.ConnectionCount(runnerId));
         await Task.WhenAny(closed, Task.Delay(Timeout.Infinite, context.RequestAborted)).ConfigureAwait(false);
         logger.LogInformation("Runner {RunnerId} tunnel connection ended", runnerId);

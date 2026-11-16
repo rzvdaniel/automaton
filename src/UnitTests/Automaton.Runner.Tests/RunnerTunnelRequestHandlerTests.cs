@@ -63,6 +63,14 @@ public sealed class RunnerTunnelRequestHandlerTests
     }
 
     [Test]
+    public async Task ResolveAsync_RefusesAFastApiPathThatWouldLeaveTheLocalProcess()
+    {
+        var context = Context("//evil.example/x", string.Empty, TunnelDestinations.FastApi, null, null);
+
+        Assert.That(await CreateHandler().ResolveAsync(context, CancellationToken.None), Is.Null);
+    }
+
+    [Test]
     public async Task HandleAsync_AnswersBusyWhileTheRunnerSwitchesApiInstance()
     {
         var handler = CreateHandler();

@@ -55,7 +55,7 @@ internal sealed class RunnerTunnelListener : IConnectionListenerFactory, IConnec
             Transport = new DuplexPipe(PipeReader.Create(stream), PipeWriter.Create(stream));
             var closedSource = new CancellationTokenSource();
             ConnectionClosed = closedSource.Token;
-            _ = stream.Closed.ContinueWith(_ => closedSource.Cancel(), TaskScheduler.Default);
+            _ = stream.Closed.ContinueWith(_ => { closedSource.Cancel(); closedSource.Dispose(); }, TaskScheduler.Default);
         }
 
         public override void Abort(ConnectionAbortedException abortReason) => stream.Dispose();
