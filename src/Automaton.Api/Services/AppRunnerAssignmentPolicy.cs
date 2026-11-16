@@ -57,12 +57,17 @@ public sealed class AppRunnerAssignmentPolicy(
             runnerId.Value,
             userId,
             cancellationToken);
-        if (target.ExecutionRunnerId != runner.Id)
+        // Saving an App re-assigns its current Runner; that must not forget a running deployment.
+        var runnerChanged = target.ExecutionRunnerId != runner.Id;
+        if (runnerChanged)
         {
             target.GenericRuntimeDeployed = false;
         }
         target.ExecutionRunnerId = runner.Id;
-        target.Status = DeploymentTargetStatus.NotDeployed;
+        if (runnerChanged || target.Status == DeploymentTargetStatus.Unassigned)
+        {
+            target.Status = DeploymentTargetStatus.NotDeployed;
+        }
         target.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
