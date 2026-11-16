@@ -7,13 +7,16 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import AppActions from '../components/AppActions.vue'
 import AppActivity from '../components/AppActivity.vue'
+import AppDefinitionDialog from '../components/AppDefinitionDialog.vue'
+import AppDomainTab from '../components/AppDomainTab.vue'
+import AppSecrets from '../components/AppSecrets.vue'
+import AppStoreListing from '../components/AppStoreListing.vue'
 import AppMark from '../components/AppMark.vue'
 import AppOverview from '../components/AppOverview.vue'
 import AppSettingsPage from '../components/AppSettingsPage.vue'
 import ShareDialog from '../components/ShareDialog.vue'
 import {
   appTabs,
-  opensAdvanced,
   resolveAppViewFromQuery,
   withoutAuthoringQuery,
   type AppViewKey,
@@ -26,6 +29,7 @@ import type { AppDeploymentTarget, AppSharing } from '../types/apps.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
 import { accessLabel, appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
+import { useDeleteApp } from '../utils/use-delete-app'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const route = useRoute()
@@ -35,7 +39,6 @@ const editorStore = useAppEditorStore()
 
 const appId = computed(() => String(route.params.id ?? ''))
 const activeView = ref<AppViewKey>(resolveAppViewFromQuery(route.query))
-const advancedOpen = ref(opensAdvanced(route.query))
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const executions = ref<AppActionExecution[]>([])
 const schedules = ref<ActionSchedule[]>([])
@@ -43,13 +46,32 @@ const actions = ref<ActionModule[]>([])
 const sharing = ref<AppSharing | null>(null)
 const showShareDialog = ref(false)
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const moreMenu = ref<InstanceType<typeof Menu> | null>(null)
+const showDefinition = ref(false)
+const savedSecretCount = ref(0)
 const starting = ref(false)
 const activityRefresh = ref(0)
 let poll: ReturnType<typeof setInterval> | null = null
 let unsubscribeBackendRuntimeLogs: (() => void) | null = null
 
 const app = computed(() => editorStore.currentApp)
-const tabs = computed(() => appTabs(actions.value.length > 0))
+const canManage = computed(() => app.value?.canUpdate !== false)
+const hasSecrets = computed(() => (app.value?.application?.secrets?.length ?? 0) > 0 || savedSecretCount.value > 0)
+const tabs = computed(() => appTabs({
+  hasActions: actions.value.length > 0,
+  hasSecrets: hasSecrets.value,
+  canManage: canManage.value,
+  isPublishable: kind.value !== 'tool',
+}))
+/** The tab shown: a link to a tab this app or person does not have shows Overview. */
+const shownView = computed<AppViewKey>(() => tabs.value.some((tab) => tab.key === activeView.value) ? activeView.value : 'overview')
+const { askDelete } = useDeleteApp(() => app.value!)
+const moreItems = computed(() => [
+  { label: 'View definition', icon: 'pi pi-file', command: () => { showDefinition.value = true } },
+  ...(canManage.value ? [{ separator: true }, { label: 'Delete app…', icon: 'pi pi-trash', class: 'menu-danger', command: askDelete }] : []),
+])
+const isPublicApp = computed(() => sharing.value?.audience === 'internet')
+const publicHost = computed(() => (app.value?.publicUrl ? new URL(getPublishedAppUrl(app.value.publicUrl)).host : ''))
 const kind = computed(() => (app.value ? appKindOf(app.value) : 'web'))
 const liveTarget = computed(() => getLiveTarget(deploymentTargets.value))
 const lastRun = computed(() => [...executions.value].sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0] ?? null)
@@ -111,6 +133,7 @@ onMounted(async () => {
     await handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
     void loadWhatItDoes()
     void loadSharing()
+    void loadSecretCount()
     if (wantsShare) showShareDialog.value = true
   } catch (error: unknown) {
     toast.add({
@@ -257,6 +280,21 @@ async function handleTargetsChanged(targets: AppDeploymentTarget[]) {
   }
 }
 
+async function loadSecretCount() {
+  try {
+    const settingNames = (app.value?.application?.settings ?? []).map((item) => item.name)
+    savedSecretCount.value = (await appsService.listSecrets(appId.value)).filter((secret) => !settingNames.includes(secret.name)).length
+  } catch {
+    savedSecretCount.value = 0
+  }
+}
+
+/** The Share dialog links to the Domain and Store listing tabs. */
+function openFromShare(tab: 'domain' | 'store') {
+  showShareDialog.value = false
+  handleNavigation(tab)
+}
+
 async function loadSharing() {
   try {
     sharing.value = await appsService.getSharing(appId.value)
@@ -313,6 +351,8 @@ async function handleSharingChanged() {
               <Button label="Copy address" icon="pi pi-copy" :disabled="!address" data-testid="copy-address" @click="copyAddress" />
             </template>
             <Button v-else-if="openAppUrl" label="Open app" icon="pi pi-external-link" data-testid="open-app" @click="openApp" />
+            <Button icon="pi pi-ellipsis-h" severity="secondary" outlined aria-label="More actions" aria-haspopup="true" data-testid="more-actions" @click="moreMenu?.toggle($event)" />
+            <Menu ref="moreMenu" :model="moreItems" popup />
           </div>
         </header>
 
@@ -330,7 +370,7 @@ async function handleSharingChanged() {
         </div>
 
         <AppOverview
-          v-if="activeView === 'overview' || (activeView === 'actions' && actions.length === 0)"
+          v-if="shownView === 'overview'"
           :app="app"
           :targets="deploymentTargets"
           :executions="executions"
@@ -343,12 +383,13 @@ async function handleSharingChanged() {
           @navigate="handleNavigation"
           @share="showShareDialog = true"
           @paused-changed="editorStore.refreshApp(appId)"
+          @targets-changed="refreshTargets"
         />
         <AppActions
-          v-else-if="activeView === 'actions' && actions.length > 0"
+          v-else-if="shownView === 'actions'"
           :app-id="app.id"
           :paused="!!app.isPaused"
-          :can-update="app.canUpdate !== false"
+          :can-update="canManage"
           :actions="actions"
           :schedules="schedules"
           :executions="executions"
@@ -356,7 +397,7 @@ async function handleSharingChanged() {
           @changed="loadWhatItDoes"
         />
         <AppActivity
-          v-else-if="activeView === 'activity'"
+          v-else-if="shownView === 'activity'"
           :app-id="app.id"
           :executions="executions"
           :live-output-available="liveOutputAvailable"
@@ -365,13 +406,28 @@ async function handleSharingChanged() {
           :deploy-target="kind === 'tool' ? null : liveTarget"
           :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
         />
-        <AppSettingsPage
-          v-else-if="activeView === 'settings'"
-          :app="app"
-          :targets="deploymentTargets"
-          :open-advanced="advancedOpen"
-          @targets-changed="refreshTargets"
+        <AppSecrets
+          v-else-if="shownView === 'secrets'"
+          :app-id="app.id"
+          :declared="app.application?.secrets"
+          :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
         />
+        <AppDomainTab
+          v-else-if="shownView === 'domain'"
+          :app-id="app.id"
+          :app-name="app.name"
+          :is-public="isPublicApp"
+          :public-host="publicHost"
+          @share="showShareDialog = true"
+        />
+        <AppStoreListing
+          v-else-if="shownView === 'store'"
+          :app="app"
+          :sharing="sharing"
+          @changed="handleSharingChanged"
+          @share="showShareDialog = true"
+        />
+        <AppSettingsPage v-else-if="shownView === 'settings'" :app="app" />
       </main>
 
       <ShareDialog
@@ -379,7 +435,9 @@ async function handleSharingChanged() {
         :app-id="app.id"
         :app-name="app.name"
         @changed="handleSharingChanged"
+        @open="openFromShare"
       />
+      <AppDefinitionDialog v-model:visible="showDefinition" :app="app" />
     </template>
 
     <div v-else class="state-container">

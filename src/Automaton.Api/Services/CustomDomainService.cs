@@ -53,8 +53,19 @@ public sealed record AppCustomDomainDto(
     string ChallengeHost, string ChallengeValue);
 
 /// <param name="Target">The address the domain's CNAME record must point to (an A record may use <paramref name="TargetAddresses"/>).</param>
+/// <param name="Check">What the last "Check DNS" found, step by step; null when the state was not the result of a check.</param>
 public sealed record AppCustomDomainsState(
-    string Target, IReadOnlyList<string> TargetAddresses, IReadOnlyList<AppCustomDomainDto> Domains);
+    string Target, IReadOnlyList<string> TargetAddresses, IReadOnlyList<AppCustomDomainDto> Domains,
+    IReadOnlyList<DomainCheckStep>? Check = null);
+
+/// <param name="Status">"ok", "failed" or "skipped" (not checked because an earlier step failed).</param>
+public sealed record DomainCheckStep(string Key, string Title, string Status, string Detail);
+
+/// <summary>A DNS check that did not pass; the message is for people and <see cref="Steps"/> says which step failed.</summary>
+public sealed class DomainCheckException(string message, IReadOnlyList<DomainCheckStep> steps) : InvalidOperationException(message)
+{
+    public IReadOnlyList<DomainCheckStep> Steps { get; } = steps;
+}
 
 /// <summary>
 /// Adds, verifies and removes the owner's own domains for a public app. A domain starts routing (and gets a certificate
@@ -106,16 +117,28 @@ public sealed class CustomDomainService(
         var domain = await FindAsync(appId, domainId, cancellationToken);
 
         // A claim on a name is proven by a TXT record only the name's DNS owner can create; pointing DNS here is not enough.
-        var proof = await resolver.ResolveTxtAsync(ChallengePrefix + domain.Host, cancellationToken);
-        if (!proof.Any(text => string.Equals(text.Trim(), ChallengeValuePrefix + domain.VerificationToken, StringComparison.Ordinal)))
-            throw new InvalidOperationException(
-                $"The TXT record {ChallengePrefix}{domain.Host} with the value {ChallengeValuePrefix}{domain.VerificationToken} was not found. Create it, wait for it to spread, and check again.");
+        var txtName = ChallengePrefix + domain.Host;
+        var txtValue = ChallengeValuePrefix + domain.VerificationToken;
+        const string TxtTitle = "Ownership (TXT record)", PointsTitle = "Points to this server", CertTitle = "Certificate";
+        var proof = await resolver.ResolveTxtAsync(txtName, cancellationToken);
+        if (!proof.Any(text => string.Equals(text.Trim(), txtValue, StringComparison.Ordinal)))
+            throw new DomainCheckException(
+                $"The TXT record {txtName} with the value {txtValue} was not found. Create it, wait for it to spread, and check again.",
+                [new("txt", TxtTitle, "failed", $"No TXT record {txtName} with the expected value yet."),
+                 new("points", PointsTitle, "skipped", "Checked after the ownership record is found."),
+                 new("certificate", CertTitle, "skipped", "Issued once the domain points here.")]);
+        var txtOk = new DomainCheckStep("txt", TxtTitle, "ok", "Found the expected value.");
 
         var targets = await ResolveTargetAddressesAsync(cancellationToken);
         var actual = await resolver.ResolveAsync(domain.Host, cancellationToken);
         if (targets.Count == 0 || !actual.Any(address => targets.Contains(address)))
-            throw new InvalidOperationException(
-                $"{domain.Host} does not point at this server yet. Create the DNS record shown, wait for it to spread, and check again.");
+            throw new DomainCheckException(
+                $"{domain.Host} does not point at this server yet. Create the DNS record shown, wait for it to spread, and check again.",
+                [txtOk,
+                 new("points", PointsTitle, "failed", actual.Count == 0
+                     ? $"No CNAME or A record for {domain.Host} yet."
+                     : $"{domain.Host} resolves to {string.Join(", ", actual)}, not to this server."),
+                 new("certificate", CertTitle, "skipped", "Issued once the domain points here.")]);
 
         if (domain.VerifiedAt is null)
         {
@@ -128,7 +151,13 @@ public sealed class CustomDomainService(
             if (domain.IsPrimary) await RestartForNewAddressAsync(app, cancellationToken);
         }
 
-        return await BuildStateAsync(appId, cancellationToken);
+        var state = await BuildStateAsync(appId, cancellationToken);
+        return state with
+        {
+            Check = [txtOk,
+                new("points", PointsTitle, "ok", $"{domain.Host} resolves to {string.Join(", ", actual.Where(targets.Contains))}."),
+                new("certificate", CertTitle, "ok", "Issued automatically; the app answers on the domain.")]
+        };
     }
 
     public async Task<AppCustomDomainsState> SetPrimaryAsync(Guid appId, Guid domainId, CancellationToken cancellationToken)

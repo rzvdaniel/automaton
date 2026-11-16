@@ -185,4 +185,14 @@ public sealed class AppMetadataService(
         return imageUrl;
     }
 
+    /// <summary>Puts the screenshots in the given order; ids must be exactly the app's screenshots.</summary>
+    public async Task ReorderScreenshotsAsync(Guid appId, IReadOnlyList<Guid> orderedIds)
+    {
+        var screenshots = await dataContext.WebAppScreenshots.Where(s => s.WebAppId == appId).ToListAsync();
+        if (orderedIds.Count != screenshots.Count || !screenshots.Select(s => s.Id).ToHashSet().SetEquals(orderedIds))
+            throw new InvalidOperationException("The order must list every screenshot of the app once.");
+        for (var index = 0; index < orderedIds.Count; index++)
+            screenshots.Single(s => s.Id == orderedIds[index]).SortOrder = index;
+        await dataContext.SaveChangesAsync();
+    }
 }

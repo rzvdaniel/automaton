@@ -211,7 +211,7 @@ async function copy(command: string) {
 
       <div v-if="apps.length" data-test="app-restore">
         <h2 class="studio-section">Restore one app</h2>
-        <p class="studio-muted mt-0">Open an app, then Settings, then Advanced.</p>
+        <p class="studio-muted mt-0">Open an app, then Settings, then Danger zone.</p>
         <div class="flex flex-wrap gap-2">
           <RouterLink v-for="app in apps" :key="app.id" :to="{ path: `/apps/${app.id}`, query: { view: 'settings' } }" class="p-button btn-small">
             {{ app.name }}

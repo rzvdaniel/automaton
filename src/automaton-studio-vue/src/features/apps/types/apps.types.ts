@@ -685,6 +685,16 @@ export interface AppCustomDomains {
   target: string
   targetAddresses: string[]
   domains: AppCustomDomain[]
+  /** Set on the answer to a DNS check: what was found, step by step. */
+  check?: DomainCheckStep[]
+}
+
+/** One step of a DNS check: ownership (TXT), points here, certificate. */
+export interface DomainCheckStep {
+  key: 'txt' | 'points' | 'certificate'
+  title: string
+  status: 'ok' | 'failed' | 'skipped'
+  detail: string
 }
 
 /** A team (project) the signed-in person belongs to. */
