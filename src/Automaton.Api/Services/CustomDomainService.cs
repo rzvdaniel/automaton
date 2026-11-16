@@ -65,7 +65,8 @@ public sealed class CustomDomainService(
     ResourceAuthorizationService authorizationService,
     IOptions<PublishedAppsConfig> options,
     ICustomDomainResolver resolver,
-    BackendRouteConfigService routeConfigService)
+    BackendRouteConfigService routeConfigService,
+    IAppRuntimeRestarter? runtimes = null)
 {
     private readonly PublishedAppsConfig config = options.Value;
 
@@ -101,7 +102,7 @@ public sealed class CustomDomainService(
     /// <summary>Checks the domain's DNS. When it points at this server the domain starts routing.</summary>
     public async Task<AppCustomDomainsState> VerifyAsync(Guid appId, Guid domainId, CancellationToken cancellationToken)
     {
-        await LoadManagedAppAsync(appId, cancellationToken);
+        var app = await LoadManagedAppAsync(appId, cancellationToken);
         var domain = await FindAsync(appId, domainId, cancellationToken);
 
         // A claim on a name is proven by a TXT record only the name's DNS owner can create; pointing DNS here is not enough.
@@ -124,6 +125,7 @@ public sealed class CustomDomainService(
                 other => other.WebAppId == appId && other.IsPrimary, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await routeConfigService.RefreshAsync(cancellationToken);
+            if (domain.IsPrimary) await RestartForNewAddressAsync(app, cancellationToken);
         }
 
         return await BuildStateAsync(appId, cancellationToken);
@@ -131,7 +133,7 @@ public sealed class CustomDomainService(
 
     public async Task<AppCustomDomainsState> SetPrimaryAsync(Guid appId, Guid domainId, CancellationToken cancellationToken)
     {
-        await LoadManagedAppAsync(appId, cancellationToken);
+        var app = await LoadManagedAppAsync(appId, cancellationToken);
         var domain = await FindAsync(appId, domainId, cancellationToken);
         if (domain.VerifiedAt is null)
             throw new InvalidOperationException("Check the domain's DNS before making it the primary address.");
@@ -140,12 +142,13 @@ public sealed class CustomDomainService(
         foreach (var other in domains) other.IsPrimary = other.Id == domainId;
         await dbContext.SaveChangesAsync(cancellationToken);
         await routeConfigService.RefreshAsync(cancellationToken);
+        await RestartForNewAddressAsync(app, cancellationToken);
         return await BuildStateAsync(appId, cancellationToken);
     }
 
     public async Task<AppCustomDomainsState> RemoveAsync(Guid appId, Guid domainId, CancellationToken cancellationToken)
     {
-        await LoadManagedAppAsync(appId, cancellationToken);
+        var app = await LoadManagedAppAsync(appId, cancellationToken);
         var domain = await FindAsync(appId, domainId, cancellationToken);
         dbContext.AppCustomDomains.Remove(domain);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -164,7 +167,15 @@ public sealed class CustomDomainService(
         }
 
         await routeConfigService.RefreshAsync(cancellationToken);
+        if (domain.IsPrimary) await RestartForNewAddressAsync(app, cancellationToken);
         return await BuildStateAsync(appId, cancellationToken);
+    }
+
+    /// <summary>An app whose settings default to its address gets the new address only after a restart.</summary>
+    private async Task RestartForNewAddressAsync(WebApp app, CancellationToken cancellationToken)
+    {
+        if (runtimes is not null && AppSecretService.UsesAppAddress(app.ApplicationContractJson))
+            await runtimes.RestartRunningAsync(app.Id, CancellationToken.None);
     }
 
     public static string Normalize(string? host) => (host ?? string.Empty).Trim().TrimEnd('.').ToLowerInvariant();

@@ -54,7 +54,7 @@ public sealed class CustomDomainTests
         return new Setup(db, CreateTempDirectory(), new FakeResolver(), OwnerId);
     }
 
-    private static CustomDomainService Service(Setup setup, Guid? userId = null, List<string>? allowed = null)
+    private static CustomDomainService Service(Setup setup, Guid? userId = null, List<string>? allowed = null, IAppRuntimeRestarter? restarter = null)
     {
         var http = new DefaultHttpContext
         {
@@ -67,7 +67,8 @@ public sealed class CustomDomainTests
             new ResourceAuthorizationService(setup.Db, user),
             Options.Create(new PublishedAppsConfig { AllowedCustomDomains = allowed ?? [] }),
             setup.Resolver,
-            CreateService(setup.Db, setup.RouteRoot, "letsencrypt"));
+            CreateService(setup.Db, setup.RouteRoot, "letsencrypt"),
+            restarter);
     }
 
     private static async Task ProveAsync(Setup setup, string host)
@@ -109,6 +110,30 @@ public sealed class CustomDomainTests
         setup.Resolver.Txt["_automaton-challenge.blog.example.test"] = ["automaton-verify=0000"];
         Assert.ThrowsAsync<InvalidOperationException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
         Assert.That(File.Exists(Path.Combine(setup.RouteRoot, "managed-runtime-routes.yml")), Is.False);
+    }
+
+    private sealed class CountingRestarter : IAppRuntimeRestarter
+    {
+        public int Restarts;
+        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false) { Restarts++; return Task.FromResult(1); }
+    }
+
+    [Test]
+    public async Task NewPrimaryDomain_RestartsAnAppWhoseSettingDefaultsToItsAddress_AndOnlyThen()
+    {
+        var setup = await CreateAsync();
+        var restarter = new CountingRestarter();
+        var domainId = (await Service(setup, restarter: restarter).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
+        await ProveAsync(setup, "blog.example.test");
+
+        await Service(setup, restarter: restarter).VerifyAsync(AppId, domainId, default);
+        Assert.That(restarter.Restarts, Is.EqualTo(0));
+
+        var app = await setup.Db.WebApps.SingleAsync(a => a.Id == AppId);
+        app.ApplicationContractJson = """{"settings":[{"name":"URL","default":"{{app.address}}"}]}""";
+        await setup.Db.SaveChangesAsync();
+        await Service(setup, restarter: restarter).SetPrimaryAsync(AppId, domainId, default);
+        Assert.That(restarter.Restarts, Is.EqualTo(1));
     }
 
     [Test]
