@@ -121,13 +121,16 @@ public static class RunnersInstallCommand
     // The script runs in a POSIX shell: any CR (Windows Environment.NewLine, CRLF from the server) would break the here-document.
     internal static string ToShellInput(string command) => command.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n') + "\n";
 
-    internal const string WindowsSsh = @"C:\Windows\System32\OpenSSH\ssh.exe";
+    internal static string WindowsSsh => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "OpenSSH", "ssh.exe");
 
     /// <summary>Prefers the Windows OpenSSH client so the Windows ssh-agent works even from Git Bash.</summary>
     internal static string ChooseSshBinary(bool isWindows, Func<string, bool> exists) =>
         isWindows && exists(WindowsSsh) ? WindowsSsh : "ssh";
 
-    internal static async Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct)
+    internal static Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct)
+        => ExecuteAsync(command, ssh, timeoutSeconds, ct, "Installer");
+
+    internal static async Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct, string label)
     {
         var sshBinary = ChooseSshBinary(OperatingSystem.IsWindows(), File.Exists);
         var start = new ProcessStartInfo(ssh is null ? "sudo" : sshBinary)
@@ -137,7 +140,7 @@ public static class RunnersInstallCommand
         };
         if (ssh is null) { start.ArgumentList.Add("bash"); start.ArgumentList.Add("-s"); }
         else { start.ArgumentList.Add("-T"); start.ArgumentList.Add("--"); start.ArgumentList.Add(ssh); start.ArgumentList.Add("sudo bash -s"); }
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start installer process.");
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {label.ToLowerInvariant()} process.");
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
@@ -166,7 +169,7 @@ public static class RunnersInstallCommand
                 var sshHint = ssh is not null && output.Contains("Permission denied (publickey", StringComparison.OrdinalIgnoreCase)
                     ? $"\nSSH used {sshBinary}; check that your key is loaded in its ssh-agent (ssh-add) and accepted for {ssh}."
                     : string.Empty;
-                throw new InvalidOperationException($"Installer exited {process.ExitCode}: {lastLines}{localHint}{sshHint}");
+                throw new InvalidOperationException($"{label} exited {process.ExitCode}: {lastLines}{localHint}{sshHint}");
             }
         }
         catch (OperationCanceledException)
@@ -174,7 +177,7 @@ public static class RunnersInstallCommand
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             await process.WaitForExitAsync(CancellationToken.None);
             if (ct.IsCancellationRequested) throw;
-            throw new TimeoutException($"Installer did not finish within {timeoutSeconds} seconds.");
+            throw new TimeoutException($"{label} did not finish within {timeoutSeconds} seconds.");
         }
     }
 

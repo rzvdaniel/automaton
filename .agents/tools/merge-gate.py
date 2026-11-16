@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Check a pull request against the merge gate in .agents/skills/pr-review/SKILL.md.
 
-Usage: python3 .agents/tools/merge-gate.py <pr-number> [--repo owner/name] [--merge]
+Usage: python3 .agents/tools/merge-gate.py <pr-number> [--repo owner/name] [--merge] [--skip-ci]
 
 Prints one line per check and exits 0 when the pull request may be merged, 1 when it may not.
 With --merge it also squash-merges the checked commit, and only when every check passes. Agents merge only
 this way, never with gh pr merge directly.
+With --skip-ci the "ci" row is not evaluated: the CI job running the gate uses it, because the other checks are
+required by branch protection and the gate job would otherwise wait for itself.
 Requires the gh CLI.
 """
 import fnmatch
@@ -92,7 +94,26 @@ def read_review(review: dict) -> dict:
     }
 
 
-def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str, list[tuple[str, str, str]]]:
+def security_row(tier: str, reviews: list[dict], review: dict | None, head: str) -> tuple[str, str, str]:
+    """A high-tier change needs the Security: section in a review by someone other than the main reviewer."""
+    if tier != "high":
+        ok = review and review["security"] and review["commit"] == head
+        return ("PASS", "security", "security pass recorded") if ok else (
+            "FAIL", "security", "this change needs a 'Security:' section in the review of the final commit")
+    who = lambda item: (item.get("author") or {}).get("login")
+    at_head = [item for item in reviews if read_review(item)["commit"] == head]
+    passes = [item for item in at_head if read_review(item)["security"]]
+    if not passes:
+        return ("FAIL", "security", "a high-tier change needs a separate review with a 'Security:' section on the final commit")
+    # The main review is any other non-blocking review of the final commit; the last-review check covers the verdict.
+    others = [item for item in at_head if read_review(item)["verdict"] != "changes"
+              and any(who(item) != who(sec) for sec in passes)]
+    if not others:
+        return ("FAIL", "security", "the security pass must come from a different reviewer than the main review")
+    return ("PASS", "security", "separate security pass recorded")
+
+
+def check(pr: dict, patterns: list[str], security: list[str] = (), skip_ci: bool = False) -> tuple[str, list[tuple[str, str, str]]]:
     """Return the tier and (result, name, detail) rows; result is PASS, FAIL or WARN."""
     rows = []
     head = pr["headRefOid"]
@@ -117,7 +138,9 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
     checks = pr.get("statusCheckRollup", [])
     not_green = [item.get("name") or item.get("context") or "?" for item in checks
                  if (item.get("conclusion") or item.get("state") or "PENDING") not in GREEN]
-    if not checks:
+    if skip_ci:
+        rows.append(("PASS", "ci", "not evaluated here; branch protection requires the other checks"))
+    elif not checks:
         rows.append(("FAIL", "ci", "no checks on the final commit yet; an empty list is not a pass"))
     elif not_green:
         rows.append(("FAIL", "ci", "not green: " + ", ".join(not_green)))
@@ -138,21 +161,20 @@ def check(pr: dict, patterns: list[str], security: list[str] = ()) -> tuple[str,
 
     needs_security = tier == "high" or any(matches(path, pattern) for path in paths for pattern in security)
     if needs_security:
-        rows.append(("PASS", "security", "security pass recorded") if review and review["security"] and review["commit"] == head
-                    else ("FAIL", "security", "this change needs a 'Security:' section in the review of the final commit"))
+        rows.append(security_row(tier, reviews, review, head))
 
     if big:
         rows.append(("PASS", "removal", big + "; high tier"))
 
     body = pr.get("body") or ""
-    missing = [part for part in ("How verified", "Risk", "How to revert")
+    missing = [part for part in ("How verified", "Risk", "How to revert", "Docs")
                if not re.search(r"^\W*" + part + r"\W*:", body, re.I | re.M)]
     if CLOSING.search(body):
         rows.append(("FAIL", "description", "says Closes/Fixes #N; an issue closes only when it is live"))
     elif missing:
         rows.append(("FAIL", "description", "missing: " + ", ".join(missing)))
     else:
-        rows.append(("PASS", "description", "how verified, risk and how to revert are there"))
+        rows.append(("PASS", "description", "how verified, risk, how to revert and docs are there"))
 
     code = [path for path in paths if path.startswith("src/") and not path.endswith(".md")]
     tests = [path for path in code if "/UnitTests/" in path or re.search(r"\.(test|spec)\.[jt]s$", path)]
@@ -174,7 +196,11 @@ def main() -> int:
     args = sys.argv[1:]
     repo = []
     merge = "--merge" in args
-    args = [arg for arg in args if arg != "--merge"]
+    skip_ci = "--skip-ci" in args
+    if merge and skip_ci:
+        print("--skip-ci cannot be combined with --merge")
+        return 2
+    args = [arg for arg in args if arg not in ("--merge", "--skip-ci")]
     if "--repo" in args:
         at = args.index("--repo")
         repo, args = args[at:at + 2], args[:at] + args[at + 2:]
@@ -201,7 +227,7 @@ def main() -> int:
         print(f"FAIL  tier: could not read .github/CODEOWNERS from {pr['baseRefName']}")
         print(f"MERGE GATE: FAIL (tier unknown, PR {args[0]})")
         return 1
-    tier, rows = check(pr, owner_patterns(owners), security_patterns(owners))
+    tier, rows = check(pr, owner_patterns(owners), security_patterns(owners), skip_ci)
     for result, name, detail in rows:
         print(f"{result}  {name}: {detail}")
     failed = any(result == "FAIL" for result, _, _ in rows)
