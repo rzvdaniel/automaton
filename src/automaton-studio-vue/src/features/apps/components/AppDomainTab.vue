@@ -135,9 +135,9 @@ const aRecord = computed(() => state.value?.targetAddresses?.[0] ?? '')
               <thead><tr><th>Type</th><th>Name</th><th>Value</th></tr></thead>
               <tbody>
                 <tr v-for="row in records(domain)" :key="row.key">
-                  <td>{{ row.type }}</td>
-                  <td><span class="cell"><code>{{ row.name }}</code><Button :label="copied === row.key + 'n' ? 'Copied' : 'Copy'" size="small" text severity="secondary" :aria-label="`Copy the ${row.type} name`" @click="copy(row.key + 'n', row.name)" /></span></td>
-                  <td><span class="cell"><code>{{ row.value }}</code><Button :label="copied === row.key + 'v' ? 'Copied' : 'Copy'" size="small" text severity="secondary" :aria-label="`Copy the ${row.type} value`" @click="copy(row.key + 'v', row.value)" /></span></td>
+                  <td data-label="Type">{{ row.type }}</td>
+                  <td data-label="Name"><span class="cell"><code>{{ row.name }}</code><Button :label="copied === row.key + 'n' ? 'Copied' : 'Copy'" size="small" text severity="secondary" :aria-label="`Copy the ${row.type} name`" @click="copy(row.key + 'n', row.name)" /></span></td>
+                  <td data-label="Value"><span class="cell"><code>{{ row.value }}</code><Button :label="copied === row.key + 'v' ? 'Copied' : 'Copy'" size="small" text severity="secondary" :aria-label="`Copy the ${row.type} value`" @click="copy(row.key + 'v', row.value)" /></span></td>
                 </tr>
               </tbody>
             </table>
@@ -203,6 +203,15 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { padding: 6px 8px; text-align: left; color: var(--ink-soft); font-weight: 500; border-bottom: 1px solid var(--line); }
 td { padding: 6px 8px; border-bottom: 1px solid var(--row-line); vertical-align: middle; }
 .cell { display: flex; align-items: center; gap: 6px; }
+.cell code { min-width: 0; flex: 1; }
+@media (max-width: 600px) {
+  thead { display: none; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  td { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-bottom: 0; }
+  td::before { content: attr(data-label); color: var(--ink-soft); font-weight: 500; }
+  .cell { justify-content: space-between; }
+}
 .notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .check-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }

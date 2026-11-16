@@ -35,6 +35,14 @@ describe('AppDomainTab', () => {
     expect(wrapper.emitted('share')).toHaveLength(1)
   })
 
+  it('labels each record cell so the table can stack on phones', async () => {
+    vi.mocked(appsService.getCustomDomains).mockResolvedValue(waiting)
+    const wrapper = open()
+    await flushPromises()
+    const labels = wrapper.findAll('[data-testid="dns-records"] tbody tr:first-child td').map((td) => td.attributes('data-label'))
+    expect(labels).toEqual(['Type', 'Name', 'Value'])
+  })
+
   it('shows the records with relative names and the full names below', async () => {
     vi.mocked(appsService.getCustomDomains).mockResolvedValue(waiting)
     const wrapper = open()
