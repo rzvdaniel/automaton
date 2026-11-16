@@ -32,6 +32,8 @@ public sealed class AppSourceController(
     {
         var owner = await FindOwnerAsync(appId, token);
         if (owner is null) return Forbid();
+        if (path.Contains("..", StringComparison.Ordinal) || Path.IsPathRooted(path))
+            return BadRequest(new { success = false, message = "Invalid path" });
         var content = await storage.ReadAppRootFileAsync(owner.Value, appId, path);
         return content is null
             ? NotFound(new { success = false, message = "File not found" })
