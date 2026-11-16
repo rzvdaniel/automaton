@@ -86,7 +86,8 @@ public sealed class AppSettingValueServiceTests
         var (_, secrets, db, appId, _) = Create("""{"settings":[{"name":"URL","default":"{{app.address}}"}]}""");
         db.WebApps.Single(app => app.Id == appId).PublicUrl = null;
         db.SaveChanges();
-        Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None)).ContainsKey("URL"), Is.False);
+        Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None))["URL"],
+            Is.EqualTo($"https://app-{appId:N}.apps.example.com"));
         db.WebApps.Single(app => app.Id == appId).PublicUrl = "blog";
         db.SaveChanges();
 

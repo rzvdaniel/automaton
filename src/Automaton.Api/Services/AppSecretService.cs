@@ -252,7 +252,8 @@ public sealed class AppSecretService(
 
     /// <summary>
     /// The app's public address without a trailing slash: its primary verified own domain, else its slug on the apps
-    /// domain. Null while the app has neither, so the setting stays unset instead of holding a placeholder.
+    /// domain, else its private address on the apps domain (the one every app has before it is public), so an app that
+    /// needs its address to start can start straight after install. Null only when the server has no apps domain.
     /// </summary>
     private async Task<string?> AppAddressAsync(Guid appId, CancellationToken token)
     {
@@ -262,10 +263,14 @@ public sealed class AppSecretService(
             .Where(domain => domain.WebAppId == appId && domain.IsPrimary && domain.VerifiedAt != null)
             .Select(domain => domain.Host).FirstOrDefaultAsync(token);
         if (primary is not null) return $"https://{primary}";
+        if (publishedApps is null) return null;
         var slug = await db.WebApps.Where(app => app.Id == appId).Select(app => app.PublicUrl).FirstOrDefaultAsync(token);
-        if (string.IsNullOrWhiteSpace(slug) || publishedApps is null) return null;
+        var appsDomain = publishedApps.Value.PublicBaseUrlHost;
+        var host = string.IsNullOrWhiteSpace(slug)
+            ? PublishedAppHostNames.BuildPrivateAppHost(appId, appsDomain)
+            : PublishedAppHostNames.BuildPublishedAppHost(slug, appsDomain);
         var port = parsed is { IsDefaultPort: false } ? $":{parsed.Port}" : string.Empty;
-        return $"{scheme}://{PublishedAppHostNames.BuildPublishedAppHost(slug, publishedApps.Value.PublicBaseUrlHost)}{port}";
+        return $"{scheme}://{host}{port}";
     }
 
     private async Task AddVaultSecretsAsync(AppVaults vaults, List<ApplicationSecretDeclaration> wanted,
