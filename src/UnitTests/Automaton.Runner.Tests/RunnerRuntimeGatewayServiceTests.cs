@@ -103,6 +103,39 @@ public sealed class RunnerRuntimeGatewayServiceTests
     }
 
     [Test]
+    public async Task GatewayWithASecretRefusesOtherContainersAndNeverPassesTheSecretToTheApp()
+    {
+        const string secret = "gateway-secret-0123456789abcdef";
+        Environment.SetEnvironmentVariable(RunnerGatewayAccess.SecretEnvironmentVariable, secret);
+        try
+        {
+            var handler = new CapturingHandler();
+            await using var gateway = await StartGatewayAsync(Guid.NewGuid(), Guid.NewGuid(), handler);
+            using var client = new HttpClient();
+
+            // The test client connects over loopback like the Runner's own tunnel, so use the secret check endpoint
+            // and the header path: without the header the probe is refused, with it the app never sees the header.
+            using var refused = await client.GetAsync(new Uri(gateway.GetUri("/"), "/gateway-check"));
+            Assert.That(refused.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+
+            using var withSecret = new HttpRequestMessage(HttpMethod.Get, new Uri(gateway.GetUri("/"), "/gateway-check"));
+            withSecret.Headers.TryAddWithoutValidation(RunnerGatewayAccess.SecretHeader, secret);
+            using var accepted = await client.SendAsync(withSecret);
+            Assert.That(accepted.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, gateway.GetUri("/page"));
+            request.Headers.TryAddWithoutValidation(RunnerGatewayAccess.SecretHeader, secret);
+            using var response = await client.SendAsync(request);
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(handler.Request!.Headers.Contains(RunnerGatewayAccess.SecretHeader), Is.False);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerGatewayAccess.SecretEnvironmentVariable, null);
+        }
+    }
+
+    [Test]
     public async Task GatewayFiltersHopByHopHeadersAndPreservesEndToEndHeaders()
     {
         var appId = Guid.NewGuid();

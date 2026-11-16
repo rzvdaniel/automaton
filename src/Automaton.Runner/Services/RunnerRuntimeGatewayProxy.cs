@@ -51,6 +51,7 @@ internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeReg
             if (IsHopByHopHeader(header.Key, connectionTokens)
                 || header.Key.StartsWith("Sec-WebSocket-", StringComparison.OrdinalIgnoreCase)
                 || header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals(RunnerGatewayAccess.SecretHeader, StringComparison.OrdinalIgnoreCase)
                 || header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
                 continue;
             var value = header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase)
@@ -135,8 +136,10 @@ internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeReg
         IEnumerable<string> values,
         ISet<string> connectionTokens)
     {
+        // The gateway secret is for the gateway only: an app that received it could call other apps' gateway paths.
         if (IsHopByHopHeader(name, connectionTokens)
-            || string.Equals(name, "Host", StringComparison.OrdinalIgnoreCase))
+            || string.Equals(name, "Host", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, RunnerGatewayAccess.SecretHeader, StringComparison.OrdinalIgnoreCase))
             return;
 
         if (name.Equals("Cookie", StringComparison.OrdinalIgnoreCase))

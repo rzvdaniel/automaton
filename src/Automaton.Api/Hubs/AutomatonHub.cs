@@ -190,6 +190,14 @@ public class AutomatonHub : Hub
     {
         var runner = GetRunner();
         var services = Context.GetHttpContext()!.RequestServices;
+        try { await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Rejected runtime gateway report for runner {RunnerId}", runner.Id);
+            Context.Abort();
+            return;
+        }
+
         var registry = services.GetRequiredService<RunnerGatewayRegistry>();
         if (await registry.ReportAsync(runner.Id, url, secret, Context.ConnectionAborted))
         {
