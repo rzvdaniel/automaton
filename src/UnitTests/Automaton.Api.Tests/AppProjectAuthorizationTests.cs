@@ -97,6 +97,34 @@ public class AppProjectAuthorizationTests
 
 
     [Test]
+    public async Task Get_LetsAnAdministratorOpenAnyAppReadOnly_ButNotAStranger()
+    {
+        var ownerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var strangerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        using var tempRoot = new AppAuthorizationTestData.TemporaryDirectory();
+        using var dbContext = AppAuthorizationTestData.CreateDbContext();
+        AppAuthorizationTestData.SeedProjectScopedApp(dbContext, appId, Guid.NewGuid(), ownerId, collaboratorId);
+        var role = new ApplicationRole { Id = Guid.NewGuid(), Name = UserRole.Administrator, NormalizedName = UserRole.Administrator.ToUpperInvariant() };
+        dbContext.Roles.Add(role);
+        dbContext.UserRoles.Add(new ApplicationUserRole { UserId = adminId, RoleId = role.Id });
+        await dbContext.SaveChangesAsync();
+
+        var asAdmin = AppAuthorizationTestServiceFactory.CreateAppsService(dbContext, adminId, tempRoot.Path).Get(appId);
+        var asStranger = AppAuthorizationTestServiceFactory.CreateAppsService(dbContext, strangerId, tempRoot.Path).Get(appId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(asAdmin, Is.Not.Null);
+            Assert.That(asAdmin!.CanUpdate, Is.False);
+            Assert.That(asStranger, Is.Null);
+        });
+    }
+
+    [Test]
     public void List_ReturnsProjectOwnerAsUserId_ForProjectScopedApp()
     {
         var projectOwnerId = Guid.NewGuid();

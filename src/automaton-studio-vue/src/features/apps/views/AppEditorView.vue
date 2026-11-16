@@ -8,6 +8,7 @@ import { useToast } from 'primevue/usetoast'
 import AppActions from '../components/AppActions.vue'
 import AppActivity from '../components/AppActivity.vue'
 import AppDefinitionDialog from '../components/AppDefinitionDialog.vue'
+import AppAdminTab from '@/features/admin/components/AppAdminTab.vue'
 import AppDomainTab from '../components/AppDomainTab.vue'
 import AppSecrets from '../components/AppSecrets.vue'
 import AppStoreListing from '../components/AppStoreListing.vue'
@@ -30,6 +31,7 @@ import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
 import { accessLabel, appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
 import { useDeleteApp } from '../utils/use-delete-app'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const route = useRoute()
@@ -38,7 +40,10 @@ const toast = useToast()
 const editorStore = useAppEditorStore()
 
 const appId = computed(() => String(route.params.id ?? ''))
-const activeView = ref<AppViewKey>(resolveAppViewFromQuery(route.query))
+// Admin → Apps links here with ?view=admin (an approval link may say ?tab=admin).
+const activeView = ref<AppViewKey>(route.query.tab === 'admin' ? 'admin' : resolveAppViewFromQuery(route.query))
+const roles = useAuthStore().user?.roles ?? []
+const isAdministrator = roles.includes('SysAdmin') || roles.includes('Admin')
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const executions = ref<AppActionExecution[]>([])
 const schedules = ref<ActionSchedule[]>([])
@@ -62,6 +67,7 @@ const tabs = computed(() => appTabs({
   hasSecrets: hasSecrets.value,
   canManage: canManage.value,
   isPublishable: kind.value !== 'tool',
+  isAdmin: isAdministrator,
 }))
 /** The tab shown: a link to a tab this app or person does not have shows Overview. */
 const shownView = computed<AppViewKey>(() => tabs.value.some((tab) => tab.key === activeView.value) ? activeView.value : 'overview')
@@ -130,7 +136,11 @@ onMounted(async () => {
 
   try {
     await editorStore.loadApp(appId.value)
-    await handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
+    // An administrator opening someone else's app may not list its targets; the page still opens.
+    await handleTargetsChanged(await appsService.listDeploymentTargets(appId.value).catch((error: unknown) => {
+      if (isAdministrator) return []
+      throw error
+    }))
     void loadWhatItDoes()
     void loadSharing()
     void loadSecretCount()
@@ -428,6 +438,13 @@ async function handleSharingChanged() {
           @share="showShareDialog = true"
         />
         <AppSettingsPage v-else-if="shownView === 'settings'" :app="app" />
+        <AppAdminTab
+          v-else-if="shownView === 'admin'"
+          :app-id="app.id"
+          :app-name="app.name"
+          :paused="!!app.isPaused"
+          @paused-changed="editorStore.refreshApp(appId)"
+        />
       </main>
 
       <ShareDialog

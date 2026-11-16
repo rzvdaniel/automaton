@@ -70,6 +70,12 @@ describe('studio router', () => {
     expect(router.getRoutes().find((route) => route.name === name)?.redirect).toEqual({ name: 'people' })
   })
 
+  it('sends the old admin app page to the app page Admin tab', () => {
+    const matched = router.resolve('/admin/apps/a1').matched
+    const redirect = matched[matched.length - 1]?.redirect as (to: { params: Record<string, string> }) => unknown
+    expect(redirect({ params: { appId: 'a1' } })).toEqual({ path: '/apps/a1', query: { view: 'admin' } })
+  })
+
   it.each(['apikeys', 'downloads', 'admin-installation'])('sends the old %s page to Settings', (name) => {
     const redirect = router.getRoutes().find((route) => route.name === name)?.redirect as { path: string; hash: string }
     expect(redirect.path).toBe('/settings')

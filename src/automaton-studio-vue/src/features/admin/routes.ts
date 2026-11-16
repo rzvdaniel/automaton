@@ -10,7 +10,6 @@ import AdminAppActivityView from './views/AdminAppActivityView.vue'
 import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
 import AdminUserDetailView from './views/AdminUserDetailView.vue'
 import AdminUserAppsView from './views/AdminUserAppsView.vue'
-import AdminAppDetailView from './views/AdminAppDetailView.vue'
 import AdminAppsView from './views/AdminAppsView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
@@ -70,11 +69,8 @@ export const adminRoutes: RouteRecordRaw[] = [
       },
       {
         path: 'apps/:appId',
-        name: 'admin-app-detail',
-        component: AdminAppDetailView,
-        meta: {
-          title: 'App Details',
-        },
+        // The app page has an Admin tab now; old links and approval emails still work.
+        redirect: (to) => ({ path: `/apps/${String(to.params.appId)}`, query: { view: 'admin' } }),
       },
       {
         path: 'logs',
