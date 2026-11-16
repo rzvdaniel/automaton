@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -23,6 +24,11 @@ public class InternalRuntimeController : ControllerBase
     private readonly ILogger<InternalRuntimeController> logger;
     private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly ConfigurationService configurationService;
+    private readonly IMemoryCache cache;
+
+    // Every request of a private app asks for this check; a visitor loading a page fires dozens. The answer is reused
+    // briefly, so a removed share or a paused app is honoured within this time at most.
+    internal static readonly TimeSpan AuthCacheLifetime = TimeSpan.FromSeconds(10);
 
     public InternalRuntimeController(
         ApplicationDbContext dbContext,
@@ -31,8 +37,10 @@ public class InternalRuntimeController : ControllerBase
         ViewerTokenService viewerTokens,
         ILogger<InternalRuntimeController> logger,
         IOptions<PublishedAppsConfig> publishedAppsConfig,
-        ConfigurationService configurationService)
+        ConfigurationService configurationService,
+        IMemoryCache cache)
     {
+        this.cache = cache;
         this.configurationService = configurationService;
         this.dbContext = dbContext;
         this.authorizationService = authorizationService;
@@ -74,24 +82,31 @@ public class InternalRuntimeController : ControllerBase
             return SignInRequired(appId);
         }
 
-        var appExists = await dbContext.WebApps
-            .AnyAsync(a => a.Id == appId && a.AccessStatus == AppAccessStatuses.Active
-                && a.DeletionClaimId == null, cancellationToken);
-        if (!appExists)
+        // Keyed by the cookie's hash, so one visitor's answer is never another's; only a full success is kept.
+        var cacheKey = $"runtime-auth:{RuntimeAccessVersion.Current}:{appId:N}:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cookie)))}";
+        if (!cache.TryGetValue(cacheKey, out bool isAdministrator))
         {
-            logger.LogDebug("Runtime auth failed for app {AppId}: app unavailable.", appId);
-            return Unauthorized();
-        }
+            var appExists = await dbContext.WebApps
+                .AnyAsync(a => a.Id == appId && a.AccessStatus == AppAccessStatuses.Active
+                    && a.DeletionClaimId == null, cancellationToken);
+            if (!appExists)
+            {
+                logger.LogDebug("Runtime auth failed for app {AppId}: app unavailable.", appId);
+                return Unauthorized();
+            }
 
-        if (!await authorizationService.CanUseAppRuntimeAsync(appId, validation.UserId, cancellationToken))
-        {
-            logger.LogDebug("Runtime auth forbidden for app {AppId} and user {UserId}.", appId, validation.UserId);
-            return StatusCode(StatusCodes.Status403Forbidden);
+            if (!await authorizationService.CanUseAppRuntimeAsync(appId, validation.UserId, cancellationToken))
+            {
+                logger.LogDebug("Runtime auth forbidden for app {AppId} and user {UserId}.", appId, validation.UserId);
+                return StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            isAdministrator = await authorizationService.IsSystemAdministratorAsync(validation.UserId, cancellationToken);
+            cache.Set(cacheKey, isAdministrator, AuthCacheLifetime);
         }
 
         // Tell the app who is using it: the role (the app hides controls) and a short-lived token (the API's proof, for
         // changes only a system administrator may make). Traefik copies these over whatever the browser sent.
-        var isAdministrator = await authorizationService.IsSystemAdministratorAsync(validation.UserId, cancellationToken);
         Response.Headers[ViewerHeaders.Role] = isAdministrator ? "administrator" : "user";
         Response.Headers[ViewerHeaders.Token] = viewerTokens.Create(appId, validation.UserId);
         return NoContent();

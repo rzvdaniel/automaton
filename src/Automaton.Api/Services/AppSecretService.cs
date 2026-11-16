@@ -260,7 +260,7 @@ public sealed class AppSecretService(
         var baseUrl = publishedApps?.Value.PublicBaseUrl;
         var scheme = Uri.TryCreate(baseUrl, UriKind.Absolute, out var parsed) ? parsed.Scheme : "https";
         var primary = await db.AppCustomDomains
-            .Where(domain => domain.WebAppId == appId && domain.IsPrimary && domain.VerifiedAt != null)
+            .Where(domain => domain.WebAppId == appId && domain.IsPrimary && domain.LiveAt != null)
             .Select(domain => domain.Host).FirstOrDefaultAsync(token);
         if (primary is not null) return $"https://{primary}";
         if (publishedApps is null) return null;

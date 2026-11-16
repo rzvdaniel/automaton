@@ -26,7 +26,8 @@ public sealed class AppPauseService(
     IAppRuntimeCommandQueue operations,
     UserContextService user,
     IAuditEventService auditEvents,
-    ILogger<AppPauseService> logger)
+    ILogger<AppPauseService> logger,
+    BackendRouteConfigService? routes = null)
 {
     public const string PauseCommandKind = "pause-runtime";
     public const string ResumeCommandKind = "resume-runtime";
@@ -58,6 +59,7 @@ public sealed class AppPauseService(
             app.PausedAt = pause ? DateTime.UtcNow : null;
             app.Updated = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
+            await RefreshRoutesAsync(ct);
         }
         // Schedules are handled on every call, so repeating a call finishes anything an earlier call left undone.
         var changed = pause ? await PauseSchedulesAsync(appId, ct) : await ResumeSchedulesAsync(appId, userId, warnings, ct);
@@ -78,6 +80,17 @@ public sealed class AppPauseService(
         // Repeating the call also repeats the Runner command, so a Runner that missed it catches up.
         if (pause) await QueueRuntimeCommandsAsync(appId, userId, pause, warnings, ct);
         return new AppPauseState(appId, app.IsPaused, app.PausedAt, changed, warnings);
+    }
+
+    // A paused app's address is served by the tunnel (its "paused" page), not directly by the Runner's gateway (#1181).
+    private async Task RefreshRoutesAsync(CancellationToken ct)
+    {
+        if (routes is null) return;
+        try { await routes.RefreshAsync(ct); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "Could not refresh app routes after a pause or resume");
+        }
     }
 
     private async Task<int> PauseSchedulesAsync(Guid appId, CancellationToken ct)

@@ -15,7 +15,7 @@ vi.mock('../services/apps.service', () => ({
   },
 }))
 
-const domain = { id: 'd1', host: 'blog.example.com', isPrimary: false, verified: false, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }
+const domain = { id: 'd1', host: 'blog.example.com', isPrimary: false, verified: false, live: false, status: 'WaitingForDns' as const, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }
 const waiting = { target: 'apps.test', targetAddresses: ['203.0.113.10'], domains: [domain] }
 const steps = (statuses: string[]) => ['txt', 'points', 'certificate'].map((key, index) => ({ key, title: key, status: statuses[index], detail: `${key} detail` }))
 
@@ -65,7 +65,7 @@ describe('AppDomainTab', () => {
 
   it('shows each step and a live message when the check passes', async () => {
     vi.mocked(appsService.getCustomDomains).mockResolvedValue(waiting)
-    vi.mocked(appsService.verifyCustomDomain).mockResolvedValue({ ...waiting, domains: [{ ...domain, verified: true, isPrimary: true }], check: steps(['ok', 'ok', 'ok']) } as never)
+    vi.mocked(appsService.verifyCustomDomain).mockResolvedValue({ ...waiting, domains: [{ ...domain, verified: true, live: true, status: 'Live', isPrimary: true }], check: steps(['ok', 'ok', 'ok']) } as never)
     const wrapper = open()
     await flushPromises()
     await wrapper.get('[data-testid="custom-domain-verify"]').trigger('click')
@@ -73,6 +73,18 @@ describe('AppDomainTab', () => {
     expect(wrapper.findAll('[data-testid="check-steps"] li')).toHaveLength(3)
     expect(wrapper.get('[data-testid="check-live"]').text()).toContain('blog.example.com is live')
     expect(wrapper.text()).toContain('Live · primary address')
+  })
+
+  it('says the certificate is pending when DNS is right but the domain is not live yet', async () => {
+    vi.mocked(appsService.getCustomDomains).mockResolvedValue(waiting)
+    vi.mocked(appsService.verifyCustomDomain).mockResolvedValue({ ...waiting, domains: [{ ...domain, verified: true, status: 'Verified' }], check: steps(['ok', 'ok', 'skipped']) } as never)
+    const wrapper = open()
+    await flushPromises()
+    await wrapper.get('[data-testid="custom-domain-verify"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="check-live"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="check-waiting"]').text()).toContain('certificate is being issued')
+    expect(wrapper.text()).toContain('Verified · waiting for the certificate')
   })
 
   it('shows the failing step and the server message when the check fails', async () => {

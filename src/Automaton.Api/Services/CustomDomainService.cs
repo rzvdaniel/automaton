@@ -10,6 +10,30 @@ using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
+public interface ICustomDomainLiveProbe
+{
+    /// <summary>True when https://host answers with a valid certificate and the app (not a missing route) responds.</summary>
+    Task<bool> IsServingAsync(string host, CancellationToken cancellationToken);
+}
+
+public sealed class HttpsCustomDomainLiveProbe : ICustomDomainLiveProbe
+{
+    private static readonly HttpClient Client = new(new HttpClientHandler { AllowAutoRedirect = false })
+    { Timeout = TimeSpan.FromSeconds(10) };
+
+    public async Task<bool> IsServingAsync(string host, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await Client.GetAsync($"https://{host}/", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var status = (int)response.StatusCode;
+            return status != 404 && status < 500;
+        }
+        catch (HttpRequestException) { return false; }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return false; }
+    }
+}
+
 public interface ICustomDomainResolver
 {
     Task<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken);
@@ -50,7 +74,7 @@ public sealed class DnsCustomDomainResolver : ICustomDomainResolver
 /// <param name="ChallengeHost">The TXT record name that proves ownership; its value is <paramref name="ChallengeValue"/>.</param>
 public sealed record AppCustomDomainDto(
     Guid Id, string Host, bool IsPrimary, bool Verified, DateTimeOffset? VerifiedAt,
-    string ChallengeHost, string ChallengeValue);
+    bool Live, string Status, string ChallengeHost, string ChallengeValue);
 
 /// <param name="Target">The address the domain's CNAME record must point to (an A record may use <paramref name="TargetAddresses"/>).</param>
 /// <param name="Check">What the last "Check DNS" found, step by step; null when the state was not the result of a check.</param>
@@ -76,6 +100,7 @@ public sealed class CustomDomainService(
     ResourceAuthorizationService authorizationService,
     IOptions<PublishedAppsConfig> options,
     ICustomDomainResolver resolver,
+    ICustomDomainLiveProbe liveProbe,
     BackendRouteConfigService routeConfigService,
     IAppRuntimeRestarter? runtimes = null)
 {
@@ -143,29 +168,92 @@ public sealed class CustomDomainService(
         if (domain.VerifiedAt is null)
         {
             domain.VerifiedAt = DateTimeOffset.UtcNow;
-            // The first verified domain becomes the app's address; the old address then redirects to it.
-            domain.IsPrimary = !await dbContext.AppCustomDomains.AnyAsync(
-                other => other.WebAppId == appId && other.IsPrimary, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
+            // It routes now so it can get its certificate; it becomes the app's address only once it is live.
             await routeConfigService.RefreshAsync(cancellationToken);
-            if (domain.IsPrimary) await RestartForNewAddressAsync(app, cancellationToken);
         }
+
+        await CheckLiveAsync(app, domain, cancellationToken);
 
         var state = await BuildStateAsync(appId, cancellationToken);
         return state with
         {
             Check = [txtOk,
                 new("points", PointsTitle, "ok", $"{domain.Host} resolves to {string.Join(", ", actual.Where(targets.Contains))}."),
-                new("certificate", CertTitle, "ok", "Issued automatically; the app answers on the domain.")]
+                domain.LiveAt is not null
+                    ? new("certificate", CertTitle, "ok", "Issued; the app answers on the domain.")
+                    : new("certificate", CertTitle, "skipped", "Being issued. The domain goes live once the app answers over HTTPS; check again in a minute.")]
         };
+    }
+
+    /// <summary>
+    /// Probes a verified domain. A domain that serves the app becomes live (and the app's address when it has none);
+    /// one that stops serving loses live and primary, and another live domain takes over. Returns true when anything changed.
+    /// </summary>
+    public async Task<bool> CheckLiveAsync(WebApp app, AppCustomDomain domain, CancellationToken cancellationToken)
+    {
+        if (domain.VerifiedAt is null) return false;
+        var serving = await liveProbe.IsServingAsync(domain.Host, cancellationToken);
+        if (serving) ProbeFailures.TryRemove(domain.Id, out _);
+        else if (domain.LiveAt is not null && ProbeFailures.AddOrUpdate(domain.Id, 1, (_, count) => count + 1) < FailuresBeforeDrop)
+            return false; // a live domain survives a blip (a deploy, a timeout); it drops only after repeated failures
+        if (serving == (domain.LiveAt is not null)) return false;
+
+        var primaryBefore = await PrimaryHostAsync(app.Id, cancellationToken);
+        domain.LiveAt = serving ? DateTimeOffset.UtcNow : null;
+        await UpdatePrimaryAsync(app.Id, domain, serving, cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await routeConfigService.RefreshAsync(cancellationToken);
+        if (await PrimaryHostAsync(app.Id, cancellationToken) != primaryBefore)
+            await RestartForNewAddressAsync(app, CancellationToken.None);
+        return true;
+    }
+
+    private async Task UpdatePrimaryAsync(Guid appId, AppCustomDomain domain, bool serving, CancellationToken cancellationToken)
+    {
+        if (serving)
+        {
+            domain.IsPrimary = !await dbContext.AppCustomDomains.AnyAsync(
+                other => other.WebAppId == appId && other.IsPrimary && other.Id != domain.Id, cancellationToken);
+            return;
+        }
+
+        var wasPrimary = domain.IsPrimary;
+        domain.IsPrimary = false;
+        if (!wasPrimary) return;
+        var next = await dbContext.AppCustomDomains
+            .Where(other => other.WebAppId == appId && other.Id != domain.Id && other.LiveAt != null)
+            .OrderBy(other => other.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+        if (next is not null) next.IsPrimary = true;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int> ProbeFailures = new();
+    private const int FailuresBeforeDrop = 3;
+
+    private Task<string?> PrimaryHostAsync(Guid appId, CancellationToken cancellationToken) =>
+        dbContext.AppCustomDomains.AsNoTracking().Where(d => d.WebAppId == appId && d.IsPrimary && d.LiveAt != null)
+            .Select(d => d.Host).FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>Re-checks every verified domain of every app; run by the background check.</summary>
+    public async Task CheckAllLiveAsync(CancellationToken cancellationToken)
+    {
+        var domains = await dbContext.AppCustomDomains.Where(domain => domain.VerifiedAt != null).ToListAsync(cancellationToken);
+        foreach (var domain in domains)
+        {
+            var app = await dbContext.WebApps.AsNoTracking().FirstOrDefaultAsync(a => a.Id == domain.WebAppId && a.DeletionClaimId == null, cancellationToken);
+            if (app is null) continue;
+            try { await CheckLiveAsync(app, domain, cancellationToken); }
+            catch (DbUpdateException) { dbContext.ChangeTracker.Clear(); } // removed or changed meanwhile; the next pass retries
+        }
     }
 
     public async Task<AppCustomDomainsState> SetPrimaryAsync(Guid appId, Guid domainId, CancellationToken cancellationToken)
     {
         var app = await LoadManagedAppAsync(appId, cancellationToken);
         var domain = await FindAsync(appId, domainId, cancellationToken);
-        if (domain.VerifiedAt is null)
-            throw new InvalidOperationException("Check the domain's DNS before making it the primary address.");
+        if (domain.LiveAt is null)
+            throw new InvalidOperationException("The domain can become the primary address once it is live: DNS checked, certificate issued and the app answering there.");
 
         var domains = await dbContext.AppCustomDomains.Where(other => other.WebAppId == appId).ToListAsync(cancellationToken);
         foreach (var other in domains) other.IsPrimary = other.Id == domainId;
@@ -186,7 +274,7 @@ public sealed class CustomDomainService(
         if (domain.IsPrimary)
         {
             var next = await dbContext.AppCustomDomains
-                .Where(other => other.WebAppId == appId && other.VerifiedAt != null)
+                .Where(other => other.WebAppId == appId && other.LiveAt != null)
                 .OrderBy(other => other.CreatedAt).FirstOrDefaultAsync(cancellationToken);
             if (next is not null)
             {
@@ -243,8 +331,12 @@ public sealed class CustomDomainService(
             addresses.Select(address => address.ToString()).ToList(),
             domains.Select(domain => new AppCustomDomainDto(
                 domain.Id, domain.Host, domain.IsPrimary, domain.VerifiedAt is not null, domain.VerifiedAt,
+                domain.LiveAt is not null, StatusOf(domain),
                 ChallengePrefix + domain.Host, ChallengeValuePrefix + domain.VerificationToken)).ToList());
     }
+
+    private static string StatusOf(AppCustomDomain domain) =>
+        domain.VerifiedAt is null ? "WaitingForDns" : domain.LiveAt is null ? "Verified" : "Live";
 
     private async Task<AppCustomDomain> FindAsync(Guid appId, Guid domainId, CancellationToken cancellationToken) =>
         await dbContext.AppCustomDomains.FirstOrDefaultAsync(domain => domain.Id == domainId && domain.WebAppId == appId, cancellationToken)

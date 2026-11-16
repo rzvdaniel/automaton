@@ -44,7 +44,7 @@ internal static class BackendRouteConfigTestFixture
         });
     }
 
-    internal static BackendRouteConfigService CreateService(ApplicationDbContext dbContext, string rootPath, string? certificateResolver = null)
+    internal static BackendRouteConfigService CreateService(ApplicationDbContext dbContext, string rootPath, string? certificateResolver = null, RunnerGatewayRegistry? gateways = null)
     {
         return new BackendRouteConfigService(
             dbContext,
@@ -56,7 +56,8 @@ internal static class BackendRouteConfigTestFixture
                 CertificateResolver = certificateResolver
             }),
             new StubWebHostEnvironment(),
-            NullLogger<BackendRouteConfigService>.Instance);
+            NullLogger<BackendRouteConfigService>.Instance,
+            gateways);
     }
 
     internal static string GenericRuntimeContractJson() =>

@@ -546,6 +546,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppPublicationService>();
         services.AddScoped<AppSharingService>();
         services.AddSingleton<ICustomDomainResolver, DnsCustomDomainResolver>();
+        services.AddSingleton<ICustomDomainLiveProbe, HttpsCustomDomainLiveProbe>();
         services.AddScoped<CustomDomainService>();
         services.AddScoped<IAppRuntimeCommandQueue, RunnerExecutionAppCommandQueue>();
         services.AddScoped<AppPauseService>();
@@ -573,6 +574,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<PublicMarketplaceCatalogQuery>();
         services.AddScoped<WebAppStarService>();
         services.AddSingleton<TunnelRequestRegistry>();
+        services.AddSingleton<RunnerGatewayRegistry>();
         services.AddSingleton<TunnelLongLivedLimiter>();
         return services;
     }
@@ -619,6 +621,7 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<ScheduledActionExecutionHandler>();
         services.AddHostedService<AppModuleExecutionReconciliationService>();
         services.AddHostedService<ManagedRuntimeRouteReconciliationService>();
+        services.AddHostedService<CustomDomainLiveCheckService>();
         services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
         services.AddScoped(typeof(UserImpersonationServiceFactory<>));
         return services;

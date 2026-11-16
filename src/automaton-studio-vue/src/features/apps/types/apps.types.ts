@@ -675,6 +675,9 @@ export interface AppCustomDomain {
   host: string
   isPrimary: boolean
   verified: boolean
+  /** Served over a valid certificate; only a live domain is the primary address. */
+  live: boolean
+  status: 'WaitingForDns' | 'Verified' | 'Live'
   /** The TXT record that proves you own the domain: this name, this value. */
   challengeHost: string
   challengeValue: string
