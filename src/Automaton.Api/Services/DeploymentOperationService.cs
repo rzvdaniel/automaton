@@ -245,22 +245,41 @@ public sealed class DeploymentOperationService(
 
     private async Task<bool> FailAsync(DeploymentOperation snapshot, string message, CancellationToken cancellationToken)
     {
-        var operation = await dataContext.DeploymentOperations
-            .SingleOrDefaultAsync(item => item.Id == snapshot.Id, cancellationToken);
-        if (operation is null ||
-            operation.Status is not (DeploymentOperationStatuses.Pending or DeploymentOperationStatuses.Running))
-            return false;
-        // A late Runner result finds the operation Failed and the attempt cleared, so it is ignored.
-        operation.Status = DeploymentOperationStatuses.Failed;
-        operation.CompletedAtUtc = DateTime.UtcNow;
-        operation.LeaseExpiresAtUtc = null;
-        operation.ErrorMessage = message;
-        operation.ResultJson = JsonSerializer.Serialize(new DeployPackageResponse
+        var resultJson = JsonSerializer.Serialize(new DeployPackageResponse
         {
             Success = false,
             State = DeploymentOperationStatuses.Failed,
             Message = message
         }, JsonOptions);
+        var operation = snapshot;
+        // Only flip the row while it is still Pending/Running, so a result that just landed is not overwritten.
+        if (dataContext.Database.IsRelational())
+        {
+            var changed = await dataContext.DeploymentOperations
+                .Where(item => item.Id == snapshot.Id &&
+                    (item.Status == DeploymentOperationStatuses.Pending ||
+                     item.Status == DeploymentOperationStatuses.Running))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.Status, DeploymentOperationStatuses.Failed)
+                    .SetProperty(item => item.CompletedAtUtc, DateTime.UtcNow)
+                    .SetProperty(item => item.LeaseExpiresAtUtc, (DateTime?)null)
+                    .SetProperty(item => item.ErrorMessage, message)
+                    .SetProperty(item => item.ResultJson, resultJson), cancellationToken);
+            if (changed != 1) return false;
+        }
+        else
+        {
+            var tracked = await dataContext.DeploymentOperations
+                .SingleOrDefaultAsync(item => item.Id == snapshot.Id, cancellationToken);
+            if (tracked is null ||
+                tracked.Status is not (DeploymentOperationStatuses.Pending or DeploymentOperationStatuses.Running))
+                return false;
+            tracked.Status = DeploymentOperationStatuses.Failed;
+            tracked.CompletedAtUtc = DateTime.UtcNow;
+            tracked.LeaseExpiresAtUtc = null;
+            tracked.ErrorMessage = message;
+            tracked.ResultJson = resultJson;
+        }
         var targets = await dataContext.AppDeploymentTargets
             .Where(target => target.WebAppId == operation.WebAppId &&
                 target.Status == DeploymentTargetStatus.Deploying &&
@@ -273,8 +292,7 @@ public sealed class DeploymentOperationService(
             target.ActiveDeploymentExecutionAttemptId = null;
             target.UpdatedAt = DateTimeOffset.UtcNow;
         }
-        try { await dataContext.SaveChangesAsync(cancellationToken); }
-        catch (DbUpdateConcurrencyException) { return false; }
+        await dataContext.SaveChangesAsync(cancellationToken);
         DeploymentPackageStore.TryDelete(operation.PackagePath);
         return true;
     }
