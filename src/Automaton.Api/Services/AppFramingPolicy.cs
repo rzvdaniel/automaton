@@ -64,16 +64,19 @@ public static class AppFramingPolicy
     }
 }
 
-/// <summary>Sends a request for an app through its Runner tunnel.</summary>
-public interface ITunnelForwarder
+/// <summary>The status and headers an app's page answered with through its Runner tunnel.</summary>
+public sealed record TunnelProbeResult(int StatusCode, IReadOnlyDictionary<string, string[]> HeaderValues);
+
+/// <summary>Asks an app for one page through its Runner tunnel, without reading the body.</summary>
+public interface ITunnelProber
 {
-    Task<TunnelResponse> ForwardAsync(Guid appId, Guid deploymentTargetId, HttpRequest request, string path, CancellationToken cancellationToken);
+    Task<TunnelProbeResult> ProbeAsync(Guid appId, Guid deploymentTargetId, string host, string path, CancellationToken cancellationToken);
 }
 
 /// <summary>Asks an app's root page, through the Runner tunnel, whether it can be shown inside Studio.</summary>
 public sealed class AppFramingProbe(
     ApplicationDbContext dbContext,
-    ITunnelForwarder tunnelService,
+    ITunnelProber tunnelService,
     IOptions<PublishedAppsConfig> publishedAppsOptions,
     ILogger<AppFramingProbe> logger)
 {
@@ -100,17 +103,7 @@ public sealed class AppFramingProbe(
             var path = string.Empty;
             for (var hop = 0; hop <= MaxRedirects; hop++)
             {
-                var context = new DefaultHttpContext();
-                context.Request.Method = HttpMethods.Get;
-                context.Request.Scheme = "https";
-                context.Request.Host = new HostString(host);
-
-                var response = await tunnelService.ForwardAsync(appId, targetId, context.Request, path, cancellationToken);
-                if (response.BodyStream is { } stream)
-                {
-                    await stream.CancelAsync();
-                    stream.Dispose();
-                }
+                var response = await tunnelService.ProbeAsync(appId, targetId, host, path, cancellationToken);
 
                 if (response.StatusCode is >= 300 and < 400
                     && response.HeaderValues.FirstOrDefault(h => h.Key.Equals("Location", StringComparison.OrdinalIgnoreCase)).Value is { Length: > 0 } location

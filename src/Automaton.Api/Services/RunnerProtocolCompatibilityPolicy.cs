@@ -31,4 +31,9 @@ public static class RunnerProtocolCompatibilityPolicy
     public static bool SupportsRuntimeTunnelReconnectCommands(string? apiCompatibilityVersion)
         => int.TryParse(apiCompatibilityVersion, out var version)
             && version >= int.Parse(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands);
+
+    /// <summary>The app tunnel is HTTP/2 over a Runner-initiated connection; a Runner that predates it cannot carry app traffic.</summary>
+    public static bool SupportsAppTunnelOverHttp2(string? apiCompatibilityVersion)
+        => int.TryParse(apiCompatibilityVersion, out var version)
+            && version >= int.Parse(RunnerApiCompatibilityVersions.AppTunnelOverHttp2);
 }

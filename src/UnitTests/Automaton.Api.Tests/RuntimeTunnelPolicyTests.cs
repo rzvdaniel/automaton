@@ -1,14 +1,13 @@
+using Automaton.Core.Constants;
 using System.Text;
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -61,73 +60,35 @@ public class RuntimeTunnelPolicyTests
     }
 
     [Test]
-    public void CreateForwardedHeaders_GivesTheAppThePublicHostAndSchemeAndIgnoresClientValues()
+    public void ApplyTunnelHeaders_GivesTheAppThePublicHostAndSchemeAndIgnoresClientValues()
     {
-        var context = new DefaultHttpContext();
-        context.Request.Scheme = "https";
-        context.Request.Host = new HostString("app-1.apps.example.test");
-        context.Request.Headers["X-Forwarded-Host"] = "evil.example";
-        context.Request.Headers["X-Forwarded-Proto"] = "http";
-        context.Request.Headers["Origin"] = "https://app-1.apps.example.test";
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        using var message = new HttpRequestMessage(HttpMethod.Get, "http://runner.tunnel/");
+        message.Headers.TryAddWithoutValidation("X-Forwarded-Host", "evil.example");
+        message.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "http");
+        message.Headers.TryAddWithoutValidation(TunnelHeaders.Destination, TunnelDestinations.FastApi);
+        message.Headers.TryAddWithoutValidation("Origin", "https://app-1.apps.example.test");
 
-        var headers = RuntimeTunnelRequestSender.CreateForwardedHeaders(context.Request);
+        RuntimeTunnelRequestSender.ApplyTunnelHeaders(
+            message.Headers, appId, targetId, staticSite: false, "app-1.apps.example.test", "https");
 
         Assert.Multiple(() =>
         {
-            Assert.That(headers["X-Forwarded-Host"], Is.EqualTo(new[] { "app-1.apps.example.test" }));
-            Assert.That(headers["X-Forwarded-Proto"], Is.EqualTo(new[] { "https" }));
-            Assert.That(headers["Origin"], Is.EqualTo(new[] { "https://app-1.apps.example.test" }));
-            Assert.That(headers.ContainsKey("Host"), Is.False);
+            Assert.That(message.Headers.GetValues("X-Forwarded-Host"), Is.EqualTo(new[] { "app-1.apps.example.test" }));
+            Assert.That(message.Headers.GetValues("X-Forwarded-Proto"), Is.EqualTo(new[] { "https" }));
+            Assert.That(message.Headers.GetValues("Origin"), Is.EqualTo(new[] { "https://app-1.apps.example.test" }));
+            Assert.That(message.Headers.GetValues(TunnelHeaders.Destination), Is.EqualTo(new[] { TunnelDestinations.RuntimeGateway }));
+            Assert.That(message.Headers.GetValues(TunnelHeaders.AppId), Is.EqualTo(new[] { appId.ToString("D") }));
+            Assert.That(message.Headers.GetValues(TunnelHeaders.TargetId), Is.EqualTo(new[] { targetId.ToString("D") }));
         });
     }
 
-    [Test]
-    public async Task ReadBodyAsync_ReadsUnknownLengthBodyWithinLimit()
-    {
-        var context = new DefaultHttpContext();
-        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("chunked-body"));
-        context.Request.ContentLength = null;
-
-        var result = await RuntimeTunnelService.ReadBodyAsync(context.Request, 64, CancellationToken.None);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.TooLarge, Is.False);
-            Assert.That(Encoding.UTF8.GetString(result.Body!), Is.EqualTo("chunked-body"));
-        });
-    }
-
-    [Test]
-    public async Task ReadBodyAsync_ReadsKnownLengthBodyWithinLimit()
-    {
-        var context = new DefaultHttpContext();
-        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("known-body"));
-        context.Request.ContentLength = 10;
-
-        var result = await RuntimeTunnelService.ReadBodyAsync(context.Request, 64, CancellationToken.None);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.TooLarge, Is.False);
-            Assert.That(Encoding.UTF8.GetString(result.Body!), Is.EqualTo("known-body"));
-        });
-    }
-
-    [Test]
-    public async Task ReadBodyAsync_RejectsUnknownLengthBodyAboveLimit()
-    {
-        var context = new DefaultHttpContext();
-        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("too-large"));
-        context.Request.ContentLength = null;
-
-        var result = await RuntimeTunnelService.ReadBodyAsync(context.Request, 3, CancellationToken.None);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.TooLarge, Is.True);
-            Assert.That(result.Body, Is.Null);
-        });
-    }
+    [TestCase("assets/site.css", "?v=1", "http://runner.tunnel/assets/site.css?v=1")]
+    [TestCase("a b/ü.txt", "", "http://runner.tunnel/a%20b/%C3%BC.txt")]
+    [TestCase("", "", "http://runner.tunnel/")]
+    public void BuildUri_EncodesThePathForTheRunner(string path, string query, string expected)
+        => Assert.That(RuntimeTunnelRequestSender.BuildUri(path, query).AbsoluteUri, Is.EqualTo(expected));
 
     [Test]
     public void IsExpectedAppHost_RejectsDirectApiHost()
@@ -242,7 +203,7 @@ public class RuntimeTunnelPolicyTests
     }
 
     [Test]
-    public async Task ForwardAsync_AllowsGenericRuntimeDeploymentWithoutLegacyMarker()
+    public async Task ResolveAsync_AllowsGenericRuntimeDeploymentWithoutLegacyMarker()
     {
         var appId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
@@ -251,9 +212,47 @@ public class RuntimeTunnelPolicyTests
         var request = new DefaultHttpContext().Request;
         request.Host = new HostString($"app-{appId:N}.apps.automaton.monster");
 
-        var response = await service.ForwardAsync(appId, target.Id, request, string.Empty, CancellationToken.None);
+        var resolved = await service.ResolveAsync(appId, target.Id, request, string.Empty, CancellationToken.None);
 
-        Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
+        Assert.That(resolved.Failure, Is.Null);
+        Assert.That(resolved.Runner, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task ResolveAsync_AnswersUpgradeNeededForARunnerThatPredatesTheHttp2Tunnel()
+    {
+        var appId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        var (target, identity) = await SeedGenericRuntimeDeploymentAsync(dbContext, appId);
+        dbContext.Runners.Single().ApiCompatibilityVersion = RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands;
+        await dbContext.SaveChangesAsync();
+        var service = CreateRuntimeTunnelService(dbContext, identity);
+        var request = new DefaultHttpContext().Request;
+        request.Host = new HostString($"app-{appId:N}.apps.automaton.monster");
+
+        var resolved = await service.ResolveAsync(appId, target.Id, request, string.Empty, CancellationToken.None);
+
+        Assert.That(resolved.Failure?.StatusCode, Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+        Assert.That(resolved.Failure?.Body, Does.Contain("upgraded"));
+    }
+
+    [Test]
+    public async Task ResolveAsync_AnswersNotConnectedWhenTheRunnerHasNoTunnelConnection()
+    {
+        var appId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        var (target, identity) = await SeedGenericRuntimeDeploymentAsync(dbContext, appId);
+        var service = new RuntimeTunnelService(
+            dbContext, new RunnerTunnelRegistry(),
+            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
+            identity, NullLogger<RuntimeTunnelService>.Instance, new RuntimeTunnelTargetCache(TimeSpan.Zero, TimeProvider.System));
+        var request = new DefaultHttpContext().Request;
+        request.Host = new HostString($"app-{appId:N}.apps.automaton.monster");
+
+        var resolved = await service.ResolveAsync(appId, target.Id, request, string.Empty, CancellationToken.None);
+
+        Assert.That(resolved.Failure?.StatusCode, Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+        Assert.That(resolved.Failure?.Body, Does.Contain("not connected"));
     }
 
     private static async Task<(AppDeploymentTarget Target, ApiInstanceIdentityService Identity)> SeedGenericRuntimeDeploymentAsync(
@@ -272,6 +271,7 @@ public class RuntimeTunnelPolicyTests
             ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
             ConnectionId = "connection",
             ApiInstanceId = identity.ApiInstanceId,
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current,
             LastHeartbeatAtUtc = DateTime.UtcNow
         });
         dbContext.WebApps.Add(new WebApp
@@ -293,16 +293,12 @@ public class RuntimeTunnelPolicyTests
         ApplicationDbContext dbContext,
         ApiInstanceIdentityService identity)
     {
-        var registry = new TunnelRequestRegistry();
-        var requestSender = new RuntimeTunnelRequestSender(
-            new CompletingHubContext(registry),
-            registry,
-            new TunnelLongLivedLimiter(),
-            Options.Create(new RuntimeTunnelConfig()),
-            NullLogger<RuntimeTunnelRequestSender>.Instance);
+        var tunnels = new RunnerTunnelRegistry();
+        foreach (var runner in dbContext.Runners.AsNoTracking().ToList())
+            tunnels.Add(runner.Id, new TunnelConnectionStream(new MemoryStream()), out _);
         return new RuntimeTunnelService(
             dbContext,
-            requestSender,
+            tunnels,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             identity,
             NullLogger<RuntimeTunnelService>.Instance,
@@ -313,46 +309,4 @@ public class RuntimeTunnelPolicyTests
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
-
-    private sealed class CompletingHubContext(TunnelRequestRegistry registry) : IHubContext<AutomatonHub>
-    {
-        public IHubClients Clients { get; } = new CompletingHubClients(registry);
-        public IGroupManager Groups { get; } = null!;
-    }
-
-    private sealed class CompletingHubClients(TunnelRequestRegistry registry) : IHubClients
-    {
-        private readonly CompletingClientProxy client = new(registry);
-
-        public IClientProxy All => throw new NotSupportedException();
-        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public ISingleClientProxy Client(string connectionId) => client;
-        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => client;
-        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
-        public IClientProxy Group(string groupName) => throw new NotSupportedException();
-        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
-        public IClientProxy User(string userId) => throw new NotSupportedException();
-        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
-    }
-
-    private sealed class CompletingClientProxy(TunnelRequestRegistry registry) : ISingleClientProxy
-    {
-        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
-        {
-            if (method == AutomatonHubMethods.TunnelRequest && args[0] is TunnelRequest request)
-            {
-                registry.TryComplete(new TunnelResponse
-                {
-                    RequestId = request.RequestId,
-                    StatusCode = StatusCodes.Status200OK
-                });
-            }
-
-            return Task.CompletedTask;
-        }
-    }
 }

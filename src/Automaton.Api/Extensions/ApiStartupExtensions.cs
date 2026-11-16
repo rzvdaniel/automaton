@@ -1,3 +1,4 @@
+using Automaton.Api.Services;
 using Automaton.Api.Authentication;
 using Automaton.Api.Data;
 using Automaton.Api.Hubs;
@@ -40,6 +41,7 @@ internal static class ApiApplicationPipelineExtensions
         app.MapControllers();
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
+        app.MapRunnerTunnel();
         app.MapApiNotFound();
         app.MapFallbackToPage("/_Host");
     }

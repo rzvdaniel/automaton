@@ -1,22 +1,14 @@
 namespace Automaton.Api.Config;
 
 /// <summary>
-/// Limits browser requests that cross the SignalR runner tunnel. Request bodies are bounded; response bodies and WebSockets stream in chunks.
+/// Limits browser requests that cross a Runner's app tunnel. Bodies stream in both directions, so only long-lived
+/// connections are bounded.
 /// </summary>
 public sealed class RuntimeTunnelConfig
 {
-    public int MaxBodyBytes { get; set; } = 512 * 1024;
-    public int TimeoutSeconds { get; set; } = 45;
-
-    /// <summary>Streaming responses (Server-Sent Events, large downloads) and WebSockets one app may hold open at once.</summary>
+    /// <summary>WebSockets one app may hold open at once.</summary>
     public int MaxLongLivedPerApp { get; set; } = 20;
 
-    /// <summary>How long a streaming response (a large file) waits for a free slot before the app answers 503.</summary>
-    public int StreamSlotWaitSeconds { get; set; } = 10;
-
-    /// <summary>How many streaming responses of one app may wait for a slot at once; more get 503 immediately.</summary>
-    public int MaxStreamSlotWaitersPerApp { get; set; } = 100;
-
-    /// <summary>A streaming response or WebSocket with no traffic for this long is closed.</summary>
+    /// <summary>A request or WebSocket with no traffic for this long is closed.</summary>
     public int StreamIdleTimeoutSeconds { get; set; } = 300;
 }

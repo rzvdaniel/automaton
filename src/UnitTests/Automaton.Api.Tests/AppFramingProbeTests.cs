@@ -86,7 +86,7 @@ public sealed class AppFramingProbeTests
         Assert.That(await probe.CanBeFramedAsync(appId, Studio, CancellationToken.None), Is.True);
     }
 
-    internal static AppFramingProbe Probe(ApplicationDbContext dbContext, ITunnelForwarder forwarder)
+    internal static AppFramingProbe Probe(ApplicationDbContext dbContext, ITunnelProber forwarder)
         => new(dbContext, forwarder, Options(), NullLogger<AppFramingProbe>.Instance);
 
     internal static IOptions<PublishedAppsConfig> Options()
@@ -103,19 +103,17 @@ public sealed class AppFramingProbeTests
         return id;
     }
 
-    internal static TunnelResponse Response(int status, params (string Name, string Value)[] headers) => new()
-    {
-        StatusCode = status,
-        HeaderValues = headers.ToDictionary(h => h.Name, h => new[] { h.Value }, StringComparer.OrdinalIgnoreCase)
-    };
+    internal static TunnelProbeResult Response(int status, params (string Name, string Value)[] headers) => new(
+        status,
+        headers.ToDictionary(h => h.Name, h => new[] { h.Value }, StringComparer.OrdinalIgnoreCase));
 
-    internal sealed class FakeForwarder(Func<Guid, string, TunnelResponse> respond) : ITunnelForwarder
+    internal sealed class FakeForwarder(Func<Guid, string, TunnelProbeResult> respond) : ITunnelProber
     {
         public List<string> Paths { get; } = [];
         public bool Hang { get; init; }
 
-        public async Task<TunnelResponse> ForwardAsync(
-            Guid appId, Guid deploymentTargetId, HttpRequest request, string path, CancellationToken cancellationToken)
+        public async Task<TunnelProbeResult> ProbeAsync(
+            Guid appId, Guid deploymentTargetId, string host, string path, CancellationToken cancellationToken)
         {
             Paths.Add(path);
             if (Hang) await Task.Delay(Timeout.Infinite, cancellationToken);

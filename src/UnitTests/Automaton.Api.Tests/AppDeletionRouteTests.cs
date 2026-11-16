@@ -22,9 +22,9 @@ public sealed class AppDeletionRouteTests
         var request = RuntimeRequest(app.Id);
         var service = CreateTunnel(db);
 
-        var result = await service.ForwardAsync(app.Id, app.DeploymentTargets.Single().Id, request, "", CancellationToken.None);
+        var result = await service.ResolveAsync(app.Id, app.DeploymentTargets.Single().Id, request, "", CancellationToken.None);
 
-        Assert.That(result.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
+        Assert.That(result.Failure?.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
     }
 
     [Test]
