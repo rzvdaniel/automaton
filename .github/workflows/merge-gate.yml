@@ -27,7 +27,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
       # Check only: never --merge. The other checks are required by branch protection, so --skip-ci.
+      # A base branch from before --skip-ci existed has nothing to run yet (only the pull request that adds this file).
       - name: Run merge-gate.py
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 .agents/tools/merge-gate.py "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --skip-ci
+        run: |
+          if ! grep -q -- '--skip-ci' .agents/tools/merge-gate.py; then
+            echo "The base branch's merge-gate.py has no --skip-ci yet; nothing to check."
+            exit 0
+          fi
+          python3 .agents/tools/merge-gate.py "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --skip-ci

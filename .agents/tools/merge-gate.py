@@ -105,6 +105,7 @@ def security_row(tier: str, reviews: list[dict], review: dict | None, head: str)
     passes = [item for item in at_head if read_review(item)["security"]]
     if not passes:
         return ("FAIL", "security", "a high-tier change needs a separate review with a 'Security:' section on the final commit")
+    # The main review is any other non-blocking review of the final commit; the last-review check covers the verdict.
     others = [item for item in at_head if read_review(item)["verdict"] != "changes"
               and any(who(item) != who(sec) for sec in passes)]
     if not others:
