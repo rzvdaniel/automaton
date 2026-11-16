@@ -32,7 +32,7 @@ public static class RunnersDeleteCommand
                 if (sshTarget is not null)
                 {
                     var script = removal.GetProperty("uninstallCommand").GetString() ?? throw new InvalidOperationException("Uninstall command missing.");
-                    await RunnersInstallCommand.ExecuteAsync(script, sshTarget, 300, context.GetCancellationToken());
+                    await RunnersInstallCommand.ExecuteAsync(script, sshTarget, 300, context.GetCancellationToken(), "Uninstall");
                     hostCleanupConfirmed = true;
                 }
                 if (hostCleanupConfirmed)

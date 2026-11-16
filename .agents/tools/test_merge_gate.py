@@ -7,13 +7,13 @@ spec.loader.exec_module(gate)
 OWNERS = "# comment\n/src/Automaton.Identity/ @o\n/scripts/update-automaton.sh @o  # why\n\n# --- security pass ---\n/.github/workflows/ @o\n"
 PATTERNS = gate.owner_patterns(OWNERS)
 SECURITY = gate.security_patterns(OWNERS)
-BODY = "Refs #1.\n**How verified:** x\n**Risk:** medium\n**How to revert:** revert this PR"
+BODY = "Refs #1.\n**How verified:** x\n**Risk:** medium\n**How to revert:** revert this PR\n**Docs:** none, because test"
 GREEN = [{"name": "tests", "conclusion": "SUCCESS"}]
 
 
-def review(body, commit="abc", state="COMMENTED", at="2026-01-01T00:00:00Z"):
+def review(body, commit="abc", state="COMMENTED", at="2026-01-01T00:00:00Z", who="main-reviewer"):
     return {"body": body, "state": state, "commit": {"oid": commit}, "submittedAt": at,
-            "authorAssociation": "OWNER"}
+            "authorAssociation": "OWNER", "author": {"login": who}}
 
 
 def pr(paths, reviews=(), labels=(), body=BODY, checks=GREEN):
@@ -127,9 +127,24 @@ class Gate(unittest.TestCase):
     def test_high_needs_security_but_no_owner_label(self):
         paths = ["src/Automaton.Identity/a.cs"]
         ok = review("APPROVE\nTier: high\n\nSecurity: checked the token permissions")
-        self.assertEqual(failed(gate.check(pr(paths, [ok]), PATTERNS)), [])
+        # One reviewer cannot be both the main review and the security pass on a high-tier change.
+        self.assertEqual(failed(gate.check(pr(paths, [ok]), PATTERNS)), ["security"])
+        main = review("APPROVE\nTier: high", at="2026-01-01T00:00:00Z")
+        second = review("APPROVE\nSecurity: checked the token permissions", at="2026-01-02T00:00:00Z", who="security-reviewer")
+        self.assertEqual(failed(gate.check(pr(paths, [main, second]), PATTERNS)), [])
+        same = review("APPROVE\nSecurity: ok", at="2026-01-02T00:00:00Z")
+        self.assertEqual(failed(gate.check(pr(paths, [main, same]), PATTERNS)), ["security"])
+        stale = review("APPROVE\nSecurity: ok", commit="old", at="2026-01-02T00:00:00Z", who="security-reviewer")
+        self.assertIn("security", failed(gate.check(pr(paths, [main, stale]), PATTERNS)))
         bare = review("APPROVE\nTier: high")
         self.assertEqual(failed(gate.check(pr(paths, [bare]), PATTERNS)), ["security"])
+
+    def test_skip_ci_ignores_checks(self):
+        self.assertEqual(failed(gate.check(pr(["README.md"], checks=[]), PATTERNS, skip_ci=True)), [])
+
+    def test_description_needs_docs_line(self):
+        body = BODY.replace("\n**Docs:** none, because test", "")
+        self.assertEqual(failed(gate.check(pr(["README.md"], body=body), PATTERNS)), ["description"])
 
     def test_ci_and_description(self):
         self.assertEqual(failed(gate.check(pr(["README.md"], checks=[]), PATTERNS)), ["ci"])

@@ -33,6 +33,10 @@ public sealed class RunnerUninstallCommandTests
         var docker = Path.Combine(directory.Path, "docker");
         await File.WriteAllTextAsync(docker, FakeDocker);
         File.SetUnixFileMode(docker, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        // A fake rm records the call, so the test never touches /opt.
+        var rm = Path.Combine(directory.Path, "rm");
+        await File.WriteAllTextAsync(rm, "#!/bin/sh\nprintf 'rm %s\\n' \"$*\" >> \"$CALLS\"\n");
+        File.SetUnixFileMode(rm, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         using var process = StartShell(directory.Path, log, mode, installation, runnerId);
         await process.StandardInput.WriteAsync(RunnerUninstallCommand.Build(runnerId, installation));
         process.StandardInput.Close();
@@ -49,11 +53,13 @@ public sealed class RunnerUninstallCommandTests
             Assert.That(calls, Does.Contain($"rm --force automaton-self-hosted-{installation[3..15]}"));
             Assert.That(calls, Does.Contain($"rm --force automaton-static-{installation[3..]}"));
             Assert.That(calls, Does.Contain($"volume rm automaton-machine-runner-{installation}-workspace"));
+            Assert.That(calls, Does.Contain($"rm -rf -- /opt/automaton/self-hosted-runners/{installation}"));
         }
         else
         {
             Assert.That(calls, Does.Not.Contain("rm --force"));
             Assert.That(calls, Does.Not.Contain("volume rm"));
+            if (expectedExitCode != 0) Assert.That(calls, Does.Not.Contain("rm -rf"));
         }
     }
 
