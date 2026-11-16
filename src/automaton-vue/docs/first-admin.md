@@ -1,6 +1,7 @@
 ---
 title: Create the first administrator
 description: Open the one-time setup link after installation, create the administrator account and sign in to Studio.
+order: 50
 ---
 
 # Create the first administrator

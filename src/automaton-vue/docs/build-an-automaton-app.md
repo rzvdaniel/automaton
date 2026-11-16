@@ -1,6 +1,7 @@
 ---
 title: Build an Automaton app
 description: The app contract in practice; static sites, servers with a runtime, durable data and what to tell a coding agent.
+order: 70
 ---
 
 # Build an Automaton app

@@ -1,6 +1,7 @@
 ---
 title: automaton.json reference
 description: Reference for the Automaton app identity and generic build, runtime, health, and storage contract.
+order: 130
 ---
 
 # automaton.json reference

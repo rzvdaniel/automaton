@@ -217,26 +217,28 @@ function readPublicBootstrap() {
 const siteOrigin = 'https://automaton.monster'
 const websiteDocsRoot = path.resolve(__dirname, 'docs')
 
-// Key documentation pages, in reading order. llms.txt lists them and llms-full.txt contains them,
-// both built from the Markdown source at build time so they cannot go stale.
-const keyDocs: Array<{ file: string; url: string }> = [
-  'install-with-ai',
-  'getting-started',
-  'numbers',
-  'install-server',
-  'first-admin',
-  'deploy-runner',
-  'build-an-automaton-app',
-  'deploy',
-  'update-server',
-  'backup-restore',
-  'secrets-and-permissions',
-  'automaton-cli',
-  'automaton-json',
-  'troubleshooting',
-  'limitations',
-  'security',
-].map(slug => ({ file: path.join(websiteDocsRoot, `${slug}.md`), url: `${siteOrigin}/docs/${slug}` }))
+// Key documentation pages. Every page in docs/ with an `order` in its frontmatter is listed in llms.txt and
+// contained in llms-full.txt, sorted by `order`, so a new page needs no code change. Built from the Markdown
+// source at build time so they cannot go stale.
+function listKeyDocs() {
+  return fs
+    .readdirSync(websiteDocsRoot)
+    .filter(name => name.endsWith('.md'))
+    .map(name => {
+      const file = path.join(websiteDocsRoot, name)
+      const rawOrder = readFrontmatterField(file, 'order')
+      const order = rawOrder === '' ? NaN : Number(rawOrder)
+      return { file, order, url: `${siteOrigin}/docs/${name.slice(0, -3)}` }
+    })
+    .filter(doc => Number.isFinite(doc.order))
+    .sort((a, b) => a.order - b.order || a.url.localeCompare(b.url))
+}
+
+function readFrontmatterField(file: string, name: string) {
+  const raw = fs.readFileSync(file, 'utf-8').replace(/\r\n/g, '\n')
+  const match = /^---\n([\s\S]*?)\n---\n/.exec(raw)
+  return new RegExp(`^${name}: *(.+)$`, 'm').exec(match?.[1] ?? '')?.[1].trim() ?? ''
+}
 
 function readKeyDoc(doc: { file: string }) {
   const raw = fs.readFileSync(doc.file, 'utf-8').replace(/\r\n/g, '\n')
@@ -252,7 +254,7 @@ function buildPublicLlmsAssets() {
   const bootstrap = readPublicBootstrap()
   const basePrompt = readSharedBasePrompt()
   const guidanceDocuments = listSeedGuidanceDocuments()
-  const docs = keyDocs.map(doc => ({ ...doc, ...readKeyDoc(doc) }))
+  const docs = listKeyDocs().map(doc => ({ ...doc, ...readKeyDoc(doc) }))
   const llmsTextLines = [
     bootstrap,
     '',

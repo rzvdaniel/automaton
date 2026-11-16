@@ -1,6 +1,7 @@
 ---
 title: Deploy and publish an app
 description: Validate, deploy and publish an Automaton app from the CLI, check its status, set a marketplace listing, and delete it.
+order: 80
 ---
 
 # Deploy and publish an app

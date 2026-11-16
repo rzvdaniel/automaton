@@ -1,7 +1,7 @@
 Refs #<issue>.
 
 - **<behaviour>:** what changed and why, one line each.
-- **Docs:** which Admin or architecture docs were updated, or why none were needed.
+- **Docs:** `updated <page>` (user pages are in `src/automaton-vue/docs`; also Admin or architecture docs) or `none, because ...`.
 - **Tests:** what was added.
 
 **How verified:** what you ran and what came back (test projects and pass counts, the command and its output, a screenshot link for a UI change). Say plainly what was not run.

@@ -1,6 +1,7 @@
 ---
 title: Your first app
 description: Describe an app to your AI agent; it builds, deploys and runs it on your server.
+order: 20
 ---
 
 # Your first app

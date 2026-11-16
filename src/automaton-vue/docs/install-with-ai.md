@@ -1,6 +1,7 @@
 ---
 title: Install with your AI agent
 description: Give your AI agent a server, a domain and an email. It installs Automaton and hands you a one-time link to choose your password.
+order: 10
 ---
 
 # Install with your AI agent

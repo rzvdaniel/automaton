@@ -132,6 +132,13 @@ Name everything you create `e2e-<issue>-...` (apps, projects, API keys), so agen
 collide. Remove it when done: `python .agents/tools/test-server-cleanup.py` lists it, `--apply` removes it. Test
 accounts stay. A nightly timer removes `e2e-` items older than a day.
 
+## Follow the docs
+
+Run each "Check after release" step by following the user docs page the PR's `Docs:` line names
+(`src/automaton-vue/docs`, as published for the released version), not from memory of the change. Before labelling
+`verified`, confirm the page matches what you saw (commands, output, labels, steps). A mismatch is
+`verification-failed` plus a docs fix, even when the feature works.
+
 ## Labels and closing
 
 - `verified`: every "Done when" check passed end to end on the test server, with a proof artifact.
