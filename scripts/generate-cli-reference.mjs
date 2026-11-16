@@ -26,7 +26,7 @@ for (const line of lines.slice(from + 1)) {
   if (!line.trim()) break
   const m = /^\s{2}(\S+(?: <[^>]+>)?)\s{2,}(.*?)\s*(?:\[\])?$/.exec(line)
   if (!m) { console.error(`Cannot parse help line: ${line}`); process.exit(1) }
-  rows.push(`| \`automaton ${m[1]}\` | ${m[2].replace(/\|/g, '\\|')} |`)
+  rows.push(`| \`automaton ${m[1]}\` | ${m[2].replace(/[\\|]/g, '\\$&')} |`)
 }
 if (rows.length === 0) { console.error('No commands found in the CLI help.'); process.exit(1) }
 
