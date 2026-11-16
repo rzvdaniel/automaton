@@ -63,11 +63,11 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
         }
         catch (RunnerNotRespondingException)
         {
-            // A Runner that stopped recently still looks online; answer now instead of waiting on it. The cleanup
-            // command stays queued, so the Runner performs it when it returns.
+            // A Runner that stopped recently still looks online; answer now instead of waiting on it. Giving up
+            // cancels the queued command, so nothing is removed and the owner deletes again once the Runner is back.
             await RecordCleanupFailureAsync(
                 target,
-                "The Runner did not answer in time and may be offline. The cleanup is queued and runs when the Runner returns; delete the app again after that.",
+                "The Runner did not answer in time and may be offline. Nothing was removed; delete the app again when the Runner is back online.",
                 CancellationToken.None);
         }
         catch (InvalidOperationException exception) when (!string.IsNullOrWhiteSpace(exception.Message))
