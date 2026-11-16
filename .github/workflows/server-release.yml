@@ -190,9 +190,7 @@ jobs:
           cp docker/install/{compose.yaml,configure.py,check_dns.py,explain_certificate_failure.py,backup.sh,cleanup.sh,restore.sh,update-from-request.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
           cp scripts/install-automaton.sh automaton-server/install.sh
           cp scripts/update-automaton.sh automaton-server/update.sh
-          # The website page without its frontmatter and with absolute links, so it reads correctly in the bundle.
-          awk 'NR==1 && /^---$/ {skip=1; next} skip && /^---$/ {skip=0; next} !skip' src/automaton-vue/docs/install-server.md \
-            | sed -E 's#\]\(\./#](https://automaton.monster/docs/#g; s#\]\(/docs/#](https://automaton.monster/docs/#g' > automaton-server/README.md
+          cp src/automaton-vue/docs/install-server.md automaton-server/README.md
           printf 'server-v%s\n' "$VERSION" > automaton-server/version
           previous=$(gh release list --limit 100 --json tagName --jq '[.[] | select(.tagName | startswith("server-v"))][0].tagName // empty')
           if [[ -n "$previous" ]]; then
