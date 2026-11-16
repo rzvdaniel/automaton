@@ -821,6 +821,9 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<bool>("IsPrimary")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTimeOffset?>("LiveAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("VerificationToken")
                         .IsRequired()
                         .HasMaxLength(64)

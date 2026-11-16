@@ -21,8 +21,8 @@ const stubs = {
     template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)">`,
   },
 }
-const waiting = { target: 'apps.test', targetAddresses: ['203.0.113.10'], domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: false, verified: false, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }] }
-const verified = { ...waiting, domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: true, verified: true, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }] }
+const waiting = { target: 'apps.test', targetAddresses: ['203.0.113.10'], domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: false, verified: false, live: false, status: 'WaitingForDns' as const, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }] }
+const verified = { ...waiting, domains: [{ id: 'd1', host: 'blog.example.com', isPrimary: true, verified: true, live: true, status: 'Live' as const, challengeHost: '_automaton-challenge.blog.example.com', challengeValue: 'automaton-verify=abc' }] }
 
 function open() {
   return mount(CustomDomains, { props: { appId: 'app-1' }, global: { stubs } })
@@ -62,7 +62,7 @@ describe('CustomDomains', () => {
     await flushPromises()
     await wrapper.get('[data-testid="custom-domain-verify"]').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('Primary address')
+    expect(wrapper.text()).toContain('Live · primary address')
   })
 
   it('shows the server message when DNS does not point here yet', async () => {

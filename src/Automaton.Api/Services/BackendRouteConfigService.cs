@@ -150,7 +150,7 @@ public class BackendRouteConfigService
             : await dbContext.AppCustomDomains.AsNoTracking()
                 .Where(domain => domainAppIds.Contains(domain.WebAppId) && domain.VerifiedAt != null)
                 .OrderBy(domain => domain.CreatedAt)
-                .Select(domain => new { domain.WebAppId, Route = new CustomDomainRoute(domain.Id, domain.Host, domain.IsPrimary) })
+                .Select(domain => new { domain.WebAppId, Route = new CustomDomainRoute(domain.Id, domain.Host, domain.IsPrimary && domain.LiveAt != null) })
                 .ToListAsync(cancellationToken);
 
         return candidates

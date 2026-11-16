@@ -94,7 +94,7 @@ public sealed class AppSettingValueServiceTests
         var env = await secrets.ResolveForExecutionAsync(appId, CancellationToken.None);
 
         Assert.That(env["URL"], Is.EqualTo("https://blog.apps.example.com"));
-        db.AppCustomDomains.Add(new() { Id = Guid.NewGuid(), WebAppId = appId, Host = "blog.example.org", IsPrimary = true, VerifiedAt = DateTimeOffset.UtcNow });
+        db.AppCustomDomains.Add(new() { Id = Guid.NewGuid(), WebAppId = appId, Host = "blog.example.org", IsPrimary = true, VerifiedAt = DateTimeOffset.UtcNow, LiveAt = DateTimeOffset.UtcNow });
         db.SaveChanges();
         Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None))["URL"], Is.EqualTo("https://blog.example.org"));
     }

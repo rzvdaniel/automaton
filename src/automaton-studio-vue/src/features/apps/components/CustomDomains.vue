@@ -47,8 +47,9 @@ async function add() {
       <li v-for="domain in state.domains" :key="domain.id" class="domains__item" data-testid="custom-domain">
         <div>
           <strong>{{ domain.host }}</strong>
-          <span v-if="domain.verified" class="domains__badge">{{ domain.isPrimary ? 'Primary address' : 'Redirects to the primary' }}</span>
-          <span v-else class="domains__badge domains__badge--wait">Waiting for DNS</span>
+          <span v-if="domain.live" class="domains__badge" data-testid="custom-domain-status">{{ domain.isPrimary ? 'Live · primary address' : 'Live · redirects to the primary' }}</span>
+          <span v-else-if="domain.verified" class="domains__badge domains__badge--wait" data-testid="custom-domain-status">Verified · waiting for the certificate</span>
+          <span v-else class="domains__badge domains__badge--wait" data-testid="custom-domain-status">Waiting for DNS</span>
         </div>
         <p v-if="!domain.verified" class="domains__hint" data-testid="custom-domain-dns">
           Create a <code>TXT</code> record named <code data-testid="custom-domain-txt">{{ domain.challengeHost }}</code> with the value <code>{{ domain.challengeValue }}</code> to prove the domain is yours. Then create a <code>CNAME</code> record for <code>{{ domain.host }}</code> pointing to <code>{{ state.target }}</code>
@@ -58,7 +59,7 @@ async function add() {
         <div class="domains__actions">
           <Button v-if="!domain.verified" label="Check DNS" size="small" :disabled="busy" data-testid="custom-domain-verify"
                   @click="run(() => appsService.verifyCustomDomain(appId, domain.id))" />
-          <Button v-else-if="!domain.isPrimary" label="Make primary" size="small" text :disabled="busy"
+          <Button v-else-if="domain.live && !domain.isPrimary" label="Make primary" size="small" text :disabled="busy"
                   @click="run(() => appsService.setPrimaryCustomDomain(appId, domain.id))" />
           <Button label="Remove" size="small" severity="danger" text :disabled="busy" data-testid="custom-domain-remove"
                   @click="run(() => appsService.removeCustomDomain(appId, domain.id))" />
