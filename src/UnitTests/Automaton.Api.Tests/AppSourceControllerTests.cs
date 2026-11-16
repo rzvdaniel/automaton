@@ -24,13 +24,13 @@ public sealed class AppSourceControllerTests
         var path = Path.Combine(Path.GetTempPath(), "automaton-source-tests", Guid.NewGuid().ToString("N"));
         try
         {
-            AppAuthorizationTestServiceFactory.CreateAppsService(db, owner, path, out var storage);
-            var root = storage.GetAppRootPath(owner, appId);
+            AppAuthorizationTestServiceFactory.CreateAppsService(db, developer, path, out var storage);
+            var root = storage.GetAppRootPath(developer, appId);
             Directory.CreateDirectory(root);
             File.WriteAllText(Path.Combine(root, "automaton.json"), "{}");
 
-            Assert.That(await Controller(db, storage, owner).Files(appId, default), Is.TypeOf<OkObjectResult>());
-            Assert.That(await Controller(db, storage, owner).File(appId, "automaton.json", default), Is.TypeOf<OkObjectResult>());
+            Assert.That(await Controller(db, storage, developer).Files(appId, default), Is.TypeOf<OkObjectResult>());
+            Assert.That(await Controller(db, storage, developer).File(appId, "automaton.json", default), Is.TypeOf<OkObjectResult>());
             Assert.That(await Controller(db, storage, viewer).Files(appId, default), Is.TypeOf<ForbidResult>(), "view-only member");
             Assert.That(await Controller(db, storage, viewer).File(appId, "automaton.json", default), Is.TypeOf<ForbidResult>());
             Assert.That(await Controller(db, storage, Guid.NewGuid()).Files(appId, default), Is.TypeOf<ForbidResult>(), "a stranger");
