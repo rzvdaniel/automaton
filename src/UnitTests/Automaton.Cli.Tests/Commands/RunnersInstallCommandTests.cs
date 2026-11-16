@@ -297,4 +297,15 @@ public class RunnersInstallCommandTests
                 => Task.FromResult(owner.Respond(request));
         }
     }
+
+    [Test]
+    public void ChooseSshBinary_PrefersWindowsOpenSshOnlyOnWindowsWhenPresent()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(RunnersInstallCommand.ChooseSshBinary(true, _ => true), Is.EqualTo(RunnersInstallCommand.WindowsSsh));
+            Assert.That(RunnersInstallCommand.ChooseSshBinary(true, _ => false), Is.EqualTo("ssh"));
+            Assert.That(RunnersInstallCommand.ChooseSshBinary(false, _ => true), Is.EqualTo("ssh"));
+        });
+    }
 }

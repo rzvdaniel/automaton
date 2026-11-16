@@ -121,9 +121,16 @@ public static class RunnersInstallCommand
     // The script runs in a POSIX shell: any CR (Windows Environment.NewLine, CRLF from the server) would break the here-document.
     internal static string ToShellInput(string command) => command.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n') + "\n";
 
+    internal const string WindowsSsh = @"C:\Windows\System32\OpenSSH\ssh.exe";
+
+    /// <summary>Prefers the Windows OpenSSH client so the Windows ssh-agent works even from Git Bash.</summary>
+    internal static string ChooseSshBinary(bool isWindows, Func<string, bool> exists) =>
+        isWindows && exists(WindowsSsh) ? WindowsSsh : "ssh";
+
     internal static async Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct)
     {
-        var start = new ProcessStartInfo(ssh is null ? "sudo" : "ssh")
+        var sshBinary = ChooseSshBinary(OperatingSystem.IsWindows(), File.Exists);
+        var start = new ProcessStartInfo(ssh is null ? "sudo" : sshBinary)
         {
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
             UseShellExecute = false
@@ -156,7 +163,10 @@ public static class RunnersInstallCommand
                 var localHint = needsSudoHint
                     ? "\n--local installs on this machine (it needs sudo here). For a remote server, use --ssh user@host."
                     : string.Empty;
-                throw new InvalidOperationException($"Installer exited {process.ExitCode}: {lastLines}{localHint}");
+                var sshHint = ssh is not null && output.Contains("Permission denied (publickey", StringComparison.OrdinalIgnoreCase)
+                    ? $"\nSSH used {sshBinary}; check that your key is loaded in its ssh-agent (ssh-add) and accepted for {ssh}."
+                    : string.Empty;
+                throw new InvalidOperationException($"Installer exited {process.ExitCode}: {lastLines}{localHint}{sshHint}");
             }
         }
         catch (OperationCanceledException)

@@ -18,7 +18,7 @@ Do not use a live server's untracked settings file as the setup template. Read t
 
 - `.env.prod.example` and `docker-compose.prod.yml` for production services, domains, DNS/TLS, the database (MySQL on the existing host), RabbitMQ, runtime proxy authentication, image/network settings and retention.
 - `src/Automaton.Api/appsettings.Production.example.json` for shared API/Worker application settings and optional integrations.
-- `.env.runner.example`, `docker-compose.runner.yml` and `docs/prod/deploying-runner.md` for independently installed Runners.
+- `.env.runner.example` and `docker-compose.runner.yml` for independently installed Runners.
 - `docs/prod/production-docker-cheat-sheet.md` and `docs/prod/self-hosted-runners.md` for host prerequisites, persistent data and recovery notes.
 
 For each setting, identify its consumer and classify it as operator-provided, generated per installation, derived from another setting, or optional. Confirm required versus optional by checking Compose interpolation and application startup validation; do not infer that every example field is mandatory. Keep the checklist synchronized with the example files and consumers.
