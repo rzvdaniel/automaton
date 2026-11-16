@@ -41,6 +41,10 @@ public sealed class AppSecretService(
     /// <summary>A setting default containing this token gets the app's own public address, for example https://blog.apps.example.com.</summary>
     public const string AppAddressToken = "{{app.address}}";
 
+    /// <summary>True when a setting default in the contract uses <see cref="AppAddressToken"/>, so the running app must restart when its address changes.</summary>
+    public static bool UsesAppAddress(string? contractJson)
+        => contractJson?.Contains(AppAddressToken, StringComparison.Ordinal) == true;
+
     public const int MaxSecretsPerApp = 50;
     public const int MaxSecretsPerVault = 200;
     public const int MaxValueLength = 16 * 1024;

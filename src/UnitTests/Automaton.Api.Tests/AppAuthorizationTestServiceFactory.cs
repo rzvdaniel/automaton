@@ -31,6 +31,14 @@ internal static class AppAuthorizationTestServiceFactory
         return ComposeAppsService(dependencies);
     }
 
+    public static AppPublicationService CreatePublicationService(
+        ApplicationDbContext db, Guid userId, IAppRuntimeRestarter restarter)
+    {
+        var d = CreateDependencies(db, userId, null);
+        return new(d.Db, d.UserContext, d.Authorization, d.Assignment, d.Audit, d.ApplicationEvents, d.RecentActivity,
+            d.Routes, runtimes: restarter);
+    }
+
     private static AppsServiceDependencies CreateDependencies(
         ApplicationDbContext db,
         Guid userId,
