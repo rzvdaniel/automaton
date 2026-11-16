@@ -7,7 +7,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import AppActions from '../components/AppActions.vue'
 import AppActivity from '../components/AppActivity.vue'
-import AppDefinitionDialog from '../components/AppDefinitionDialog.vue'
+import AppSourceTab from '../components/AppSourceTab.vue'
 import AppAdminTab from '@/features/admin/components/AppAdminTab.vue'
 import AppDomainTab from '../components/AppDomainTab.vue'
 import AppSecrets from '../components/AppSecrets.vue'
@@ -52,7 +52,6 @@ const sharing = ref<AppSharing | null>(null)
 const showShareDialog = ref(false)
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const moreMenu = ref<InstanceType<typeof Menu> | null>(null)
-const showDefinition = ref(false)
 const savedSecretCount = ref(0)
 const starting = ref(false)
 const activityRefresh = ref(0)
@@ -73,8 +72,7 @@ const tabs = computed(() => appTabs({
 const shownView = computed<AppViewKey>(() => tabs.value.some((tab) => tab.key === activeView.value) ? activeView.value : 'overview')
 const { askDelete } = useDeleteApp(() => app.value!)
 const moreItems = computed(() => [
-  { label: 'View definition', icon: 'pi pi-file', command: () => { showDefinition.value = true } },
-  ...(canManage.value ? [{ separator: true }, { label: 'Delete app…', icon: 'pi pi-trash', class: 'menu-danger', command: askDelete }] : []),
+  ...(canManage.value ? [{ label: 'Delete app…', icon: 'pi pi-trash', class: 'menu-danger', command: askDelete }] : []),
 ])
 const isPublicApp = computed(() => sharing.value?.audience === 'internet')
 const publicHost = computed(() => (app.value?.publicUrl ? new URL(getPublishedAppUrl(app.value.publicUrl)).host : ''))
@@ -416,6 +414,7 @@ async function handleSharingChanged() {
           :deploy-target="kind === 'tool' ? null : liveTarget"
           :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
         />
+        <AppSourceTab v-else-if="shownView === 'source'" :app-id="app.id" :definition="app.application" />
         <AppSecrets
           v-else-if="shownView === 'secrets'"
           :app-id="app.id"
@@ -454,7 +453,6 @@ async function handleSharingChanged() {
         @changed="handleSharingChanged"
         @open="openFromShare"
       />
-      <AppDefinitionDialog v-model:visible="showDefinition" :app="app" />
     </template>
 
     <div v-else class="state-container">
