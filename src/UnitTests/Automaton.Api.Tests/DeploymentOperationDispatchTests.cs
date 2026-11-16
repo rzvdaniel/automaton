@@ -64,6 +64,18 @@ public sealed class DeploymentOperationDispatchTests
         Assert.That(await service.CancelActiveCoreAsync(fixture.AppId, null, CancellationToken.None), Is.EqualTo(0));
     }
 
+    [Test]
+    public async Task CancelActive_WithTargetSlug_CancelsCliStartedOperationWithoutSlug()
+    {
+        await using var fixture = await ApplicationDeploymentServiceTests.DeploymentFixture.CreateAsync();
+        var (operation, service) = await StuckAsync(fixture, DateTime.UtcNow);
+        Assert.That(operation.TargetSlug, Is.Null);
+
+        Assert.That(await service.CancelActiveCoreAsync(fixture.AppId, "other-target", CancellationToken.None), Is.EqualTo(0));
+        Assert.That(await service.CancelActiveCoreAsync(fixture.AppId, fixture.Target.Slug, CancellationToken.None), Is.EqualTo(1));
+        await AssertFailedAndReleasedAsync(fixture, operation.Id);
+    }
+
     private static async Task<(DeploymentOperation, DeploymentOperationService)> StuckAsync(
         ApplicationDeploymentServiceTests.DeploymentFixture fixture, DateTime startedAt)
     {
