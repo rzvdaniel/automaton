@@ -6,7 +6,7 @@ license: Apache-2.0
 
 # Production deployment
 
-A live deployment requires an explicit user request. Use the versioned installer and updater described in [the installation guide](../../../docs/prod/install-automaton.md). Source blue/green deploy scripts have been retired.
+A live deployment requires an explicit user request. Use the versioned installer and updater described in [the installation guide](../../../src/automaton-vue/docs/install-server.md). Source blue/green deploy scripts have been retired.
 
 ## Server release and update
 

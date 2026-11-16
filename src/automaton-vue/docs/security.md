@@ -26,6 +26,10 @@ Generic deployments do not accept host mounts, privileged containers, host netwo
 
 Containers are a process boundary, not a virtual machine. On a shared machine they suit people who trust each other (one person, a team, an organisation), not mutually untrusted tenants. Put workloads you do not trust on a separate machine with its own Runner.
 
+## Runners and the docker socket
+
+A Machine Management Runner has access to the host's Docker socket to manage bounded app and Action containers, so a compromised Runner could control host Docker. Install it only on machines you trust, keep user code in the isolated containers above, and keep a Runner's enrollment command private: it is a one-time secret, returned once and stored by the API as a hash.
+
 ## Secrets
 
 - App, project and personal secrets are stored encrypted on the server (ASP.NET Core Data Protection).

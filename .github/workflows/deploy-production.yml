@@ -1,7 +1,7 @@
 name: Deploy production
 
 # Manual only. The `production` environment needs the owner's approval, only accepts runs from main, and holds the
-# SSH settings as environment secrets. Setup: docs/prod/deploy-from-github.md.
+# SSH settings as environment secrets. Setup: docs/maintainers/deploy-from-github.md.
 on:
   workflow_dispatch:
     inputs:

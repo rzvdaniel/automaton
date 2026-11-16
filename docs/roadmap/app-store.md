@@ -58,7 +58,7 @@ Implemented: `Store.Settings` (`public` default, `disabled`), `GET/PUT api/admin
 
 ### 8. Documentation
 
-- Single source of truth in `docs/prod/install-automaton.md`; README and `src/automaton-vue/docs/install-server.md` summarize and link.
+- Single source of truth in `src/automaton-vue/docs/install-server.md`; README and `src/automaton-vue/docs/install-server.md` summarize and link.
 - DNS table: `api` (CLI, Runner broker, API), `studio` (administration), `store` (public app store), `apps`/`*.apps` (deployed apps). Port 5671 explained as the Runner broker everywhere.
 - Mention the store in "What you get", the started-services lists and updater text; document listing in the store as separate from deploying (link `publish.md`).
 - Short architecture overview near the top of the README: CLI → API/Studio → Runners → apps; store reads the API.

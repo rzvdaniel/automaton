@@ -61,7 +61,7 @@ sudo ./setup-service.sh
 
 ## Production installation and updates
 
-Use `install-automaton.sh` for a fresh standalone server and the installed `update.sh` for subsequent releases. See [the installation guide](../docs/prod/install-automaton.md).
+Use `install-automaton.sh` for a fresh standalone server and the installed `update.sh` for subsequent releases. See [the installation guide](../src/automaton-vue/docs/install-server.md).
 
 ```bash
 sudo bash /opt/automaton-server/update.sh
@@ -70,7 +70,7 @@ sudo bash /opt/automaton-server/install.sh --status
 
 The Runner's nightly cleanup removes unused images; Server Console warns about low disk. The retired source blue/green deployment helpers have been removed. The separately hosted marketing website is outside the server updater.
 
-CLI releases remain independent: run [Pack CLI and Runner](../.github/workflows/nuget.yml) with an explicit version and publish enabled. See [CLI NuGet publishing](../docs/prod/cli-nuget-publishing.md).
+CLI releases remain independent: run [Pack CLI and Runner](../.github/workflows/nuget.yml) with an explicit version and publish enabled. See [CLI NuGet publishing](../docs/maintainers/cli-nuget-publishing.md).
 
 ---
 

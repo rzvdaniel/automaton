@@ -121,4 +121,4 @@ Run focused tests for the change. For backend changes, follow the build/analyzer
 dotnet build Automaton.All.sln -c Debug --no-incremental
 ```
 
-Release workflows live under [.github/workflows](../.github/workflows). Server bundles, Runner images and CLI/NuGet releases are published separately. See [CLI publishing](prod/cli-nuget-publishing.md).
+Release workflows live under [.github/workflows](../.github/workflows). Server bundles, Runner images and CLI/NuGet releases are published separately. See [CLI publishing](maintainers/cli-nuget-publishing.md).

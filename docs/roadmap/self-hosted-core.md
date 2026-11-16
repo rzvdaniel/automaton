@@ -159,7 +159,7 @@ Demonstrated on 23 October 2026 using a separate development API, Studio, Worker
 
 - The generated installation command enrolled one Management Runner. The workstation CLI created an app before assignment, assigned it, deployed an image-based HTTP app and opened its published URL in a browser. The fresh development database contained no Hosted Runner records.
 - Redeployment changed version 1 to version 2 while preserving a marker created only under `AUTOMATON_APP_DATA_DIR`. An intentionally failing replacement retained version 2 and that marker; the corrected CLI returned failure/exit 1. A final healthy redeployment succeeded. Container inspection confirmed CPU/memory/PID limits and a read-only root filesystem.
-- The run found and corrected two concrete blockers: the development edge lacked the default `api-live-edge` service name, and the CLI treated a failed runtime deployment as successful with warnings. The demonstrated corrections at `c1125734` merged in [PR #417](https://github.com/rzvdaniel/automaton/pull/417) as `a442dda3`. See the [operations guide](../prod/self-hosted-runners.md) for the working flow and prerequisites.
+- The run found and corrected two concrete blockers: the development edge lacked the default `api-live-edge` service name, and the CLI treated a failed runtime deployment as successful with warnings. The demonstrated corrections at `c1125734` merged in [PR #417](https://github.com/rzvdaniel/automaton/pull/417) as `a442dda3`. See the [operations guide](../../src/automaton-vue/docs/deploy-runner.md) for the working flow and prerequisites.
 
 The previous workstation-to-workload networking blocker was avoided by placing the isolated development control plane and Runner on the same test host. Existing databases and app volumes were preserved; only the separate development database was initialized/migrated. This does not close the deferred M1/M2 multi-user, Action, cancellation or restart/replay evidence (checked later: see [Two-user isolation acceptance](#two-user-isolation-acceptance)). Second-machine acceptance remains deferred.
 
@@ -223,7 +223,7 @@ The completion criteria are covered: a fresh machine installation, CLI deploymen
 These are later improvements, not prerequisites for M3's single-server target or M4 source cleanup:
 
 - Second-machine acceptance and additional multi-machine operating features. Preserve existing enrollment/assignment behavior.
-- Additional monitoring, per-category storage breakdowns and system-app catalog work. Basic host retention/admission is covered by the [operations policies](../prod/production-docker-cheat-sheet.md#storage-maintenance); applying those policies to existing hosts remains an operator step, not milestone acceptance.
+- Additional monitoring, per-category storage breakdowns and system-app catalog work. Basic host retention/admission is covered by the [operations policies](../maintainers/production-docker-cheat-sheet.md#storage-maintenance); applying those policies to existing hosts remains an operator step, not milestone acceptance.
 - Runner self-update is done: **Runners → Upgrade** replaces an online Runner with rollback; the manual command remains for offline Runners.
 - Off-site backup destinations and app-data backups, delivered as maintenance apps; see [self-maintenance](self-maintenance.md). Nightly local database/key backups and `restore.sh` ship with the server.
 - Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.

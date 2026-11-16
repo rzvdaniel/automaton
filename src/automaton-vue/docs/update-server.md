@@ -11,7 +11,7 @@ This page updates the API, Worker, Studio and app store of your server to a newe
 
 - You are a system administrator, and the CLI is signed in to the server: `automaton login --server https://api.example.com`.
 - A server installed with the current installer. An older one needs the SSH fallback below once.
-- Servers still on MySQL cannot take this update; move them first with the [migration guide](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/migrate-to-postgresql.md).
+- Servers still on MySQL cannot take this update; move them first, see [Move a MySQL server to PostgreSQL](#move-a-mysql-server-to-postgresql).
 
 ## Steps
 
@@ -59,4 +59,31 @@ Expected: `ok`, and `Version:` shows the new release.
 - **HTTP 409.** Another update is running; wait for it.
 - **Update failed.** Read `/var/lib/automaton/update/status/update.log` (also shown by `automaton server update-status`). The previous release and a recovery backup are kept; the log names the backup. Do not rerun blindly. Restore with [Back up and restore](./backup-restore) if a migration already ran.
 
-How the trigger works (the API never runs as root), adopted installs and recovery: [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md#update-an-installed-server).
+How the trigger works: the API never runs as root. It writes a request into `/var/lib/automaton/update/requests/`; the systemd path unit `automaton-update.path` starts `automaton-update.service`, which runs the installed `update.sh` as root (checksum check, recovery backup and health checks apply unchanged). One update runs at a time and every request is audited. Servers installed before this feature get the units the first time `update.sh` runs over SSH.
+
+## What the updater does
+
+It selects the newest stable release (public GHCR, no GitHub account), verifies the bundle checksum and version, and refuses a release that removes a service or changes PostgreSQL, RabbitMQ, Traefik, volumes, secrets or networks. With less than 10 GiB free it first removes unused Docker images and build cache (never volumes, images of existing containers or backups). It writes a root-only recovery directory under `/opt/automaton-server/backups` (PostgreSQL dump, configuration, API data, Data Protection keys, previous manifest), applies the new images, checks the public Studio/API routes, keeps the newest three update backups (`--keep-backups N`) and removes the previous release's images. For an offline transfer use `--bundle PATH --checksum PATH --version server-vX.Y.Z`. Copy recovery directories to encrypted off-host storage.
+
+If an update fails after containers began changing, do not rerun it blindly: a migration may have run, so an image-only rollback can be unsafe. Restore the database, configuration and keys together ([Back up and restore](./backup-restore)); the updater never rolls the database back on its own. Servers on 0.1.18 or earlier run their previous updater for the first update: run `update.sh` a second time to enable nightly backups.
+
+Servers older than the app store refuse that release from their old updater: fetch the current one once (`curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/update-automaton.sh -o update-automaton.sh`, read it, `sudo bash update-automaton.sh`) and add the `store.example.com` DNS record first so its certificate is issued right away.
+
+## Move a MySQL server to PostgreSQL
+
+Servers installed before PostgreSQL (`release.env` has a `MYSQL_IMAGE` line) keep their data in MySQL until `migrate-to-postgresql.sh` copies and verifies every table and switches the installation over. The MySQL volume is never modified, so you can go back. A standard installation made by `install.sh` is covered; an adopted installation needs a rehearsal first and, when its override contains the MySQL service, a separate `--postgres-override FILE` for the PostgreSQL stack.
+
+Before you start: 10 GiB free (installation, Docker data directory and `--backup-dir`), internet access, a running server, an administrator account in `AUTOMATON_CHECK_EMAIL` / `AUTOMATON_CHECK_PASSWORD` (the script compares what the API lists before and after; optional `AUTOMATON_CHECK_USER_EMAIL` / `_PASSWORD` for a regular user), a provider snapshot, `tmux` or `screen`, and a quiet moment: API and Worker are down while the data is copied (about a minute for a small server). Apps keep running on their Runners. Rehearse on a restored backup on a scratch machine first (`--rehearsal`, never on the real server).
+
+```bash
+curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/docker/install/migrate-to-postgresql.sh -o migrate-to-postgresql.sh
+less migrate-to-postgresql.sh
+sudo bash migrate-to-postgresql.sh --version server-vX.Y.Z                         # report only
+sudo -E bash migrate-to-postgresql.sh --version server-vX.Y.Z --run --confirm your-domain.example
+```
+
+The report lists tables to copy and work in flight (queued jobs, running Actions and Runner operations); wait for it or accept losing it with `--discard-in-flight`. The run takes a verified recovery backup (`backups/mysql-to-postgresql-<time>`), copies all tables in one transaction and verifies row counts, content hashes, foreign keys and sequences, starts the new API and Worker, checks the API snapshot and public routes, and then replaces the MySQL release files. Afterwards sign in, open an app and run an Action that reads a secret, and check schedules.
+
+If it stops before the switch, it returns to MySQL by itself (if that fails, fix the reported problem and run `--rollback`, which is safe to repeat). After the switch, fix what it reports and run `--finish` with the same release and `AUTOMATON_CHECK_*` set; `--run` is refused so old MySQL data cannot overwrite PostgreSQL data. If your connection drops, run `--rollback` (or `--finish` if the recovery directory's `STATE` file says `switched`).
+
+Go back with `sudo bash /opt/automaton-server/migrate-to-postgresql.sh --rollback --confirm your-domain.example`: it saves the PostgreSQL data to a dump, restores configuration and release files and restarts MySQL; anything written to PostgreSQL after the switch is lost. After a few days, remove the old database and recovery data; the script prints the exact names.

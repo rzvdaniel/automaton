@@ -30,7 +30,7 @@ automaton runners install --name main --ssh user@host
 automaton runners install --name main --print-command
 ```
 
-For `--ssh`, the CLI runs the `ssh` executable found on your PATH. On Windows, use Windows OpenSSH (`C:\Windows\System32\OpenSSH\ssh.exe`) on PATH; a Git Bash SSH wrapper can fail with this command.
+To remove a Runner over SSH, run `automaton runners delete RUNNER --ssh user@host`; it runs the uninstall on the host and then deletes the registration.
 
 The CLI asks you to confirm the Docker access. Add `--yes` for automation (required when not interactive). Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds for the Runner to connect (`--timeout` changes this) and prints its Runner ID. `--print-command` also asks for confirmation, so give it `--yes` when there is no terminal, and it then waits for the Runner to enroll: run the printed command on the host within `--timeout` seconds (default 300), or the CLI times out. Use `--json` with `--ssh` or `--local` for `{runnerId, name, status}`.
 
@@ -62,4 +62,12 @@ With exactly one online Runner, `automaton deploy` uses it automatically. With s
 - **Times out waiting for connection.** Port 5671 on the `api` host must be reachable from the Runner machine. See [Install the server](./install-server).
 - **Enrollment command expired.** Run `automaton runners install` again; each command is single use.
 
-Host requirements and the trust boundary are in the [Runner reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/self-hosted-runners.md). Next: [deploy an app](./deploy).
+Studio shows each Runner's storage and last heartbeat; it is offline after about ten minutes without one. Add another machine by repeating the install with a distinct name; do not clone a Runner's configuration or volume. Moving an app to another Runner does not move its host-local data. The generated command checks Linux, Docker and the socket, pulls the Runner image, creates an installation-scoped workspace volume at `/automaton/storage`, and fails with a redacted log tail if the container does not stay running. ext4 is the tested baseline; XFS and other filesystems with a working Docker are fine. Check free space on Docker's data filesystem, not just `/`.
+
+Runners on other machines get `api.<domain>:5671` (TLS, certificate from the same Traefik resolver as the API) as their broker, with no configuration. Fresh installs write it; `update.sh` replaces a private address (an IP or single-label host) in `HostedRunnerRabbitMq` with it and keeps a custom public hostname. Port 5671 must be open on the public address.
+
+If an app's Runner does not answer within 60 seconds, starting Actions and reading Action logs return **503** "It may be offline"; start the Runner and retry. A scheduled run that cannot reach it is recorded as failed.
+
+Upgrading: a Runner on an old image shows **Update available**; its owner selects **Upgrade** (refused while a deploy or Action runs, or when offline). It starts a helper container that pulls the server's configured image and recreates the Runner with the same identity, configuration and volume; apps keep running, and if the new container does not connect the previous one is restored. Use `automaton runners upgrade RUNNER --wait` from the CLI, or **Run it manually** for an offline or very old Runner. Do not rerun the install command as an upgrade.
+
+The trust boundary is in [Security overview](./security#runners-and-the-docker-socket). Next: [deploy an app](./deploy).

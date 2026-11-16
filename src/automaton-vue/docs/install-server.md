@@ -92,4 +92,42 @@ A fresh server cannot send email, so password reset emails and email invitations
 - **Certificate not issued.** Port 80 must be reachable from the internet. If the installer reports a Let's Encrypt `429 rateLimited` error, the same host names have used their weekly limit (five certificates in seven days; repeated installs on one domain use it up). Wait until the retry time it prints or use other host names, then rerun the same command: if HTTPS is not answering it restarts Traefik so the certificates are requested again.
 - **Retrying.** Rerun the same command with the same domain and email; generated credentials are kept. Never run `docker compose down -v`: it deletes data.
 
-For custom paths, protected settings, adopted installs and recovery, see the [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md). To update or restore later: [Update the server](./update-server), [Back up and restore](./backup-restore).
+## Reference
+
+**DNS and ports.** The installer checks `api`, `studio`, `store`, `apps` and a generated name under `*.apps` before starting. Keep `api` directly reachable: Runners use its TLS broker port 5671. PostgreSQL, plaintext RabbitMQ and RabbitMQ administration are not exposed. Behind NAT, pass `--public-ip`. Before you start: select the SSH key you will connect with when you create the server and check `ssh root@SERVER_IP true`; on Cloudflare set the records to DNS only; install pending OS updates first.
+
+**Catalog apps.** On a fresh install the first administrator and connected Runner trigger installation of Server Console, Website Monitor and Heartbeat from the official catalog, unpublished (Server Console with `server:read`, `notify:email` and `server:cleanup` approved). To opt out, set `Catalog.InstallEssentialsOnFirstRunner` to `false` in `/etc/automaton/appsettings.Production.json` and restart the API before connecting the Runner.
+
+**Configuration and secrets.** Release files are in `/opt/automaton-server`, private configuration in `/etc/automaton` (secret files owner-readable only; override both paths on every invocation if you use custom ones). The installer generates the database, broker, signing, encryption and setup secrets once; rerunning it keeps them and operator edits, and refuses a different domain, configuration directory or release. SMTP, GitHub OAuth and Stripe live in `appsettings.Production.json` (SMTP can instead be saved in Studio, see above); after editing, recreate the services:
+
+```bash
+cd /opt/automaton-server
+sudo docker compose --env-file release.env --env-file .env -f compose.yaml up -d --force-recreate api worker
+```
+
+Back up the API Data Protection key ring with the database: Studio-managed SMTP settings and other encrypted records cannot be read without the matching keys. If secrets are lost, restore configuration and keys together; never generate replacements against an existing database.
+
+**Switch the TLS mode.** The default issues certificates over HTTP validation (port 80 must stay reachable). With many published apps, switch to a Cloudflare wildcard certificate (token: Zone Read and DNS Edit for the zone) to avoid Let's Encrypt's 50 certificates per domain per week; the domain and email cannot be changed:
+
+```bash
+sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare   # hidden token prompt, or --cloudflare-token-file PATH
+sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode http         # back
+```
+
+It restarts Traefik and API, waits for the HTTPS checks, never touches credentials or data, and is safe to repeat. It refuses a hand-written `traefik.yml` (adopted installation).
+
+**Apps' own domains.** The owner of a public app adds a domain on the app's Domain tab. Studio shows a TXT record (`_automaton-challenge.<domain>`, proves ownership) and a CNAME to the apps domain or an A record to this server; Check DNS reports which step failed. Traefik then requests a certificate over HTTP-01. `PublishedApps:AllowedCustomDomains` limits the allowed domains; domains under the server's apps domain are refused.
+
+**Adopted installations.** A reviewed migration can adopt an existing server into this layout (the installer does not do it). A root-owned `compose.override.yaml` beside `compose.yaml` keeps external volumes, networks and pinned infrastructure images; the updater applies it to the installed and candidate release and preserves it. Include `-f compose.override.yaml` in manual Compose commands and review the effective configuration with `docker compose ... config` (its output can contain secrets). Never attach an existing database volume to a newer database image.
+
+**Status and recovery.**
+
+```bash
+sudo bash /opt/automaton-server/install.sh --status
+cd /opt/automaton-server
+sudo docker compose --env-file release.env --env-file .env -f compose.yaml logs --tail 100 api worker traefik
+```
+
+Redact logs before sharing. To retry after a failed HTTPS setup, correct the DNS records (or the Cloudflare token) and rerun the same command; for a certificate that was not issued, restart Traefik: `docker compose --project-directory /opt/automaton-server --env-file /opt/automaton-server/release.env --env-file /opt/automaton-server/.env -f /opt/automaton-server/compose.yaml restart traefik` (add `-f compose.override.yaml` on adopted servers).
+
+To update or restore later: [Update the server](./update-server), [Back up and restore](./backup-restore).

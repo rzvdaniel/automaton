@@ -28,7 +28,7 @@ previous server release; `always` publishes regardless; `never` skips it. Run th
 workflow by hand only for a CLI-only release.
 
 Runners are distributed as container images only; see
-[deploying the Runner](deploying-runner.md).
+[self-hosted Runners](../../src/automaton-vue/docs/deploy-runner.md).
 
 ## 2. Install the Locally Packed CLI Globally for Development
 
