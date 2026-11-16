@@ -15,17 +15,17 @@ describe('app page navigation', () => {
   it('shows each tab only where it applies', () => {
     const labels = (options: Parameters<typeof appTabs>[0]) => appTabs(options).map((tab) => tab.label)
     expect(labels({ canManage: true, isPublishable: true, hasSecrets: true, hasActions: true, isAdmin: true }))
-      .toEqual(['Overview', 'Activity', 'Actions', 'Secrets', 'Domain', 'Store listing', 'Settings', 'Admin'])
-    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Domain', 'Store listing', 'Settings'])
-    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Settings'])
-    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Admin'])
+      .toEqual(['Overview', 'Activity', 'Actions', 'Source', 'Secrets', 'Domain', 'Store listing', 'Settings', 'Admin'])
+    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Source', 'Domain', 'Store listing', 'Settings'])
+    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Source', 'Settings'])
+    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Source', 'Admin'])
   })
 
   it('keeps every earlier ?view= link working', () => {
     for (const view of ['logs', 'deployments']) expect(resolveAppView(view)).toBe('activity')
     for (const view of ['runtime', 'targets', 'contract']) expect(resolveAppView(view)).toBe('overview')
     expect(resolveAppView('more')).toBe('settings')
-    for (const view of ['actions', 'secrets', 'domain', 'store', 'settings', 'admin']) expect(resolveAppView(view)).toBe(view)
+    for (const view of ['actions', 'source', 'secrets', 'domain', 'store', 'settings', 'admin']) expect(resolveAppView(view)).toBe(view)
   })
 
   it('falls back to Overview for removed authoring views and unknown values', () => {

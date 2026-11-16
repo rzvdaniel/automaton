@@ -1,18 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import Select from 'primevue/select'
-import Splitter from 'primevue/splitter'
-import SplitterPanel from 'primevue/splitterpanel'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
-import CodeEditor from '@/features/apps/components/CodeEditor.vue'
-import FileTree from '@/features/apps/components/FileTree.vue'
 import { appsService } from '@/features/apps/services/apps.service'
-import { getLanguageFromExtension, type FileNode } from '@/features/apps/types/apps.types'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { AdminAppDetails } from '../types/admin.types'
 import { adminAppsService } from '../services/adminAppsService'
@@ -94,44 +88,6 @@ async function decideMachine(machine: RunnerMaintenancePermission, approved: boo
   }
 }
 
-// Source code: a read-only browser of the stored files.
-const browsing = ref(false)
-const fileTree = ref<FileNode[]>([])
-const activePath = ref<string | null>(null)
-const activeContent = ref('')
-const TEXT = ['html', 'htm', 'css', 'js', 'ts', 'json', 'md', 'markdown', 'xml', 'svg', 'py', 'txt', 'bat', 'vue', 'scss', 'sass', 'less', 'yml', 'yaml']
-
-function firstFile(nodes: FileNode[]): string | null {
-  for (const node of nodes) {
-    if (node.type === 'file') return node.path
-    const child = node.children?.length ? firstFile(node.children) : null
-    if (child) return child
-  }
-  return null
-}
-
-async function openFile(path: string) {
-  activePath.value = path
-  activeContent.value = ''
-  if (!TEXT.includes(path.split('.').pop()?.toLowerCase() ?? '')) {
-    activeContent.value = 'Binary or non-text file preview is not available in the admin viewer.'
-    return
-  }
-  try { activeContent.value = await adminAppsService.readRootFile(props.appId, path) } catch { activeContent.value = 'Failed to load file.' }
-}
-
-async function browse() {
-  browsing.value = true
-  if (fileTree.value.length > 0) return
-  try {
-    fileTree.value = await adminAppsService.getRootFileTree(props.appId)
-    const first = firstFile(fileTree.value)
-    if (first) await openFile(first)
-  } catch {
-    fail('Failed to load the stored files')
-  }
-}
-
 async function saveModeration() {
   savingModeration.value = true
   try {
@@ -203,14 +159,6 @@ function askPause() {
       </div>
     </section>
 
-    <section class="card line" aria-labelledby="source-title">
-      <div>
-        <h2 id="source-title">Source code</h2>
-        <p class="hint">Read-only view of the stored files, including automaton.json.</p>
-      </div>
-      <Button label="Browse files" icon="pi pi-folder-open" severity="secondary" outlined data-testid="browse-files" @click="browse" />
-    </section>
-
     <section class="card" aria-labelledby="mod-title" data-testid="admin-moderation">
       <div class="line">
         <div>
@@ -227,18 +175,6 @@ function askPause() {
       <label class="field">Moderation note<Textarea v-model="moderationReason" rows="2" auto-resize placeholder="Optional moderation note" /></label>
       <div class="end"><Button label="Save moderation" icon="pi pi-save" outlined :loading="savingModeration" :disabled="!details" @click="saveModeration" /></div>
     </section>
-
-    <Dialog v-model:visible="browsing" modal header="Stored files" :style="{ width: 'min(72rem, 96vw)' }">
-      <Splitter class="viewer">
-        <SplitterPanel :size="28" :min-size="20">
-          <FileTree title="Stored Files" :nodes="fileTree" :active-path="activePath" empty-message="No files available for this app." @open-file="openFile" />
-        </SplitterPanel>
-        <SplitterPanel :size="72" :min-size="40">
-          <div class="code-path">{{ activePath || 'Select a file' }}</div>
-          <div v-if="activePath" class="code"><CodeEditor :file-path="activePath" :content="activeContent" :language="getLanguageFromExtension(activePath)" :read-only="true" /></div>
-        </SplitterPanel>
-      </Splitter>
-    </Dialog>
   </div>
 </template>
 
@@ -255,7 +191,4 @@ code { font-family: var(--mono); font-size: 13px; }
 .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .fields label, .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .end { display: flex; justify-content: flex-end; }
-.viewer { height: 60vh; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.code-path { padding: 8px 12px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 13px; }
-.code { height: calc(100% - 38px); min-height: 20rem; }
 </style>

@@ -686,6 +686,18 @@ class AppsService {
 
 
 
+  /** The stored files of an app, read-only (app managers and administrators). */
+  async getSourceFileTree(appId: string): Promise<FileNode[]> {
+    const { data } = await apiClient.get<{ files: string[] }>(`/api/apps/${appId}/source`)
+    return this.buildFileTree(data.files ?? [], { includeMetadata: true })
+  }
+
+  async readSourceFile(appId: string, path: string): Promise<string> {
+    const encoded = path.split('/').map(encodeURIComponent).join('/')
+    const { data } = await apiClient.get<{ content: string }>(`/api/apps/${appId}/source/${encoded}`)
+    return data.content ?? ''
+  }
+
   /**
    * Build file tree from flat list of file paths
    */
