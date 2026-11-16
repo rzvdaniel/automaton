@@ -12,14 +12,16 @@ import { getLanguageFromExtension, type FileNode } from '../types/apps.types'
 const props = defineProps<{ appId: string; definition?: unknown }>()
 
 const DEFINITION = '\0definition'
-const TEXT = ['html', 'htm', 'css', 'js', 'ts', 'json', 'md', 'markdown', 'xml', 'svg', 'py', 'txt', 'bat', 'vue', 'scss', 'sass', 'less', 'yml', 'yaml']
+const NO_PREVIEW = 'Binary or large file: no preview.'
 
 const toast = useToast()
 const tree = ref<FileNode[]>([])
 const active = ref<string>(DEFINITION)
 const content = ref('')
 
-const definitionJson = computed(() => JSON.stringify(props.definition ?? {}, null, 2))
+// The stored automaton.json; the parsed definition only stands in until (or unless) the file loads.
+const storedDefinition = ref<string | null>(null)
+const definitionJson = computed(() => storedDefinition.value ?? JSON.stringify(props.definition ?? {}, null, 2))
 const isDefinition = computed(() => active.value === DEFINITION)
 const shownPath = computed(() => (isDefinition.value ? 'automaton.json' : active.value))
 const shownContent = computed(() => (isDefinition.value ? definitionJson.value : content.value))
@@ -36,14 +38,11 @@ async function open(path: string) {
   active.value = path
   if (path === DEFINITION) return
   content.value = ''
-  if (!TEXT.includes(path.split('.').pop()?.toLowerCase() ?? '')) {
-    content.value = 'Binary or non-text file preview is not available.'
-    return
-  }
-  try { content.value = await appsService.readSourceFile(props.appId, path) } catch { content.value = 'Failed to load file.' }
+  try { content.value = (await appsService.readSourceFile(props.appId, path)) ?? NO_PREVIEW } catch { content.value = 'Failed to load file.' }
 }
 
 onMounted(async () => {
+  appsService.readSourceFile(props.appId, 'automaton.json').then((text) => { if (text !== null) storedDefinition.value = text }).catch(() => {})
   try { tree.value = await appsService.getSourceFileTree(props.appId) } catch {
     toast.add({ severity: 'error', summary: 'Failed to load the stored files', life: 3000 })
   }

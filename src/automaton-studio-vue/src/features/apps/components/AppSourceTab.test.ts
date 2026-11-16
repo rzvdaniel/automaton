@@ -6,7 +6,7 @@ vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
 vi.mock('../services/apps.service', () => ({
   appsService: {
     getSourceFileTree: vi.fn().mockResolvedValue([{ name: 'index.html', path: 'index.html', type: 'file' }]),
-    readSourceFile: vi.fn().mockResolvedValue('<html></html>'),
+    readSourceFile: vi.fn().mockResolvedValue('{"stored": true}'),
   },
 }))
 
@@ -26,7 +26,7 @@ describe('AppSourceTab', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="source-definition"]').text()).toContain('Definition (automaton.json)')
     expect(wrapper.get('[data-testid="code"]').text()).toContain('automaton.json|')
-    expect(wrapper.get('[data-testid="code"]').text()).toContain('"name": "Demo"')
+    expect(wrapper.get('[data-testid="code"]').text()).toContain('"stored": true')
     expect(wrapper.get('[data-testid="tree"]').text()).toBe('1')
   })
 })

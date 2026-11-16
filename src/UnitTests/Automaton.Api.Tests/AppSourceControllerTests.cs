@@ -26,11 +26,19 @@ public sealed class AppSourceControllerTests
         {
             AppAuthorizationTestServiceFactory.CreateAppsService(db, developer, path, out var storage);
             var root = storage.GetAppRootPath(developer, appId);
-            Directory.CreateDirectory(root);
-            File.WriteAllText(Path.Combine(root, "automaton.json"), "{}");
+            Directory.CreateDirectory(Path.Combine(root, "source"));
+            Directory.CreateDirectory(Path.Combine(root, "live"));
+            File.WriteAllText(Path.Combine(root, "_metadata.json"), "{}");
+            File.WriteAllText(Path.Combine(root, "live", "index.html"), "live");
+            File.WriteAllText(Path.Combine(root, "source", "automaton.json"), "{\"stored\":1}");
 
-            Assert.That(await Controller(db, storage, developer).Files(appId, default), Is.TypeOf<OkObjectResult>());
-            Assert.That(await Controller(db, storage, developer).File(appId, "automaton.json", default), Is.TypeOf<OkObjectResult>());
+            var listing = (await Controller(db, storage, developer).Files(appId, default) as OkObjectResult)!.Value!;
+            var listed = ((IEnumerable<string>)listing.GetType().GetProperty("files")!.GetValue(listing)!).ToList();
+            Assert.That(listed, Is.EqualTo(new[] { "automaton.json" }), "only source/: no metadata, live or versions");
+            var read = (await Controller(db, storage, developer).File(appId, "automaton.json", default) as OkObjectResult)!.Value!;
+            Assert.That(read.GetType().GetProperty("content")!.GetValue(read), Is.EqualTo("{\"stored\":1}"));
+            Assert.That(await Controller(db, storage, developer).File(appId, "../_metadata.json", default), Is.TypeOf<BadRequestObjectResult>());
+            Assert.That(await Controller(db, storage, developer).File(appId, "/etc/passwd", default), Is.TypeOf<BadRequestObjectResult>());
             Assert.That(await Controller(db, storage, viewer).Files(appId, default), Is.TypeOf<ForbidResult>(), "view-only member");
             Assert.That(await Controller(db, storage, viewer).File(appId, "automaton.json", default), Is.TypeOf<ForbidResult>());
             Assert.That(await Controller(db, storage, Guid.NewGuid()).Files(appId, default), Is.TypeOf<ForbidResult>(), "a stranger");

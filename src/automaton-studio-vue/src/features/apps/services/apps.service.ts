@@ -692,10 +692,11 @@ class AppsService {
     return this.buildFileTree(data.files ?? [], { includeMetadata: true })
   }
 
-  async readSourceFile(appId: string, path: string): Promise<string> {
+  /** The file's text, or null when it is binary or too large to preview. */
+  async readSourceFile(appId: string, path: string): Promise<string | null> {
     const encoded = path.split('/').map(encodeURIComponent).join('/')
-    const { data } = await apiClient.get<{ content: string }>(`/api/apps/${appId}/source/${encoded}`)
-    return data.content ?? ''
+    const { data } = await apiClient.get<{ content: string; preview?: boolean }>(`/api/apps/${appId}/source/${encoded}`)
+    return data.preview === false ? null : data.content ?? ''
   }
 
   /**
