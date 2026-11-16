@@ -23,4 +23,4 @@ Administrators use the API (a Studio page is not built yet):
 - `GET` and `PUT /api/admin/retention` read and set the server defaults (`runDays`, `minimumRunsPerAction`, `logDays`, `failedMultiplier`, `auditDays`, `homeCardRunsToKeep`).
 - `GET`, `PUT` and `DELETE /api/admin/retention/apps/{appId}` read, set and clear a per-app override of `runDays`, `minimumRunsPerAction` and `logDays`. The override wins over the default.
 
-Keeping runs or logs more than 90 days needs the extra `?approveLongRetention=true`; without it the request is refused with 400.
+Audit events cannot be kept for less than 30 days, and every change to these settings is itself written to the audit log (Admin, Logs). Keeping runs or logs more than 90 days needs the extra `?approveLongRetention=true`; without it the request is refused with 400.

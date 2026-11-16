@@ -34,6 +34,8 @@ public static class RetentionSettings
     public const string AppKeyPrefix = "Retention.App.";
     public const int ApprovalThresholdDays = 90;
     public const int MaximumDays = 3650;
+    /// <summary>Audit events are never kept shorter than this, so a short setting cannot erase the record of its own change.</summary>
+    public const int MinimumAuditDays = 30;
     public const string HomeCardAction = "home-card";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -52,7 +54,7 @@ public static class RetentionSettings
     {
         CheckDays("RunDays", value.RunDays, approved, needsApproval: true);
         CheckDays("LogDays", value.LogDays, approved, needsApproval: true);
-        CheckDays("AuditDays", value.AuditDays, approved, needsApproval: false);
+        CheckDays("AuditDays", value.AuditDays, approved, needsApproval: false, minimum: MinimumAuditDays);
         CheckMinimum(value.MinimumRunsPerAction);
         if (value.FailedMultiplier is < 1 or > 10) throw new ArgumentException("FailedMultiplier must be between 1 and 10.");
         if (value.HomeCardRunsToKeep is < 1 or > 100) throw new ArgumentException("HomeCardRunsToKeep must be between 1 and 100.");
@@ -78,9 +80,9 @@ public static class RetentionSettings
         => new(app?.RunDays ?? defaults.RunDays, app?.MinimumRunsPerAction ?? defaults.MinimumRunsPerAction,
             app?.LogDays ?? defaults.LogDays, defaults.FailedMultiplier);
 
-    private static void CheckDays(string name, int days, bool approved, bool needsApproval)
+    private static void CheckDays(string name, int days, bool approved, bool needsApproval, int minimum = 1)
     {
-        if (days is < 1 or > MaximumDays) throw new ArgumentException($"{name} must be between 1 and {MaximumDays}.");
+        if (days < minimum || days > MaximumDays) throw new ArgumentException($"{name} must be between {minimum} and {MaximumDays}.");
         if (needsApproval && days > ApprovalThresholdDays && !approved)
             throw new ArgumentException($"Keeping {name} more than {ApprovalThresholdDays} days needs approval.");
     }
