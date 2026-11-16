@@ -1,6 +1,7 @@
 ---
 title: Install the server
 description: Install Automaton (Studio, API, app store, PostgreSQL, RabbitMQ, Traefik) on one x86_64 Linux server with a domain, using one command.
+order: 40
 ---
 
 # Install the server
@@ -20,6 +21,8 @@ Measured times, memory and cost are in [Automaton by the numbers](./numbers): ab
 - DNS A records pointing to the server's public IP, set to DNS only (no proxy). Two records are enough: `example.com` and `*.example.com`. Alternatively one record per name: `api`, `studio`, `store`, `apps` and `*.apps` under `example.com`.
 
 Private-only, offline and ARM installs are not supported.
+
+The installer downloads and checks the release bundle for you. If you download the bundle (`automaton-server.tar.gz`) yourself, also download `automaton-server.tar.gz.sha256` from the same release and run `sha256sum -c automaton-server.tar.gz.sha256` before you run `install.sh`.
 
 ## Install
 

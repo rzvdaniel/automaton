@@ -1,6 +1,7 @@
 ---
 title: Automaton by the numbers
 description: Measured install, update and restore times, server resources, and project activity.
+order: 30
 ---
 
 # Automaton by the numbers

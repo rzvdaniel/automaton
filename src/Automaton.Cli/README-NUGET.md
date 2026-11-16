@@ -20,12 +20,12 @@ dotnet tool install --global Automaton.Cli
 
 ## Common commands
 
+To install a Runner, see [Add a Runner](https://automaton.monster/docs/deploy-runner). All commands: [Automaton CLI reference](https://automaton.monster/docs/automaton-cli).
+
 ```bash
 automaton login
 automaton login --local
 automaton login --device
-# Install a Runner on Ubuntu with Docker running (add --yes for automation)
-automaton runners install --name main --ssh user@host
 automaton profiles
 automaton new "My App"
 automaton pull

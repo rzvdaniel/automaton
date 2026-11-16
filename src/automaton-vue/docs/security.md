@@ -1,6 +1,7 @@
 ---
 title: Security overview
 description: How an Automaton installation isolates apps, protects secrets and app permissions, audits changes, and what is out of scope.
+order: 160
 ---
 
 # Security overview

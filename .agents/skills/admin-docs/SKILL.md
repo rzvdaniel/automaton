@@ -17,6 +17,8 @@ Use this skill when a change affects what an Automaton administrator sees or doe
 5. Update navigation and contextual links with the page.
 6. Validate links and claims against the final implementation.
 
+Install, update, backup and Runner steps are documented once, in the website docs (`src/automaton-vue/docs`, for example `install-server`, `update-server`, `deploy-runner`). Admin pages link to them (`https://automaton.monster/docs/<page>`) and describe only what Studio shows or does; do not repeat the steps.
+
 Write short, task-focused instructions. State prerequisites, permissions, expected results, and destructive consequences. Distinguish actions performed by Studio from commands an administrator runs on a host. Never invent controls, routes, commands, guarantees, or statuses. Never include secrets or real host identifiers.
 
 If the change has no administrator-visible effect, do not change the docs. State that conclusion in the handoff.

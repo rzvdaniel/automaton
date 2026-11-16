@@ -1,6 +1,7 @@
 ---
 title: Update the server
 description: Update an installed Automaton server to the latest release from the CLI or Studio, with SSH as the fallback.
+order: 90
 ---
 
 # Update the server

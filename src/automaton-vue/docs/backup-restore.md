@@ -1,6 +1,7 @@
 ---
 title: Back up and restore
 description: Nightly server backups, how to take and list one, and how to restore the database and keys from a backup.
+order: 100
 ---
 
 # Back up and restore

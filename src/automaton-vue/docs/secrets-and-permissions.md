@@ -1,6 +1,7 @@
 ---
 title: Secrets and permissions
 description: Give an app its credentials with automaton secrets and request platform permissions that an administrator approves.
+order: 110
 ---
 
 # Secrets and permissions

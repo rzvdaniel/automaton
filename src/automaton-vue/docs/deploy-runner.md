@@ -1,6 +1,7 @@
 ---
 title: Add a Runner
 description: Install a Machine Management Runner on a Linux host with the CLI so Automaton can run your apps.
+order: 60
 ---
 
 # Add a Runner

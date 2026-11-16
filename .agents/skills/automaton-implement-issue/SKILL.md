@@ -53,7 +53,7 @@ Create a to-do item for each step and tick them off.
      Your handoff says the PR is merged and waiting for the batch check.
 8. **Hand off.** Remove `agent:in-progress` when the issue is labelled `verified` or handed to the verifier. Open
    issues for gaps you found. If the issue completes a roadmap step or testing showed the docs are wrong, fix
-   `docs/roadmap/README.md` or the docs in a small follow-up PR.
+   `docs/roadmap/README.md` or the docs (user pages in `src/automaton-vue/docs`) in a small follow-up PR.
 
 ## Handoff
 

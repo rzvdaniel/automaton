@@ -14,6 +14,9 @@ What the change does for people, in the imperative: "Let app owners delete apps 
 
 Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_template.md) and pass it with
 `gh pr create --body-file`. The merge gate refuses a PR without "How verified", "Risk", "How to revert" and "Docs".
+- **Docs** is one line: "updated `<page>`" (a page in `src/automaton-vue/docs`, the Admin docs or an architecture guide) or
+  "none, because ...". Ask "which user page does this change make wrong?" before you write "none". The verifier
+  follows the page you name when it runs your "Check after release" list.
 
 - **How verified** is evidence, not a claim: the commands and what came back. For a bug, name the test that failed
   before the fix. For a Studio or website change, include a screenshot in the proof (see automaton-verify-release).

@@ -1,6 +1,7 @@
 ---
 title: Current limitations
 description: What Automaton does not do yet, stated specifically.
+order: 150
 ---
 
 # Current limitations

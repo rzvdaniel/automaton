@@ -8,6 +8,17 @@ license: Apache-2.0
 
 Keep repository documentation accurate, concise, and aligned with implemented behavior and current delivery status.
 
+## Where documentation lives
+
+Four homes, one audience each:
+
+- **Website docs** (`src/automaton-vue/docs`): what users and administrators do (install, update, backup, Runners, CLI). Every page has `title`, `description` and `order` in its frontmatter; a page with `order` appears in `llms.txt` without a code change. The command list in `automaton-cli.md` is generated: `node scripts/generate-cli-reference.mjs`.
+- **In-app admin docs** (`src/Automaton.Api/Documentation/Admin`): what Studio shows; link to the website docs for steps.
+- **`docs/maintainers`**: what runs automaton.monster and releases.
+- **Agent guidance** (`AGENTS.md`, `.agents/skills`, `shared/ai-guidance`): how agents work and what they tell users' agents.
+
+`node scripts/check-doc-links.mjs` (CI) checks links and that website pages have frontmatter.
+
 ## Architecture guides
 
 Architecture guides under `docs/architecture/` describe the implemented system. Keep the relevant guide up to date in the same change whenever architecture, state ownership, message flow, runtime boundaries, or operational guarantees change.

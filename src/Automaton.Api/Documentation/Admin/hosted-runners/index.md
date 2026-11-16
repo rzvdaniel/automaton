@@ -5,7 +5,7 @@ order: 20
 
 # Runner Administration
 
-Machine Management is the supported Runner profile. Install it from **Server → Add a Runner**, then assign it to the app environment. Each machine runs one management Runner and can host multiple isolated applications.
+Machine Management is the supported Runner profile. Install it from **Server → Add a Runner** (steps: [Add a Runner](https://automaton.monster/docs/deploy-runner)), then assign it to the app environment. Each machine runs one management Runner and can host multiple isolated applications.
 
 - [Server installation and setup](./server-installation.md)
 - [Environments, deployment targets, and Runner assignments](./deployment-targets.md)
