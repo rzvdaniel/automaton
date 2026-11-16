@@ -138,6 +138,8 @@ public sealed class AiGuidanceSeedExportTests
                 ("automaton-mcp", "Automaton MCP", "The boundary between Automaton MCP inspection and CLI delivery.", 100, "[\"mcp\",\"tools\"]")
             }));
         Assert.That(await provider.GetGuidanceByKeyAsync("automaton-app-contract"), Is.Null);
+        Assert.That((await provider.GetGuidanceByKeyAsync("Automaton-MCP"))?.Key, Is.EqualTo("automaton-mcp"));
+        Assert.That((await provider.ListLoadableGuidanceAsync("MCP")).Select(item => item.Key), Is.EqualTo(new[] { "automaton-mcp" }));
     }
 
     private static string Hash(string content) =>

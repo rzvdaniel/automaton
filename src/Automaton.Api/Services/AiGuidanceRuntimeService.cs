@@ -32,7 +32,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.Metadata.RequiredByDefault
                 && !item.Metadata.IsModelLoadable
                 && item.Metadata.DocumentKind == AiGuidanceDocumentKinds.BasePrompt
-                && item.Metadata.Surface == surface))
+                && string.Equals(item.Metadata.Surface, surface, StringComparison.OrdinalIgnoreCase)))
             .Select(ToDocument)
             .FirstOrDefault());
 
@@ -41,7 +41,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.Metadata.IsModelLoadable
                 && item.Metadata.RequiredByDefault
                 && item.Metadata.DocumentKind == AiGuidanceDocumentKinds.Guidance
-                && item.Metadata.Surface == surface))
+                && string.Equals(item.Metadata.Surface, surface, StringComparison.OrdinalIgnoreCase)))
             .Select(ToDocument)
             .ToList());
 
@@ -49,7 +49,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         Task.FromResult<IReadOnlyList<AutomatonGuidanceCatalogItem>>(Ordered(_entries.Value.Where(item =>
                 item.Metadata.IsModelLoadable
                 && item.Metadata.DocumentKind == AiGuidanceDocumentKinds.Guidance
-                && (string.IsNullOrWhiteSpace(surface) || item.Metadata.Surface == surface)))
+                && (string.IsNullOrWhiteSpace(surface) || string.Equals(item.Metadata.Surface, surface, StringComparison.OrdinalIgnoreCase))))
             .Select(ToCatalogItem)
             .ToList());
 
@@ -63,7 +63,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         return Task.FromResult(_entries.Value
             .Where(item => item.Metadata.IsModelLoadable
                 && item.Metadata.DocumentKind == AiGuidanceDocumentKinds.Guidance
-                && item.Metadata.Key == key)
+                && string.Equals(item.Metadata.Key, key, StringComparison.OrdinalIgnoreCase))
             .Select(ToDocument)
             .FirstOrDefault());
     }
