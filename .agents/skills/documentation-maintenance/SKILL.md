@@ -12,7 +12,7 @@ Keep repository documentation accurate, concise, and aligned with implemented be
 
 Four homes, one audience each:
 
-- **Website docs** (`src/automaton-vue/docs`): what users and administrators do (install, update, backup, Runners, CLI). Every page has `title`, `description` and `order` in its frontmatter; a page with `order` appears in `llms.txt` without a code change. The command list in `automaton-cli.md` is generated: `node scripts/generate-cli-reference.mjs`.
+- **Website docs** (`src/automaton-vue/docs`): what users and administrators do (install, update, backup, Runners, CLI). Every page has `title` and `description` in its frontmatter; a page that also has `order` appears in `llms.txt` without a code change. The command list in `automaton-cli.md` is generated: `node scripts/generate-cli-reference.mjs`.
 - **In-app admin docs** (`src/Automaton.Api/Documentation/Admin`): what Studio shows; link to the website docs for steps.
 - **`docs/maintainers`**: what runs automaton.monster and releases.
 - **Agent guidance** (`AGENTS.md`, `.agents/skills`, `shared/ai-guidance`): how agents work and what they tell users' agents.
