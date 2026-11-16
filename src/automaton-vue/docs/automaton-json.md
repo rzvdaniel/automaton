@@ -153,7 +153,7 @@ Anyone can install a published app that allows forking from Studio. The installe
 ]
 ```
 
-- **`settings`** are plain, non-secret values (`name` as for secrets, optional `description`, `default`, `required`). The installer fills them in; they reach Actions and the running app as environment variables, like secrets, and a `default` applies until a value is saved. Unlike secrets, their values are not redacted from Action output, but they are write-only in Studio like secrets. Anything sensitive belongs in `secrets`, not here.
+- **`settings`** are plain, non-secret values (`name` as for secrets, optional `description`, `default`, `required`). The installer fills them in; they reach Actions and the running app as environment variables, like secrets, and a `default` applies until a value is saved. A `default` containing `{{app.address}}` gets the app's own public address with no trailing slash (its primary verified own domain, otherwise its address on the apps domain), for example `"default": "{{app.address}}"`; the setting stays unset while the app has no address. Saving or clearing a setting restarts the running app so the container sees the new value. Unlike secrets, their values are not redacted from Action output, but they are write-only in Studio like secrets. Anything sensitive belongs in `secrets`, not here.
 - **`schedules`** are offered to the installer, who accepts or skips each; accepted ones become ordinary Action schedules of the installed app. `action` is an Action key; give exactly one of `cron` (five fields) or `intervalSeconds`; `input` is an object.
 - **`secrets`** and **`permissions`** work as above. Infrastructure permissions still need a system administrator's approval.
 
