@@ -1,13 +1,10 @@
 using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Entities;
-using Automaton.Api.Hubs;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
-using static Automaton.Api.Hubs.AutomatonHub;
 
 namespace Automaton.Api.Services;
 
@@ -17,8 +14,7 @@ namespace Automaton.Api.Services;
 /// code or deploy controller/backend artifacts.
 /// </summary>
 public sealed class RuntimeFileProxyService(
-    IHubContext<AutomatonHub> automatonHub,
-    TunnelRequestRegistry tunnelRegistry,
+    RunnerTunnelRegistry tunnels,
     IOptions<AppsTunnelConfig> tunnelOptions,
     ApiInstanceIdentityService apiInstanceIdentityService,
     IAppDeploymentTargetResolver deploymentTargetResolver,
@@ -49,14 +45,14 @@ public sealed class RuntimeFileProxyService(
             deployment_target_id = target.Id,
             path = relativePath
         });
-        var response = await SendTunnelRequestAsync(runner, "POST", "/api/runtime-file", body, cancellationToken);
-        if (response.StatusCode == StatusCodes.Status404NotFound)
+        using var response = await SendTunnelRequestAsync(runner, "/api/runtime-file", body, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
-        if (response.StatusCode < 200 || response.StatusCode >= 300)
-            throw new InvalidOperationException(response.Error ?? $"Runner returned HTTP {response.StatusCode}.");
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Runner returned HTTP {(int)response.StatusCode}.");
 
         var payload = JsonSerializer.Deserialize<RunnerRuntimeFileResponse>(
-            response.Body ?? "{}",
+            await response.Content.ReadAsStringAsync(cancellationToken),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (string.IsNullOrWhiteSpace(payload?.ContentBase64))
             return null;
@@ -66,11 +62,10 @@ public sealed class RuntimeFileProxyService(
             string.IsNullOrWhiteSpace(payload.ContentType) ? "application/octet-stream" : payload.ContentType);
     }
 
-    private async Task<TunnelResponse> SendTunnelRequestAsync(
+    private async Task<HttpResponseMessage> SendTunnelRequestAsync(
         Runner runner,
-        string method,
         string path,
-        string? body,
+        string body,
         CancellationToken cancellationToken)
     {
         if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
@@ -82,18 +77,27 @@ public sealed class RuntimeFileProxyService(
             throw new InvalidOperationException($"Runner '{runner.Name}' belongs to another API instance.");
         }
 
-        var (requestId, responseTask) = tunnelRegistry.Register(
-            TimeSpan.FromSeconds(tunnelConfig.TimeoutSeconds), cancellationToken);
-        await automatonHub.Clients.Client(runner.ConnectionId!)
-            .SendAsync(AutomatonHubMethods.TunnelRequest, new TunnelRequest
-            {
-                RequestId = requestId,
-                Method = method,
-                Path = path,
-                Body = body
-            }, cancellationToken);
+        using var lease = tunnels.TryAcquire(runner.Id)
+            ?? throw new InvalidOperationException($"Runner '{runner.Name}' has no tunnel connection");
+        using var request = new HttpRequestMessage(HttpMethod.Post, RuntimeTunnelRequestSender.BuildUri(path, string.Empty))
+        {
+            Version = System.Net.HttpVersion.Version20,
+            VersionPolicy = System.Net.Http.HttpVersionPolicy.RequestVersionExact,
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        };
+        request.Headers.TryAddWithoutValidation(TunnelHeaders.Destination, TunnelDestinations.FastApi);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(tunnelConfig.TimeoutSeconds));
+        // Buffered here (not ResponseHeadersRead) so the lease can end with the call.
+        return await lease.Invoker.SendAsync(request, timeout.Token) is { } response
+            ? await Buffer(response, timeout.Token)
+            : throw new InvalidOperationException("No response from the Runner.");
+    }
 
-        return await responseTask;
+    private static async Task<HttpResponseMessage> Buffer(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        await response.Content.LoadIntoBufferAsync(cancellationToken);
+        return response;
     }
 
     private sealed class RunnerRuntimeFileResponse

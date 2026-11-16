@@ -333,8 +333,8 @@ public sealed class AppPauseTests
         var page = RuntimeTunnelService.PausedPage();
 
         Assert.That(page.StatusCode, Is.EqualTo(503));
-        Assert.That(page.HeaderValues["Content-Type"], Is.EqualTo(new[] { "text/html; charset=utf-8" }));
-        Assert.That(System.Text.Encoding.UTF8.GetString(page.BodyBytes!), Does.Contain("This app is paused"));
+        Assert.That(page.ContentType, Is.EqualTo("text/html; charset=utf-8"));
+        Assert.That(page.Body, Does.Contain("This app is paused"));
     }
 
     private sealed class CountingRestarter : IAppRuntimeRestarter

@@ -26,7 +26,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
     private readonly AppActionExecutionService appActionExecutionService;
-    private readonly HubExecutionHandlerRegistrar executionHandlerRegistrar;
+    private readonly RunnerTunnel tunnel;
     private readonly HubControlHandlerRegistrar controlHandlerRegistrar;
     private readonly HubConnectionFailureReporter connectionFailureReporter;
     private readonly SemaphoreSlim connectionLoopSignal = new(0, 1);
@@ -45,7 +45,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
     public HubService(
         ConfigurationService configService,
         ApiKeyAuthenticationService apiKeyAuthService,
-        TunnelForwarderService tunnelForwarder,
+        RunnerTunnel tunnel,
         IServiceProvider serviceProvider,
         AppActionExecutionService appActionExecutionService)
     {
@@ -55,9 +55,9 @@ public class HubService : IRuntimeTunnelReconnectRequester
         this.logger = Log.ForContext<HubService>();
         heartbeatService = new HubHeartbeatService(() => connection, logger);
         this.appActionExecutionService = appActionExecutionService;
-        executionHandlerRegistrar = new HubExecutionHandlerRegistrar(
-            tunnelForwarder,
-            logger);
+        this.tunnel = tunnel;
+        tunnel.TryBeginRequest = tunnelReconnectState.TryBeginTunnelRequest;
+        tunnel.CompleteRequest = CompleteTunnelRequest;
         controlHandlerRegistrar = new HubControlHandlerRegistrar(serviceProvider, logger);
         connectionFailureReporter = new HubConnectionFailureReporter(configService, logger);
 
@@ -257,10 +257,6 @@ public class HubService : IRuntimeTunnelReconnectRequester
             // Keep-alive interval to maintain connection during long operations
             connection.KeepAliveInterval = TimeSpan.FromSeconds(15);
 
-            executionHandlerRegistrar.Register(
-                connection,
-                tunnelReconnectState.TryBeginTunnelRequest,
-                CompleteTunnelRequest);
             controlHandlerRegistrar.Register(
                 connection,
                 SetConnectedApiIdentity,
@@ -273,6 +269,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
             await heartbeatService.StartAsync(cancellationToken);
             await heartbeatService.SendAsync(cancellationToken);
             await ReportRuntimeGatewayAsync(connection, cancellationToken);
+            await tunnel.StartAsync(apiKey, cancellationToken);
 
             // Use logger for success and avoid duplicate console messages — the retry loop will report higher-level status
             logger.Debug("Connected to hub at {HubUrl}", hubUrl);
@@ -306,7 +303,8 @@ public class HubService : IRuntimeTunnelReconnectRequester
         retryTokenSource?.Dispose();
         retryTokenSource = null;
         await heartbeatService.StopAsync();
-        
+        await tunnel.StopAsync();
+
         if (connection != null)
         {
             try
@@ -403,6 +401,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
         try
         {
             await heartbeatService.StopAsync();
+            await tunnel.StopAsync();
             await currentConnection.StopAsync();
         }
         catch (Exception exception)

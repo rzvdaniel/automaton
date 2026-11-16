@@ -11,5 +11,6 @@ public static class RunnerApiCompatibilityVersions
     public const string ContainerApplicationExecution = "3";
     public const string HostContainerExecution = "4";
     public const string RuntimeTunnelReconnectCommands = "5";
-    public const string Current = RuntimeTunnelReconnectCommands;
+    public const string AppTunnelOverHttp2 = "6";
+    public const string Current = AppTunnelOverHttp2;
 }

@@ -22,7 +22,7 @@ internal static class RunnerExecutionServicesRegistration
         services.AddSingleton<HostContainerBuildCleanupService>();
         services.AddSingleton<HostContainerResultNotifier>();
         services.AddSingleton<HostContainerExecutionApiClient>();
-        services.AddSingleton<TunnelForwarderService>();
+        services.AddSingleton<RunnerTunnel>();
         services.AddSingleton<IRunnerExecutionExecutor, RunnerExecutionExecutor>();
         services.AddSingleton<RunnerFileTransferExecutor>();
         services.AddSingleton(provider => new RunnerExecutionJournal(provider.GetRequiredService<FileStorageService>().GetRunnerExecutionJournalDirectory()));

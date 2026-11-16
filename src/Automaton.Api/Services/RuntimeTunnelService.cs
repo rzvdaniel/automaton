@@ -11,32 +11,42 @@ using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
-public sealed record ResolvedTunnelTarget(Runner? Runner, bool StaticSite, TunnelResponse? Failure);
+public sealed record ResolvedTunnelTarget(Runner? Runner, bool StaticSite, TunnelFailure? Failure);
 
 /// <summary>
-/// Proxies browser traffic to a self-hosted Runner through its existing SignalR connection.
-/// The runner only accepts the fixed loopback runtime gateway destination.
+/// Decides whether a browser request for an app may be sent through its Runner's tunnel, and probes an app's pages through it.
+/// The Runner only accepts the fixed local destinations (runtime gateway, static site, FastAPI).
 /// </summary>
 public sealed class RuntimeTunnelService(
     ApplicationDbContext dbContext,
-    RuntimeTunnelRequestSender requestSender,
+    RunnerTunnelRegistry tunnels,
     IOptions<PublishedAppsConfig> publishedAppsOptions,
     ApiInstanceIdentityService apiInstanceIdentityService,
     ILogger<RuntimeTunnelService> logger,
-    RuntimeTunnelTargetCache targetCache) : ITunnelForwarder
+    RuntimeTunnelTargetCache targetCache) : ITunnelProber
 {
     private readonly PublishedAppsConfig publishedAppsConfig = publishedAppsOptions.Value;
 
-    public async Task<TunnelResponse> ForwardAsync(
-        Guid appId,
-        Guid deploymentTargetId,
-        HttpRequest request,
-        string path,
-        CancellationToken cancellationToken)
+    /// <summary>Asks the app for one page through the tunnel and returns its status and headers; the body is not read.</summary>
+    public async Task<TunnelProbeResult> ProbeAsync(
+        Guid appId, Guid deploymentTargetId, string host, string path, CancellationToken cancellationToken)
     {
-        var resolved = await ResolveAsync(appId, deploymentTargetId, request, path, cancellationToken);
-        return resolved.Failure ?? await requestSender.ForwardAsync(
-            appId, deploymentTargetId, resolved.Runner!, request, path, cancellationToken, resolved.StaticSite);
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString(host);
+        var resolved = await ResolveAsync(appId, deploymentTargetId, context.Request, path, cancellationToken);
+        if (resolved.Failure is { } failure)
+            return new TunnelProbeResult(failure.StatusCode, new Dictionary<string, string[]>());
+        if (tunnels.TryAcquire(resolved.Runner!.Id) is not { } connection)
+            return new TunnelProbeResult(StatusCodes.Status503ServiceUnavailable, new Dictionary<string, string[]>());
+
+        using var lease = connection;
+        using var message = RuntimeTunnelRequestSender.CreateRequest(
+            HttpMethod.Get, appId, deploymentTargetId, path, string.Empty, context.Request, resolved.StaticSite);
+        using var response = await connection.Invoker.SendAsync(message, cancellationToken);
+        var headers = response.Headers.Concat(response.Content.Headers)
+            .ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+        return new TunnelProbeResult((int)response.StatusCode, headers);
     }
 
     /// <summary>Runs every check a tunnel request needs and returns the Runner to use, or the response to send instead.</summary>
@@ -56,7 +66,7 @@ public sealed class RuntimeTunnelService(
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
                 appId, deploymentTargetId, request.Host.Host, path, "target-not-found");
-            return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status404NotFound, "The deployed app target was not found."));
+            return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status404NotFound, "The deployed app target was not found."));
         }
 
         if (!IsExpectedAppHost(request.Host.Host, target, publishedAppsConfig, lookup.VerifiedDomains))
@@ -64,7 +74,7 @@ public sealed class RuntimeTunnelService(
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
                 appId, deploymentTargetId, runner.Id, request.Host.Host, path, "unexpected-host");
-            return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status404NotFound, "The deployed app target was not found."));
+            return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status404NotFound, "The deployed app target was not found."));
         }
 
         if (target.WebApp.IsPaused)
@@ -75,7 +85,7 @@ public sealed class RuntimeTunnelService(
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
                 appId, deploymentTargetId, runner.Id, request.Host.Host, path, "hosted-runner");
-            return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status404NotFound, "Per-user Hosted runtime is retired. Assign a Management Runner."));
+            return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status404NotFound, "Per-user Hosted runtime is retired. Assign a Management Runner."));
         }
 
         if (!SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(runner.Purpose, runner.ApplicationProfile))
@@ -83,7 +93,7 @@ public sealed class RuntimeTunnelService(
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
                 appId, deploymentTargetId, runner.Id, request.Host.Host, path, "unsupported-profile");
-            return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status404NotFound, "The deployed app target was not found."));
+            return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status404NotFound, "The deployed app target was not found."));
         }
 
         if (!IsCurrentApiInstance(runner.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId))
@@ -92,15 +102,25 @@ public sealed class RuntimeTunnelService(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason} RunnerApiInstanceId={RunnerApiInstanceId} CurrentApiInstanceId={CurrentApiInstanceId}",
                 appId, deploymentTargetId, runner.Id, request.Host.Host, path, "runner-wrong-api-instance",
                 runner.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId);
-            return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is connected to another API instance."));
+            return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is connected to another API instance."));
         }
 
-        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+        if (RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow)
+            && !RunnerProtocolCompatibilityPolicy.SupportsAppTunnelOverHttp2(runner.ApiCompatibilityVersion))
+        {
+            logger.LogWarning(
+                "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason} RunnerProtocol={RunnerProtocol}",
+                appId, deploymentTargetId, runner.Id, request.Host.Host, path, "runner-outdated", runner.ApiCompatibilityVersion);
+            return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status503ServiceUnavailable, "The assigned Runner must be upgraded to carry app traffic."));
+        }
+
+        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow)
+            || !tunnels.IsConnected(runner.Id))
         {
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
                 appId, deploymentTargetId, runner.Id, request.Host.Host, path, "runner-offline");
-            return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is not connected."));
+            return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is not connected."));
         }
 
         return new ResolvedTunnelTarget(runner, UsesMachineStaticSite(target, runner, request.Host.Host), null);
@@ -139,35 +159,9 @@ public sealed class RuntimeTunnelService(
         "<body><main><h1>This app is paused</h1><p>Its owner has paused it. Please come back later.</p></main></body></html>";
 
     /// <summary>The short page a paused app's address answers with (503); nothing of the app is reached.</summary>
-    internal static TunnelResponse PausedPage() => new()
-    {
-        StatusCode = StatusCodes.Status503ServiceUnavailable,
-        Error = "This app is paused.",
-        BodyBytes = System.Text.Encoding.UTF8.GetBytes(PausedHtml),
-        HeaderValues = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Content-Type"] = ["text/html; charset=utf-8"],
-            ["Cache-Control"] = ["no-store"],
-            ["Retry-After"] = ["3600"]
-        }
-    };
-
-    private static TunnelResponse Failure(int statusCode, string error) => new()
-    {
-        StatusCode = statusCode,
-        Error = error,
-        BodyBytes = System.Text.Encoding.UTF8.GetBytes(error),
-        HeaderValues = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Content-Type"] = ["text/plain; charset=utf-8"]
-        }
-    };
-
-    internal static Task<(byte[]? Body, bool TooLarge)> ReadBodyAsync(
-        HttpRequest request,
-        int maxBytes,
-        CancellationToken cancellationToken)
-        => RuntimeTunnelRequestSender.ReadBodyAsync(request, maxBytes, cancellationToken);
+    internal static TunnelFailure PausedPage() => new(
+        StatusCodes.Status503ServiceUnavailable, PausedHtml, "text/html; charset=utf-8",
+        new Dictionary<string, string> { ["Cache-Control"] = "no-store", ["Retry-After"] = "3600" });
 
     internal static bool IsExpectedAppHost(
         string host,

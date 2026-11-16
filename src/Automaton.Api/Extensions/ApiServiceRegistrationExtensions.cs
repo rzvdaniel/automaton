@@ -573,7 +573,8 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<PublicMarketplaceCreatorAppsQuery>();
         services.AddScoped<PublicMarketplaceCatalogQuery>();
         services.AddScoped<WebAppStarService>();
-        services.AddSingleton<TunnelRequestRegistry>();
+        services.AddSingleton<RunnerTunnelRegistry>();
+        services.AddHttpForwarder();
         services.AddSingleton<RunnerGatewayRegistry>();
         services.AddSingleton<TunnelLongLivedLimiter>();
         return services;
@@ -597,9 +598,8 @@ internal static class ApiAppExecutionRegistration
         services.AddSingleton<RuntimeTunnelTargetCache>();
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
-        services.AddScoped<ITunnelForwarder>(provider => provider.GetRequiredService<RuntimeTunnelService>());
+        services.AddScoped<ITunnelProber>(provider => provider.GetRequiredService<RuntimeTunnelService>());
         services.AddScoped<AppFramingProbe>();
-        services.AddScoped<RuntimeTunnelWebSocketService>();
         services.AddScoped<RuntimeFileProxyService>();
         services.AddScoped<ApplicationDeploymentService>();
         services.AddScoped<DeploymentPackageFinalizationService>();

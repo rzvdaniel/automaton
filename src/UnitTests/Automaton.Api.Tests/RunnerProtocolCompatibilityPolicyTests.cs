@@ -55,6 +55,14 @@ public sealed class RunnerProtocolCompatibilityPolicyTests
             Is.EqualTo(expected));
     }
 
+    [TestCase(RunnerApiCompatibilityVersions.AppTunnelOverHttp2, true)]
+    [TestCase(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands, false)]
+    [TestCase(null, false)]
+    public void AppTunnelCompatibilityRequiresProtocolSix(string? version, bool expected)
+    {
+        Assert.That(RunnerProtocolCompatibilityPolicy.SupportsAppTunnelOverHttp2(version), Is.EqualTo(expected));
+    }
+
     private static Runner CreateRunner(string? version) => new()
     {
         Id = Guid.NewGuid(),
