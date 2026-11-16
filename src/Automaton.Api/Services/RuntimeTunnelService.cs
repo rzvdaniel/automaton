@@ -59,7 +59,7 @@ public sealed class RuntimeTunnelService(
             return new ResolvedTunnelTarget(null, false, Failure(StatusCodes.Status404NotFound, "The deployed app target was not found."));
         }
 
-        if (!IsExpectedAppHost(request.Host.Host, target, publishedAppsConfig))
+        if (!IsExpectedAppHost(request.Host.Host, target, publishedAppsConfig, lookup.VerifiedDomains))
         {
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
@@ -106,7 +106,7 @@ public sealed class RuntimeTunnelService(
         return new ResolvedTunnelTarget(runner, UsesMachineStaticSite(target, runner, request.Host.Host), null);
     }
 
-    private sealed record TargetLookup(AppDeploymentTarget? Target, bool IsHostedRunner);
+    private sealed record TargetLookup(AppDeploymentTarget? Target, bool IsHostedRunner, IReadOnlyList<string> VerifiedDomains);
 
     // Shared by every request waiting on the same lookup, so it must not depend on any one request's cancellation.
     private async Task<TargetLookup> LoadAsync(Guid appId, Guid deploymentTargetId)
@@ -123,7 +123,13 @@ public sealed class RuntimeTunnelService(
                 target.GenericRuntimeDeployed);
         var isHostedRunner = target?.ExecutionRunner is { } runner &&
             await dbContext.HostedRunners.AnyAsync(hostedRunner => hostedRunner.RunnerId == runner.Id);
-        return new TargetLookup(target, isHostedRunner);
+        var verifiedDomains = target is null
+            ? []
+            : await dbContext.AppCustomDomains.AsNoTracking()
+                .Where(domain => domain.WebAppId == appId && domain.VerifiedAt != null)
+                .Select(domain => domain.Host)
+                .ToListAsync();
+        return new TargetLookup(target, isHostedRunner, verifiedDomains);
     }
 
     private const string PausedHtml =
@@ -163,7 +169,11 @@ public sealed class RuntimeTunnelService(
         CancellationToken cancellationToken)
         => RuntimeTunnelRequestSender.ReadBodyAsync(request, maxBytes, cancellationToken);
 
-    internal static bool IsExpectedAppHost(string host, AppDeploymentTarget target, PublishedAppsConfig publishedAppsConfig)
+    internal static bool IsExpectedAppHost(
+        string host,
+        AppDeploymentTarget target,
+        PublishedAppsConfig publishedAppsConfig,
+        IReadOnlyCollection<string>? verifiedDomains = null)
     {
         var privateHost = PublishedAppHostNames.BuildPrivateAppHost(
             target.WebAppId, publishedAppsConfig.PublicBaseUrlHost);
@@ -179,7 +189,9 @@ public sealed class RuntimeTunnelService(
 
         var publicHost = PublishedAppHostNames.BuildPublishedAppHost(
             target.WebApp.PublicUrl, publishedAppsConfig.PublicBaseUrlHost);
-        return string.Equals(host, publicHost, StringComparison.OrdinalIgnoreCase);
+        // A verified custom domain (#1178) is routed by Traefik to this public app, so it is an expected host too.
+        return string.Equals(host, publicHost, StringComparison.OrdinalIgnoreCase) ||
+            (verifiedDomains?.Contains(host, StringComparer.OrdinalIgnoreCase) ?? false);
     }
 
     internal static bool IsCurrentApiInstance(string? runnerApiInstanceId, string currentApiInstanceId)
