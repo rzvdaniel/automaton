@@ -14,7 +14,8 @@ public sealed record AppSettingValueSummary(string Name, string Value, DateTime 
 public sealed class AppSettingValueService(
     ApplicationDbContext db,
     AppSecretService secrets,
-    ResourceAuthorizationService authorization)
+    ResourceAuthorizationService authorization,
+    IAppRuntimeRestarter? runtimes = null)
 {
     public async Task<IReadOnlyList<AppSettingValueSummary>> ListAsync(Guid appId, Guid userId, CancellationToken token)
     {
@@ -40,6 +41,7 @@ public sealed class AppSettingValueService(
         row.UpdatedByUserId = userId;
         await db.SaveChangesAsync(token);
         await secrets.DeleteAsync(appId, userId, name, token);
+        await RestartAsync(appId);
         return new(name, value, row.UpdatedAtUtc);
     }
 
@@ -54,7 +56,14 @@ public sealed class AppSettingValueService(
             await db.SaveChangesAsync(token);
         }
         var oldOverride = await secrets.DeleteAsync(appId, userId, name, token);
+        if (row is not null || oldOverride) await RestartAsync(appId);
         return row is not null || oldOverride;
+    }
+
+    /// <summary>Running copies keep the old value until restarted, so a saved setting restarts them (queued, not awaited).</summary>
+    private async Task RestartAsync(Guid appId)
+    {
+        if (runtimes is not null) await runtimes.RestartRunningAsync(appId, CancellationToken.None);
     }
 
     private async Task<HashSet<string>> DeclaredSettingNamesAsync(Guid appId, CancellationToken token)

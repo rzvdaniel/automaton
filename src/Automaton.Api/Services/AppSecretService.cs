@@ -38,6 +38,9 @@ public sealed class AppSecretService(
 {
     public const string ApiUrlVariable = "AUTOMATON_API_URL";
 
+    /// <summary>A setting default containing this token gets the app's own public address, for example https://blog.apps.example.com.</summary>
+    public const string AppAddressToken = "{{app.address}}";
+
     public const int MaxSecretsPerApp = 50;
     public const int MaxSecretsPerVault = 200;
     public const int MaxValueLength = 16 * 1024;
@@ -229,9 +232,36 @@ public sealed class AppSecretService(
             values[setting.Name] = setting.Value;
             delivered.RemoveAll(entry => entry.Name == setting.Name && entry.Scope == AppSecretScopes.App);
         }
+        string? address = null;
         foreach (var setting in contract.Settings ?? [])
             if (setting.Default is { Length: > 0 } fallback && !values.ContainsKey(setting.Name))
+            {
+                if (fallback.Contains(AppAddressToken, StringComparison.Ordinal))
+                {
+                    address ??= await AppAddressAsync(appId, token);
+                    if (address is null) continue;
+                    fallback = fallback.Replace(AppAddressToken, address, StringComparison.Ordinal);
+                }
                 values[setting.Name] = fallback;
+            }
+    }
+
+    /// <summary>
+    /// The app's public address without a trailing slash: its primary verified own domain, else its slug on the apps
+    /// domain. Null while the app has neither, so the setting stays unset instead of holding a placeholder.
+    /// </summary>
+    private async Task<string?> AppAddressAsync(Guid appId, CancellationToken token)
+    {
+        var baseUrl = publishedApps?.Value.PublicBaseUrl;
+        var scheme = Uri.TryCreate(baseUrl, UriKind.Absolute, out var parsed) ? parsed.Scheme : "https";
+        var primary = await db.AppCustomDomains
+            .Where(domain => domain.WebAppId == appId && domain.IsPrimary && domain.VerifiedAt != null)
+            .Select(domain => domain.Host).FirstOrDefaultAsync(token);
+        if (primary is not null) return $"https://{primary}";
+        var slug = await db.WebApps.Where(app => app.Id == appId).Select(app => app.PublicUrl).FirstOrDefaultAsync(token);
+        if (string.IsNullOrWhiteSpace(slug) || publishedApps is null) return null;
+        var port = parsed is { IsDefaultPort: false } ? $":{parsed.Port}" : string.Empty;
+        return $"{scheme}://{PublishedAppHostNames.BuildPublishedAppHost(slug, publishedApps.Value.PublicBaseUrlHost)}{port}";
     }
 
     private async Task AddVaultSecretsAsync(AppVaults vaults, List<ApplicationSecretDeclaration> wanted,

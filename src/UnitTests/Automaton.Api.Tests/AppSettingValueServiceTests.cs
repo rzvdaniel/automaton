@@ -80,7 +80,43 @@ public sealed class AppSettingValueServiceTests
         Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None))["A"], Is.EqualTo("da"));
     }
 
-    private static (AppSettingValueService Settings, AppSecretService Secrets, ApplicationDbContext Db, Guid AppId, Guid OwnerId) Create(string contractJson)
+    [Test]
+    public async Task ADefaultWithTheAppAddressTokenGetsTheAppsPublicAddress()
+    {
+        var (_, secrets, db, appId, _) = Create("""{"settings":[{"name":"URL","default":"{{app.address}}"}]}""");
+        db.WebApps.Single(app => app.Id == appId).PublicUrl = null;
+        db.SaveChanges();
+        Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None)).ContainsKey("URL"), Is.False);
+        db.WebApps.Single(app => app.Id == appId).PublicUrl = "blog";
+        db.SaveChanges();
+
+        var env = await secrets.ResolveForExecutionAsync(appId, CancellationToken.None);
+
+        Assert.That(env["URL"], Is.EqualTo("https://blog.apps.example.com"));
+        db.AppCustomDomains.Add(new() { Id = Guid.NewGuid(), WebAppId = appId, Host = "blog.example.org", IsPrimary = true, VerifiedAt = DateTimeOffset.UtcNow });
+        db.SaveChanges();
+        Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None))["URL"], Is.EqualTo("https://blog.example.org"));
+    }
+
+    [Test]
+    public async Task SavingOrClearingASettingRestartsTheRunningApp()
+    {
+        var restarter = new CountingRestarter();
+        var (settings, _, _, appId, ownerId) = Create("""{"settings":[{"name":"A"}]}""", restarter);
+
+        await settings.SetAsync(appId, ownerId, "A", "x", CancellationToken.None);
+        await settings.ClearAsync(appId, ownerId, "A", CancellationToken.None);
+
+        Assert.That(restarter.Restarted, Is.EqualTo(new[] { appId, appId }));
+    }
+
+    private sealed class CountingRestarter : IAppRuntimeRestarter
+    {
+        public List<Guid> Restarted { get; } = [];
+        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false) { Restarted.Add(appId); return Task.FromResult(1); }
+    }
+
+    private static (AppSettingValueService Settings, AppSecretService Secrets, ApplicationDbContext Db, Guid AppId, Guid OwnerId) Create(string contractJson, IAppRuntimeRestarter? restarter = null)
     {
         var db = AppAuthorizationTestData.CreateDbContext();
         var appId = Guid.NewGuid();
@@ -90,7 +126,8 @@ public sealed class AppSettingValueServiceTests
         db.SaveChanges();
         var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
         var authorization = new ResourceAuthorizationService(db, AppAuthorizationTestData.CreateUserContextService(ownerId));
-        var secrets = new AppSecretService(db, new SecretStore(db, protector), protector, authorization);
-        return (new AppSettingValueService(db, secrets, authorization), secrets, db, appId, ownerId);
+        var secrets = new AppSecretService(db, new SecretStore(db, protector), protector, authorization,
+            publishedApps: Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Config.PublishedAppsConfig { PublicBaseUrl = "https://apps.example.com" }));
+        return (new AppSettingValueService(db, secrets, authorization, restarter), secrets, db, appId, ownerId);
     }
 }
