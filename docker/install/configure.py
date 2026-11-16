@@ -138,7 +138,7 @@ def ensure_custom_domain_resolver(root):
 
 def ensure_runner_broker_host(root):
     """Hand remote Runners the server's public hostname (with its certificate) instead of a private address.
-    Only IP literals, single-label names and an empty host are replaced; a hand-set public hostname is kept.
+    Only IP literals, single-label names and an empty host in an existing section are replaced; a hand-set public hostname is kept.
     InfrastructureRunnerRabbitMq (the local Runner) is not touched. Returns 'changed', 'unchanged' or 'skipped'."""
     state = json.loads((root / 'installation.json').read_text())
     settings_path = root / 'appsettings.Production.json'
@@ -151,7 +151,7 @@ def ensure_runner_broker_host(root):
     api = f"api.{state['domain']}"
     broker = settings.get('HostedRunnerRabbitMq')
     if not isinstance(broker, dict):
-        broker = {}
+        return 'unchanged'  # no Runner broker configured: nothing to migrate
     host = str(broker.get('Host') or '').strip()
     try:
         ipaddress.ip_address(host.strip('[]'))
