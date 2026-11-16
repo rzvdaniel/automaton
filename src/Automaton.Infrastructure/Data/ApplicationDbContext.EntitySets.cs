@@ -36,7 +36,6 @@ public partial class ApplicationDbContext
     public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
     public virtual DbSet<AiProvider> AiProviders { get; set; }
     public virtual DbSet<AiModel> AiModels { get; set; }
-    public virtual DbSet<AiGuidanceDocument> AiGuidanceDocuments { get; set; }
     public virtual DbSet<WebApp> WebApps { get; set; }
     public virtual DbSet<AppDeploymentTarget> AppDeploymentTargets { get; set; }
     public virtual DbSet<DeploymentOperation> DeploymentOperations { get; set; }

@@ -1,10 +1,7 @@
 using Automaton.AiGuidance;
-using Automaton.Api.Constants;
-using Automaton.Api.Data;
-using Automaton.Api.Entities;
 using Automaton.Api.Services;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Automaton.Api.Tests;
 
@@ -41,9 +38,7 @@ public sealed class AiGuidanceSeedExportTests
     [Test]
     public async Task BuildExportPackAsync_ExportsExactlyTheTwoCliProjectFiles()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateRuntimeService(dbContext);
-        await service.SeedMissingDefaultsAsync();
+        var service = CreateRuntimeService();
 
         var export = await service.BuildExportPackAsync();
         var files = export.Files.ToDictionary(file => file.TargetPath, file => file.Content, StringComparer.Ordinal);
@@ -107,41 +102,49 @@ public sealed class AiGuidanceSeedExportTests
     }
 
     [Test]
-    public async Task BuildExportPackAsync_ExcludesNonCliDocumentsWithOutputPaths()
+    public async Task GuidanceOutput_IsByteForByteTheOutputOfTheDatabaseBackedRuntime()
     {
-        await using var dbContext = CreateDbContext();
-        dbContext.AiGuidanceDocuments.AddRange(
-            new AiGuidanceDocument
-            {
-                Id = Guid.NewGuid(), Key = "admin-studio", Title = "Admin Studio", Surface = "studio",
-                DocumentKind = AiGuidanceDocumentKinds.Guidance, OutputPath = "studio.md", ContentMarkdown = "studio",
-                IsEnabled = true, IsModelLoadable = true, Version = 1, CreatedAt = DateTime.UtcNow
-            },
-            new AiGuidanceDocument
-            {
-                Id = Guid.NewGuid(), Key = "admin-cli", Title = "Admin CLI", Surface = "cli",
-                DocumentKind = AiGuidanceDocumentKinds.Guidance, OutputPath = "custom.md", ContentMarkdown = "custom",
-                IsEnabled = true, IsModelLoadable = true, Version = 1, CreatedAt = DateTime.UtcNow
-            });
-        await dbContext.SaveChangesAsync();
+        // SHA-256 of the UTF-8 content captured from the previous database-backed runtime.
+        var expected = new[]
+        {
+            "export|AGENTS.md|918a0335f49b3cc9a2fdaecd866f21e14a5914a951af8aebb6bfbd86c7de4994",
+            "export|.automaton/agents/skills/automaton-app/SKILL.md|630f6010d38c224ff2b8555d477dba75efa46b07c0e2cb1f0c4b92a7b5fbed9b",
+            "base|shared|automaton-app-contract|531014b837b6f3aed563bb9dab285e7d723a8f16500d97b6dd7ac4e5847fcecf",
+            "req|studio|automaton-studio-editor|2933c8cf7b268f92e1b3bf9388d08a572a1e5d9e6b64bf9b423bf9eb3aeee93e",
+            "key|automaton-mcp|69551aad488292d9c727a288ecb2ea59677c96d0889457c257fee139a72e626c",
+            "key|automaton-actions|b71d2c99fc242e41e3b99a4803f2a62f5156af6aa2d0f94a6adb17bd4cbb9e3f",
+            "key|automaton-studio-editor|2933c8cf7b268f92e1b3bf9388d08a572a1e5d9e6b64bf9b423bf9eb3aeee93e"
+        };
+        var service = CreateRuntimeService();
+        IAutomatonGuidanceRuntimeProvider provider = service;
+        var actual = new List<string>();
+        foreach (var file in (await service.BuildExportPackAsync()).Files)
+        {
+            actual.Add($"export|{file.TargetPath}|{Hash(file.Content)}");
+        }
 
-        var export = await CreateRuntimeService(dbContext).BuildExportPackAsync();
+        actual.Add($"base|shared|automaton-app-contract|{Hash((await provider.GetBasePromptAsync("shared"))!.ContentMarkdown)}");
+        actual.AddRange((await provider.GetRequiredGuidanceAsync("studio")).Select(item => $"req|studio|{item.Key}|{Hash(item.ContentMarkdown)}"));
+        foreach (var item in await provider.ListLoadableGuidanceAsync())
+        {
+            actual.Add($"key|{item.Key}|{Hash((await provider.GetGuidanceByKeyAsync(item.Key))!.ContentMarkdown)}");
+        }
 
-        Assert.That(export.Files.Select(file => file.TargetPath), Is.EqualTo(new[] { "custom.md" }));
+        Assert.That(actual, Is.EqualTo(expected));
+        Assert.That(
+            (await provider.ListLoadableGuidanceAsync("mcp")).Select(item => (item.Key, item.Title, item.Description, item.SortOrder, item.TagsJson)),
+            Is.EqualTo(new[]
+            {
+                ("automaton-mcp", "Automaton MCP", "The boundary between Automaton MCP inspection and CLI delivery.", 100, "[\"mcp\",\"tools\"]")
+            }));
+        Assert.That(await provider.GetGuidanceByKeyAsync("automaton-app-contract"), Is.Null);
+        Assert.That((await provider.GetGuidanceByKeyAsync("Automaton-MCP"))?.Key, Is.EqualTo("automaton-mcp"));
+        Assert.That((await provider.ListLoadableGuidanceAsync("MCP")).Select(item => item.Key), Is.EqualTo(new[] { "automaton-mcp" }));
     }
 
-    private static ApplicationDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
+    private static string Hash(string content) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
 
-        return new ApplicationDbContext(options);
-    }
-
-    private static AiGuidanceRuntimeService CreateRuntimeService(ApplicationDbContext dbContext) =>
-        new(
-            dbContext,
-            new EmbeddedAutomatonGuidanceProvider(),
-            NullLogger<AiGuidanceRuntimeService>.Instance);
+    private static AiGuidanceRuntimeService CreateRuntimeService() =>
+        new(new EmbeddedAutomatonGuidanceProvider());
 }
