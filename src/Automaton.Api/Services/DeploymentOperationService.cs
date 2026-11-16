@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Automaton.Api.Enums;
 using System.Text.Json;
 using Automaton.Api.Data;
@@ -229,10 +230,12 @@ public sealed class DeploymentOperationService(
     internal async Task<int> CancelActiveCoreAsync(Guid appId, string? targetSlug, CancellationToken cancellationToken)
     {
         var slug = string.IsNullOrWhiteSpace(targetSlug) ? null : targetSlug.Trim();
+        var matchesTarget = await TargetFilterAsync(appId, slug, cancellationToken);
         var active = await dataContext.DeploymentOperations
             .AsNoTracking()
-            .Where(operation => operation.WebAppId == appId &&
-                (slug == null || operation.TargetSlug == slug) &&
+            .Where(operation => operation.WebAppId == appId)
+            .Where(matchesTarget)
+            .Where(operation =>
                 (operation.Status == DeploymentOperationStatuses.Pending ||
                  operation.Status == DeploymentOperationStatuses.Running))
             .ToListAsync(cancellationToken);
@@ -241,6 +244,21 @@ public sealed class DeploymentOperationService(
             if (await FailAsync(operation, "The deployment was cancelled by the app owner.", cancellationToken))
                 cancelled++;
         return cancelled;
+    }
+
+    // CLI-started operations carry no TargetSlug (they deploy to the default target), so a slug filter
+    // also matches the target's active operation and, for the default target, operations without a slug.
+    private async Task<Expression<Func<DeploymentOperation, bool>>> TargetFilterAsync(
+        Guid appId, string? slug, CancellationToken cancellationToken)
+    {
+        if (slug == null) return operation => true;
+        var lowered = slug.ToLowerInvariant();
+        var target = await dataContext.AppDeploymentTargets.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.WebAppId == appId && item.Slug == lowered, cancellationToken);
+        var activeId = target?.ActiveDeploymentOperationId;
+        var isDefault = target?.IsDefault == true;
+        return operation => operation.TargetSlug == slug || operation.Id == activeId ||
+            (isDefault && (operation.TargetSlug == null || operation.TargetSlug == ""));
     }
 
     private async Task<bool> FailAsync(DeploymentOperation snapshot, string message, CancellationToken cancellationToken)
