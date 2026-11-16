@@ -8,6 +8,10 @@ order: 90
 
 This page updates the API, Worker, Studio and app store of your server to a newer release. Services can be briefly unavailable. Apps keep running on their Runners.
 
+## What to ask the user
+
+Confirm the update (services are briefly unavailable) and, for the SSH fallback, the root SSH login. Never ask for passwords or tokens. Updates take their own recovery backup.
+
 ## Prerequisites
 
 - You are a system administrator, and the CLI is signed in to the server: `automaton login --server https://api.example.com`.

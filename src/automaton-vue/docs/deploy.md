@@ -8,10 +8,14 @@ order: 80
 
 This page ships an app to a Runner and makes it public. Deploy and publish are separate: deploy builds and starts the app, publish gives it a public URL.
 
+## What to ask the user
+
+Ask for the app's name, whether to publish it (apps are private until published) and the public name for its address, and which Runner when several are online. Never ask for passwords, tokens or API keys; secrets go in with [`automaton secrets`](./secrets-and-permissions) from a file or hidden prompt.
+
 ## Prerequisites
 
 - An app folder with `automaton.json` ([Build an Automaton app](./build-an-automaton-app); overview in [Your first app](./getting-started)).
-- At least one online Runner ([Add a Runner](./deploy-runner)).
+- At least one online Runner ([Add a Runner](./deploy-runner)). Check: `automaton runners` shows one as `connected`, and `automaton whoami` names the right server.
 
 ## Steps
 

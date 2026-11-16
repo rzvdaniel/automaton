@@ -8,6 +8,10 @@ order: 100
 
 This page covers the server's database and keys. It does not cover files that apps keep in their own data directories.
 
+## What to ask the user
+
+Taking or listing a backup needs no input. Ask before a restore (it replaces the database, configuration and keys) and for the backup to restore. Never ask for or print the backup's encryption password or keys; keep archives off the chat.
+
 ## Prerequisites
 
 SSH access with sudo on the server.
