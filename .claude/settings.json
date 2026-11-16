@@ -2,9 +2,9 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Agent",
+        "matcher": "Agent|Task",
         "hooks": [
-          { "type": "command", "command": "node .claude/hooks/agent-type-guard.mjs" }
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/agent-type-guard.mjs\"" }
         ]
       }
     ]

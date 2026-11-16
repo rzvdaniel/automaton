@@ -7,8 +7,8 @@ process.stdin.on('end', () => {
   const type = toolInput.subagent_type ?? 'general-purpose';
   const prompt = String(toolInput.prompt ?? '');
   const generic = ['general-purpose', 'claude'].includes(type);
-  const deliveryWork = /(#\d{3,}|\bPR\b|pull request|\bissue\b)/i.test(prompt)
-    && /(implement|review|security pass|merge)/i.test(prompt);
+  const deliveryWork = /(#\d{3,}|\bPR\b|\bpull request\b)/i.test(prompt)
+    && /\b(implement|review|security pass|merge gate)\b/i.test(prompt);
   if (generic && deliveryWork) {
     process.stderr.write('Issue or PR work goes to subagent_type "automaton-implementer" (implementation) or '
       + '"automaton-reviewer" (review, security pass); they carry AGENTS.md and the delivery skills. '
