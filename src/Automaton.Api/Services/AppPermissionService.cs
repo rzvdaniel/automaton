@@ -127,7 +127,7 @@ public sealed class AppPermissionService(
 
     /// <summary>The Studio page where a system administrator approves an app's permissions.</summary>
     public static string? ApprovalUrl(string? studioUrl, Guid appId)
-        => string.IsNullOrWhiteSpace(studioUrl) ? null : $"{studioUrl.TrimEnd('/')}/admin/apps/{appId}?tab=permissions";
+        => string.IsNullOrWhiteSpace(studioUrl) ? null : $"{studioUrl.TrimEnd('/')}/apps/{appId}?view=admin";
 
     // A stored contract that no longer reads requests nothing; the next deployment stores a new one.
     internal static string[] RequestedPermissions(string json)

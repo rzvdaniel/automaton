@@ -66,16 +66,7 @@ function onPage(event: DataTablePageEvent) {
 }
 
 function openApp(app: AdminAppListItem) {
-  void router.push({
-    name: 'admin-app-detail',
-    params: { appId: app.id },
-    query: {
-      from: 'apps',
-      ownerUserId: app.ownerUserId || undefined,
-      ownerUserName: app.ownerName || undefined,
-      tab: isSystemAdministrator.value && app.waitingPermissions.length > 0 ? 'permissions' : undefined,
-    },
-  })
+  void router.push({ name: 'app-editor', params: { id: app.id }, query: { view: 'admin' } })
 }
 
 function openOwner(app: AdminAppListItem) {

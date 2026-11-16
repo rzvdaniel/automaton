@@ -72,7 +72,7 @@ public sealed class AdminAppDirectoryServiceTests
     {
         var appId = Guid.NewGuid();
         Assert.That(AppPermissionService.ApprovalUrl("https://studio.example.com/", appId),
-            Is.EqualTo($"https://studio.example.com/admin/apps/{appId}?tab=permissions"));
+            Is.EqualTo($"https://studio.example.com/apps/{appId}?view=admin"));
         Assert.That(AppPermissionService.ApprovalUrl("", appId), Is.Null);
     }
 
