@@ -1,9 +1,7 @@
 using Automaton.AiGuidance;
-using Automaton.Api.Data;
 using Automaton.Api.Services;
 using Automaton.Mcp.SystemPrompts;
 using Automaton.Mcp.Tools;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 
@@ -15,8 +13,7 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task BuildSystemPrompt_UsesGenericStudioContract_AndExcludesCliBootstrapPhrases()
     {
-        await using var dbContext = CreateDbContext();
-        var runtimeProvider = await CreateRuntimeProviderAsync(dbContext);
+        var runtimeProvider = CreateRuntimeProvider();
         var builder = new AppSystemPromptBuilder(
             runtimeProvider,
             new KeywordAppPromptContextSelector(),
@@ -44,8 +41,7 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task BuildSystemPrompt_UsesTheGenericContract_WhenRequestNeedsPersistence()
     {
-        await using var dbContext = CreateDbContext();
-        var runtimeProvider = await CreateRuntimeProviderAsync(dbContext);
+        var runtimeProvider = CreateRuntimeProvider();
         var builder = new AppSystemPromptBuilder(
             runtimeProvider,
             new KeywordAppPromptContextSelector(),
@@ -103,8 +99,7 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task AutomatonGuidanceTool_ListsFocusedGuidanceReferences()
     {
-        await using var dbContext = CreateDbContext();
-        var tool = new AutomatonGuidanceTool(await CreateRuntimeProviderAsync(dbContext));
+        var tool = new AutomatonGuidanceTool(CreateRuntimeProvider());
 
         var result = await tool.ExecuteToolAsync(
             AutomatonGuidanceTool.ListGuidanceName,
@@ -125,8 +120,7 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task AutomatonGuidanceTool_ReturnsRequestedGuidanceContent()
     {
-        await using var dbContext = CreateDbContext();
-        var tool = new AutomatonGuidanceTool(await CreateRuntimeProviderAsync(dbContext));
+        var tool = new AutomatonGuidanceTool(CreateRuntimeProvider());
 
         var result = await tool.ExecuteToolAsync(
             AutomatonGuidanceTool.GetGuidanceName,
@@ -141,24 +135,8 @@ public class AppSystemPromptBuilderTests
         Assert.That(result.Content, Does.Contain("# Automaton Actions"));
     }
 
-    private static ApplicationDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-
-        return new ApplicationDbContext(options);
-    }
-
-    private static async Task<AiGuidanceRuntimeService> CreateRuntimeProviderAsync(ApplicationDbContext dbContext)
-    {
-        var service = new AiGuidanceRuntimeService(
-            dbContext,
-            new EmbeddedAutomatonGuidanceProvider(),
-            NullLogger<AiGuidanceRuntimeService>.Instance);
-        await service.SeedMissingDefaultsAsync();
-        return service;
-    }
+    private static AiGuidanceRuntimeService CreateRuntimeProvider() =>
+        new(new EmbeddedAutomatonGuidanceProvider());
 
     private sealed class StubStepSystemPromptBuilder : IStepSystemPromptBuilder
     {

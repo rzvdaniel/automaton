@@ -2,12 +2,10 @@ using Automaton.Ai;
 using Automaton.Ai.Models;
 using Automaton.Ai.Providers;
 using Automaton.AiGuidance;
-using Automaton.Api.Data;
 using Automaton.Api.Services.Mcp;
 using Automaton.Api.Services;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Tools;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Automaton.Api.Tests;
@@ -18,8 +16,7 @@ public class AutomatonMcpClientToolExposureTests
     [Test]
     public async Task StartConversationAsync_ExposesAutomatonGuidanceTools_ToProviderTools()
     {
-        await using var dbContext = CreateDbContext();
-        var runtimeProvider = await CreateRuntimeProviderAsync(dbContext);
+        var runtimeProvider = CreateRuntimeProvider();
         var fakeProvider = new FakeAiProvider();
         var registry = new FakeAiProviderRegistry(fakeProvider);
         var toolProvider = new AppMcpToolProvider(
@@ -48,24 +45,8 @@ public class AutomatonMcpClientToolExposureTests
         Assert.That(fakeProvider.ReceivedToolNames, Does.Contain(AutomatonGuidanceTool.GetGuidanceName));
     }
 
-    private static ApplicationDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-
-        return new ApplicationDbContext(options);
-    }
-
-    private static async Task<AiGuidanceRuntimeService> CreateRuntimeProviderAsync(ApplicationDbContext dbContext)
-    {
-        var service = new AiGuidanceRuntimeService(
-            dbContext,
-            new EmbeddedAutomatonGuidanceProvider(),
-            NullLogger<AiGuidanceRuntimeService>.Instance);
-        await service.SeedMissingDefaultsAsync();
-        return service;
-    }
+    private static AiGuidanceRuntimeService CreateRuntimeProvider() =>
+        new(new EmbeddedAutomatonGuidanceProvider());
 
     private sealed class FakeAiProvider : IAiProvider
     {

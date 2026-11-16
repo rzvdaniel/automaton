@@ -716,7 +716,6 @@ internal static class ApiOperationsRegistration
         services.AddScoped<AiConversationHistoryPersistenceService>();
         services.AddScoped<IAiGuidanceRuntimeService, AiGuidanceRuntimeService>();
         services.AddScoped<IAutomatonGuidanceRuntimeProvider, AiGuidanceRuntimeService>();
-        services.AddScoped<AdminAiGuidanceService>();
         services.AddScoped<AdminDocumentationService>();
         services.AddScoped<RunnerAuditService>();
         services.AddScoped<RunnerRegistrationService>();

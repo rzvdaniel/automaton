@@ -18,9 +18,6 @@ namespace Automaton.Api.Extensions
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            var guidanceService = scope.ServiceProvider.GetRequiredService<IAiGuidanceRuntimeService>();
-            await guidanceService.SeedMissingDefaultsAsync(cancellationToken);
-
             return app;
         }
 
