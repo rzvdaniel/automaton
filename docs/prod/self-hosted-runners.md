@@ -52,6 +52,14 @@ health signals.
 
 For repository development, `scripts/setup-local-development.ps1` starts the existing local control plane; it no longer provisions a per-user Hosted Runner or changes a subscription. Install Machine Management through the same Studio flow and explicitly assign the app. Endpoint health alone does not establish installation/deployment acceptance. A remote workload machine must resolve and reach the configured development API and broker; a developer-only hostname is insufficient.
 
+## Broker address for remote Runners
+
+Runners on other machines get `api.<domain>:5671` (TLS, certificate from the same
+Traefik resolver as the API) as their broker, with no configuration. Fresh installs
+write it; `update.sh` replaces a private address (an IP or single-label host) in
+`HostedRunnerRabbitMq` with it and keeps a custom public hostname. Port 5671 must be
+open on the public address. `docker-compose.prod.yml` uses `API_DOMAIN`.
+
 ## Verified single-machine development flow
 
 On 23 October 2026, API, Studio, Worker and the CI-produced Runner from `38d994c2`

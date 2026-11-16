@@ -310,9 +310,16 @@ fi
 printf '%s\n' "$resolver_output" | grep -v '^RESULT=' || true
 restart_traefik=false
 if [[ "$resolver_output" == *'RESULT=changed'* ]]; then restart_traefik=true; fi
+echo 'Giving remote Runners the public broker address if a private one is set.'
+if ! broker_output=$(python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-runner-broker-host); then
+    echo "Runner broker configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
+    exit 1
+fi
+printf '%s\n' "$broker_output" | grep -v '^RESULT=' || true
 old_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
 new_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$bundle/release.env" | cut -d= -f2-)
 recreate=()
+[[ "$restart_traefik" == true || "$broker_output" == *'RESULT=changed'* ]] && restart_traefik=true
 [[ "$restart_traefik" != true ]] || recreate=(--force-recreate)  # API reads the settings file only at startup.
 if [[ "$old_runner_image" != "$new_runner_image" ]]; then
     [[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }

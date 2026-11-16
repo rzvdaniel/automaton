@@ -221,6 +221,33 @@ class InstallationConfigurationTests(unittest.TestCase):
         module.configure(other, 'example.com', 'owner@example.com')
         self.assertEqual(module.ensure_custom_domain_resolver(other), 'unchanged')
 
+    def test_ensure_runner_broker_host_replaces_private_address_only(self):
+        module.configure(self.root, 'example.com', 'owner@example.com')
+        path = self.root / 'appsettings.Production.json'
+        settings = json.loads(path.read_text())
+        local = dict(settings['InfrastructureRunnerRabbitMq'])
+        settings['HostedRunnerRabbitMq'] = dict(Host='10.0.0.3', Port=5672, TlsEnabled=False, TlsServerName=None)
+        path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'changed')
+        migrated = json.loads(path.read_text())
+        self.assertEqual(migrated['HostedRunnerRabbitMq'], dict(Host='api.example.com', Port=5671, TlsEnabled=True, TlsServerName='api.example.com'))
+        self.assertEqual(migrated['InfrastructureRunnerRabbitMq'], local)
+        before = self.snapshot()
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'unchanged')
+        self.assertEqual(before, self.snapshot())
+
+    def test_ensure_runner_broker_host_keeps_custom_public_host_and_fresh_install(self):
+        module.configure(self.root, 'example.com', 'owner@example.com')
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'unchanged')
+        path = self.root / 'appsettings.Production.json'
+        settings = json.loads(path.read_text())
+        settings['HostedRunnerRabbitMq']['Host'] = 'broker.other.net'
+        path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'unchanged')
+        settings['HostedRunnerRabbitMq']['Host'] = 'rabbitmq'
+        path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'changed')
+
     def test_switch_to_cloudflare_rewrites_only_tls_files(self):
         self.configure()
         touched = ('traefik.yml', 'dynamic/installation.yml', 'dynamic/store.yml', 'dynamic/studio-paths.yml',
