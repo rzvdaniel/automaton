@@ -190,7 +190,7 @@ jobs:
           cp docker/install/{compose.yaml,configure.py,check_dns.py,explain_certificate_failure.py,backup.sh,cleanup.sh,restore.sh,update-from-request.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
           cp scripts/install-automaton.sh automaton-server/install.sh
           cp scripts/update-automaton.sh automaton-server/update.sh
-          cp docs/prod/install-automaton.md automaton-server/README.md
+          cp src/automaton-vue/docs/install-server.md automaton-server/README.md
           printf 'server-v%s\n' "$VERSION" > automaton-server/version
           previous=$(gh release list --limit 100 --json tagName --jq '[.[] | select(.tagName | startswith("server-v"))][0].tagName // empty')
           if [[ -n "$previous" ]]; then

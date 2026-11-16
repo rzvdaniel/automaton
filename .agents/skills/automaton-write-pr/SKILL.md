@@ -26,7 +26,7 @@ Never write `Closes #N` or `Fixes #N`: an issue closes only when its change is l
 ## Documentation
 
 Update documentation in the same PR when behaviour that administrators or users see changes (admin-docs skill), or
-when architecture changes (`AGENTS.md`). Keep it brief: say what is true now, in a few sentences, in the existing
+when architecture changes (`AGENTS.md`). User-facing behaviour (install, update, backup, Runners, CLI) is documented in `src/automaton-vue/docs`, nowhere else. Keep it brief: say what is true now, in a few sentences, in the existing
 page. Do not add new pages, change logs or plans unless the task asks for them.
 
 ## Commits

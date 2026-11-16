@@ -1,6 +1,6 @@
 # Production operations
 
-Production uses the [versioned server installer and updater](install-automaton.md). The source blue/green deployment scripts have been removed.
+Production uses the [versioned server installer and updater](../../src/automaton-vue/docs/install-server.md). The source blue/green deployment scripts have been removed.
 
 ## Updates and status
 

@@ -8,7 +8,7 @@
 #
 # --version downloads and verifies the release bundle; --bundle-dir DIR uses an extracted, verified one instead.
 # --postgres-override FILE uses a separate Compose override after the switch; the installed override remains MySQL's.
-# Run it in tmux or screen. See docs/prod/migrate-to-postgresql.md.
+# Run it in tmux or screen. See src/automaton-vue/docs/update-server.md#move-a-mysql-server-to-postgresql.
 #
 # Until the new stack is started the old installation is only stopped and its configuration patched (and saved first); the MySQL
 # volume is never modified. Any failure before the switch returns to the MySQL services. After it, --finish completes the

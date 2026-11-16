@@ -143,7 +143,7 @@ ensure_update_trigger() {
 # its data has to be migrated first, and the old backup and restore scripts stay in place until then.
 if grep -q '^MYSQL_IMAGE=' "$install_dir/release.env"; then
     echo 'This installation still runs on MySQL; this release uses PostgreSQL.' >&2
-    echo 'Nothing was changed. Migrate the data to PostgreSQL first with migrate-to-postgresql.sh (docs/prod/migrate-to-postgresql.md, issue #587), then update.' >&2
+    echo 'Nothing was changed. Migrate the data to PostgreSQL first with migrate-to-postgresql.sh (src/automaton-vue/docs/update-server.md#move-a-mysql-server-to-postgresql, issue #587), then update.' >&2
     exit 1
 fi
 if cmp -s "$bundle/release.env" "$install_dir/release.env"; then

@@ -45,7 +45,7 @@ These skills are the repository contract. Other folders under `.agents/skills/` 
 - Do not rename public concepts, routes or APIs unless the task requires it.
 - Do not hardcode deployment-specific domains, ports, filesystem roots, limits or infrastructure names.
 - Choose the smallest complete change through existing code paths; no speculative abstractions or future stages (details in the maintainability skill).
-- Implemented code, tests and Admin docs are current behavior. Keep the relevant guide under `docs/architecture/` up to date when architecture, state ownership, message flow or runtime boundaries change.
+- Implemented code, tests and Admin docs are current behavior. User-facing behavior (install, update, backup, Runners, CLI) is documented only in `src/automaton-vue/docs`; `docs/maintainers/` holds what runs automaton.monster and releases. Keep the relevant guide under `docs/architecture/` up to date when architecture, state ownership, message flow or runtime boundaries change.
 - Run the smallest relevant check after each change (`bash -n` for shell scripts, type-check for Studio, the affected .NET project or test filter). Report checks you could not run exactly.
 
 ## Product surfaces

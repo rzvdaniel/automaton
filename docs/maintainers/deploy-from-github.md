@@ -36,10 +36,14 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
 - **Browser:** Actions → Deploy production → Run workflow → branch `main`, version such as `0.2.103` → Run. Open the run and **Review deployments → Approve**.
 - **GitHub phone app:** open the repository → Actions → Deploy production → ⋯ / Run workflow, enter the version. When the run waits, you get a notification: open it and tap **Review deployments → Approve**.
 
-Run the version on the test server first. A failed update keeps the previous release and its recovery backup; see [install-automaton.md](install-automaton.md).
+Run the version on the test server first. A failed update keeps the previous release and its recovery backup; see [Update the server](../../src/automaton-vue/docs/install-server.md).
 
 ## Release report and AI check
 
 Every server release carries a report as its GitHub Release body: an AI check (Green, Yellow or Red with short reasons), a "Risky" list, and one section per merged pull request (tier, review, security pass, proof, migrations, how to revert). The **Deploy production** run summary shows the verdict and links the report before you approve the `production` environment. Red is a warning, not a block.
 
 The AI check needs the repository secret `CLAUDE_CODE_OAUTH_TOKEN` (a Claude subscription token from `claude setup-token`). Only the release workflow reads it. Without it, or when the usage limit is hit, the body says "AI check unavailable" and the release still publishes. Render a report locally with `python3 .agents/tools/release-report.py --from server-v0.2.104 --to server-v0.2.105`.
+
+## Publishing a server release
+
+Run `.github/workflows/server-release.yml` on the reviewed revision with a version such as `0.1.0`. It builds and pushes the API, Worker and domain-independent Studio images to GHCR, keeps the previous infrastructure image digests, runs an isolated first-administrator smoke test, and publishes the bundle, checksum, installer and updater as `server-v0.1.0` plus a distribution image for anonymous updates. All four GHCR packages must be public (the workflow checks anonymous pulls; on first publication of the distribution package change its visibility, then rerun). Runner images are published separately by `runner-image.yml`; each server release pins the current `automaton-runner:latest` digest. The configuration tests and smoke test are development validation: accept a release on a disposable server (public DNS, certificates, clean Ubuntu with Docker) before calling it supported.

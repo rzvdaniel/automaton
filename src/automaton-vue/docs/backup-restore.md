@@ -15,6 +15,12 @@ SSH access with sudo on the server.
 
 The installer turns on a nightly backup between 03:00 and 04:00 server time and keeps the newest 7 in `/opt/automaton-server/backups/nightly`. Each holds a PostgreSQL dump and the keys that decrypt it. The **Backups** page in Studio shows the last, next and offsite backup, lists them, gives the restore command and has a **Back up now** button for administrators (CLI: `automaton server backup`, and `automaton server backup-status` for the next scheduled run).
 
+Each backup folder holds `database.dump` (custom-format `pg_dump`), the API and Worker Data Protection keys, the server version and checksums, plus an encrypted `.tar.age` archive. The X25519 private key is `/etc/automaton/secrets/backup-key` (root-only): save it separately in a password manager, an archive cannot be restored without it. Administrators can also start a backup from Studio or the CLI; the API never runs it as root (a systemd path unit `automaton-backup-request.path` runs it).
+
+**Nightly cleanup** runs in the Runner at 05:00 UTC by default: it removes unused Docker images and build cache older than 7 days and trims journal files above 200 MB, never volumes, images of existing containers or backups. Administrators see and change it on Studio's **Server** page.
+
+Besides the database, protect `/etc/automaton`, the Docker volumes and, on each Runner host, `/opt/automaton/self-hosted-runners/<installation-id>` with its labeled volumes (workspace and app data). Quiesce app writes for writable volumes, keep copies off the machine they protect, and test a restore on an isolated replacement. There is no restore tool for Runner data.
+
 ## Take or list a backup
 
 ```bash
@@ -68,5 +74,3 @@ Expected: `ok`, and your users and apps are counted.
 
 - **Studio shows a Backups error.** The last backup failed or is over 36 hours old. Check `sudo journalctl -u automaton-backup.service`.
 - **Restore refuses.** Pick a name from `--list`; it must match a folder in `backups/nightly`.
-
-Details: [operator reference](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md#backups-and-restore).
