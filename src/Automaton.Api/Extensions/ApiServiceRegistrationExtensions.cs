@@ -573,6 +573,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<PublicMarketplaceCatalogQuery>();
         services.AddScoped<WebAppStarService>();
         services.AddSingleton<TunnelRequestRegistry>();
+        services.AddSingleton<RunnerGatewayRegistry>();
         services.AddSingleton<TunnelLongLivedLimiter>();
         return services;
     }

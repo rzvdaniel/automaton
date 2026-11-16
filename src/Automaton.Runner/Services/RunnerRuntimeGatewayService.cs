@@ -32,7 +32,19 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         app.UseWebSockets();
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
         app.MapGet("/ready", () => Results.Ok(new { status = "ready" }));
-        app.Map("/apps", branch => branch.Run(ProxyRuntimePathAsync));
+        // The server probes this to learn the secret works; it never answers without it.
+        app.MapGet("/gateway-check", (HttpContext context) =>
+            RunnerGatewayAccess.HasSecret(context, RunnerGatewayAccess.Secret) ? Results.NoContent() : Results.Unauthorized());
+        app.Map("/apps", branch => branch.Run(async context =>
+        {
+            if (!RunnerGatewayAccess.IsAllowed(context))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
+            await ProxyRuntimePathAsync(context);
+        }));
 
         application = app;
         await app.StartAsync(cancellationToken);

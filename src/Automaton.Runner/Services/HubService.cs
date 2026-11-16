@@ -272,6 +272,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
             await connection.StartAsync(cancellationToken);
             await heartbeatService.StartAsync(cancellationToken);
             await heartbeatService.SendAsync(cancellationToken);
+            await ReportRuntimeGatewayAsync(connection, cancellationToken);
 
             // Use logger for success and avoid duplicate console messages — the retry loop will report higher-level status
             logger.Debug("Connected to hub at {HubUrl}", hubUrl);
@@ -283,6 +284,15 @@ public class HubService : IRuntimeTunnelReconnectRequester
                 hubUrl, ex.GetType().Name, ex.Message);
             throw; // Re-throw to let the retry policy handle it
         }
+    }
+
+    // Tells the server where its proxy can reach this Runner's gateway directly (#1181). A server that does not know
+    // the method, or cannot reach the address, keeps using the tunnel, so a failure here is not a connection failure.
+    private async Task ReportRuntimeGatewayAsync(HubConnection hub, CancellationToken cancellationToken)
+    {
+        if (RunnerGatewayAccess.Published() is not { } gateway) return;
+        try { await hub.InvokeAsync("ReportRuntimeGateway", gateway.Url, gateway.Secret, cancellationToken); }
+        catch (Exception ex) { logger.Debug(ex, "The server did not accept the runtime gateway report"); }
     }
 
     public async Task DisconnectAsync()
