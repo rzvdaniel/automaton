@@ -146,6 +146,9 @@ public sealed class CustomDomainTests
 
         setup.Probe.Serving = false;
         await Service(setup).CheckAllLiveAsync(default);
+        Assert.That((await Service(setup).GetAsync(AppId, default)).Domains.Single().IsPrimary, Is.True, "one failed probe is tolerated");
+        await Service(setup).CheckAllLiveAsync(default);
+        await Service(setup).CheckAllLiveAsync(default);
         var dropped = (await Service(setup).GetAsync(AppId, default)).Domains.Single();
         Assert.That(dropped.IsPrimary, Is.False);
         Assert.That(Routes(setup), Does.Not.Contain("redirect"));

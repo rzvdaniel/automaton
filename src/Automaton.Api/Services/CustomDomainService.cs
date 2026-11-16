@@ -163,29 +163,46 @@ public sealed class CustomDomainService(
     {
         if (domain.VerifiedAt is null) return false;
         var serving = await liveProbe.IsServingAsync(domain.Host, cancellationToken);
+        if (serving) ProbeFailures.TryRemove(domain.Id, out _);
+        else if (domain.LiveAt is not null && ProbeFailures.AddOrUpdate(domain.Id, 1, (_, count) => count + 1) < FailuresBeforeDrop)
+            return false; // a live domain survives a blip (a deploy, a timeout); it drops only after repeated failures
         if (serving == (domain.LiveAt is not null)) return false;
 
-        var wasPrimary = domain.IsPrimary;
+        var primaryBefore = await PrimaryHostAsync(app.Id, cancellationToken);
         domain.LiveAt = serving ? DateTimeOffset.UtcNow : null;
-        if (serving)
-        {
-            domain.IsPrimary = !await dbContext.AppCustomDomains.AnyAsync(
-                other => other.WebAppId == app.Id && other.IsPrimary && other.Id != domain.Id, cancellationToken);
-        }
-        else
-        {
-            domain.IsPrimary = false;
-            var next = await dbContext.AppCustomDomains
-                .Where(other => other.WebAppId == app.Id && other.Id != domain.Id && other.LiveAt != null)
-                .OrderBy(other => other.CreatedAt).FirstOrDefaultAsync(cancellationToken);
-            if (wasPrimary && next is not null) next.IsPrimary = true;
-        }
+        await UpdatePrimaryAsync(app.Id, domain, serving, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await routeConfigService.RefreshAsync(cancellationToken);
-        await RestartForNewAddressAsync(app, CancellationToken.None);
+        if (await PrimaryHostAsync(app.Id, cancellationToken) != primaryBefore)
+            await RestartForNewAddressAsync(app, CancellationToken.None);
         return true;
     }
+
+    private async Task UpdatePrimaryAsync(Guid appId, AppCustomDomain domain, bool serving, CancellationToken cancellationToken)
+    {
+        if (serving)
+        {
+            domain.IsPrimary = !await dbContext.AppCustomDomains.AnyAsync(
+                other => other.WebAppId == appId && other.IsPrimary && other.Id != domain.Id, cancellationToken);
+            return;
+        }
+
+        var wasPrimary = domain.IsPrimary;
+        domain.IsPrimary = false;
+        if (!wasPrimary) return;
+        var next = await dbContext.AppCustomDomains
+            .Where(other => other.WebAppId == appId && other.Id != domain.Id && other.LiveAt != null)
+            .OrderBy(other => other.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+        if (next is not null) next.IsPrimary = true;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int> ProbeFailures = new();
+    private const int FailuresBeforeDrop = 3;
+
+    private Task<string?> PrimaryHostAsync(Guid appId, CancellationToken cancellationToken) =>
+        dbContext.AppCustomDomains.AsNoTracking().Where(d => d.WebAppId == appId && d.IsPrimary && d.LiveAt != null)
+            .Select(d => d.Host).FirstOrDefaultAsync(cancellationToken);
 
     /// <summary>Re-checks every verified domain of every app; run by the background check.</summary>
     public async Task CheckAllLiveAsync(CancellationToken cancellationToken)
@@ -194,7 +211,9 @@ public sealed class CustomDomainService(
         foreach (var domain in domains)
         {
             var app = await dbContext.WebApps.AsNoTracking().FirstOrDefaultAsync(a => a.Id == domain.WebAppId && a.DeletionClaimId == null, cancellationToken);
-            if (app is not null) await CheckLiveAsync(app, domain, cancellationToken);
+            if (app is null) continue;
+            try { await CheckLiveAsync(app, domain, cancellationToken); }
+            catch (DbUpdateException) { dbContext.ChangeTracker.Clear(); } // removed or changed meanwhile; the next pass retries
         }
     }
 
