@@ -1,30 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import {
-  APP_TABS,
   appTabs,
   DEFAULT_APP_VIEW,
-  opensAdvanced,
   resolveAppView,
-  resolveAppViewFromQuery,
   withoutAuthoringQuery,
 } from './app-navigation'
 
 describe('app page navigation', () => {
-  it('opens on Overview and has three plain tabs', () => {
+  it('opens on Overview; a read-only person sees Overview and Activity', () => {
     expect(DEFAULT_APP_VIEW).toBe('overview')
-    expect(APP_TABS.map((tab) => tab.label)).toEqual(['Overview', 'Activity', 'Settings'])
+    expect(appTabs().map((tab) => tab.label)).toEqual(['Overview', 'Activity'])
   })
 
-  it('adds an Actions tab after Activity only when the app has Actions', () => {
-    expect(appTabs(true).map((tab) => tab.label)).toEqual(['Overview', 'Activity', 'Actions', 'Settings'])
-    expect(appTabs(false).map((tab) => tab.label)).toEqual(['Overview', 'Activity', 'Settings'])
-    expect(resolveAppView('actions')).toBe('actions')
+  it('shows each tab only where it applies', () => {
+    const labels = (options: Parameters<typeof appTabs>[0]) => appTabs(options).map((tab) => tab.label)
+    expect(labels({ canManage: true, isPublishable: true, hasSecrets: true, hasActions: true, isAdmin: true }))
+      .toEqual(['Overview', 'Activity', 'Actions', 'Secrets', 'Domain', 'Store listing', 'Settings', 'Admin'])
+    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Domain', 'Store listing', 'Settings'])
+    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Settings'])
+    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Admin'])
   })
 
   it('keeps every earlier ?view= link working', () => {
     for (const view of ['logs', 'deployments']) expect(resolveAppView(view)).toBe('activity')
-    for (const view of ['runtime', 'targets', 'contract', 'more']) expect(resolveAppView(view)).toBe('settings')
-    expect(resolveAppView('settings')).toBe('settings')
+    for (const view of ['runtime', 'targets', 'contract']) expect(resolveAppView(view)).toBe('overview')
+    expect(resolveAppView('more')).toBe('settings')
+    for (const view of ['actions', 'secrets', 'domain', 'store', 'settings', 'admin']) expect(resolveAppView(view)).toBe(view)
   })
 
   it('falls back to Overview for removed authoring views and unknown values', () => {
@@ -34,15 +35,6 @@ describe('app page navigation', () => {
     expect(resolveAppView('publishing')).toBe('overview')
     expect(resolveAppView('unknown')).toBe('overview')
     expect(resolveAppView(undefined)).toBe('overview')
-  })
-
-  it('opens Advanced for links that pointed at what Advanced now holds', () => {
-    expect(resolveAppViewFromQuery({ view: 'settings', settings: 'targets' })).toBe('settings')
-    expect(opensAdvanced({ view: 'settings', settings: 'targets' })).toBe(true)
-    expect(opensAdvanced({ view: 'more' })).toBe(true)
-    expect(opensAdvanced({ view: 'runtime' })).toBe(true)
-    expect(opensAdvanced({ view: 'settings' })).toBe(false)
-    expect(opensAdvanced({ view: 'logs' })).toBe(false)
   })
 
   it('removes prompt and authoring-view deep links without dropping operational context', () => {

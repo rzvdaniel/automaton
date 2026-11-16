@@ -679,6 +679,11 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}/screenshots/${screenshotId}`)
   }
 
+  /** Puts the screenshots in this order. PUT /api/apps/{id}/screenshots/order */
+  async reorderScreenshots(id: string, ids: string[]): Promise<void> {
+    await apiClient.put(`/api/apps/${id}/screenshots/order`, { ids })
+  }
+
 
 
   /**

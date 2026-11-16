@@ -14,14 +14,11 @@ vi.mock('../services/apps.service', () => ({
     get: vi.fn(),
     getMarketplaceCategories: vi.fn(),
     listMyTeams: vi.fn(),
-    updateListing: vi.fn(),
-    uploadThumbnail: vi.fn(),
-    uploadScreenshot: vi.fn(),
-    deleteScreenshot: vi.fn(),
-    removeThumbnail: vi.fn(),
-    getCustomDomains: vi.fn().mockResolvedValue({ target: 'apps.test', targetAddresses: [], domains: [] }),
   },
 }))
+
+const toastAdd = vi.fn()
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 
 const stubs = {
   Dialog: { template: '<div><slot /><slot name="footer" /></div>' },
@@ -144,35 +141,44 @@ describe('ShareDialog', () => {
     expect(wrapper.find('#share-team').text()).toContain('Design')
   })
 
-  it('keeps the dialog as it was and shows the error when the listing cannot be saved', async () => {
-    vi.mocked(appsService.updateListing).mockRejectedValueOnce({ response: { data: { message: 'Unknown category' } } })
+  it('closes the dialog and confirms after a successful save', async () => {
+    vi.mocked(appsService.setSharing).mockResolvedValue({ audience: 'server', people: [] })
     const wrapper = open()
     await flushPromises()
-    await wrapper.find('[data-testid="share-choice-internet"] input').setValue(true)
-    await wrapper.find('[data-testid="share-list"] input').setValue(true)
+    await wrapper.find('[data-testid="share-choice-server"] input').setValue(true)
     await wrapper.find('[data-testid="share-save"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="share-error"]').text()).toContain('Unknown category')
-    expect(appsService.setSharing).not.toHaveBeenCalled()
-    expect(wrapper.emitted('changed')).toBeUndefined()
+    expect(wrapper.emitted('update:visible')?.[0]).toEqual([false])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }))
   })
 
-  it('lists the app in the store with its summary, category and tags', async () => {
+  it('stays open with the error and a usable Save when saving fails', async () => {
+    vi.mocked(appsService.setSharing).mockRejectedValueOnce({ response: { data: { message: 'Address taken' } } })
+    const wrapper = open()
+    await flushPromises()
+    await wrapper.find('[data-testid="share-choice-server"] input').setValue(true)
+    await wrapper.find('[data-testid="share-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="share-error"]').text()).toContain('Address taken')
+    expect(wrapper.emitted('update:visible')).toBeUndefined()
+    expect(wrapper.find('[data-testid="share-save"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('lists in the store from the checkbox and links to the listing and domain tabs', async () => {
+    vi.mocked(appsService.getSharing).mockResolvedValue({ audience: 'internet', people: [], publicUrlSlug: 'static-tool', listed: false })
     vi.mocked(appsService.setSharing).mockResolvedValue({ audience: 'internet', people: [], publicUrlSlug: 'static-tool', listed: true })
     const wrapper = open()
     await flushPromises()
-
-    await wrapper.find('[data-testid="share-choice-internet"] input').setValue(true)
-    expect(wrapper.find('[data-testid="share-listing"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="share-store-link"]').exists()).toBe(false)
     await wrapper.find('[data-testid="share-list"] input').setValue(true)
-    await wrapper.find('#share-summary').setValue('A handy tool')
-    await wrapper.find('#share-category').setValue('Tools')
-    await wrapper.find('#share-tags').setValue('x, y')
+    await wrapper.find('[data-testid="share-store-link"]').trigger('click')
+    await wrapper.find('[data-testid="share-domain-link"]').trigger('click')
     await wrapper.find('[data-testid="share-save"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.emitted('open')).toEqual([['store'], ['domain']])
     expect(appsService.setSharing).toHaveBeenCalledWith('app-1', 'internet', 'static-tool', undefined, true)
-    expect(appsService.updateListing).toHaveBeenCalledWith('app-1', { summary: 'A handy tool', category: 'Tools', tags: ['x', 'y'] })
   })
 })

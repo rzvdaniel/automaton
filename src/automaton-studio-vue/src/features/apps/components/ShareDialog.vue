@@ -5,8 +5,8 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { appsService } from '../services/apps.service'
-import type { AppScreenshot, AppSharing, MyTeam, SharingAudience } from '../types/apps.types'
-import CustomDomains from './CustomDomains.vue'
+import type { AppSharing, MyTeam, SharingAudience } from '../types/apps.types'
+import { useToast } from 'primevue/usetoast'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const props = defineProps<{
@@ -19,7 +19,10 @@ const emit = defineEmits<{
   'update:visible': [value: boolean]
   /** Who can open the app changed; the page reloads the app. */
   changed: []
+  /** The person wants the Domain or Store listing tab. */
+  open: [tab: 'domain' | 'store']
 }>()
+const toast = useToast()
 
 const CHOICES: ReadonlyArray<{ key: SharingAudience, title: string, line: string, icon: string }> = [
   { key: 'me', title: 'Only me', line: 'Nobody else can open this app.', icon: 'pi pi-lock' },
@@ -35,16 +38,7 @@ const address = ref('')
 const email = ref('')
 const teams = ref<MyTeam[]>([])
 const teamId = ref('')
-// "List in the store": the same fields as `automaton listing` (summary, category, tags, cover, screenshots).
 const listed = ref(false)
-const summary = ref('')
-const category = ref('')
-const tags = ref('')
-const categories = ref<string[]>([])
-const cover = ref<string | null>(null)
-const screenshots = ref<AppScreenshot[]>([])
-const savedListing = ref('')
-const listingFailed = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -58,12 +52,9 @@ const addressValid = computed(() => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(addre
 const publicUrl = computed(() => getPublishedAppUrl(address.value || 'your-app'))
 const unchanged = computed(() => !!sharing.value
   && sharing.value.audience === selected.value
-  && (selected.value !== 'internet' || address.value === (sharing.value.publicUrlSlug ?? '')))
-const listingText = computed(() => JSON.stringify(listed.value ? [true, summary.value.trim(), category.value, tags.value.trim()] : [false]))
-const tagList = computed(() => tags.value.split(',').map(tag => tag.trim()).filter(Boolean))
-const listingChanged = computed(() => selected.value === 'internet' && listingText.value !== savedListing.value)
+  && (selected.value !== 'internet' || (address.value === (sharing.value.publicUrlSlug ?? '') && listed.value === (sharing.value.listed ?? false))))
 const teamChanged = computed(() => selected.value === 'team' && teamId.value !== (sharing.value?.team?.id ?? ''))
-const canSave = computed(() => !saving.value && (!unchanged.value || listingChanged.value || teamChanged.value)
+const canSave = computed(() => !saving.value && (!unchanged.value || teamChanged.value)
   && (selected.value !== 'team' || !!teamId.value)
   && (selected.value !== 'internet' || addressValid.value)
   && (selected.value !== 'people' || (sharing.value?.people.length ?? 0) > 0))
@@ -79,21 +70,6 @@ function apply(state: AppSharing) {
   address.value = state.publicUrlSlug ?? address.value
   teamId.value = state.team?.id ?? teamId.value
   listed.value = state.listed ?? false
-  savedListing.value = listingText.value
-}
-
-async function loadListing() {
-  listingFailed.value = false
-  try {
-    const app = await appsService.get(props.appId)
-    summary.value = app.summary ?? ''
-    category.value = app.category ?? ''
-    tags.value = app.tags ?? ''
-    cover.value = app.thumbnailUrl ?? null
-    screenshots.value = app.screenshots ?? []
-    categories.value = await appsService.getMarketplaceCategories()
-  } catch { listingFailed.value = true }
-  savedListing.value = listingText.value
 }
 
 const teamsFailed = ref(false)
@@ -109,7 +85,7 @@ async function load() {
   try {
     const state = await appsService.getSharing(props.appId)
     apply(state)
-    await Promise.all([loadListing(), loadTeams()])
+    await loadTeams()
     if (!address.value) address.value = appsService.generateSlug(props.appName)
   } catch (reason) {
     error.value = messageOf(reason, 'Could not load who can open this app.')
@@ -136,10 +112,6 @@ async function save() {
   error.value = ''
   try {
     const internet = selected.value === 'internet'
-    // The listing text goes first, so a rejected category leaves sharing exactly as it was.
-    if (internet && listed.value) {
-      await appsService.updateListing(props.appId, { summary: summary.value.trim(), category: category.value, tags: tagList.value })
-    }
     const state = await appsService.setSharing(
       props.appId,
       selected.value,
@@ -148,6 +120,8 @@ async function save() {
       internet ? listed.value : undefined,
     )
     apply(state)
+    toast.add({ severity: 'success', summary: 'Sharing saved', life: 2500 })
+    isVisible.value = false
     emit('changed')
   } catch (reason) {
     error.value = messageOf(reason, 'Sharing was not changed.')
@@ -181,39 +155,6 @@ async function removePerson(userId: string) {
   } catch (reason) {
     error.value = messageOf(reason, 'That person could not be removed.')
   }
-}
-
-async function uploadFile(event: Event, upload: (file: File) => Promise<void>) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-  error.value = ''
-  try { await upload(file) } catch (reason) { error.value = messageOf(reason, 'That image could not be uploaded (PNG, JPG, WEBP or GIF up to 2 MB).') }
-}
-
-const onCover = (event: Event) => uploadFile(event, async (file) => {
-  cover.value = await appsService.uploadThumbnail(props.appId, file)
-})
-
-const onScreenshot = (event: Event) => uploadFile(event, async (file) => {
-  screenshots.value = [...screenshots.value, await appsService.uploadScreenshot(props.appId, file)]
-})
-
-async function removeCover() {
-  error.value = ''
-  try {
-    await appsService.removeThumbnail(props.appId)
-    cover.value = null
-  } catch (reason) { error.value = messageOf(reason, 'The cover could not be removed.') }
-}
-
-async function removeScreenshot(id: string) {
-  error.value = ''
-  try {
-    await appsService.deleteScreenshot(props.appId, id)
-    screenshots.value = screenshots.value.filter(shot => shot.id !== id)
-  } catch (reason) { error.value = messageOf(reason, 'That screenshot could not be removed.') }
 }
 
 async function copyAddress() {
@@ -296,45 +237,16 @@ async function copyAddress() {
         <p class="share__hint">Anyone with the address can open the app, so keep private data out of it.</p>
 
         <label class="share__check" data-testid="share-list">
-          <input v-model="listed" type="checkbox" :disabled="listingFailed">
+          <input v-model="listed" type="checkbox">
           <span><strong>List in the store</strong> Show it in the public marketplace.</span>
         </label>
-        <p v-if="listingFailed" class="share__hint" data-testid="share-listing-error">The store listing could not be loaded, so it cannot be changed now. Close and reopen this dialog to retry.</p>
-        <div v-if="listed" class="share__listing" data-testid="share-listing">
-          <label for="share-summary" class="share__label">Summary</label>
-          <InputText id="share-summary" v-model="summary" maxlength="200" placeholder="One line shown on the app card" />
-          <label for="share-category" class="share__label">Category</label>
-          <select id="share-category" v-model="category" class="share__select">
-            <option value="">No category</option>
-            <option v-for="name in categories" :key="name" :value="name">{{ name }}</option>
-          </select>
-          <label for="share-tags" class="share__label">Tags</label>
-          <InputText id="share-tags" v-model="tags" placeholder="game, multiplayer" />
-          <p class="share__hint">Covers and screenshots are saved as soon as you add or remove them.</p>
-          <span class="share__label">Cover</span>
-          <div class="share__images">
-            <img v-if="cover" :src="cover" alt="Cover" class="share__image">
-            <label class="share__upload">
-              {{ cover ? 'Replace' : 'Add cover' }}
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden data-testid="share-cover" @change="onCover">
-            </label>
-            <Button v-if="cover" label="Remove" text size="small" severity="secondary" @click="removeCover" />
-          </div>
-          <span class="share__label">Screenshots</span>
-          <div class="share__images">
-            <span v-for="shot in screenshots" :key="shot.id" class="share__shot">
-              <img :src="shot.imageUrl" alt="Screenshot" class="share__image">
-              <Button icon="pi pi-times" text rounded size="small" severity="secondary" aria-label="Remove screenshot" @click="removeScreenshot(shot.id)" />
-            </span>
-            <label class="share__upload">
-              Add screenshot
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden data-testid="share-screenshot" @change="onScreenshot">
-            </label>
-          </div>
-        </div>
+        <p v-if="listed" class="share__hint">
+          <a href="#" data-testid="share-store-link" @click.prevent="emit('open', 'store')">Edit listing →</a>
+        </p>
+        <p v-if="sharing?.audience === 'internet'" class="share__hint">
+          <a href="#" data-testid="share-domain-link" @click.prevent="emit('open', 'domain')">Your own domain →</a>
+        </p>
       </section>
-
-      <CustomDomains v-if="sharing?.audience === 'internet' && selected === 'internet'" :app-id="appId" />
     </div>
 
     <template #footer>
@@ -369,11 +281,6 @@ async function copyAddress() {
 .share__select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--p-content-border-color, var(--p-surface-border)); background: var(--p-content-background, transparent); color: inherit; }
 .share__check { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; cursor: pointer; }
 .share__check span { display: flex; flex-direction: column; }
-.share__listing { display: flex; flex-direction: column; gap: 8px; padding-left: 4px; }
-.share__images { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.share__image { height: 56px; border-radius: 8px; object-fit: cover; }
-.share__shot { display: inline-flex; align-items: center; }
-.share__upload { font-size: 13px; color: var(--p-primary-color); cursor: pointer; }
 .share__label { font-weight: 600; font-size: 14px; }
 .share__hint { margin: 0; font-size: 13px; color: var(--p-text-muted-color, var(--p-text-color-secondary)); overflow-wrap: anywhere; }
 </style>

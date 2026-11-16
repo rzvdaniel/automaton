@@ -5,20 +5,18 @@ import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import { appsService } from '../services/apps.service'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { App, AppDeploymentTarget } from '../types/apps.types'
-import AppAdvanced from './AppAdvanced.vue'
-import AppPermissions from './AppPermissions.vue'
-import AppSecrets from './AppSecrets.vue'
+import type { App } from '../types/apps.types'
+import { useDeleteApp } from '../utils/use-delete-app'
 import AppSettingValues from './AppSettingValues.vue'
 
-const props = defineProps<{ app: App; targets: ReadonlyArray<AppDeploymentTarget>; openAdvanced?: boolean }>()
-const emit = defineEmits<{ targetsChanged: [] }>()
+const props = defineProps<{ app: App }>()
 
 const toast = useToast()
 const editorStore = useAppEditorStore()
 const name = ref('')
 const summary = ref('')
 const saving = ref(false)
+const { deleting, askDelete } = useDeleteApp(() => props.app)
 /** Read-only access (canUpdate is false) sees the page but cannot change anything. */
 const canEdit = computed(() => props.app.canUpdate !== false)
 
@@ -65,9 +63,13 @@ async function save() {
       <div v-if="canEdit && changed" class="actions"><Button label="Save" icon="pi pi-check" :loading="saving" @click="save" /></div>
     </section>
     <AppSettingValues v-if="canEdit && app.application?.settings?.length" :app-id="app.id" :app="app" :declared="app.application.settings" />
-    <AppSecrets v-if="canEdit" :app-id="app.id" :declared="app.application?.secrets" :setting-names="(app.application?.settings ?? []).map((item) => item.name)" />
-    <AppPermissions :app-id="app.id" />
-    <AppAdvanced v-if="canEdit" :app="app" :targets="targets" :open="openAdvanced" @changed="emit('targetsChanged')" />
+    <section v-if="canEdit" class="card danger" aria-labelledby="danger-title" data-testid="danger-zone">
+      <div>
+        <h2 id="danger-title">Danger zone</h2>
+        <p class="hint">Delete {{ app.name }}, its data and its public address. This can't be undone.</p>
+      </div>
+      <Button label="Delete app…" severity="danger" outlined :loading="deleting" data-testid="delete-app" @click="askDelete" />
+    </section>
   </div>
 </template>
 
@@ -78,4 +80,6 @@ h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .about { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
 .about label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .actions { display: flex; justify-content: flex-end; }
+.danger { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; border-color: var(--signal-ink); }
+.hint { margin: 4px 0 0; color: var(--ink-soft); font-size: 13px; }
 </style>

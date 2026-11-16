@@ -18,6 +18,7 @@ import {
 import { describeDisk } from '../utils/app-disk'
 import type { AppDiskUsage } from '../types/apps.types'
 import AppRestartButton from './AppRestartButton.vue'
+import AppRunsOn from './AppRunsOn.vue'
 import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { DeploymentTargetStatus } from '../types/apps.types'
@@ -36,7 +37,7 @@ const props = defineProps<{
   privateAddress: string
   sharing: AppSharing | null
 }>()
-const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-changed': [] }>()
+const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-changed': []; 'targets-changed': [] }>()
 const toast = useToast()
 
 const secretNames = ref<string[] | null>(null)
@@ -64,7 +65,7 @@ watch(() => props.app.id, async (id) => {
   ])
   if (props.app.id !== id) return
   if (secrets.status === 'fulfilled') secretNames.value = secrets.value.map((secret) => secret.name)
-  if (perms.status === 'fulfilled') permissions.value = perms.value.permissions
+  if (perms.status === 'fulfilled') permissions.value = perms.value?.permissions ?? []
 }, { immediate: true })
 
 /** Only people who can change the app change who opens it. */
@@ -255,7 +256,7 @@ const source = computed(() => {
         </div>
         <div v-if="dataDirectory && kind !== 'site' && kind !== 'tool'" class="row"><span>Data folder</span><span class="mono hint">{{ dataDirectory }}</span></div>
         <div v-if="disk" class="row" data-testid="disk-use"><span>Disk</span><span class="mono hint">{{ describeDisk(disk) }}</span></div>
-        <button v-if="secretCount > 0" type="button" class="row row--link" @click="emit('navigate', 'settings')">
+        <button v-if="secretCount > 0" type="button" class="row row--link" @click="emit('navigate', 'secrets')">
           <span>{{ secretCount }} {{ secretCount === 1 ? 'secret' : 'secrets' }}</span>
           <span class="end">
             <span v-if="pill" class="pill" :class="pill.bad ? 'pill--bad' : 'pill--ok'">{{ pill.text }}</span>
@@ -266,14 +267,21 @@ const source = computed(() => {
           <span>{{ settingCount }} {{ settingCount === 1 ? 'setting' : 'settings' }}</span>
           <i class="pi pi-chevron-right chevron" aria-hidden="true"></i>
         </button>
-        <div v-for="item in permissions" :key="item.permission" class="row">
-          <span>{{ item.permission }}</span>
-          <span class="pill" :class="item.approved ? 'pill--ok' : 'pill--bad'">{{ item.approved ? 'approved' : 'waiting for approval' }}</span>
-        </div>
-        <p v-if="kind === 'tool' && secretCount === 0 && permissions.length === 0 && settingCount === 0" class="hint">Nothing to set up.</p>
+        <p v-if="kind === 'tool' && secretCount === 0 && settingCount === 0" class="hint">Nothing to set up.</p>
         <div v-if="kind !== 'tool'" class="row">
           <span>{{ whoLabel }}<br><span class="hint">{{ whoValue }}</span></span>
           <Button v-if="canShare" label="Change" size="small" severity="secondary" outlined @click="emit('share')" />
+        </div>
+      </section>
+    </div>
+
+    <div class="grid">
+      <AppRunsOn :app="app" :targets="targets" @changed="emit('targets-changed')" />
+      <section v-if="permissions.length > 0" class="card" aria-labelledby="permissions-title" data-testid="permissions-card">
+        <h2 id="permissions-title">Permissions</h2>
+        <div v-for="item in permissions" :key="item.permission" class="row">
+          <span class="mono">{{ item.permission }}</span>
+          <span class="pill" :class="item.approved ? 'pill--ok' : 'pill--bad'">{{ item.approved ? 'approved' : 'waiting for an administrator' }}</span>
         </div>
       </section>
     </div>

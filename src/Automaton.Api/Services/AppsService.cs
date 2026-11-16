@@ -275,6 +275,9 @@ public class AppsService
 
     public Task<string?> DeleteScreenshotAsync(Guid appId, Guid screenshotId)
         => appMetadataService.DeleteScreenshotAsync(appId, screenshotId);
+
+    public Task ReorderScreenshotsAsync(Guid appId, IReadOnlyList<Guid> orderedIds)
+        => appMetadataService.ReorderScreenshotsAsync(appId, orderedIds);
     internal static void ApplyStorageMetadata(AppModel app, AppStorageMetadata? metadata)
     {
         if (app == null || metadata == null)

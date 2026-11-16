@@ -102,8 +102,9 @@ public sealed class CustomDomainTests
 
         var domainId = state.Domains.Single().Id;
         setup.Resolver.Txt[state.Domains.Single().ChallengeHost] = [state.Domains.Single().ChallengeValue];
-        var ex = Assert.ThrowsAsync<InvalidOperationException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
+        var ex = Assert.ThrowsAsync<DomainCheckException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
         Assert.That(ex!.Message, Does.Contain("does not point at this server"));
+        Assert.That(((DomainCheckException)ex).Steps.Select(step => step.Status), Is.EqualTo(new[] { "ok", "failed", "skipped" }));
         Assert.That(File.Exists(Path.Combine(setup.RouteRoot, "managed-runtime-routes.yml")), Is.False);
     }
 
@@ -114,12 +115,13 @@ public sealed class CustomDomainTests
         var domainId = (await Service(setup).AddAsync(AppId, "blog.example.test", default)).Domains.Single().Id;
         setup.Resolver.Records["blog.example.test"] = [ServerIp];
 
-        var ex = Assert.ThrowsAsync<InvalidOperationException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
+        var ex = Assert.ThrowsAsync<DomainCheckException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
         Assert.That(ex!.Message, Does.Contain("_automaton-challenge.blog.example.test"));
+        Assert.That(((DomainCheckException)ex).Steps.Select(step => step.Status), Is.EqualTo(new[] { "failed", "skipped", "skipped" }));
 
         // Someone else's token (a squatter's) does not prove this claim either.
         setup.Resolver.Txt["_automaton-challenge.blog.example.test"] = ["automaton-verify=0000"];
-        Assert.ThrowsAsync<InvalidOperationException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
+        Assert.ThrowsAsync<DomainCheckException>(() => Service(setup).VerifyAsync(AppId, domainId, default));
         Assert.That(File.Exists(Path.Combine(setup.RouteRoot, "managed-runtime-routes.yml")), Is.False);
     }
 
@@ -133,6 +135,7 @@ public sealed class CustomDomainTests
 
         var state = await Service(setup).VerifyAsync(AppId, domainId, default);
         Assert.That(state.Domains.Single().Status, Is.EqualTo("Verified"));
+        Assert.That(state.Check!.Last().Status, Is.EqualTo("skipped"), "no certificate step passes before the app answers");
         Assert.That(state.Domains.Single().IsPrimary, Is.False);
         Assert.That(Routes(setup), Does.Contain("blog.example.test"));
         Assert.That(Routes(setup), Does.Not.Contain("redirectregex").And.Not.Contain("redirect"));
@@ -188,6 +191,7 @@ public sealed class CustomDomainTests
         var state = await Service(setup).VerifyAsync(AppId, domainId, default);
 
         Assert.That(state.Domains.Single(), Has.Property("IsPrimary").True.And.Property("Verified").True);
+        Assert.That(state.Check!.Select(step => step.Status), Is.All.EqualTo("ok"));
         var routes = Routes(setup);
         var id = AppId.ToString("N");
         Assert.Multiple(() =>

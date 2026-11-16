@@ -155,6 +155,21 @@ public sealed class AppImageManagementService(
         }
     }
 
+    public async Task<AppImageOperationResult> ReorderScreenshotsAsync(Guid appId, IReadOnlyList<Guid> orderedIds, string? userName)
+    {
+        if (appsService.Get(appId) is null) return AppImageOperationResult.NotFound();
+        if (!await authorizationService.CanUpdateAppAsync(appId)) return Denied("Screenshot reorder", appId, userName);
+        try
+        {
+            await appsService.ReorderScreenshotsAsync(appId, orderedIds);
+            return AppImageOperationResult.NoContent();
+        }
+        catch (InvalidOperationException exception)
+        {
+            return AppImageOperationResult.BadRequest(exception.Message);
+        }
+    }
+
     private string? Validate(IFormFile? file, Guid appId)
     {
         if (file is null || file.Length == 0)

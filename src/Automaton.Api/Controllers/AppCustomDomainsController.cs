@@ -48,6 +48,7 @@ public class AppCustomDomainsController(
         }
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message }); }
+        catch (DomainCheckException ex) { return BadRequest(new { message = ex.Message, steps = ex.Steps }); }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
     }
 }

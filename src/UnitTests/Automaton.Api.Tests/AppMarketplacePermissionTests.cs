@@ -25,7 +25,8 @@ public sealed class AppMarketplacePermissionTests
         {
             await viewer.UploadAsync(AppId, null, "viewer"),
             await viewer.UploadScreenshotAsync(AppId, null, "viewer"),
-            await viewer.DeleteScreenshotAsync(AppId, Guid.NewGuid(), "viewer")
+            await viewer.DeleteScreenshotAsync(AppId, Guid.NewGuid(), "viewer"),
+            await viewer.ReorderScreenshotsAsync(AppId, [], "viewer")
         };
         // A Developer passes the permission check and reaches file validation.
         var developer = await CreateImageService(db, DeveloperId).UploadScreenshotAsync(AppId, null, "developer");

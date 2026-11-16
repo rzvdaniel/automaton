@@ -396,6 +396,17 @@ public class AppsController : BaseController
         return ToImageOperationResult(result, "Failed to delete screenshot");
     }
 
+    public sealed record ReorderScreenshotsRequest(List<Guid> Ids);
+
+    [HttpPut("{id}/screenshots/order")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> ReorderScreenshots(Guid id, [FromBody] ReorderScreenshotsRequest request)
+    {
+        if (!HasAppWriteKeyScope()) return KeyScopeDenied();
+        var result = await appImageManagementService.ReorderScreenshotsAsync(id, request.Ids, User.Identity?.Name);
+        return ToImageOperationResult(result, "Failed to reorder screenshots");
+    }
+
     private ObjectResult Forbidden(UnauthorizedAccessException exception)
         => StatusCode(StatusCodes.Status403Forbidden, new { message = exception.Message });
 

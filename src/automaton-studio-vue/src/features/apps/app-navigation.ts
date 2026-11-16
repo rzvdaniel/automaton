@@ -1,6 +1,6 @@
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 
-export const APP_VIEW_KEYS = ['overview', 'activity', 'actions', 'settings'] as const
+export const APP_VIEW_KEYS = ['overview', 'activity', 'actions', 'secrets', 'domain', 'store', 'settings', 'admin'] as const
 
 export type AppViewKey = (typeof APP_VIEW_KEYS)[number]
 
@@ -11,33 +11,47 @@ export interface AppTab {
 
 export const DEFAULT_APP_VIEW: AppViewKey = 'overview'
 
-const ALL_TABS: ReadonlyArray<AppTab> = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'activity', label: 'Activity' },
-  { key: 'actions', label: 'Actions' },
-  { key: 'settings', label: 'Settings' },
-]
-
-/** The tabs of the app page: Actions, after Activity, only when the app has Actions. */
-export function appTabs(hasActions: boolean): ReadonlyArray<AppTab> {
-  return hasActions ? ALL_TABS : ALL_TABS.filter((tab) => tab.key !== 'actions')
+const LABELS: Record<AppViewKey, string> = {
+  overview: 'Overview',
+  activity: 'Activity',
+  actions: 'Actions',
+  secrets: 'Secrets',
+  domain: 'Domain',
+  store: 'Store listing',
+  settings: 'Settings',
+  admin: 'Admin',
 }
 
-/** The three tabs every app has. */
-export const APP_TABS: ReadonlyArray<AppTab> = appTabs(false)
+export interface AppTabOptions {
+  hasActions?: boolean
+  hasSecrets?: boolean
+  /** Can change the app (Secrets, Settings). */
+  canManage?: boolean
+  /** Has an address people open (not a tool): Domain and Store listing. */
+  isPublishable?: boolean
+  isAdmin?: boolean
+}
+
+/** The tabs of the app page, in order; each shows only when it applies to this app and person. */
+export function appTabs({ hasActions = false, hasSecrets = false, canManage = false, isPublishable = false, isAdmin = false }: AppTabOptions = {}): ReadonlyArray<AppTab> {
+  const keys: AppViewKey[] = ['overview', 'activity']
+  if (hasActions) keys.push('actions')
+  if (canManage && hasSecrets) keys.push('secrets')
+  if (canManage && isPublishable) keys.push('domain', 'store')
+  if (canManage) keys.push('settings')
+  if (isAdmin) keys.push('admin')
+  return keys.map((key) => ({ key, label: LABELS[key] }))
+}
 
 /** Earlier `?view=` values and the tab each one now lives in. */
 const LEGACY_VIEWS: Record<string, AppViewKey> = {
   logs: 'activity',
   deployments: 'activity',
-  runtime: 'settings',
-  targets: 'settings',
-  contract: 'settings',
+  runtime: 'overview',
+  targets: 'overview',
+  contract: 'overview',
   more: 'settings',
 }
-
-/** Earlier views whose content now sits in Settings, under the closed Advanced section. */
-const ADVANCED_VIEWS = new Set(['runtime', 'targets', 'contract', 'more'])
 
 export function resolveAppView(value: unknown): AppViewKey {
   if (typeof value !== 'string') return DEFAULT_APP_VIEW
@@ -47,12 +61,6 @@ export function resolveAppView(value: unknown): AppViewKey {
 
 export function resolveAppViewFromQuery(query: LocationQuery): AppViewKey {
   return resolveAppView(query.view)
-}
-
-/** True when an earlier link pointed at something that is now inside Settings > Advanced. */
-export function opensAdvanced(query: LocationQuery): boolean {
-  return (typeof query.view === 'string' && ADVANCED_VIEWS.has(query.view))
-    || (query.view === 'settings' && query.settings === 'targets')
 }
 
 export function withoutAuthoringQuery(query: LocationQuery): LocationQueryRaw {
