@@ -71,4 +71,22 @@ If an app's Runner does not answer within 60 seconds, starting Actions and readi
 
 Upgrading: a Runner on an old image shows **Update available**; its owner selects **Upgrade** (refused while a deploy or Action runs, or when offline). It starts a helper container that pulls the server's configured image and recreates the Runner with the same identity, configuration and volume; apps keep running, and if the new container does not connect the previous one is restored. Use `automaton runners upgrade RUNNER --wait` from the CLI, or **Run it manually** for an offline or very old Runner. Do not rerun the install command as an upgrade.
 
+## Environments and Runner assignments
+
+Every app has one **Live** environment (stored internally as a deployment target). You can add named environments, for example `staging`, and each one has its own Runner assignment, deployed files, process, logs and private address. Environments can share a Runner without sharing runtime state.
+
+- `automaton deploy` deploys Live; `automaton deploy staging` deploys the environment with that slug.
+- Manage them in Studio under **Apps → open an app → Settings → Environments**: deploy, open the preview, view logs, rename, change the Runner, promote an additional environment to Live, or delete it. Promoting changes which running copy answers the app's normal and public addresses; it does not redeploy or reassign anything. The Live environment cannot be deleted until another one is promoted.
+- Changing the Runner of a deployed environment asks for confirmation, because its runtime on the old Runner is cleaned up. Other environments are not touched.
+- When Live has no Runner and exactly one online Runner is available in the app's scope (personal or project), `automaton deploy` assigns it and says so. Otherwise assign one: `automaton set-runner NAME` for Live, or the Runner picker in Studio.
+- A project member with a Developer API key can use `automaton project runners list|add|remove` to manage a project's Runner links.
+
+Environment status in Studio: **Unassigned** (no Runner), **Not deployed**, **Deploying** (a deploy not finished by the Runner after 30 minutes is marked Failed; the owner can cancel it), **Running**, **Failed**, **Runner offline**. A failed deploy leaves the previous healthy runtime serving.
+
+Studio can also deploy the source the server stores for an app: **Apps → open an app → Overview → Deploy**. It refuses apps that deploy a prebuilt artifact (a runtime command with no build command); deploy those with the CLI.
+
+## Deleting an app
+
+**Apps → open an app → Settings → Danger Zone → Delete App** removes the app's runtimes, workspace, staging and persistent data, including its Compose volumes. Every assigned Runner must be online. If cleanup fails the app is kept: fix the reported problem and retry. Deleting an additional environment keeps the app's shared data. If an interrupted deletion stays blocked, an administrator can retry it with `DELETE /api/Apps/{appId}?recoverInterrupted=true`; if the Runner is permanently gone and you have removed its containers and storage yourself, add `&abandonOfflineRuntimes=true`.
+
 The trust boundary is in [Security overview](./security#runners-and-the-docker-socket). Next: [deploy an app](./deploy).

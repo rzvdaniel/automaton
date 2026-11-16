@@ -16,7 +16,6 @@ Read the matching skill before changing the related area:
 | Production scripts, Compose, Traefik, certificates, health checks, blue-green, rollback, production updates | [Production deployment](.agents/skills/production-deployment/SKILL.md) |
 | Fresh production installation, setup configuration, secrets, bootstrap | [Production installation setup](.agents/skills/production-installation-setup/SKILL.md) |
 | Docker disk space on a production host | [Production Docker maintenance](.agents/skills/production-docker-maintenance/SKILL.md) |
-| Administrator-visible Studio or API behavior and its documentation | [Admin docs](.agents/skills/admin-docs/SKILL.md) |
 | Roadmaps, architecture guides, other repository documentation | [Documentation maintenance](.agents/skills/documentation-maintenance/SKILL.md) |
 | User-facing Studio UI, theme tokens, visual verification, browser automation | [Studio design](.agents/skills/studio-design/SKILL.md) |
 | Reviewing or merging any pull request (risk tier, review, security pass, merge gate) | [PR review](.agents/skills/pr-review/SKILL.md) and [`REVIEW.md`](REVIEW.md) |
@@ -45,7 +44,7 @@ These skills are the repository contract. Other folders under `.agents/skills/` 
 - Do not rename public concepts, routes or APIs unless the task requires it.
 - Do not hardcode deployment-specific domains, ports, filesystem roots, limits or infrastructure names.
 - Choose the smallest complete change through existing code paths; no speculative abstractions or future stages (details in the maintainability skill).
-- Implemented code, tests and Admin docs are current behavior. User-facing behavior (install, update, backup, Runners, CLI) is documented only in `src/automaton-vue/docs`; `docs/maintainers/` holds what runs automaton.monster and releases. Keep the relevant guide under `docs/architecture/` up to date when architecture, state ownership, message flow or runtime boundaries change.
+- Implemented code and tests are current behavior. User-facing behavior (install, update, backup, Runners, CLI) is documented only in `src/automaton-vue/docs`; `docs/maintainers/` holds what runs automaton.monster and releases. Keep the relevant guide under `docs/architecture/` up to date when architecture, state ownership, message flow or runtime boundaries change.
 - Run the smallest relevant check after each change (`bash -n` for shell scripts, type-check for Studio, the affected .NET project or test filter). Report checks you could not run exactly.
 
 ## Product surfaces
@@ -57,7 +56,6 @@ These skills are the repository contract. Other folders under `.agents/skills/` 
 - CLI: `src/Automaton.Cli/`
 - Runner: `src/Automaton.Runner/`
 - Shared infrastructure and identity: `src/Automaton.Infrastructure/`, `src/Automaton.Identity/`
-- Admin documentation: `src/Automaton.Api/Documentation/Admin/`
 - Production and local scripts: `scripts/`
 - Tests: `src/UnitTests/`
 
