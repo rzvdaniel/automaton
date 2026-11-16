@@ -17,5 +17,8 @@ public class AppCustomDomain
 
     public bool IsPrimary { get; set; }
     public DateTimeOffset? VerifiedAt { get; set; }
+
+    /// <summary>Set while the server's own check finds the domain serving the app over a valid certificate; only a live domain can be primary.</summary>
+    public DateTimeOffset? LiveAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
