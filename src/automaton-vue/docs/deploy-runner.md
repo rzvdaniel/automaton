@@ -83,7 +83,7 @@ Ask the user to confirm: apps on that Runner stop and lose their host-local data
 automaton runners delete main --ssh user@host      # runs the uninstall over SSH, then deletes the registration
 ```
 
-`--ssh` is in releases newer than 0.2.130. Without it: `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host, then `automaton runners delete main --host-cleanup-confirmed`. It answers 409 "still online" until the uninstall ran. The host's installation folder is kept; remove it by hand.
+`--ssh` is in releases newer than 0.2.130. Without it: `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host, then `automaton runners delete main --host-cleanup-confirmed`. It answers 409 "still online" until the uninstall ran. Servers before that fix (released after 0.2.130) leave the installation folder on the host (`/opt/automaton/self-hosted-runners/...`); remove it by hand.
 
 Check: `automaton runners` no longer lists it, and `docker ps` on the host shows no container named `automaton-self-hosted-*` for it.
 
