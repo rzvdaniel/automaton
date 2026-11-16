@@ -144,6 +144,7 @@ Private app links use `app-{appId:N}.{configured apps domain}`, with no hyphens 
 - **Unassigned** — no Runner is assigned.
 - **Not deployed** — a Runner is assigned, but no successful deployment is recorded.
 - **Deploying** — a deployment or protected lifecycle operation is active.
+  A deployment the Runner has not finished within 30 minutes is marked Failed automatically, which releases the target. The app owner can also cancel it from **Runs on → Cancel deploy** (`POST /api/apps/{id}/deploy/cancel`). A late Runner result for a cancelled or timed-out deployment is ignored.
 - **Running** — the latest deployment succeeded.
 - **Failed** — the latest deployment failed.
 - **Runner offline** — deployment history exists, but the assigned Runner is unavailable.

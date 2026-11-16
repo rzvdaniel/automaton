@@ -59,6 +59,21 @@ async function saveRunner() {
   }
 }
 
+const isDeploying = computed(() => liveTarget.value?.status === 'Deploying')
+const cancelling = ref(false)
+
+async function cancelDeploy() {
+  cancelling.value = true
+  try {
+    await appsService.cancelDeployment(props.app.id, liveTarget.value?.slug)
+    emit('changed')
+  } catch (error) {
+    fail('The deployment could not be cancelled', error)
+  } finally {
+    cancelling.value = false
+  }
+}
+
 const definitionDialog = ref(false)
 
 // Earlier version (Runner-local Action versions)
@@ -100,6 +115,11 @@ async function restore(actionKey: string, version: string) {
       <span>Runner</span>
       <span class="value mono">{{ runnerText }}</span>
       <Button v-if="canEdit && liveTarget" label="Change…" size="small" text @click="openRunner" />
+    </div>
+    <div v-if="canEdit && isDeploying" class="row" data-testid="cancel-deploy">
+      <span>Deploying</span>
+      <span class="value hint">Stuck? Cancel it to redeploy or delete.</span>
+      <Button label="Cancel deploy" size="small" severity="danger" text :loading="cancelling" @click="cancelDeploy" />
     </div>
     <div v-if="canEdit && hasActions" class="row">
       <span>Version</span>
