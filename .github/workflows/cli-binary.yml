@@ -84,3 +84,4 @@ jobs:
             if ($LASTEXITCODE -eq 0) { throw "$exe installed despite a wrong checksum" }
             if (Test-Path (Join-Path $dir "automaton.exe")) { throw "$exe left a binary after a wrong checksum" }
           }
+          $global:LASTEXITCODE = 0
