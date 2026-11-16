@@ -48,7 +48,7 @@ public static class RunnersDeleteCommand
                     else
                     {
                         AnsiConsole.MarkupLine("[yellow]Runner removal prepared.[/] Run this command on its host:");
-                        AnsiConsole.WriteLine(uninstallCommand);
+                        WriteUnwrapped(uninstallCommand);
                         AnsiConsole.MarkupLine($"Then run [bold]automaton runners delete {Markup.Escape(runnerId)} --host-cleanup-confirmed[/].");
                     }
                 }
@@ -63,4 +63,7 @@ public static class RunnersDeleteCommand
         });
         return command;
     }
+
+    /// <summary>Prints the command as one line; Spectre would wrap it at the terminal width and break copy and paste.</summary>
+    public static void WriteUnwrapped(string text) => Console.Out.WriteLine(text);
 }
