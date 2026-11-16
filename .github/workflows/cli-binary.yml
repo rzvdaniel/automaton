@@ -55,7 +55,7 @@ jobs:
         shell: pwsh
         run: |
           $env:AUTOMATON_DOWNLOAD_BASE = "http://127.0.0.1:8099"
-          $env:AUTOMATON_INSTALL_DIR = Join-Path $env:RUNNER_TEMP "ps7in"
+          $env:AUTOMATON_INSTALL_DIR = Join-Path $env:RUNNER_TEMP "ps7\bin"
           & ./scripts/cli/install.ps1
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           & (Join-Path $env:AUTOMATON_INSTALL_DIR "automaton.exe") --version | Select-String "Version: 1.2.3"
@@ -64,7 +64,7 @@ jobs:
         shell: powershell
         run: |
           $env:AUTOMATON_DOWNLOAD_BASE = "http://127.0.0.1:8099"
-          $env:AUTOMATON_INSTALL_DIR = Join-Path $env:RUNNER_TEMP "ps51in"
+          $env:AUTOMATON_INSTALL_DIR = Join-Path $env:RUNNER_TEMP "ps51\bin"
           & ./scripts/cli/install.ps1
           $v = & (Join-Path $env:AUTOMATON_INSTALL_DIR "automaton.exe") --version
           if (-not ($v -match "Version: 1.2.3")) { throw "automaton --version did not report 1.2.3: $v" }
