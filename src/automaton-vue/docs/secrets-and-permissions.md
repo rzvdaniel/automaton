@@ -66,4 +66,6 @@ Every declared secret shows `present` and the scope that provides it. `automaton
 - **Static site cannot use secrets.** Its files go to the browser. Put secrets in an API or server-rendered app.
 - **Values are never shown again.** Saving the same name replaces the value.
 
+The proxy removes any `X-Automaton-Viewer-Role` and `X-Automaton-Viewer-Token` a client sends, on every route including public apps and open paths. Your app receives them only on requests the platform signed in, so you can trust them; without them the request is anonymous.
+
 `server:cleanup` writes are checked per viewer: the app receives `X-Automaton-Viewer-Role` (to hide controls) and a short-lived `X-Automaton-Viewer-Token` on each request, and must forward the token as the `X-Automaton-Viewer-Token` header on `PUT`/`POST` calls to `/api/server/cleanup`. The API refuses with 403 unless it belongs to a system administrator.

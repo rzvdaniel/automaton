@@ -371,6 +371,12 @@ public class BackendRouteConfigService
     private void AppendMiddlewares(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
     {
         builder.AppendLine("  middlewares:");
+        // Routes the proxy does not authenticate (public apps, open paths) still drop any viewer headers the client sent.
+        builder.AppendLine("    viewer-strip:");
+        builder.AppendLine("      headers:");
+        builder.AppendLine("        customRequestHeaders:");
+        builder.AppendLine("          X-Automaton-Viewer-Role: \"\"");
+        builder.AppendLine("          X-Automaton-Viewer-Token: \"\"");
         // The private address always asks for sign-in; the public address only when the app requires it.
         foreach (var route in routes)
         {
@@ -446,7 +452,7 @@ public class BackendRouteConfigService
         var secret = route.Gateway is null ? string.Empty : $", \"{route.RuntimeServiceName}-secret\"";
         var middlewares = authenticated
             ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{rewrite}\"{secret}]"
-            : $"[\"{rewrite}\"{secret}]";
+            : $"[\"viewer-strip\", \"{rewrite}\"{secret}]";
         builder.AppendLine($"      middlewares: {middlewares}");
     }
 
