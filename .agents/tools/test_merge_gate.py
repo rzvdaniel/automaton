@@ -41,7 +41,7 @@ class Tier(unittest.TestCase):
         self.assertEqual(gate.path_tier([".github/workflows/deploy-production.yml"], patterns), "high")
 
     def test_docs_only_is_low(self):
-        self.assertEqual(gate.path_tier(["docs/roadmap/README.md", "src/Automaton.Api/Documentation/Admin/apps.md"], PATTERNS), "low")
+        self.assertEqual(gate.path_tier(["docs/roadmap/README.md", "docs/maintainers/x.md"], PATTERNS), "low")
 
     def test_agent_guidance_and_code_are_medium(self):
         for path in ("AGENTS.md", ".agents/skills/pr-review/SKILL.md", ".claude/skills/a/SKILL.md", "docs/x.sh",

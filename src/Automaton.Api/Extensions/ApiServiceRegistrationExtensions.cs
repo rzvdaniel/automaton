@@ -717,7 +717,6 @@ internal static class ApiOperationsRegistration
         services.AddSingleton<AiGuidanceRuntimeService>();
         services.AddSingleton<IAiGuidanceRuntimeService>(sp => sp.GetRequiredService<AiGuidanceRuntimeService>());
         services.AddSingleton<IAutomatonGuidanceRuntimeProvider>(sp => sp.GetRequiredService<AiGuidanceRuntimeService>());
-        services.AddScoped<AdminDocumentationService>();
         services.AddScoped<RunnerAuditService>();
         services.AddScoped<RunnerRegistrationService>();
         services.AddScoped<RunnerDeletionService>();

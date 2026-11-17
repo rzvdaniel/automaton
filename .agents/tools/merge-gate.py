@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SECURITY_MARKER = "# --- security pass ---"
 # A change is low risk when every file is documentation for people: Markdown in these places and nothing else.
 # Skills, AGENTS.md, templates and the guidance shipped to users' agents steer agents, so they are never low.
-PEOPLE_DOCS = ("docs/", "src/Automaton.Api/Documentation/Admin/")
+PEOPLE_DOCS = ("docs/",)
 TRUSTED = {"OWNER", "MEMBER", "COLLABORATOR"}
 CLOSING = re.compile(r"\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+", re.I)
 GREEN = {"SUCCESS", "SKIPPED", "NEUTRAL"}

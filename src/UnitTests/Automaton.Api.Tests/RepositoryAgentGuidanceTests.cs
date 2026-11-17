@@ -7,7 +7,7 @@ public sealed class RepositoryAgentGuidanceTests
     {
         var repositoryRoot = FindRepositoryRoot();
         var agentsDirectory = Path.Combine(repositoryRoot, ".agents");
-        var ownedSkills = new[] { "admin-docs", "generic-runtime", "production-deployment" };
+        var ownedSkills = new[] { "generic-runtime", "production-deployment" };
 
         Assert.That(Directory.Exists(Path.Combine(repositoryRoot, ".agent")), Is.False);
 

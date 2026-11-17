@@ -14,7 +14,7 @@ What the change does for people, in the imperative: "Let app owners delete apps 
 
 Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_template.md) and pass it with
 `gh pr create --body-file`. The merge gate refuses a PR without "How verified", "Risk", "How to revert" and "Docs".
-- **Docs** is one line: "updated `<page>`" (a page in `src/automaton-vue/docs`, the Admin docs or an architecture guide) or
+- **Docs** is one line: "updated `<page>`" (a page in `src/automaton-vue/docs` or an architecture guide) or
   "none, because ...". Ask "which user page does this change make wrong?" before you write "none". The verifier
   follows the page you name when it runs your "Check after release" list.
 
@@ -28,7 +28,7 @@ Never write `Closes #N` or `Fixes #N`: an issue closes only when its change is l
 
 ## Documentation
 
-Update documentation in the same PR when behaviour that administrators or users see changes (admin-docs skill), or
+Update documentation in the same PR when behaviour that administrators or users see changes, or
 when architecture changes (`AGENTS.md`). User-facing behaviour (install, update, backup, Runners, CLI) is documented in `src/automaton-vue/docs`, nowhere else. Keep it brief: say what is true now, in a few sentences, in the existing
 page. Do not add new pages, change logs or plans unless the task asks for them.
 
