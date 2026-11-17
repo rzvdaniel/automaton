@@ -294,8 +294,10 @@ public sealed class AppCatalogService(
             throw new InvalidDataException("The catalog has no repository.");
         // One bad entry must not hide the others.
         document.Apps.RemoveAll(app => !AppCatalogInstallService.IsValidSource(document.Repo, app.Folder, app.Commit));
-        // movedFrom only follows apps that used to be in the official catalog; a custom source cannot take over other installs.
-        foreach (var app in document.Apps.Where(app => app.MovedFrom is not null && !IsValidMovedFrom(app.MovedFrom)))
+        // movedFrom only follows apps that used to be in the official catalog, and only from the official source or the
+        // automaton.monster store: any other custom source could otherwise take over installs the official catalog dropped.
+        var trusted = forcedRepo is null || string.Equals(forcedRepo, CatalogSourceStore.StoreRepo, StringComparison.OrdinalIgnoreCase);
+        foreach (var app in document.Apps.Where(app => app.MovedFrom is not null && (!trusted || !IsValidMovedFrom(app.MovedFrom))))
             app.MovedFrom = null;
         return document;
     }

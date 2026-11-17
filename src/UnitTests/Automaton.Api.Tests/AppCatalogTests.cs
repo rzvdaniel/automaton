@@ -269,6 +269,18 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public void Parse_KeepsMovedFromOnlyForTheOfficialSourceAndTheStore()
+    {
+        var body = MovedJson();
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogService.Parse(body).Apps.Single().MovedFrom, Is.Not.Null);
+            Assert.That(AppCatalogService.Parse(body, "rzvdaniel/automaton-monster").Apps.Single().MovedFrom, Is.Not.Null);
+            Assert.That(AppCatalogService.Parse(body, "someone/else").Apps.Single().MovedFrom, Is.Null);
+        });
+    }
+
+    [Test]
     public async Task Get_MarksAMovedAppInstalledWhenItWasInstalledFromItsOldRepo()
     {
         await using var db = CreateDb();
