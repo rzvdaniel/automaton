@@ -3786,6 +3786,28 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("UserHomePins");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.UserNotificationAck", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime>("AcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("UserId", "Key");
+
+                    b.ToTable("UserNotificationAcks");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.UserSetting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4933,6 +4955,15 @@ namespace Automaton.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.UserNotificationAck", b =>
+                {
                     b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")

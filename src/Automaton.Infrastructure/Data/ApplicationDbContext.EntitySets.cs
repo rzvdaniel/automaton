@@ -43,6 +43,7 @@ public partial class ApplicationDbContext
     public virtual DbSet<WebAppStar> WebAppStars { get; set; }
     public virtual DbSet<UserHomePin> UserHomePins { get; set; }
     public virtual DbSet<UserHomeDismissal> UserHomeDismissals { get; set; }
+    public virtual DbSet<UserNotificationAck> UserNotificationAcks { get; set; }
     public virtual DbSet<WebAppScreenshot> WebAppScreenshots { get; set; }
     public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
     public virtual DbSet<AppShare> AppShares { get; set; }

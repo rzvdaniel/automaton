@@ -29,7 +29,7 @@ public sealed class HomeService(
         cards.AddRange(HomeNeedsYouService.AppCards(listed));
         var dismissed = await db.UserHomeDismissals.AsNoTracking().Where(item => item.UserId == userId)
             .Select(item => item.CardKey).ToListAsync(token);
-        return new(cards.Where(card => !dismissed.Contains(card.Key)).ToList(), pinned);
+        return new(cards.Where(card => !dismissed.Contains(card.Key) && !Notifications.NotificationKinds.InFeed.Contains(card.Kind)).ToList(), pinned);
     }
 
     /// <summary>Pins an app from the person's Apps list. Returns false when it is not on that list.</summary>

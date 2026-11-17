@@ -194,6 +194,19 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> ListNotificationsAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/notifications", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task AcknowledgeNotificationAsync(string key, CancellationToken ct = default)
+    {
+        using var resp = await _http.PutAsync($"api/notifications/{Uri.EscapeDataString(key)}/acknowledgement", null, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     internal async Task<IReadOnlyList<AppInventoryItem>> ListAppInventoryAsync(CancellationToken ct = default)
         => (await ListAppsAsync(ct)).Deserialize<AppInventoryItem[]>(JsonOptions) ?? [];
 
