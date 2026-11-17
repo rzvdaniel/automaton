@@ -19,9 +19,17 @@ const auth = useAuthStore()
 const toast = useToast()
 
 const isAdmin = computed(() => auth.user?.roles?.includes('SysAdmin') === true)
-const empty = computed(() => store.pinned.length === 0 && store.needsYou.length === 0)
+const empty = computed(() => store.pinned.length === 0 && store.needsYou.length === 0 && store.notifications.length === 0)
 
 onMounted(() => store.load())
+
+async function acknowledge(key: string) {
+  try {
+    await store.acknowledge(key)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'The notification could not be acknowledged.', life: 5000 })
+  }
+}
 
 async function dismiss(key: string) {
   try {
@@ -84,6 +92,37 @@ function shift(index: number, by: number) {
     </Message>
 
     <template v-else>
+      <section v-if="store.notifications.length > 0" aria-labelledby="notifications-title" data-testid="notifications">
+        <h2 id="notifications-title" class="home-section">Notifications</h2>
+        <div class="home-cards">
+          <article
+            v-for="item in store.notifications"
+            :key="item.key"
+            class="need"
+            :class="`need--${item.severity}`"
+            :data-testid="`notification-${item.kind}`"
+          >
+            <div class="need__text">
+              <p class="need__title">{{ item.title }}</p>
+              <p class="need__detail">{{ item.detail }}</p>
+            </div>
+            <div class="need__actions">
+              <Button :label="item.actionLabel" size="small" class="btn-ink" @click="router.push(item.actionPath)" />
+              <Button
+                v-if="item.acknowledgeable"
+                label="Acknowledge"
+                size="small"
+                text
+                severity="secondary"
+                :aria-label="`Acknowledge ${item.title}`"
+                data-testid="acknowledge-notification"
+                @click="acknowledge(item.key)"
+              />
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section v-if="store.needsYou.length > 0" aria-labelledby="needs-you-title" data-testid="needs-you">
         <h2 id="needs-you-title" class="home-section">Needs you</h2>
         <div class="home-cards">
@@ -188,6 +227,8 @@ function shift(index: number, by: number) {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
 }
+.need--critical { border-color: var(--danger, #c0392b); }
+.need--warning { border-color: var(--warn, #d68910); }
 .need__text { min-width: 0; }
 .need__title { margin: 0; font-weight: 600; font-size: 15px; color: var(--ink); }
 .need__detail { margin: 2px 0 0; color: var(--ink-soft); font-size: 13px; }

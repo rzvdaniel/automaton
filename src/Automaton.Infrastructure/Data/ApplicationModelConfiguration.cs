@@ -107,6 +107,13 @@ internal static class ApplicationModelConfiguration
             entity.Property(e => e.CardKey).HasMaxLength(100);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
+        modelBuilder.Entity<UserNotificationAck>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.Key });
+            entity.Property(e => e.Key).HasMaxLength(100);
+            entity.Property(e => e.Fingerprint).HasMaxLength(64);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<AppHomeCard>(entity =>
         {
             entity.HasKey(e => e.AppId);

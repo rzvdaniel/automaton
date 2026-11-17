@@ -66,7 +66,7 @@ public sealed class ServerHealthService(
         }).ToArray();
     }
 
-    private async Task<IReadOnlyList<CertificateInfo>> CertificatesAsync(DateTime nowUtc, CancellationToken token)
+    public async Task<IReadOnlyList<CertificateInfo>> CertificatesAsync(DateTime nowUtc, CancellationToken token)
     {
         var hosts = new[] { appConfiguration.WebsiteUrl, runnerOptions.Value.ServerUrl }
             .Select(url => Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps ? uri.Host : null)

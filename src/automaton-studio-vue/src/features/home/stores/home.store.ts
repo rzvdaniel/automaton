@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { homeService } from '../services/home.service'
-import type { HomeCard, HomePinnedApp } from '../types/home.types'
+import { notificationsService } from '../services/notifications.service'
+import type { HomeCard, HomePinnedApp, NotificationItem } from '../types/home.types'
 
 /** Home data for the signed-in person: Needs-you cards and pinned apps. */
 export const useHomeStore = defineStore('home', () => {
   const needsYou = ref<HomeCard[]>([])
   const pinned = ref<HomePinnedApp[]>([])
+  const notifications = ref<NotificationItem[]>([])
   const isLoading = ref(false)
   const loaded = ref(false)
   const error = ref<string | null>(null)
@@ -17,7 +19,9 @@ export const useHomeStore = defineStore('home', () => {
     isLoading.value = true
     error.value = null
     try {
-      const data = await homeService.get()
+      // The feed is secondary: Home still opens when it cannot be read.
+      const [data, feed] = await Promise.all([homeService.get(), notificationsService.list().catch(() => [] as NotificationItem[])])
+      notifications.value = feed
       needsYou.value = data.needsYou
       pinned.value = data.pinned
       loaded.value = true
@@ -59,5 +63,10 @@ export const useHomeStore = defineStore('home', () => {
     needsYou.value = needsYou.value.filter((card) => card.key !== cardKey)
   }
 
-  return { needsYou, pinned, pinnedIds, isLoading, loaded, error, load, ensureLoaded, pin, unpin, reorder, dismiss }
+  async function acknowledge(key: string) {
+    await notificationsService.acknowledge(key)
+    notifications.value = notifications.value.filter((item) => item.key !== key)
+  }
+
+  return { notifications, acknowledge, needsYou, pinned, pinnedIds, isLoading, loaded, error, load, ensureLoaded, pin, unpin, reorder, dismiss }
 })

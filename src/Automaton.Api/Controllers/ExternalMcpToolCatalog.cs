@@ -45,7 +45,16 @@ internal static class ExternalMcpToolCatalog
 
             ToolDef("list_runners",
                 "List the runners available to the current user.",
-                new { type = "object", properties = new { }, required = Array.Empty<string>() })
+                new { type = "object", properties = new { }, required = Array.Empty<string>() }),
+
+            ToolDef("list_notifications",
+                "List the platform notifications for the current user (updates, expiring certificates, offline Runners, failed deploys and backups, permission requests, failing apps). Same feed as Studio Home and 'automaton notifications'.",
+                new { type = "object", properties = new { }, required = Array.Empty<string>() }),
+
+            ToolDef("acknowledge_notification",
+                "Acknowledge a notification by its key so it is hidden in Studio, the CLI and here. Critical notifications cannot be acknowledged.",
+                Props(Prop("key", "string", "Notification key from list_notifications")),
+                ["key"])
         }
     };
 

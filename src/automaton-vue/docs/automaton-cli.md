@@ -141,6 +141,8 @@ automaton sync-ai
 automaton pull
 automaton apps                  # your apps: ID, name, Runner, status (Paused when paused), public URL
 automaton installation-status   # server version, counts, last backup
+automaton notifications         # the same notices as Studio Home; add --json for scripts and agents
+automaton notifications acknowledge <key>   # hide one (critical notices stay until fixed)
 automaton runners
 automaton project runners       # list, add or remove a project's Runners
 automaton project list
@@ -218,6 +220,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton runners` | List runners available on your Automaton account |
 | `automaton apps` | List apps in your personal workspace |
 | `automaton installation-status` | Show server version, resource counts and last backup |
+| `automaton notifications [--json]` | List your notifications: server update, expiring certificate, offline Runner, failed backup, permission requests, failing apps. `acknowledge <key>` hides one |
 | `automaton server` | Update the Automaton server you are logged in to |
 | `automaton set-runner <runner>` | Assign or clear the Runner for the Live environment |
 | `automaton config` | View or update global CLI settings |
