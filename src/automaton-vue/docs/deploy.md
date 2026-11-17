@@ -101,6 +101,10 @@ automaton deploy --resume        # resume first, then deploy
 
 Pausing stops the app on its Runner, switches off its schedules and makes its public address answer 503 with a short "This app is paused" page. Its settings, secrets, data, publication and address are kept. Resuming starts it again and turns back on the schedules that were on before the pause. `automaton apps` shows `Paused` as the status. In Studio use **Pause** / **Resume** in the Apps list or on the app's Overview.
 
+### Home, Needs you and pinned apps
+
+Studio opens on **Home**. **Needs you** lists what is waiting for you: an administrator sees a missing Runner, a server or Runner update, apps asking for permissions, and optional tips (set up email, back up the server); everyone sees apps they can change that are failing. A card goes away when its task is done. Tips have a **Dismiss** button that hides them for you for good. Use **Pin to Home** in the Apps list or on an app's page to add the app to **Pinned apps**; each pinned app shows its state, last deploy, last Action run and Runner, and a click opens it. Pins and dismissed cards belong to you alone.
+
 A deploy while the app is paused uploads the new version but keeps the app stopped and says so; use `--resume` (or resume first) to start it. You need the same rights as for deploying the app; others get 403. An API key works too: `POST /api/apps/{id}/pause` and `POST /api/apps/{id}/resume`.
 
 ## Common errors

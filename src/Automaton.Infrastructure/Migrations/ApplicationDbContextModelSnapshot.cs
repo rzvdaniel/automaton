@@ -3746,6 +3746,46 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("UserGitHubTokens");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.UserHomeDismissal", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CardKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime>("DismissedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "CardKey");
+
+                    b.ToTable("UserHomeDismissals");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.UserHomePin", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("PinnedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId", "AppId");
+
+                    b.HasIndex("AppId");
+
+                    b.HasIndex("UserId", "SortOrder");
+
+                    b.ToTable("UserHomePins");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.UserSetting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4874,6 +4914,30 @@ namespace Automaton.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("SecretDefinition");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.UserHomeDismissal", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.UserHomePin", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.WebApp", b =>

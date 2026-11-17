@@ -7,6 +7,8 @@ import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import AppFilterBar from '../components/AppFilterBar.vue'
 import AppRow from '../components/AppRow.vue'
+import PinToHomeButton from '@/features/home/components/PinToHomeButton.vue'
+import { useHomeStore } from '@/features/home/stores/home.store'
 import NewAppDialog from '../components/NewAppDialog.vue'
 import CatalogPanel from '../components/CatalogPanel.vue'
 import SharedAppsSection from '../components/SharedAppsSection.vue'
@@ -22,6 +24,7 @@ import {
 const router = useRouter()
 const route = useRoute()
 const appsStore = useAppsStore()
+const homeStore = useHomeStore()
 
 // Notice for system administrators when permission requests are waiting.
 const authStore = useAuthStore()
@@ -67,6 +70,7 @@ onMounted(async () => {
   } catch {
     // Error is handled in the store
   }
+  void homeStore.ensureLoaded()
   await loadSharedApps()
 })
 
@@ -165,6 +169,7 @@ const handleRetry = async () => {
             :state="appState(app)"
           >
             <template #action>
+              <PinToHomeButton :app-id="app.id" :app-name="app.name" compact class="mr-2" />
               <Button
                 v-if="app.canUpdate"
                 :label="app.isPaused ? 'Resume' : 'Pause'"

@@ -573,6 +573,8 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<PublicMarketplaceCreatorAppsQuery>();
         services.AddScoped<PublicMarketplaceCatalogQuery>();
         services.AddScoped<WebAppStarService>();
+        services.AddScoped<Automaton.Api.Home.HomeService>();
+        services.AddScoped<Automaton.Api.Home.HomeNeedsYouService>();
         services.AddSingleton<RunnerTunnelRegistry>();
         services.AddHttpForwarder();
         services.AddSingleton<RunnerGatewayRegistry>();
