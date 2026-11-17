@@ -87,10 +87,14 @@ elif args[0]=='compose':
         # The updater runs pg_dump (custom format) and pg_restore --list in the postgres service.
         if args[args.index('exec')+1:][:2]!=['-T','postgres']: sys.exit(2)
         command=args[args.index('postgres')+1:]
-        if command[0]=='psql':
+        if command[0]=='psql' and '-c' in command and 'DROP SCHEMA public CASCADE' in command[command.index('-c')+1]:
+            open(os.environ['FAKE_STATE']+'.schema-reset','w').close()
+        elif command[0]=='psql':
             print(os.environ.get('FAKE_MIGRATIONS_AFTER','5') if os.environ.get('FAKE_UP_FAIL') and os.path.exists(os.environ['FAKE_STATE']) else '5')
-        elif command[0]=='pg_restore' and '--clean' in command:
+        elif command[0]=='pg_restore' and '--single-transaction' in command and '--exit-on-error' in command and '--clean' not in command:
             if sys.stdin.buffer.read()!=b'PGDMP-fake-custom-archive': sys.exit(1)
+            # A table the new migration added would make the restore fail unless the schema was emptied first.
+            if os.environ.get('FAKE_MIGRATION_ADDS_TABLE')=='1' and not os.path.exists(os.environ['FAKE_STATE']+'.schema-reset'): sys.exit(1)
         elif command[0]=='pg_dump':
             if '--format=custom' not in command or command[command.index('-d')+1]!='automaton': sys.exit(2)
             sys.stdout.buffer.write(b'PGDMP-fake-custom-archive')
@@ -435,6 +439,11 @@ printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 3000000
         self.assertIn('Database restored: yes', result.stderr)
         self.assertIn('pg_restore', log.read_text())
         self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.1')
+
+    def test_rollback_restores_into_a_clean_schema_when_the_migration_added_a_table(self):
+        result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1', 'FAKE_MIGRATIONS_AFTER': '6', 'FAKE_MIGRATION_ADDS_TABLE': '1'})
+        self.assertIn('Database restored: yes', result.stderr)
+        self.assertNotIn('Database restore failed', result.stderr)
 
     def test_failed_update_rolls_back_without_database_restore_when_no_migration_ran(self):
         result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1', 'FAKE_MIGRATIONS_AFTER': '5'})

@@ -356,7 +356,10 @@ rollback() {
     if [[ "$migrations_after" != "$migrations_before" || -z "$migrations_after" ]]; then
         echo 'A migration may have run: restoring the database from the pre-update backup.' >&2
         "${new_compose[@]}" stop "${application_services[@]}" >&2 || true
-        if "${old_compose[@]}" exec -T postgres pg_restore --clean --if-exists --no-owner -U automaton -d automaton < "$backup/database.dump" >&2; then
+        # pg_restore --clean would leave tables, sequences and types the new migration created, so the next update would fail
+        # on them for good. Restore into an empty schema, all or nothing.
+        if "${old_compose[@]}" exec -T postgres psql -U automaton -d automaton -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >&2 \
+            && "${old_compose[@]}" exec -T postgres pg_restore --single-transaction --exit-on-error --no-owner -U automaton -d automaton < "$backup/database.dump" >&2; then
             restored=yes
         else
             echo "Database restore failed. Recovery backup: $backup. Assess the database before retrying." >&2
