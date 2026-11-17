@@ -140,5 +140,16 @@ describe('AppSecrets', () => {
     })
     await flushPromises()
     expect(wrapper.find('[data-testid="missing-secrets"]').text()).toContain('API_KEY')
+    expect(wrapper.get('[data-testid="secret-description"]').text()).toBe('For the vendor')
+  })
+
+  it('shows the description under the name of a secret that is set', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([{ name: 'API_KEY', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' }])
+    const wrapper = mount(AppSecrets, {
+      props: { appId: 'app-1', declared: [{ name: 'API_KEY', description: 'For the vendor' }] },
+      global: { plugins: [PrimeVue, ConfirmationService] },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="secret-description"]').text()).toBe('For the vendor')
   })
 })

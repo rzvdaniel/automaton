@@ -42,6 +42,8 @@ describe('AppSettingValues', () => {
     expect(text).toContain('default: 30')
     expect(text).toContain('SITE')
     expect(text).toContain('not set')
+    const descriptions = wrapper.findAll('[data-testid="setting-description"]')
+    expect(descriptions.map((d) => d.text())).toEqual(['How often'])
   })
 
   it('shows the current custom value, prefills the replace box, and resets to the default', async () => {

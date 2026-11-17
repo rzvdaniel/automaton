@@ -97,8 +97,11 @@ async function useDefault(name: string) {
         <Button type="submit" label="Save setting" size="small" :loading="saving" />
         <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
       </form>
-      <div v-else class="row" data-testid="setting-row" :title="item.description ?? undefined">
-        <code class="name">{{ item.name }}<span v-if="item.required" class="hint"> (required)</span></code>
+      <div v-else class="row" data-testid="setting-row">
+        <span class="name">
+          <code>{{ item.name }}<span v-if="item.required" class="hint"> (required)</span></code>
+          <small v-if="item.description" class="desc" data-testid="setting-description">{{ item.description }}</small>
+        </span>
         <span class="value hint">
           <template v-if="item.current"><code data-testid="setting-current">{{ item.current.value }}</code> (custom, set {{ formatWhen(item.current.updatedAtUtc) }})</template>
           <template v-else-if="item.earlier">set earlier, save again to show the value</template>
@@ -121,7 +124,8 @@ async function useDefault(name: string) {
 h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .hint { color: var(--ink-soft); font-size: 13px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 5px 0; border-bottom: 1px solid var(--row-line); }
-.name { flex: 0 1 220px; overflow-wrap: anywhere; }
+.name { display: flex; flex-direction: column; gap: 2px; flex: 0 1 220px; overflow-wrap: anywhere; }
+.desc { color: var(--ink-soft); font-size: 12px; }
 .value { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 code { font-family: var(--mono); font-size: 13px; }
 .link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
