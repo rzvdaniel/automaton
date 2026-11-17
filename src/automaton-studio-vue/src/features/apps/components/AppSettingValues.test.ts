@@ -54,6 +54,9 @@ describe('AppSettingValues', () => {
 
     await wrapper.find('[aria-label="Set CHECK_INTERVAL_SECONDS"]').trigger('click')
     expect((wrapper.find('#setting-value').element as HTMLInputElement).value).toBe('45')
+    expect(wrapper.find('form.row').text()).toContain('CHECK_INTERVAL_SECONDS')
+    await wrapper.find('form.row').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('form').exists()).toBe(false)
 
     await wrapper.find('[aria-label="Use the default for CHECK_INTERVAL_SECONDS"]').trigger('click')
     await flushPromises()
