@@ -6,7 +6,7 @@ export AGENT_QUEUE_HOME=$t/q AGENT_QUEUE_BIN=$d/agent-queue
 cat > "$t/fake" <<'F'
 #!/usr/bin/env bash
 p=$(cat); echo "start $1" >> "$AGENT_QUEUE_HOME/order"; echo "$p"
-[[ $p == stall* ]] && sleep 600
+[[ $p == *$'\nstall'* ]] && sleep 600
 sleep 1; echo "end $1" >> "$AGENT_QUEUE_HOME/order"
 F
 chmod +x "$t/fake"; export AGENT_QUEUE_RUNNER=$t/fake
@@ -23,4 +23,5 @@ touch -d '2 hours ago' "$t/q/logs/s.log"
 [[ $("$d/agent-queue" stalled 30) == s\ * ]] || fail "stall not detected"
 [[ $(ORCH_MAX_RETRIES=0 "$d/orchestrator.sh") == *"failing it"* ]] || fail "orchestrator did not handle stall"
 sleep 3; [[ $("$d/agent-queue" status) == *"s: cancelled"* ]] || fail "stalled task not cancelled"
+echo hello | "$d/agent-queue" add p >/dev/null; head -c 400 "$t"/q/pending/*-p.task | grep -q "^Rules: follow AGENTS.md" || fail "no rules prefix"; grep -qx hello "$t"/q/pending/*-p.task || fail "prompt not on its own line"; grep -q "handoff.nn" "$t"/q/pending/*-p.task && fail "literal nn in prompt"
 echo "ALL PASS"

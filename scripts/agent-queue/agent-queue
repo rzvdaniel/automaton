@@ -28,7 +28,14 @@ add)
   seq=$(date +%s%N)
   if [[ -n ${2:-} ]]; then cp "$2" "$Q/pending/$seq-$name.task.tmp"; else cat > "$Q/pending/$seq-$name.task.tmp"; fi
   [[ -s $Q/pending/$seq-$name.task.tmp ]] || { rm -f "$Q/pending/$seq-$name.task.tmp"; die "empty prompt"; }
-  mv "$Q/pending/$seq-$name.task.tmp" "$Q/pending/$seq-$name.task"
+  t="$Q/pending/$seq-$name.task.tmp"
+  if [[ $name == verify* ]]; then
+    pre="Rules: follow AGENTS.md and .agents/skills/automaton-verify-release/SKILL.md. Never touch production. Never print credentials. End with the proof per issue and a PASS/FAIL summary."
+  else
+    pre="Rules: follow AGENTS.md and .agents/skills/automaton-implement-issue/SKILL.md end to end (tests, PR, independent Opus review and security pass per pr-review, merge-gate.py); start reviews and security passes as subagent_type automaton-reviewer, never a generic agent. Merge only if the task says so; a tier-high PR stops at the handoff and names that the Desktop orchestrator posts the separate security pass; never release, upgrade or deploy unless it says so. Never touch production. Never print credentials. End with the implement-issue handoff."
+  fi
+  { printf '%s\n\n' "$pre"; cat "$t"; } > "$t.2" && mv "$t.2" "$t"
+  mv "$t" "$Q/pending/$seq-$name.task"
   echo "queued $name" ;;
 status)
   echo "worker:  $(flock -n "$Q/worker.lock" true 2>/dev/null && echo 'not running' || echo running)"
