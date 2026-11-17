@@ -145,7 +145,7 @@ From the app's folder:
 | Command | Does |
 |---|---|
 | `automaton secrets status` | Lists declared secrets: present or missing, and which scope provides each. |
-| `automaton secrets set NAME [--project\|--user] [--description TEXT]` | Saves a value read from standard input, or prompts without echo. Without a flag, it is an app secret. |
+| `automaton secrets set NAME [--project\|--user] [--description TEXT]` | Saves a value read from standard input, or prompts without echo. Without a flag, it is an app secret. It works before the name is declared: an app secret reaches the app either way; declaring it makes `secrets status` and the install page list it. |
 | `automaton secrets list [--project\|--user]` | Lists names, versions and descriptions, never values. |
 | `automaton secrets delete NAME [--project\|--user]` | Deletes a secret. |
 | `automaton project create NAME` | Creates a project; you become its administrator. |
