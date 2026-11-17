@@ -115,6 +115,30 @@ public sealed class AppPauseTests
     }
 
     [Test]
+    public async Task Resume_TurnsTheHomeCardPlatformScheduleBackOn()
+    {
+        await using var h = new Harness();
+        h.AddRunningTarget();
+        var card = h.AddSchedule("Home card", enabled: true);
+        card.SystemIdentity = Automaton.Api.Entities.HomeCardScheduleIdentity.For(AppId);
+        card.ActionKey = "home-card";
+        card.IntervalSeconds = 900;
+        h.Db.SaveChanges();
+        var service = h.ServiceFor(OwnerId);
+
+        await service.PauseAsync(AppId, administrator: false, default);
+        Assert.That((await h.Db.ActionSchedules.FindAsync(card.Id))!.Enabled, Is.False);
+
+        var resumed = await service.ResumeAsync(AppId, administrator: false, default);
+
+        var after = (await h.Db.ActionSchedules.FindAsync(card.Id))!;
+        Assert.That(resumed.SchedulesChanged, Is.EqualTo(1));
+        Assert.That(after.Enabled, Is.True);
+        Assert.That(after.PausedByApp, Is.False);
+        Assert.That(after.NextRunAtUtc, Is.Not.Null);
+    }
+
+    [Test]
     public async Task Pause_KeepsDataSettingsAndSchedulesRows()
     {
         await using var h = new Harness();

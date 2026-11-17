@@ -48,6 +48,13 @@ internal sealed class AppActionExecutionResultPersistence(ApplicationDbContext d
     public async Task ApplyAsync(Guid id, AppActionExecutionResult? result, CancellationToken token)
     {
         if (result is null) return;
+        var alreadyDone = await db.AppModuleExecutions.AsNoTracking().AnyAsync(e => e.Id == id && e.CompletedAtUtc != null, token);
+        await ApplyExecutionAsync(id, result, token);
+        if (!alreadyDone) await new Automaton.Api.Home.AppHomeCardStore(db).ApplyRunAsync(id, result, token);
+    }
+
+    private async Task ApplyExecutionAsync(Guid id, AppActionExecutionResult result, CancellationToken token)
+    {
         var summary = result.FailureSummary?.Length > 1000 ? result.FailureSummary[..1000] : result.FailureSummary;
         if (db.Database.IsRelational())
         {

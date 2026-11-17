@@ -52,6 +52,9 @@ public sealed class ApplicationContract
     /// <summary>Plain (non-secret) values an installer chooses, delivered as environment variables like secrets.</summary>
     public List<ApplicationSettingDeclaration> Settings { get; set; } = [];
 
+    /// <summary>Optional: how often the platform runs the app's <c>home-card</c> Action (default every 15 minutes).</summary>
+    public ApplicationHomeCardSpec? HomeCard { get; set; }
+
     /// <summary>Action schedules the installer is offered; each is created only when the installer accepts it.</summary>
     public List<ApplicationScheduleDeclaration> Schedules { get; set; } = [];
 
@@ -63,6 +66,19 @@ public sealed class ApplicationContract
         && Compose is null
         && Build.Command is not null
         && !string.IsNullOrWhiteSpace(Build.OutputDirectory);
+}
+
+/// <summary>How often the platform refreshes the app's Studio Home card.</summary>
+public sealed class ApplicationHomeCardSpec
+{
+    public const int DefaultIntervalSeconds = 900;
+    public const int MinimumIntervalSeconds = 300;
+    public const int MaximumIntervalSeconds = 86_400;
+
+    public int? IntervalSeconds { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 /// <summary>A key path of a web app with a short label.</summary>
@@ -396,6 +412,9 @@ public static class ApplicationContractValidator
             errors.Add("kind must be 'web' or 'api'");
         if (DescriptionError(contract.Description, "description") is { } descriptionError) errors.Add(descriptionError);
         ValidatePages(contract.Pages ?? [], errors);
+        if (contract.HomeCard?.IntervalSeconds is { } interval
+            && interval is < ApplicationHomeCardSpec.MinimumIntervalSeconds or > ApplicationHomeCardSpec.MaximumIntervalSeconds)
+            errors.Add($"homeCard.intervalSeconds must be between {ApplicationHomeCardSpec.MinimumIntervalSeconds} and {ApplicationHomeCardSpec.MaximumIntervalSeconds}");
         if (contract.OpenApi is not null && !IsPlainPath(contract.OpenApi))
             errors.Add("openApi must be a path that starts with / (for example /openapi.json)");
     }
