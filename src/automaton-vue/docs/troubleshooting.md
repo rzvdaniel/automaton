@@ -62,4 +62,4 @@ Common problems and how to fix them. For install problems see [Install with your
 
 ## Search server logs in the browser
 
-Install the VictoriaLogs app from the catalog, then set `Logging__Otlp__Endpoint` to its address (for example `http://<app-address>:9428`) on the API, the Worker and each Runner, and restart them. They keep writing their log files and also send their logs to VictoriaLogs, where you can filter by level (`level:error`) and watch live. Leave the setting empty to turn it off. The app keeps 14 days and at most 5 GiB by default; change `RETENTION_PERIOD` or `MAX_DISK_SPACE_BYTES` in the app's settings.
+Install the VictoriaLogs app from the catalog, then set `Logging__Otlp__Endpoint` to its address (for example `http://<app-address>:9428`) on the API, the Worker and each Runner, and restart them. They keep writing their log files and also send their logs to VictoriaLogs, where you can filter by level (`severity_text:Error`) and watch live. Leave the setting empty to turn it off. The app keeps 14 days and at most 5 GiB by default; change `RETENTION_PERIOD` or `MAX_DISK_SPACE_BYTES` in the app's settings.
