@@ -84,7 +84,7 @@ Ask the user to confirm: apps on that Runner stop and lose their host-local data
 automaton runners delete main --ssh user@host      # runs the uninstall over SSH, then deletes the registration
 ```
 
-`--ssh` needs the same root or passwordless sudo and key login as the install (see Prerequisites). Without `--ssh` (for example no sudo): `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host as root, then `automaton runners delete main --host-cleanup-confirmed`. That flag only tells the server the uninstall ran; it does not touch the host, and it answers 409 "still online" while the Runner still connects. In Studio: **Runners**, open the Runner, **Delete**; it shows the same uninstall command.
+`--ssh` needs the same root or passwordless sudo and key login as the install (see Prerequisites). Without `--ssh` (for example no sudo): `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host as root, then `automaton runners delete main --host-cleanup-confirmed`. That flag only tells the server the uninstall ran; it does not touch the host, and it answers 409 "still online" while the Runner still connects. In Studio: **Runners**, remove the Runner; it shows the same uninstall command, then tick "I ran the command successfully" and **Confirm removal**.
 
 The uninstall removes the Runner's containers and its installation folder. Docker itself, images already pulled and your own files on the host stay. Servers released up to 0.2.130 leave `/opt/automaton/self-hosted-runners/...`; remove it by hand.
 
