@@ -12,7 +12,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
 }))
-const consoleService = vi.hoisted(() => ({ install: vi.fn() }))
+const consoleService = vi.hoisted(() => ({ install: vi.fn(), get: vi.fn() }))
 vi.mock('@/features/server/services/server-console.service', () => ({ serverConsoleService: consoleService }))
 const service = vi.hoisted(() => ({ get: vi.fn(), pin: vi.fn(), unpin: vi.fn(), reorder: vi.fn(), dismiss: vi.fn() }))
 vi.mock('../services/home.service', () => ({ homeService: service }))
@@ -58,7 +58,7 @@ describe('HomeView', () => {
   it('installs Server Console from the recommended card, then the card offers Open in a new tab', async () => {
     const recommended = { ...card('recommended:server-console', true), kind: 'recommended-app', title: 'Install Server Console', catalogAppId: 'server-console', actionLabel: 'Install' }
     service.get.mockResolvedValue({ needsYou: [recommended], pinned: [] })
-    consoleService.install.mockResolvedValue({ appId: 'abc' })
+    consoleService.install.mockResolvedValue({ appId: 'abc', running: true })
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const wrapper = mountHome(['SysAdmin'])
     await flushPromises()
@@ -74,6 +74,32 @@ describe('HomeView', () => {
     expect(open).toHaveBeenCalledWith(expect.stringContaining('/apps/abc/application'), '_blank', 'noopener')
     expect(consoleService.install).toHaveBeenCalledOnce()
     open.mockRestore()
+  })
+
+  it('shows Installing… after the install until the app is running, then offers Open', async () => {
+    vi.useFakeTimers()
+    try {
+      const recommended = { ...card('recommended:server-console', true), kind: 'recommended-app', title: 'Install Server Console', catalogAppId: 'server-console', actionLabel: 'Install' }
+      service.get.mockResolvedValue({ needsYou: [recommended], pinned: [] })
+      consoleService.install.mockResolvedValue({ appId: 'abc', running: false })
+      consoleService.get.mockResolvedValueOnce({ appId: 'abc', running: false }).mockResolvedValue({ appId: 'abc', running: true })
+      const open = vi.spyOn(window, 'open').mockReturnValue(null)
+      const wrapper = mountHome(['SysAdmin'])
+      await flushPromises()
+      await wrapper.find('[data-testid="need-recommended-app"] button').trigger('click')
+      await flushPromises()
+      const button = () => wrapper.find('[data-testid="need-recommended-app"] button')
+      expect(button().text()).toContain('Installing…')
+      await button().trigger('click')
+      expect(open).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(button().text()).toContain('Installing…')
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(button().text()).toContain('Open')
+      open.mockRestore()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('dismisses an optional card for good', async () => {

@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,7 +42,7 @@ public sealed class ServerConsoleProvisioningService(
             find: () => FindInstalledAsync(userId, entry, token),
             install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
             approve: appId => ApprovePendingAsync(permissions, appId, token),
-            needsDeploy: appId => db.WebApps.Where(app => app.Id == appId).AnyAsync(app => !app.DeploymentTargets.Any(), token),
+            needsDeploy: appId => NeedsDeployAsync(db, appId, token),
             deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
             logger, token);
     }
@@ -67,6 +68,19 @@ public sealed class ServerConsoleProvisioningService(
         }
         return appId;
     }
+
+    /// <summary>
+    /// True until a first deploy was ever requested. Installing already creates the default deployment target (the Runner
+    /// assignment), so "has no target" is never true; a deploy operation or a deployed runtime is what shows one was started.
+    /// </summary>
+    internal static async Task<bool> NeedsDeployAsync(ApplicationDbContext db, Guid appId, CancellationToken token)
+        => !await db.DeploymentOperations.AnyAsync(operation => operation.WebAppId == appId, token)
+            && !await db.AppDeploymentTargets.AnyAsync(target => target.WebAppId == appId
+                && (target.GenericRuntimeDeployed || target.Status == DeploymentTargetStatus.Running || target.Status == DeploymentTargetStatus.Deploying), token);
+
+    /// <summary>True when the app's runtime is up on a Runner, so Open shows the app and not "not deployed yet".</summary>
+    public async Task<bool> IsRunningAsync(Guid appId, CancellationToken token)
+        => await db.AppDeploymentTargets.AnyAsync(target => target.WebAppId == appId && target.Status == DeploymentTargetStatus.Running, token);
 
     internal static async Task ApprovePendingAsync(AppPermissionService permissions, Guid appId, CancellationToken token)
     {

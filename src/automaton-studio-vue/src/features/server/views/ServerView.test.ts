@@ -67,8 +67,8 @@ const mountView = (roles: string[] = ['User']) => {
 describe('ServerView', () => {
   beforeEach(() => {
     vi.mocked(runnersService.list).mockReset().mockResolvedValue([runner()] as never)
-    vi.mocked(serverConsoleService.install).mockReset().mockResolvedValue({ appId: 'sc1' })
-    vi.mocked(serverConsoleService.get).mockReset().mockResolvedValue({ appId: null })
+    vi.mocked(serverConsoleService.install).mockReset().mockResolvedValue({ appId: 'sc1', running: false })
+    vi.mocked(serverConsoleService.get).mockReset().mockResolvedValue({ appId: null, running: false })
     vi.mocked(serverHealthService.get).mockReset().mockResolvedValue(health(false))
     vi.mocked(installService.getUpdate).mockReset().mockResolvedValue({
       currentVersion: 'server-v1', triggerAvailable: true, run: null, log: null, stale: false, requestPending: false, requestAgeSeconds: null, hint: null,
@@ -149,16 +149,16 @@ describe('ServerView', () => {
     await flushPromises()
     expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('not installed')
     expect(serverConsoleService.install).not.toHaveBeenCalled()
-    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1' })
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1', running: false })
     await missing.get('[data-testid="server-console-install"]').trigger('click')
     await flushPromises()
     expect(serverConsoleService.install).toHaveBeenCalledTimes(1)
     expect(missing.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
     expect(missing.find('[data-testid="server-console-notice"]').exists()).toBe(false)
     missing.unmount()
-    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: null })
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: null, running: false })
 
-    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1' })
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1', running: false })
     const installed = mountView(['SysAdmin'])
     await flushPromises()
     expect(installed.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
