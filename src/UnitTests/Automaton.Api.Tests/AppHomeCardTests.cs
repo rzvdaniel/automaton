@@ -208,4 +208,24 @@ public sealed class AppHomeCardTests
         Assert.That(await service.ListAsync(owner, administrator: true, default), Has.Count.EqualTo(1));
         Assert.ThrowsAsync<KeyNotFoundException>(() => service.SetEnabledAsync(schedule.Id, false, owner, administrator: true, default), "nobody edits it by hand");
     }
+
+    [Test]
+    public async Task SyncTurnsAPausedScheduleBackOnOnceTheAppIsResumed()
+    {
+        var db = AppAuthorizationTestData.CreateDbContext();
+        Guid app = Guid.NewGuid(), owner = Guid.NewGuid();
+        AppAuthorizationTestData.SeedApp(db, app, owner, "app");
+        var service = new HomeCardScheduleService(db);
+        await service.SyncAsync(app, owner, true, 900, default);
+        var schedule = await db.ActionSchedules.SingleAsync();
+        schedule.Enabled = false; schedule.PausedByApp = true; schedule.NextRunAtUtc = null;
+        await db.SaveChangesAsync();
+
+        await service.SyncAsync(app, owner, true, 900, default);
+
+        schedule = await db.ActionSchedules.AsNoTracking().SingleAsync();
+        Assert.That(schedule.Enabled);
+        Assert.That(schedule.PausedByApp, Is.False);
+        Assert.That(schedule.NextRunAtUtc, Is.Not.Null);
+    }
 }

@@ -45,7 +45,7 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
     /// <summary>The app's latest Action run; the platform's own card refreshes do not count.</summary>
     private Task<AppListActionRunDto?> LastRunAsync(Guid appId, CancellationToken token)
         => db.AppModuleExecutions.AsNoTracking()
-            .Where(execution => execution.AppId == appId && execution.ModuleKey != "home-card")
+            .Where(execution => execution.AppId == appId && execution.ModuleKey != Automaton.Api.Home.AppHomeCardLimits.ActionKey)
             .OrderByDescending(execution => execution.CreatedAtUtc)
             .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
             .FirstOrDefaultAsync(token);
@@ -53,7 +53,7 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
     private Task<DateTime?> NextRunAsync(Guid appId, CancellationToken token)
         => db.ActionSchedules.AsNoTracking()
             .Where(schedule => schedule.ApplicationId == appId && schedule.Enabled && schedule.NextRunAtUtc != null
-                && (schedule.SystemIdentity == null || !schedule.SystemIdentity.StartsWith("home-card:")))
+                && (schedule.SystemIdentity == null || !schedule.SystemIdentity.StartsWith(Automaton.Api.Entities.HomeCardScheduleIdentity.Prefix)))
             .MinAsync(schedule => schedule.NextRunAtUtc, token);
 
     /// <summary>The first line of a deploy error, cut short, so build output, paths and stack traces stay on the server.</summary>

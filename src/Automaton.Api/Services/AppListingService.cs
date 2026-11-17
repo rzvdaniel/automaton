@@ -30,13 +30,13 @@ internal sealed class AppListingService(
             if (!items[index].ActionsOnly) continue;
             var appId = items[index].Id;
             var run = await dataContext.AppModuleExecutions.AsNoTracking()
-                .Where(execution => execution.AppId == appId && execution.ModuleKey != "home-card")
+                .Where(execution => execution.AppId == appId && execution.ModuleKey != Automaton.Api.Home.AppHomeCardLimits.ActionKey)
                 .OrderByDescending(execution => execution.CreatedAtUtc)
                 .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
                 .FirstOrDefaultAsync(cancellationToken);
             var nextRun = await dataContext.ActionSchedules.AsNoTracking()
                 .Where(schedule => schedule.ApplicationId == appId && schedule.Enabled && schedule.NextRunAtUtc != null
-                    && (schedule.SystemIdentity == null || !schedule.SystemIdentity.StartsWith("home-card:")))
+                    && (schedule.SystemIdentity == null || !schedule.SystemIdentity.StartsWith(Automaton.Api.Entities.HomeCardScheduleIdentity.Prefix)))
                 .MinAsync(schedule => schedule.NextRunAtUtc, cancellationToken);
             items[index] = items[index].WithActionRuns(run, nextRun);
         }

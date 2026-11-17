@@ -58,9 +58,16 @@ public sealed class HomeCardScheduleService(ApplicationDbContext db)
             };
             db.ActionSchedules.Add(schedule);
         }
-        else if (schedule.IntervalSeconds == intervalSeconds && schedule.OwnerUserId == ownerId && schedule.ApplicationId == appId)
+        else if (schedule.IntervalSeconds == intervalSeconds && schedule.OwnerUserId == ownerId && schedule.ApplicationId == appId
+            && (schedule.Enabled || paused))
         {
             return;
+        }
+        else if (!paused)
+        {
+            // Repairs a schedule a pause left off.
+            schedule.Enabled = true;
+            schedule.PausedByApp = false;
         }
         schedule.OwnerUserId = ownerId;
         schedule.ApplicationId = appId;

@@ -10,7 +10,7 @@ public sealed class AppHomeCardStore(ApplicationDbContext db)
 {
     /// <summary>
     /// A succeeded run of <c>home-card</c>, or any run with <c>homeCard</c> in its result, replaces the app's card when
-    /// the card is valid. A failed <c>home-card</c> run or an invalid card keeps the previous card and marks it as late.
+    /// the card is valid. A failed <c>home-card</c> run, or a succeeded run of any Action whose <c>homeCard</c> is invalid, keeps the previous card and marks it late.
     /// </summary>
     public async Task ApplyRunAsync(Guid executionId, AppActionExecutionResult result, CancellationToken token)
     {
