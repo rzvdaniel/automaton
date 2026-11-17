@@ -23,8 +23,9 @@ const loaded = ref(false)
 const adding = ref(false)
 const error = ref<string | null>(null)
 /** The name field is only for a new secret; an existing name is edited in its own row. */
-const inRow = computed(() => adding.value && [...secrets.value, ...missing.value].some((item) => item.name === name.value))
-const rowEditing = (secretName: string) => adding.value && name.value === secretName
+const rowName = ref('')
+const inRow = computed(() => adding.value && rowName.value !== '')
+const rowEditing = (secretName: string) => adding.value && rowName.value === secretName
 const namePattern = /^[A-Z_][A-Z0-9_]{0,99}$/
 
 /** Tells password managers (1Password, LastPass, Bitwarden) this is not a login form. */
@@ -46,6 +47,7 @@ async function load() {
 /** Opens the form in place and focuses the first empty field. */
 async function openForm(secretName = '') {
   name.value = secretName
+  rowName.value = secretName
   value.value = ''
   error.value = null
   adding.value = true
@@ -55,6 +57,7 @@ async function openForm(secretName = '') {
 
 function cancel() {
   adding.value = false
+  rowName.value = ''
   name.value = ''
   value.value = ''
   error.value = null

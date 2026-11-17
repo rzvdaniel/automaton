@@ -101,6 +101,18 @@ describe('AppSecrets', () => {
     expect(wrapper.find('form').exists()).toBe(false)
   })
 
+  it('typing an existing name into Add a secret keeps the Add form', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([
+      { name: 'S3', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' },
+    ])
+    const wrapper = mountSecrets()
+    await flushPromises()
+    await wrapper.find('[data-testid="add-secret"]').trigger('click')
+    await wrapper.find('input#secret-name').setValue('S3')
+    expect(wrapper.find('input#secret-name').exists()).toBe(true)
+    expect(wrapper.find('form.row').exists()).toBe(false)
+  })
+
   it('always shows the card; Add a secret opens the form in place, focuses Name, and Cancel closes it', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([])
     const wrapper = mount(AppSecrets, {
