@@ -6,6 +6,7 @@ import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import { useToast } from 'primevue/usetoast'
 import AppMark from '@/features/apps/components/AppMark.vue'
+import { getStudioApplicationUrl } from '@/features/apps/utils/public-app-url'
 import { appState, formatShortTime } from '@/features/apps/utils/app-list-display'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { serverConsoleService } from '@/features/server/services/server-console.service'
@@ -40,13 +41,22 @@ async function dismiss(key: string) {
 }
 
 const installing = ref<string | null>(null)
-/** Server Console installs in place; any other recommended app opens in the catalog. */
+/** Cards whose app was just installed here: card key to the new app's id. The card stays and offers Open. */
+const installed = ref<Record<string, string>>({})
+const isInstalled = (card: HomeCard) => card.key in installed.value
+const installedTitle = (card: HomeCard) => `${card.title.replace(/^Install /, '')} is installed`
+/** Server Console installs in place, then the card offers Open; any other recommended app opens in the catalog. */
 async function act(card: HomeCard) {
+  if (isInstalled(card)) {
+    window.open(getStudioApplicationUrl(installed.value[card.key]), '_blank', 'noopener')
+    return
+  }
   if (card.kind !== 'recommended-app' || card.catalogAppId !== 'server-console') return router.push(card.actionPath)
   installing.value = card.key
   try {
-    await serverConsoleService.install()
-    await store.load()
+    const { appId } = await serverConsoleService.install()
+    if (appId) installed.value = { ...installed.value, [card.key]: appId }
+    else await store.load()
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Server Console could not be installed.', life: 5000 })
   } finally {
@@ -128,13 +138,22 @@ function shift(index: number, by: number) {
         <div class="home-cards">
           <article v-for="card in store.needsYou" :key="card.key" class="need" :data-testid="`need-${card.kind}`">
             <div class="need__text">
-              <p class="need__title">{{ card.title }}</p>
-              <p class="need__detail">{{ card.detail }}</p>
+              <p class="need__title">{{ isInstalled(card) ? installedTitle(card) : card.title }}</p>
+              <p v-if="!isInstalled(card)" class="need__detail">{{ card.detail }}</p>
             </div>
             <div class="need__actions">
-              <Button :label="card.actionLabel" size="small" class="btn-ink" :loading="installing === card.key" :disabled="installing !== null" @click="act(card)" />
               <Button
-                v-if="card.dismissible"
+                :label="isInstalled(card) ? 'Open' : card.actionLabel"
+                :icon="isInstalled(card) ? 'pi pi-external-link' : undefined"
+                icon-pos="right"
+                size="small"
+                class="btn-ink"
+                :loading="installing === card.key"
+                :disabled="installing !== null"
+                @click="act(card)"
+              />
+              <Button
+                v-if="card.dismissible && !isInstalled(card)"
                 label="Dismiss"
                 size="small"
                 text

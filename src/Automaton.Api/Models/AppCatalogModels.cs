@@ -20,7 +20,8 @@ public sealed record CatalogEntryDto(
     bool CustomSource,
     IReadOnlyList<string>? Tags = null,
     string? Icon = null,
-    bool Recommended = false);
+    bool Recommended = false,
+    int? RecommendedOrder = null);
 
 /// <summary>A filter option with the number of apps behind it (over the whole catalog, not the current filters).</summary>
 public sealed record CatalogFacet(string Value, string Label, int Count);

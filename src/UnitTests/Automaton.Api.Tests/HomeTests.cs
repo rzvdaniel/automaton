@@ -62,8 +62,16 @@ public sealed class HomeTests
         Assert.That(userCards, Is.Empty, "server cards are for system administrators only");
     }
 
-    private static CatalogEntryDto Entry(string id, bool recommended = true, Guid? installed = null, string source = CatalogSourceStore.OfficialId, bool newer = false)
-        => new(id, id, "summary", "Monitoring", "r/r", id, "c", "0.0.1", [], newer, installed, source, source, false, null, null, recommended);
+    private static CatalogEntryDto Entry(string id, bool recommended = true, Guid? installed = null, string source = CatalogSourceStore.OfficialId, bool newer = false, int? order = null)
+        => new(id, id, "summary", "Monitoring", "r/r", id, "c", "0.0.1", [], newer, installed, source, source, false, null, null, recommended, order);
+
+    [Test]
+    public void RecommendedCardsFollowTheCatalogOrder()
+    {
+        var cards = HomeNeedsYouService.RecommendedCards([Entry("last"), Entry("second", order: 2), Entry("server-console", order: 1)]);
+
+        Assert.That(cards.Select(card => card.CatalogAppId), Is.EqualTo(new[] { "server-console", "second", "last" }));
+    }
 
     [Test]
     public void RecommendedCardsListOnlyUninstalledRecommendedOfficialApps()
