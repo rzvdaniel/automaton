@@ -22,7 +22,8 @@ Never ask for, print or store: an SSH, sudo or administrator password, an API ke
 
 - A server with an administrator ([first administrator](./first-admin)) and the CLI signed in: `automaton login --server https://api.example.com` (see [Install with your AI agent](./install-with-ai) or [Your first app](./getting-started)). Check: `automaton whoami` names the right server.
 - An x86_64 Linux host (Ubuntu or Debian, systemd) running Docker Engine. It can be the server itself or another machine. Other distributions with Docker may work but are not tested. The Runner controls the host's Docker: install it only on machines you trust.
-- Check on the host: `docker info` works, `uname -m` prints `x86_64`, and `sudo -n true` succeeds (or you are root). `--ssh` and `--local` run the installer with `sudo`; without it use `--print-command` below.
+- **Root or passwordless sudo on the host.** The installer needs it. Check on the host: `docker info` works, `uname -m` prints `x86_64`, and `sudo -n true` succeeds (or you are root). `--local` and `--ssh` run the installer as `sudo bash -s`, so `sudo` must exist even for root. Without sudo, use `--print-command` and run the printed command as root.
+- **`--ssh` has no key option.** It runs plain `ssh -T -- user@host` without a terminal, so the key must work without any prompt: the default key (`~/.ssh/id_*`), a loaded `ssh-agent`, or a `Host` entry in `~/.ssh/config` (`HostName`, `User`, `IdentityFile`). Check first: `ssh user@host sudo -n true`. To use another key, add it to `~/.ssh/config` and pass that Host name as `--ssh`.
 - Port 5671 on the server's `api` host must be reachable from the Runner host ([Install the server](./install-server)).
 
 ## Steps
@@ -83,7 +84,9 @@ Ask the user to confirm: apps on that Runner stop and lose their host-local data
 automaton runners delete main --ssh user@host      # runs the uninstall over SSH, then deletes the registration
 ```
 
-`--ssh` is in releases newer than 0.2.130. Without it: `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host, then `automaton runners delete main --host-cleanup-confirmed`. It answers 409 "still online" until the uninstall ran. Servers before that fix (released after 0.2.130) leave the installation folder on the host (`/opt/automaton/self-hosted-runners/...`); remove it by hand.
+`--ssh` needs the same root or passwordless sudo and key login as the install (see Prerequisites). Without `--ssh` (for example no sudo): `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host as root, then `automaton runners delete main --host-cleanup-confirmed`. That flag only tells the server the uninstall ran; it does not touch the host, and it answers 409 "still online" while the Runner still connects. In Studio: **Runners**, remove the Runner; it shows the same uninstall command, then tick "I ran the command successfully" and **Confirm removal**.
+
+The uninstall removes the Runner's containers and its installation folder. Docker itself, images already pulled and your own files on the host stay. Servers released up to 0.2.130 leave `/opt/automaton/self-hosted-runners/...`; remove it by hand.
 
 Check: `automaton runners` no longer lists it, and `docker ps` on the host shows no container named `automaton-self-hosted-*` for it.
 

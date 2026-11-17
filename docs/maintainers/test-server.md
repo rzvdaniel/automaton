@@ -30,10 +30,12 @@ Set it up once, as root:
 install -m 0755 -o root -g root scripts/test-server-runner.sh /opt/automaton-server/test-server-runner.sh
 install -m 0644 -o root -g root /dev/null /opt/automaton-server/.test-server   # test server only, never production
 cat > /etc/sudoers.d/automaton-agent-runner <<'SUDO'
-agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh prepare sh_*
-agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh remove sh_*
+agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh prepare *
+agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh remove *
 SUDO
 chmod 0440 /etc/sudoers.d/automaton-agent-runner && visudo -cf /etc/sudoers.d/automaton-agent-runner
 ```
+
+sudo-rs rejects `sh_*` ("wildcards are not allowed in command arguments"), so the rule ends in `*`; the script only accepts `sh_` + 32 hex.
 
 Name the Runner `e2e-<issue>-...` and delete it when the check is done.

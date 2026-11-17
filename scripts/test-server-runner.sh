@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Root helper for the test server only: lets the unprivileged agent user install and delete a throwaway Runner.
 # Install as root:  install -m 0755 -o root -g root scripts/test-server-runner.sh /opt/automaton-server/test-server-runner.sh
-# sudoers (one line per verb, no wildcards beyond the id):
-#   agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh prepare sh_*
-#   agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh remove sh_*
+# sudoers (one line per verb; sudo-rs rejects sh_*, so the script itself accepts only sh_ + 32 hex):
+#   agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh prepare *
+#   agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh remove *
 # Refuses unless the root-owned marker /opt/automaton-server/.test-server exists (created only in the test-server setup, never on production).
 # /opt/automaton-server and its parents must be root-owned and not writable by agent, or the marker and this script could be replaced.
 # The id is validated here, so a sudoers wildcard cannot reach any other path.
