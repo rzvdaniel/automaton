@@ -19,10 +19,16 @@ verbs, both limited to one installation id (`sh_` + 32 hex):
   command Studio or `automaton runners install --print-command` prints, as the agent user (it is in the `docker` group).
 - `remove <id>`: removes that folder as root, after the uninstall command has removed the containers.
 
+The script refuses unless the root-owned marker file `/opt/automaton-server/.test-server` exists, accepts only
+`SUDO_USER=agent`, and `prepare` refuses when the folder already exists. Only the setup below creates the marker;
+**production never gets it** (never create it there). `/opt/automaton-server` and all its parents must be root-owned and
+not writable by the agent user, otherwise the agent could replace the script or the marker.
+
 Set it up once, as root:
 
 ```bash
 install -m 0755 -o root -g root scripts/test-server-runner.sh /opt/automaton-server/test-server-runner.sh
+install -m 0644 -o root -g root /dev/null /opt/automaton-server/.test-server   # test server only, never production
 cat > /etc/sudoers.d/automaton-agent-runner <<'SUDO'
 agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh prepare sh_*
 agent ALL=(root) NOPASSWD: /usr/bin/bash /opt/automaton-server/test-server-runner.sh remove sh_*
