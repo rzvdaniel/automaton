@@ -15,6 +15,9 @@ vi.mock('vue-router', () => ({
 const service = vi.hoisted(() => ({ get: vi.fn(), pin: vi.fn(), unpin: vi.fn(), reorder: vi.fn(), dismiss: vi.fn() }))
 vi.mock('../services/home.service', () => ({ homeService: service }))
 
+const notifications = vi.hoisted(() => ({ list: vi.fn(), acknowledge: vi.fn() }))
+vi.mock('../services/notifications.service', () => ({ notificationsService: notifications }))
+
 const app = (id: string, name: string) => ({
   id, name, summary: '', description: '', tags: [], isPublished: false, updatedAtUtc: '', canDelete: false,
   runtime: { genericRuntimeDeployed: true }, runner: null,
@@ -34,6 +37,7 @@ describe('HomeView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    notifications.list.mockResolvedValue([])
   })
 
   it('shows Needs-you cards and pinned apps in the saved order', async () => {
@@ -83,6 +87,24 @@ describe('HomeView', () => {
     const admin = mountHome(['SysAdmin'])
     await flushPromises()
     expect(admin.find('[data-testid="home-empty"]').text()).toContain('Server Console')
+  })
+
+  it('shows notifications, lets a warning be acknowledged and keeps a critical one', async () => {
+    const item = (key: string, severity: string, acknowledgeable: boolean) => ({
+      key, kind: key, severity, title: `Notice ${key}`, detail: 'd', actionLabel: 'Open', actionPath: '/server', count: 1, subjects: [], acknowledgeable,
+    })
+    service.get.mockResolvedValue({ needsYou: [], pinned: [] })
+    notifications.list.mockResolvedValue([item('runner-offline', 'critical', false), item('certificate-expiring', 'warning', true)])
+    notifications.acknowledge.mockResolvedValue(undefined)
+    const wrapper = mountHome(['SysAdmin'])
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid^="notification-"]')).toHaveLength(2)
+    expect(wrapper.findAll('[data-testid="acknowledge-notification"]')).toHaveLength(1)
+    await wrapper.find('[data-testid="acknowledge-notification"]').trigger('click')
+    await flushPromises()
+    expect(notifications.acknowledge).toHaveBeenCalledWith('certificate-expiring')
+    expect(wrapper.findAll('[data-testid^="notification-"]')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="notification-runner-offline"]').exists()).toBe(true)
   })
 
   it('shows an app card as plain text and greys it with its time when it is stale', async () => {

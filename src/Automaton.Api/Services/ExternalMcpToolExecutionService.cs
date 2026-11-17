@@ -14,7 +14,8 @@ public sealed class ExternalMcpToolExecutionService(
     AppFileStorageService fileStorageService,
     FileIoTool fileIoTool,
     UserContextService userContext,
-    ApplicationDbContext db)
+    ApplicationDbContext db,
+    Automaton.Api.Notifications.NotificationService notifications)
 {
     public Task<string> ExecuteAsync(
         string toolName,
@@ -29,7 +30,24 @@ public sealed class ExternalMcpToolExecutionService(
             "get_file_tree" => GetFileTreeAsync(arguments),
             "read_file" or "list_files" => ExecuteFileToolAsync(toolName, arguments),
             "list_runners" => ListRunnersAsync(userId),
+            "list_notifications" => ListNotificationsAsync(userId),
+            "acknowledge_notification" => AcknowledgeNotificationAsync(arguments, userId),
             _ => throw new InvalidOperationException($"Unknown tool: {toolName}")
+        };
+    }
+
+    private async Task<string> ListNotificationsAsync(Guid userId)
+        => JsonSerializer.Serialize(new { notifications = await notifications.ListAsync(userId, CancellationToken.None) },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+    private async Task<string> AcknowledgeNotificationAsync(JsonElement arguments, Guid userId)
+    {
+        var key = RequireString(arguments, "key");
+        return await notifications.AcknowledgeAsync(userId, key, CancellationToken.None) switch
+        {
+            Automaton.Api.Notifications.NotificationService.AcknowledgeResult.Done => $"Acknowledged {key}.",
+            Automaton.Api.Notifications.NotificationService.AcknowledgeResult.Critical => throw new InvalidOperationException("A critical notification stays until the cause is fixed."),
+            _ => throw new InvalidOperationException($"No notification '{key}'."),
         };
     }
 

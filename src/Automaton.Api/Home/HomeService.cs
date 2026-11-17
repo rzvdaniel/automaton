@@ -31,7 +31,7 @@ public sealed class HomeService(
         needsYouCards.AddRange(HomeNeedsYouService.AppCards(listed));
         var dismissed = await db.UserHomeDismissals.AsNoTracking().Where(item => item.UserId == userId)
             .Select(item => item.CardKey).ToListAsync(token);
-        return new(needsYouCards.Where(card => !dismissed.Contains(card.Key)).ToList(), pinned);
+        return new(needsYouCards.Where(card => !dismissed.Contains(card.Key) && !Notifications.NotificationKinds.InFeed.Contains(card.Kind)).ToList(), pinned);
     }
 
     /// <summary>A card is late when its last card run failed, or it was not refreshed within three of its intervals.</summary>

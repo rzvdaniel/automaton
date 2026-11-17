@@ -578,6 +578,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<WebAppStarService>();
         services.AddScoped<Automaton.Api.Home.HomeService>();
         services.AddScoped<Automaton.Api.Home.HomeNeedsYouService>();
+        services.AddScoped<Automaton.Api.Notifications.NotificationService>();
         services.AddSingleton<RunnerTunnelRegistry>();
         services.AddHttpForwarder();
         services.AddSingleton<RunnerGatewayRegistry>();
