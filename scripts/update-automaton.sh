@@ -211,6 +211,10 @@ application_services=()
 for service in $new_release_services; do
     [[ " postgres rabbitmq traefik " == *" $service "* ]] || application_services+=("$service")
 done
+old_application_services=()
+for service in $old_release_services; do
+    [[ " postgres rabbitmq traefik " == *" $service "* ]] || old_application_services+=("$service")
+done
 for service in $old_release_services; do
     container=$("${old_compose[@]}" ps -q "$service")
     [[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || { echo "$service is not running; repair the installation before updating." >&2; exit 1; }
@@ -281,6 +285,9 @@ worker_container=$("${old_compose[@]}" ps -q worker)
 docker cp "$api_container:/app/data-protection-keys/." - | gzip > "$backup/api-keys.tar.gz"
 docker cp "$worker_container:/app/data-protection-keys/." - | gzip > "$backup/worker-keys.tar.gz"
 docker cp "$api_container:/app/AppData/." - | gzip > "$backup/api-data.tar.gz"
+# Applied EF migrations before the update; a different count afterwards means a migration ran and the database must be restored on rollback.
+migration_count() { "$@" exec -T postgres psql -U automaton -d automaton -tAc 'SELECT count(*) FROM "__EFMigrationsHistory"' < /dev/null 2>/dev/null | tr -d '[:space:]' || true; }
+migrations_before=$(migration_count "${old_compose[@]}")
 "${old_compose[@]}" exec -T postgres pg_dump -U automaton -d automaton --format=custom --compress=6 < /dev/null > "$backup/database.dump"
 "${old_compose[@]}" exec -T postgres pg_restore --list < "$backup/database.dump" > /dev/null || { echo 'Database backup did not complete.' >&2; exit 1; }
 for archive in config api-keys worker-keys api-data; do tar -tzf "$backup/$archive.tar.gz" >/dev/null; done
@@ -334,20 +341,47 @@ ensure_update_trigger
 echo 'Backup verified. Pulling release images.'
 "${new_compose[@]}" pull "${application_services[@]}"
 echo "Updating ${application_services[*]}."
-if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${application_services[@]}"; then
-    echo "Update did not reach healthy state. Previous manifest and recovery backup remain at $backup. Do not retry until the database and running services are assessed." >&2
+public_checks_pass() {
+    curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]' \
+        && api_health=$(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://api.$domain/health") \
+        && printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' \
+        && curl --fail --silent --show-error "https://studio.$domain/" >/dev/null
+}
+# A failed update goes back to the previous release by itself: reinstall its (still local) images and, when a migration ran,
+# restore the pre-update database from the backup. The installed manifest, version and scripts are only replaced after success.
+rollback() {
+    echo "Update failed: $1. Rolling back to ${current_version:-the previous release}." >&2
+    local migrations_after restored=no
+    migrations_after=$(migration_count "${new_compose[@]}")
+    if [[ "$migrations_after" != "$migrations_before" || -z "$migrations_after" ]]; then
+        echo 'A migration may have run: restoring the database from the pre-update backup.' >&2
+        "${new_compose[@]}" stop "${application_services[@]}" >&2 || true
+        # pg_restore --clean would leave tables, sequences and types the new migration created, so the next update would fail
+        # on them for good. Restore into an empty schema, all or nothing.
+        if "${old_compose[@]}" exec -T postgres psql -U automaton -d automaton -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >&2 \
+            && "${old_compose[@]}" exec -T postgres pg_restore --single-transaction --exit-on-error --no-owner -U automaton -d automaton < "$backup/database.dump" >&2; then
+            restored=yes
+        else
+            echo "Database restore failed. Recovery backup: $backup. Assess the database before retrying." >&2
+        fi
+    fi
+    if "${old_compose[@]}" up -d --wait --wait-timeout 600 --force-recreate "${old_application_services[@]}" >&2 \
+        && { [[ "$restart_traefik" != true ]] || "${old_compose[@]}" restart traefik >&2; } && public_checks_pass; then
+        echo "Rolled back: the server answers on ${current_version:-the previous release}. Database restored: $restored. Recovery backup: $backup" >&2
+    else
+        echo "Rollback did not restore a healthy server. Recovery backup: $backup. Assess the services before retrying." >&2
+    fi
     exit 1
+}
+if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${application_services[@]}"; then
+    rollback 'services did not become healthy'
 fi
 if [[ "$restart_traefik" == true ]]; then
     echo 'Restarting Traefik to load the new certificate resolver.'
-    "${new_compose[@]}" restart traefik || { echo 'Traefik restart failed; restart it by hand.' >&2; exit 1; }
+    "${new_compose[@]}" restart traefik || rollback 'Traefik did not restart'
 fi
-if ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]' \
-    || ! api_health=$(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://api.$domain/health") \
-    || ! printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' \
-    || ! curl --fail --silent --show-error "https://studio.$domain/" >/dev/null; then
-    echo "Public route validation failed. Previous manifest and recovery backup remain at $backup. Assess the services before recovery." >&2
-    exit 1
+if ! public_checks_pass; then
+    rollback 'public route validation failed'
 fi
 if [[ " ${application_services[*]} " == *' store '* ]] && ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://store.$domain/" >/dev/null; then
     printf 'Warning: the app store did not answer at https://store.%s/. Point a DNS record for store.%s to this server, then restart Traefik so it requests the certificate; the rest of the update is complete.\n' "$domain" "$domain" >&2
