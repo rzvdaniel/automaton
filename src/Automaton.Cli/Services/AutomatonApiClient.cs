@@ -357,6 +357,16 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    /// <summary>Saves a plain app setting where Studio can show its value (not the write-only secret store).</summary>
+    public async Task<JsonElement> SetSettingValueAsync(string appId, string name, string value, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { value }, JsonOptions);
+        using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/apps/{appId}/setting-values/{Uri.EscapeDataString(name)}", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     /// <summary>Deletes a secret; false when it did not exist.</summary>
     public async Task<bool> DeleteSecretAsync(string appId, string scope, string name, CancellationToken ct = default)
     {

@@ -110,7 +110,9 @@ public static class CatalogInstallCommand
         if (NoRunner(app) is { } noRunner) throw new InvalidOperationException($"{noRunner}\nThe app was created (app id {appId}) but was not deployed; assign a Runner in Studio, then deploy it.");
         try
         {
-            foreach (var (key, value) in settings.Concat(secrets).Where(item => application.ValueKind != JsonValueKind.Object || !IsDefault(application, item.Key, item.Value)))
+            foreach (var (key, value) in settings.Where(item => application.ValueKind != JsonValueKind.Object || !IsDefault(application, item.Key, item.Value)))
+                await client.SetSettingValueAsync(appId, key, value);
+            foreach (var (key, value) in secrets.Where(item => application.ValueKind != JsonValueKind.Object || !IsDefault(application, item.Key, item.Value)))
                 await client.SetSecretAsync(appId, "app", key, value, null);
             var deployment = await client.DeployStoredSourceAsync(appId, wait);
             var failure = wait ? DeploymentFailure(deployment) : null;
