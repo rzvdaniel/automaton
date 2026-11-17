@@ -23,5 +23,6 @@ public static class AuditEntityTypes
     public const string UserSecretVault = "UserSecretVault";
     public const string AppPermission = "AppPermission";
     public const string ServerInstallation = "ServerInstallation";
+    public const string RetentionSettings = "RetentionSettings";
     public const string CatalogSource = "CatalogSource";
 }

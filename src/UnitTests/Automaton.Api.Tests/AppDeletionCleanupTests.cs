@@ -82,6 +82,24 @@ public sealed class AppDeletionCleanupTests
         Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.True);
     }
 
+    [Test]
+    public async Task WholeAppCleanup_RunnerThatLooksOnlineButDoesNotAnswer_FailsFastAndKeepsTheApp()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        var runner = fixture.AddRunner(online: true);
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(t => t.WebAppId == fixture.App.Id);
+        target.ExecutionRunnerId = runner.Id;
+        await fixture.Db.SaveChangesAsync();
+        fixture.Commands.RunnerStopsAnswering = true;
+
+        var error = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(() => fixture.Service.ClaimAndCleanupAppRuntimesAsync(fixture.App.Id));
+
+        Assert.That(error!.Message, Does.Contain("did not answer"));
+        Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.True);
+        var saved = await fixture.Db.AppDeploymentTargets.AsNoTracking().SingleAsync(t => t.Id == target.Id);
+        Assert.That(saved.CleanupPending, Is.True);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task InterruptedDeletion_AbandonsOnlyOfflineRunnerAfterOperatorVerification(bool online)

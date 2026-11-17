@@ -75,6 +75,7 @@ internal static class WorkerHostApplication
         services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
         services.AddHostedService<CliAuthorizationCleanupService>();
         services.AddHostedService<RetiredStorageScheduleCleanup>();
+        services.AddHostedService<RetentionPruneService>();
         services.AddHostedService<ActionSchedulePollingService>();
     }
 
