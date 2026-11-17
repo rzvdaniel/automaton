@@ -109,7 +109,7 @@ def pr_facts(pr: dict, files: list[str], migration_texts: dict[str, str], high: 
     texts = [section(body, "How verified")] + [c.get("body") or "" for c in pr.get("comments", []) if "proof" in (c.get("body") or "").lower()]
     proofs = list(dict.fromkeys(url.rstrip(".,;") for text in texts for url in URL.findall(text)))
     return {
-        "number": pr["number"], "title": pr["title"], "url": pr["url"],
+        "number": pr["number"], "title": pr["title"], "url": pr["url"], "paths": files,
         "what": what_changed(body), "tier": tier, "base_tier": base_tier,
         "tier_why": {"low": "documentation for people only", "medium": "ordinary code or guidance",
                      "high": "touches a protected path or the reviewer raised it"}[tier]

@@ -32,6 +32,10 @@ For each environment (test, production, temporary servers):
 - Pre-approvals from the owner (for example "verified releases go to production without asking") and the things that
   always need a question first.
 
+## Autonomous deploys
+- `autonomous-deploys: off` (default). The owner changes it to `on` to let the orchestrator deploy low-risk verified
+  releases to production without asking. Only the owner switches it; an agent never edits this line.
+
 ## Standing decisions
 A dated list of the owner's rules (process, quality bar, what is never done). Add to it whenever the owner decides something
 that should last.

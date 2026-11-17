@@ -80,6 +80,17 @@ It does **not** write product code (exception: skills, docs and small chores the
    `agent:human-review`.
 6. **After each task:** read the handoff, check the evidence, re-queue gaps.
 
+## Autonomous deploys (off by default)
+
+Only when the configuration says `autonomous-deploys: on` (the owner sets it). Otherwise every production deploy waits
+for the owner as before. When on, after the batch is verified on the test server and `main` is green, run
+`python3 .agents/tools/autodeploy-check.py --from <previous-release> --to <release> --enabled`. On `AUTODEPLOY: yes`
+(every PR low or medium tier, no migration, no Runner, broker, installer or updater change, nothing flagged risky,
+every issue `verified`) deploy, run the post-deploy checks, and tell the owner what went out. On `AUTODEPLOY: owner`
+list the reasons and ask for the owner's "deploy". The prerequisites on #1222 (merge gate and docs walk as required
+checks, automatic rollback, deploy notice, a test server that mirrors production) must be closed before the owner
+switches it on; if a post-deploy check fails, roll back and report instead of fixing forward on production.
+
 ## Closing issues
 
 `verified` plus the merge gate: update production, then run `python .agents/tools/close-released-issues.py` (dry
