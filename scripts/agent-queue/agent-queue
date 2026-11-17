@@ -19,6 +19,12 @@ limit_reset() {
   (( t < now )) && t=$(( t + 86400 ))
   echo "$t"
 }
+# when to resume after a usage limit: the reset plus 5 minutes, never more than 6 hours from now
+limit_deadline() {
+  local t d now; now=$(date +%s); t=$(limit_reset "$1"); d=$(( t + 300 ))
+  (( d > now + 21600 )) && d=$(( now + 21600 ))
+  echo "$d"
+}
 mkdir -p "$Q"/{pending,running,done,failed,cancelled,logs}
 die() { echo "agent-queue: $*" >&2; exit 1; }
 valid() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]] || die "bad task name '$1' (letters, digits . _ -)"; }
@@ -120,11 +126,12 @@ worker)
     # usage limit: put the task back at the front and wait for the reset instead of failing the queue
     lim=$(tail -n 20 "$l" | grep -m1 -o "hit your .*limit.*resets [^)]*)" || true)
     if [[ -n $lim && ! -e $Q/running/.cancel-$n ]]; then
-      printf '\n\nNote from agent-queue: the previous run stopped at the usage limit. Continue from the current git and GitHub state; do not redo finished steps.\n' >> "$Q/running/$b"
+      grep -qF 'Note from agent-queue: the previous run stopped at the usage limit.' "$Q/running/$b" ||
+        printf '\n\nNote from agent-queue: the previous run stopped at the usage limit. Continue from the current git and GitHub state; do not redo finished steps.\n' >> "$Q/running/$b"
       mv "$Q/running/$b" "$Q/pending/0$(date +%s%N | cut -c2-)-$n.task"; rm -f "$Q/running/.requeue-$n" "$Q/.requeue-$n"
-      t=$(limit_reset "$lim")
-      echo "$(date -Is) end $n usage-limit; waiting until $(date -Is -d @$((t+300)))" >> "$Q/worker.log"
-      while (( $(date +%s) < t + 300 )); do sleep 60; done
+      t=$(limit_deadline "$lim")
+      echo "$(date -Is) end $n usage-limit; waiting until $(date -Is -d @$t)" >> "$Q/worker.log"
+      while (( $(date +%s) < t )); do sleep 60; done
       continue
     fi
     if [[ -e $Q/running/.cancel-$n ]]; then rm -f "$Q/running/.cancel-$n" "$Q/running/.requeue-$n" "$Q/.requeue-$n"; mv "$Q/running/$b" "$Q/cancelled/$b"; st=cancelled
