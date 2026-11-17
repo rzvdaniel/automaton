@@ -42,3 +42,13 @@ start after approval.
 Deploy Actions with `automaton deploy`. Validate with
 `automaton action validate <action-key>`. Invoke a deployed Action with
 `automaton action run <action-key> --input '{...}'`.
+
+To show a live status on the app's Studio Home card, add an Action named
+`home-card` that writes the card as its whole JSON result:
+`{"status": "All good", "facts": [{"label": "Disk", "value": "61%"}], "alerts": [{"severity": "warning", "text": "Backup is late"}]}`
+(status up to 80 characters, at most 3 facts, at most 5 alerts with severity
+`info`, `warning` or `critical`; plain text only). The platform runs it every 15
+minutes (change with `application.homeCard.intervalSeconds`, at least 300) in a
+small container (128 MB, 30 seconds). Any other Action may add a `homeCard`
+object to its result instead. A failed run keeps the previous card. A running
+app's Actions also get `AUTOMATON_APP_INTERNAL_URL`, the address of the app.

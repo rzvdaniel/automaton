@@ -21,15 +21,41 @@ public sealed class HomeService(
             .OrderBy(pin => pin.SortOrder).ThenBy(pin => pin.PinnedAtUtc).ToListAsync(token);
         var byId = listed.ToDictionary(app => app.Id);
         // An app the person can no longer see simply drops out of Home.
-        var pinned = pins.Where(pin => byId.ContainsKey(pin.AppId))
-            .Select(pin => new HomePinnedApp(byId[pin.AppId], pin.PinnedAtUtc)).ToList();
+        var visiblePins = pins.Where(pin => byId.ContainsKey(pin.AppId)).ToList();
+        var cards = await LoadAppCardsAsync(visiblePins.Select(pin => pin.AppId).ToList(), token);
+        var pinned = visiblePins
+            .Select(pin => new HomePinnedApp(byId[pin.AppId], pin.PinnedAtUtc, cards.GetValueOrDefault(pin.AppId))).ToList();
 
-        var cards = new List<HomeCard>();
-        if (await authorization.IsSystemAdministratorAsync(userId, token)) cards.AddRange(await needsYou.ServerCardsAsync(token));
-        cards.AddRange(HomeNeedsYouService.AppCards(listed));
+        var needsYouCards = new List<HomeCard>();
+        if (await authorization.IsSystemAdministratorAsync(userId, token)) needsYouCards.AddRange(await needsYou.ServerCardsAsync(token));
+        needsYouCards.AddRange(HomeNeedsYouService.AppCards(listed));
         var dismissed = await db.UserHomeDismissals.AsNoTracking().Where(item => item.UserId == userId)
             .Select(item => item.CardKey).ToListAsync(token);
-        return new(cards.Where(card => !dismissed.Contains(card.Key)).ToList(), pinned);
+        return new(needsYouCards.Where(card => !dismissed.Contains(card.Key)).ToList(), pinned);
+    }
+
+    /// <summary>A card is late when its last card run failed, or it was not refreshed within three of its intervals.</summary>
+    private async Task<Dictionary<Guid, AppHomeCardDto>> LoadAppCardsAsync(IReadOnlyList<Guid> appIds, CancellationToken token)
+    {
+        if (appIds.Count == 0) return [];
+        var rows = await db.AppHomeCards.AsNoTracking().Where(card => appIds.Contains(card.AppId)).ToListAsync(token);
+        if (rows.Count == 0) return [];
+        var intervals = await db.ActionSchedules.AsNoTracking()
+            .Where(schedule => appIds.Contains(schedule.ApplicationId) && schedule.SystemIdentity != null
+                && schedule.SystemIdentity.StartsWith(HomeCardSchedules.IdentityPrefix))
+            .Select(schedule => new { schedule.ApplicationId, schedule.IntervalSeconds }).ToListAsync(token);
+        var now = DateTime.UtcNow;
+        var result = new Dictionary<Guid, AppHomeCardDto>();
+        foreach (var row in rows)
+        {
+            var content = AppHomeCardValidator.Deserialize(row.CardJson);
+            if (content is null) continue;
+            var interval = intervals.FirstOrDefault(item => item.ApplicationId == row.AppId)?.IntervalSeconds;
+            var stale = row.LastFailedAtUtc > row.UpdatedAtUtc
+                || interval is { } seconds && now - row.UpdatedAtUtc > TimeSpan.FromSeconds(seconds * 3L);
+            result[row.AppId] = new(content, row.UpdatedAtUtc, stale);
+        }
+        return result;
     }
 
     /// <summary>Pins an app from the person's Apps list. Returns false when it is not on that list.</summary>

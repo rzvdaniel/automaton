@@ -84,4 +84,28 @@ describe('HomeView', () => {
     await flushPromises()
     expect(admin.find('[data-testid="home-empty"]').text()).toContain('Server Console')
   })
+
+  it('shows an app card as plain text and greys it with its time when it is stale', async () => {
+    const html = '<img src=x onerror=alert(1)>'
+    const fresh = { card: { status: html, facts: [{ label: 'Disk', value: '61%' }], alerts: [{ severity: 'critical', text: 'Backup is late' }] }, updatedAtUtc: new Date().toISOString(), stale: false }
+    service.get.mockResolvedValue({
+      needsYou: [],
+      pinned: [
+        { app: app('1', 'Server Console'), pinnedAtUtc: '', card: fresh },
+        { app: app('2', 'Blog'), pinnedAtUtc: '', card: { ...fresh, stale: true } },
+        { app: app('3', 'Plain'), pinnedAtUtc: '', card: null },
+      ],
+    })
+    const wrapper = mountHome()
+    await flushPromises()
+    const cards = wrapper.findAll('[data-testid="app-card"]')
+    expect(cards).toHaveLength(2)
+    expect(cards[0]!.find('[data-testid="app-card-status"]').text()).toBe(html)
+    expect(cards[0]!.find('img').exists()).toBe(false)
+    expect(cards[0]!.text()).toContain('Disk')
+    expect(cards[0]!.find('[data-testid="app-card-alert"]').text()).toContain('Backup is late')
+    expect(cards[0]!.classes()).not.toContain('pin__card--stale')
+    expect(cards[1]!.classes()).toContain('pin__card--stale')
+    expect(cards[1]!.find('[data-testid="app-card-time"]').text()).toContain('Not up to date')
+  })
 })

@@ -13,9 +13,22 @@ export interface HomeCard {
   appId?: string | null
 }
 
+/** What an app's Action put on its Home card. Plain text only: always show it as text, never as HTML. */
+export interface AppHomeCard {
+  card: {
+    status: string
+    facts: { label: string; value: string }[]
+    alerts: { severity: 'info' | 'warning' | 'critical'; text: string }[]
+  }
+  updatedAtUtc: string
+  /** The last card run failed or the card was not refreshed in time. */
+  stale: boolean
+}
+
 export interface HomePinnedApp {
   app: AppListItem
   pinnedAtUtc: string
+  card?: AppHomeCard | null
 }
 
 export interface HomeData {

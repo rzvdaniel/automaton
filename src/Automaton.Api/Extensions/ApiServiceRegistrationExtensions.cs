@@ -550,6 +550,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<CustomDomainService>();
         services.AddScoped<IAppRuntimeCommandQueue, RunnerExecutionAppCommandQueue>();
         services.AddScoped<AppPauseService>();
+        services.AddScoped<Home.HomeCardScheduleService>();
         services.AddScoped<AppRestartService>();
         services.AddScoped<MachineStaticAppPublicationService>();
         services.AddScoped<RunnerRemovalService>();

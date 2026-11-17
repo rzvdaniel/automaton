@@ -34,19 +34,27 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
                     .Select(o => o.Status == DeploymentOperationStatuses.Failed ? o.ErrorMessage ?? "The deploy failed." : null)
                     .FirstOrDefaultAsync(token);
             error = Summarize(error);
-            var run = await db.AppModuleExecutions.AsNoTracking()
-                .Where(execution => execution.AppId == app.Id)
-                .OrderByDescending(execution => execution.CreatedAtUtc)
-                .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
-                .FirstOrDefaultAsync(token);
-            var next = await db.ActionSchedules.AsNoTracking()
-                .Where(schedule => schedule.ApplicationId == app.Id && schedule.Enabled && schedule.NextRunAtUtc != null)
-                .MinAsync(schedule => schedule.NextRunAtUtc, token);
+            var run = await LastRunAsync(app.Id, token);
+            var next = await NextRunAsync(app.Id, token);
             result.Add(new AppStatusItem(app.Id, app.Name, app.IsPaused, app.Live?.Status.ToString() ?? "Unassigned",
                 app.Live?.LastSuccessfulDeploymentAt?.UtcDateTime, error, run, next));
         }
         return result;
     }
+
+    /// <summary>The app's latest Action run; the platform's own card refreshes do not count.</summary>
+    private Task<AppListActionRunDto?> LastRunAsync(Guid appId, CancellationToken token)
+        => db.AppModuleExecutions.AsNoTracking()
+            .Where(execution => execution.AppId == appId && execution.ModuleKey != "home-card")
+            .OrderByDescending(execution => execution.CreatedAtUtc)
+            .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
+            .FirstOrDefaultAsync(token);
+
+    private Task<DateTime?> NextRunAsync(Guid appId, CancellationToken token)
+        => db.ActionSchedules.AsNoTracking()
+            .Where(schedule => schedule.ApplicationId == appId && schedule.Enabled && schedule.NextRunAtUtc != null
+                && (schedule.SystemIdentity == null || !schedule.SystemIdentity.StartsWith("home-card:")))
+            .MinAsync(schedule => schedule.NextRunAtUtc, token);
 
     /// <summary>The first line of a deploy error, cut short, so build output, paths and stack traces stay on the server.</summary>
     internal static string? Summarize(string? error)
