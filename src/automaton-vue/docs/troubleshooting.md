@@ -59,3 +59,7 @@ Common problems and how to fix them. For install problems see [Install with your
 - **Entry point mismatch** — Confirm that the public target's configured output directory contains the entry file expected by the runtime.
 - **Build step not run** — Run the configured build command before deploying, or put that command and its output directory in `automaton.json` so the CLI can do it automatically.
 - **JavaScript error on load** — Open the browser console in the preview and look for errors.
+
+## Search server logs in the browser
+
+Install the VictoriaLogs app from the catalog, then set `Logging__Otlp__Endpoint` to its address (for example `http://<app-address>:9428`) on the API, the Worker and each Runner, and restart them. They keep writing their log files and also send their logs to VictoriaLogs, where you can filter by level (`severity_text:Error`) and watch live. Leave the setting empty to turn it off. Use `http` only for an address on the same server or Docker network; a remote Runner should reach it over `https`. The app keeps 14 days and at most 5 GiB by default; change `RETENTION_PERIOD` or `MAX_DISK_SPACE_BYTES` in the app's settings.

@@ -1,3 +1,4 @@
+using Automaton.Core.Logs;
 using Automaton.Ai.Extensions;
 using Automaton.AiGuidance;
 using Automaton.Mcp.Client.Extensions;
@@ -455,6 +456,7 @@ internal static class ApiLoggingRegistration
                 context.Configuration["Logging:File:Path"] ?? "/app/logs",
                 context.Configuration.GetValue<int?>("Logging:File:RetainedFileCountLimit") ?? 14,
                 context.Configuration.GetValue<long?>("Logging:File:FileSizeLimitBytes") ?? 10 * 1024 * 1024);
+            logConfig.AddOtlpIfConfigured(context.Configuration, "automaton-api");
         });
         return services;
     }
