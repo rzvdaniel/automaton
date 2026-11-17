@@ -87,14 +87,20 @@ elif args[0]=='compose':
         # The updater runs pg_dump (custom format) and pg_restore --list in the postgres service.
         if args[args.index('exec')+1:][:2]!=['-T','postgres']: sys.exit(2)
         command=args[args.index('postgres')+1:]
-        if command[0]=='pg_dump':
+        if command[0]=='psql':
+            print(os.environ.get('FAKE_MIGRATIONS_AFTER','5') if os.environ.get('FAKE_UP_FAIL') and os.path.exists(os.environ['FAKE_STATE']) else '5')
+        elif command[0]=='pg_restore' and '--clean' in command:
+            if sys.stdin.buffer.read()!=b'PGDMP-fake-custom-archive': sys.exit(1)
+        elif command[0]=='pg_dump':
             if '--format=custom' not in command or command[command.index('-d')+1]!='automaton': sys.exit(2)
             sys.stdout.buffer.write(b'PGDMP-fake-custom-archive')
         elif command[:2]==['pg_restore','--list']:
             if sys.stdin.buffer.read()!=b'PGDMP-fake-custom-archive': sys.exit(1)
             print('; Archive created by fake pg_dump')
         else: sys.exit(2)
-    elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
+    elif 'up' in args:
+        if os.environ.get('FAKE_UP_FAIL')=='1' and not os.path.exists(os.environ['FAKE_STATE']):
+            open(os.environ['FAKE_STATE'],'w').close(); sys.exit(1)
 ''')
         (self.bin / 'curl').write_text("""#!/bin/sh
 case "$*" in
@@ -118,7 +124,7 @@ printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 3000000
         self.systemd_dir.mkdir()
         # Never touch the host's systemd units or /var/lib/automaton.
         self.environment = os.environ | {'PATH': str(self.bin) + ':' + os.environ['PATH'],
-                                         'AUTOMATON_UPDATE_TEST': '1', 'AUTOMATON_UPDATE_DIR': str(self.update_dir),
+                                         'AUTOMATON_UPDATE_TEST': '1', 'FAKE_STATE': str(self.root / 'up-failed'), 'AUTOMATON_UPDATE_DIR': str(self.update_dir),
                                          'AUTOMATON_SYSTEMD_DIR': str(self.systemd_dir)}
 
     def bundle(self, target=None, compose_file=None, with_update_trigger=True):
@@ -273,7 +279,7 @@ printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 3000000
     def test_unhealthy_public_api_prevents_update_completion(self):
         result = self.update(*self.bundle(), extra={'FAKE_API_HEALTH': 'unexpected response'})
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Public route validation failed', result.stderr)
+        self.assertIn('public route validation failed', result.stderr)
         self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.1')
 
     def test_override_sidecar_is_not_pulled_or_required(self):
@@ -420,6 +426,20 @@ printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 3000000
         self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False, age=False))
         backup, = (self.install / 'backups').iterdir()
         self.assertTrue((backup / 'database.dump').is_file())
+
+    def test_failed_update_rolls_back_and_restores_database_when_a_migration_ran(self):
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1', 'FAKE_MIGRATIONS_AFTER': '6', 'FAKE_DOCKER_LOG': str(log)})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Rolled back: the server answers on server-v0.1.1', result.stderr)
+        self.assertIn('Database restored: yes', result.stderr)
+        self.assertIn('pg_restore', log.read_text())
+        self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.1')
+
+    def test_failed_update_rolls_back_without_database_restore_when_no_migration_ran(self):
+        result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1', 'FAKE_MIGRATIONS_AFTER': '5'})
+        self.assertIn('Rolled back: the server answers on server-v0.1.1', result.stderr)
+        self.assertIn('Database restored: no', result.stderr)
 
     def test_preserves_and_uses_reviewed_override_for_both_manifests(self):
         override = self.install / 'compose.override.yaml'
