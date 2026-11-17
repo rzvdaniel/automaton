@@ -32,7 +32,7 @@ public sealed class OtlpLogShippingTests
     public void Unset_or_invalid_endpoint_turns_shipping_off(string? value)
         => Assert.That(OtlpLogShipping.ResolveEndpoint(Config(value)), Is.Null);
 
-        [TestCase("http://victorialogs:9428", "http://victorialogs:9428/insert/opentelemetry/v1/logs")]
+    [TestCase("http://victorialogs:9428", "http://victorialogs:9428/insert/opentelemetry/v1/logs")]
     [TestCase("http://victorialogs:9428/", "http://victorialogs:9428/insert/opentelemetry/v1/logs")]
     [TestCase("https://logs.example/custom/v1/logs", "https://logs.example/custom/v1/logs")]
     public void Bare_address_gets_the_victorialogs_path(string value, string expected)
