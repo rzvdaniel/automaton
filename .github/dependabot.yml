@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /src/automaton-studio-vue
+      - /src/automaton-vue
+      - /src/automaton-store-vue
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
