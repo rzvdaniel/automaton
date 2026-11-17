@@ -42,11 +42,15 @@ describe('CatalogPanel', () => {
     wrapper.unmount()
   })
 
-  it('shows Installed, not Install, for an app installed from the official source', async () => {
+  it('shows Open and Manage, not Install, for an app installed from the official source', async () => {
     getCatalog.mockResolvedValue({ apps: [{ ...entry, sourceId: 'official', customSource: false, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.find('.catalog-installed').text()).toBe('Installed')
+    const open = wrapper.find('a.catalog-open')
+    expect(open.text()).toBe('Open')
+    expect(open.attributes('target')).toBe('_blank')
+    expect(open.attributes('href')).toContain('/apps/app-7/application')
+    expect(wrapper.find('.catalog-installed').text()).toBe('Manage')
     expect(wrapper.find('.catalog-install').exists()).toBe(false)
     wrapper.unmount()
   })
@@ -57,14 +61,16 @@ describe('CatalogPanel', () => {
     expect(pageFamily).not.toMatch(/\.p-button\.btn-main \{[^}]*on-signal/)
   })
 
-  it('shows Installed with a Manage link for an installed entry', async () => {
+  it('opens the running app from the main button and keeps Manage as a link to Studio', async () => {
     getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-1' }], fetchedAt: null, stale: false, unavailable: false, message: null })
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.find('.catalog-installed').text()).toBe('Installed')
     expect(wrapper.find('a.catalog-installed').attributes('data-to')).toBe(JSON.stringify({ name: 'app-editor', params: { id: 'app-1' } }))
     await wrapper.find('button[aria-label="Details of Off-site Backup"]').trigger('click')
     await flushPromises()
+    const open = document.body.querySelector('a.catalog-details__open')!
+    expect(open.getAttribute('href')).toContain('/apps/app-1/application')
+    expect(open.getAttribute('target')).toBe('_blank')
     expect(document.body.textContent).toContain('Manage')
     expect(document.body.querySelector('.link')!.getAttribute('data-to')).toContain('app-1')
     wrapper.unmount()

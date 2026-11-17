@@ -55,17 +55,25 @@ describe('HomeView', () => {
     expect(wrapper.find('[data-testid="home-empty"]').exists()).toBe(false)
   })
 
-  it('installs Server Console from the recommended card and the card goes away', async () => {
-    const recommended = { ...card('recommended:server-console', true), kind: 'recommended-app', catalogAppId: 'server-console', actionLabel: 'Install' }
-    service.get.mockResolvedValueOnce({ needsYou: [recommended], pinned: [] }).mockResolvedValueOnce({ needsYou: [], pinned: [] })
-    consoleService.install.mockResolvedValue({ appId: 'x' })
+  it('installs Server Console from the recommended card, then the card offers Open in a new tab', async () => {
+    const recommended = { ...card('recommended:server-console', true), kind: 'recommended-app', title: 'Install Server Console', catalogAppId: 'server-console', actionLabel: 'Install' }
+    service.get.mockResolvedValue({ needsYou: [recommended], pinned: [] })
+    consoleService.install.mockResolvedValue({ appId: 'abc' })
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const wrapper = mountHome(['SysAdmin'])
     await flushPromises()
     await wrapper.find('[data-testid="need-recommended-app"] button').trigger('click')
     await flushPromises()
     expect(consoleService.install).toHaveBeenCalledOnce()
     expect(push).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="need-recommended-app"]').exists()).toBe(false)
+    const need = wrapper.find('[data-testid="need-recommended-app"]')
+    expect(need.text()).toContain('Server Console is installed')
+    expect(need.find('button').text()).toContain('Open')
+    expect(wrapper.find('[data-testid="dismiss-card"]').exists()).toBe(false)
+    await need.find('button').trigger('click')
+    expect(open).toHaveBeenCalledWith(expect.stringContaining('/apps/abc/application'), '_blank', 'noopener')
+    expect(consoleService.install).toHaveBeenCalledOnce()
+    open.mockRestore()
   })
 
   it('dismisses an optional card for good', async () => {

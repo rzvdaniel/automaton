@@ -13,6 +13,7 @@ import AppFilterBar, { type FilterPill } from './AppFilterBar.vue'
 import AppRow from './AppRow.vue'
 import CatalogSources from './CatalogSources.vue'
 import { appsService } from '../services/apps.service'
+import { getStudioApplicationUrl } from '../utils/public-app-url'
 import { catalogName } from '../utils/app-list-display'
 import type { CatalogEntry, CatalogQuery, CatalogResponse } from '../types/apps.types'
 
@@ -197,7 +198,10 @@ async function installFromUrl() {
             <span class="catalog-category">{{ app.category }}<template v-if="app.customSource"> · {{ app.sourceName }}</template></span>
           </template>
           <template #action>
-            <RouterLink v-if="app.installedAppId" :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="catalog-installed" :aria-label="`Open ${catalogName(app.name)}, installed`">Installed</RouterLink>
+            <span v-if="app.installedAppId" class="catalog-opened">
+              <a :href="getStudioApplicationUrl(app.installedAppId)" target="_blank" rel="noopener" class="p-button p-component p-button-sm catalog-open" :aria-label="`Open ${catalogName(app.name)}`">Open <i class="pi pi-external-link" aria-hidden="true" /></a>
+              <RouterLink :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="catalog-installed" :aria-label="`Manage ${catalogName(app.name)}`">Manage</RouterLink>
+            </span>
             <span v-else-if="app.requiresNewerServer" class="catalog-access">Needs Automaton Server {{ app.minServerVersion }} or newer</span>
             <RouterLink v-else :to="installTo(app)" class="p-button p-component p-button-outlined p-button-sm catalog-install" :aria-label="`Install ${catalogName(app.name)}`">Install</RouterLink>
           </template>
@@ -228,8 +232,9 @@ async function installFromUrl() {
           <dd v-if="showSourceLink(details)"><a :href="sourceUrl(details)" target="_blank" rel="noopener" :aria-label="`Source of ${catalogName(details.name)}`">{{ details.repo }}</a></dd>
         </dl>
         <div class="catalog-details__actions">
-          <RouterLink v-if="details.installedAppId" :to="{ name: 'app-editor', params: { id: details.installedAppId } }" class="p-button p-component p-button-outlined catalog-button">Manage</RouterLink>
-          <RouterLink v-if="!details.requiresNewerServer" :to="installTo(details)" class="p-button p-component catalog-button catalog-details__install" :aria-label="`${details.installedAppId ? 'Install another copy of' : 'Install'} ${catalogName(details.name)}`">
+          <a v-if="details.installedAppId" :href="getStudioApplicationUrl(details.installedAppId)" target="_blank" rel="noopener" class="p-button p-component catalog-button catalog-details__open">Open <i class="pi pi-external-link" aria-hidden="true" /></a>
+          <RouterLink v-if="details.installedAppId" :to="{ name: 'app-editor', params: { id: details.installedAppId } }" class="p-button p-component p-button-text catalog-button">Manage</RouterLink>
+          <RouterLink v-if="!details.requiresNewerServer" :to="installTo(details)" class="p-button p-component catalog-button" :class="details.installedAppId ? 'p-button-outlined' : 'catalog-details__install'" :aria-label="`${details.installedAppId ? 'Install another copy of' : 'Install'} ${catalogName(details.name)}`">
             {{ details.installedAppId ? 'Install again' : 'Install' }}
           </RouterLink>
         </div>
@@ -273,11 +278,14 @@ async function installFromUrl() {
 .catalog-foot { display: flex; align-items: center; gap: 12px; }
 .catalog-category { flex: none; color: var(--ink-soft); font-size: 12.5px; }
 .catalog-access { color: var(--ink-soft); font-size: 12px; opacity: 0.85; }
+.catalog-opened { display: inline-flex; align-items: center; gap: 12px; }
 .catalog-installed { flex: none; color: var(--ink-soft); font-family: var(--mono); font-size: 12px; text-decoration: none; }
 .catalog-installed:hover { color: var(--ink); text-decoration: underline; }
 .catalog-install.p-button { flex: none; min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; text-decoration: none; }
 .catalog-install.p-button:hover { border-color: var(--signal); background: transparent; color: var(--ink); }
 .catalog-button { text-decoration: none; }
+.catalog-open.p-button, .catalog-details__open.p-button { background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; text-decoration: none; gap: 6px; }
+.catalog-open.p-button:hover, .catalog-details__open.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
 .catalog-details__install.p-button { background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; }
 .catalog-details__install.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
 .catalog-details { display: flex; flex-direction: column; gap: 12px; }

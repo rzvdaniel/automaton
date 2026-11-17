@@ -63,6 +63,7 @@ public class HomeNeedsYouService(
     /// <summary>Recommended official-catalog apps that are not installed yet and run on this server.</summary>
     public static List<HomeCard> RecommendedCards(IEnumerable<CatalogEntryDto> apps) => apps
         .Where(app => app.Recommended && app.SourceId == CatalogSourceStore.OfficialId && app.InstalledAppId is null && !app.RequiresNewerServer)
+        .OrderBy(app => app.RecommendedOrder ?? int.MaxValue)
         .Select(app => new HomeCard($"{HomeCardKeys.RecommendedPrefix}{app.Id}", HomeCardKeys.RecommendedApp, "info", $"Install {app.Name}",
             app.Summary, "Install", "/apps/catalog", true, null, app.Id)).ToList();
 
