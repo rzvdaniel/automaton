@@ -22,6 +22,9 @@ const saving = ref(false)
 const loaded = ref(false)
 const adding = ref(false)
 const error = ref<string | null>(null)
+/** The name field is only for a new secret; an existing name is edited in its own row. */
+const inRow = computed(() => adding.value && [...secrets.value, ...missing.value].some((item) => item.name === name.value))
+const rowEditing = (secretName: string) => adding.value && name.value === secretName
 const namePattern = /^[A-Z_][A-Z0-9_]{0,99}$/
 
 /** Tells password managers (1Password, LastPass, Bitwarden) this is not a login form. */
@@ -110,21 +113,37 @@ function message(failure: unknown, fallback: string) {
       <Button v-if="!adding" label="Add a secret" icon="pi pi-plus" size="small" severity="secondary" outlined data-testid="add-secret" @click="openForm()" />
     </div>
     <p v-if="loaded && secrets.length === 0 && missing.length === 0" class="hint">No secrets yet. They are encrypted, never shown again and used from the next start.</p>
-    <div v-for="secret in secrets" :key="secret.name" class="row">
+    <template v-for="secret in secrets" :key="secret.name">
+      <form v-if="rowEditing(secret.name)" class="row editing" data-testid="secret-form" @submit.prevent="save" @keydown.esc.prevent="cancel">
+        <label class="rowname" for="secret-value"><code>{{ secret.name }}</code></label>
+        <InputText id="secret-value" v-model="value" class="field" name="secret-value" type="password" autocomplete="new-password" v-bind="noAutofill" />
+        <Button type="submit" label="Save secret" size="small" icon="pi pi-lock" :loading="saving" />
+        <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
+      </form>
+      <div v-else class="row">
       <code>{{ secret.name }}</code>
       <span class="hint">
         set {{ formatWhen(secret.updatedAtUtc) }} ·
         <button type="button" class="link" :aria-label="`Replace ${secret.name}`" @click="openForm(secret.name)">replace</button> ·
         <button type="button" class="link" :aria-label="`Remove ${secret.name}`" @click="remove(secret.name)">remove</button>
       </span>
-    </div>
+      </div>
+    </template>
     <div v-if="missing.length > 0" data-testid="missing-secrets">
-      <div v-for="item in missing" :key="item.name" class="row">
+      <template v-for="item in missing" :key="item.name">
+      <form v-if="rowEditing(item.name)" class="row editing" data-testid="secret-form" @submit.prevent="save" @keydown.esc.prevent="cancel">
+        <label class="rowname" for="secret-value"><code>{{ item.name }}</code></label>
+        <InputText id="secret-value" v-model="value" class="field" name="secret-value" type="password" autocomplete="new-password" v-bind="noAutofill" />
+        <Button type="submit" label="Save secret" size="small" icon="pi pi-lock" :loading="saving" />
+        <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
+      </form>
+      <div v-else class="row">
         <span><code>{{ item.name }}</code> <span class="hint">{{ item.optional ? "optional, not set" : "needed, not set" }}<template v-if="item.description"> · {{ item.description }}</template></span></span>
         <button type="button" class="link" @click="openForm(item.name)">set</button>
       </div>
+      </template>
     </div>
-    <form v-if="adding" class="add" data-testid="secret-form" @submit.prevent="save">
+    <form v-if="adding && !inRow" class="add" data-testid="secret-form" @submit.prevent="save" @keydown.esc.prevent="cancel">
       <label for="secret-name">Name
         <InputText id="secret-name" v-model="name" name="secret-name" placeholder="S3_SECRET_KEY" autocomplete="off" v-bind="noAutofill" />
       </label>
@@ -134,7 +153,7 @@ function message(failure: unknown, fallback: string) {
       <Button type="submit" label="Save secret" icon="pi pi-lock" :loading="saving" />
       <Button type="button" label="Cancel" severity="secondary" text @click="cancel" />
     </form>
-    <small v-if="adding" class="hint">Saving an existing name replaces its value.</small>
+    <small v-if="adding && !inRow" class="hint">Saving an existing name replaces its value.</small>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
   </section>
 </template>
@@ -147,6 +166,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
 code { font-family: var(--mono); font-size: 13px; }
 .link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+.field { flex: 1 1 200px; min-width: 0; }
 .add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 6px; }
 .add label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 </style>

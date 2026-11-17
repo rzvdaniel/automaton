@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { isAxiosError } from 'axios'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -34,9 +34,16 @@ async function load() {
   }
 }
 
-function edit(name: string) {
+async function edit(name: string) {
   editing.value = name
   value.value = values.value.find((setting) => setting.name === name)?.value ?? rows.value.find((row) => row.name === name)?.default ?? ''
+  error.value = null
+  await nextTick()
+  document.getElementById('setting-value')?.focus()
+}
+
+function cancel() {
+  editing.value = null
   error.value = null
 }
 
@@ -83,26 +90,27 @@ async function useDefault(name: string) {
     <p v-if="app.actionsOnly" class="hint" data-testid="settings-note">Plain values the app reads as environment variables. Changes apply on the next run.</p>
     <p v-else class="hint" data-testid="settings-note">Plain values the app reads as environment variables. A change applies when the app restarts.</p>
     <p v-if="changed && !app.isPaused && !app.actionsOnly" class="hint" data-testid="settings-restart-hint">Changed. Restart the app to apply it.</p>
-    <div v-for="item in rows" :key="item.name" class="row" data-testid="setting-row" :title="item.description ?? undefined">
-      <code class="name">{{ item.name }}<span v-if="item.required" class="hint"> (required)</span></code>
-      <span class="value hint">
-        <template v-if="item.current"><code data-testid="setting-current">{{ item.current.value }}</code> (custom, set {{ formatWhen(item.current.updatedAtUtc) }})</template>
-        <template v-else-if="item.earlier">set earlier, save again to show the value</template>
-        <template v-else-if="item.default">default: <code>{{ item.default }}</code></template>
-        <template v-else>not set</template>
-      </span>
-      <span class="hint">
-        <button type="button" class="link" :aria-label="`Set ${item.name}`" @click="edit(item.name)">{{ item.current || item.earlier ? 'replace' : 'set' }}</button>
-        <template v-if="item.current || item.earlier"> · <button type="button" class="link" :aria-label="`Use the default for ${item.name}`" @click="useDefault(item.name)">use default</button></template>
-      </span>
-    </div>
-    <form v-if="editing" class="add" @submit.prevent="save">
-      <label for="setting-value">{{ editing }}
-        <InputText id="setting-value" v-model="value" autocomplete="off" />
-      </label>
-      <Button type="submit" label="Save setting" :loading="saving" />
-      <Button type="button" label="Cancel" severity="secondary" text @click="editing = null" />
-    </form>
+    <template v-for="item in rows" :key="item.name">
+      <form v-if="editing === item.name" class="row editing" data-testid="setting-row" @submit.prevent="save" @keydown.esc.prevent="cancel">
+        <label class="name" for="setting-value"><code>{{ item.name }}</code></label>
+        <InputText id="setting-value" v-model="value" class="field" autocomplete="off" />
+        <Button type="submit" label="Save setting" size="small" :loading="saving" />
+        <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
+      </form>
+      <div v-else class="row" data-testid="setting-row" :title="item.description ?? undefined">
+        <code class="name">{{ item.name }}<span v-if="item.required" class="hint"> (required)</span></code>
+        <span class="value hint">
+          <template v-if="item.current"><code data-testid="setting-current">{{ item.current.value }}</code> (custom, set {{ formatWhen(item.current.updatedAtUtc) }})</template>
+          <template v-else-if="item.earlier">set earlier, save again to show the value</template>
+          <template v-else-if="item.default">default: <code>{{ item.default }}</code></template>
+          <template v-else>not set</template>
+        </span>
+        <span class="hint">
+          <button type="button" class="link" :aria-label="`Set ${item.name}`" @click="edit(item.name)">{{ item.current || item.earlier ? 'replace' : 'set' }}</button>
+          <template v-if="item.current || item.earlier"> · <button type="button" class="link" :aria-label="`Use the default for ${item.name}`" @click="useDefault(item.name)">use default</button></template>
+        </span>
+      </div>
+    </template>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
   </section>
 </template>
@@ -117,6 +125,5 @@ h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .value { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 code { font-family: var(--mono); font-size: 13px; }
 .link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
-.add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 6px; }
-.add label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.field { flex: 1 1 200px; min-width: 0; }
 </style>

@@ -84,7 +84,7 @@ describe('AppSecrets', () => {
     }
   })
 
-  it('fills the form from a row to replace its value', async () => {
+  it('replaces a value in its own row, focus in the input, Esc cancels', async () => {
     vi.mocked(appsService.listSecrets).mockResolvedValue([
       { name: 'S3_BUCKET', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' },
     ])
@@ -93,7 +93,12 @@ describe('AppSecrets', () => {
     await flushPromises()
 
     await wrapper.findAll('button').find((button) => button.text() === 'replace')!.trigger('click')
-    expect((wrapper.find('input#secret-name').element as HTMLInputElement).value).toBe('S3_BUCKET')
+    expect(wrapper.find('input#secret-name').exists()).toBe(false)
+    const row = wrapper.find('form.row')
+    expect(row.text()).toContain('S3_BUCKET')
+    expect(row.find('input#secret-value').exists()).toBe(true)
+    await row.trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('form').exists()).toBe(false)
   })
 
   it('always shows the card; Add a secret opens the form in place, focuses Name, and Cancel closes it', async () => {
