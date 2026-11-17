@@ -139,6 +139,21 @@ Run each "Check after release" step by following the user docs page the PR's `Do
 `verified`, confirm the page matches what you saw (commands, output, labels, steps). A mismatch is
 `verification-failed` plus a docs fix, even when the feature works.
 
+## Docs walk
+
+Required for every server release before it goes to production (#1216). After upgrading the test server, a fresh
+agent that has only the website docs (`llms.txt`, https://automaton.monster/docs) plays the next requests from
+`docs/maintainers/docs-walk-requests.md` (at least Runner install and delete over SSH, deploy and publish an app;
+on Linux, and on Windows PowerShell when a Windows machine is available) and rotates through the rest. It
+records every step where the docs were wrong, missing or unclear, and every guess. Fix the docs, then walk again.
+Then write the result into the release notes:
+
+`python3 .agents/skills/automaton-verify-release/proof.py --docs-walk Pass|Fail <version> "short note"`
+
+This adds `## Docs walk` with `Result: Pass|Fail` next to the AI check. **Deploy production** refuses a release
+whose notes do not say Pass (a missing section counts as a fail). Only the owner skips it, by starting the run with
+`skip_docs_walk` and a reason, which shows on the run page.
+
 ## Labels and closing
 
 - `verified`: every "Done when" check passed end to end on the test server, with a proof artifact.

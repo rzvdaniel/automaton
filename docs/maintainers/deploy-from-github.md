@@ -44,6 +44,10 @@ Every server release carries a report as its GitHub Release body: an AI check (G
 
 The AI check needs the repository secret `CLAUDE_CODE_OAUTH_TOKEN` (a Claude subscription token from `claude setup-token`). Only the release workflow reads it. Without it, or when the usage limit is hit, the body says "AI check unavailable" and the release still publishes. Render a report locally with `python3 .agents/tools/release-report.py --from server-v0.2.104 --to server-v0.2.105`.
 
+## Docs walk gate
+
+**Deploy production** refuses a release unless its notes have a `## Docs walk` section with `Result: Pass` (the `report` job fails, so the environment approval never comes). The verifier writes it after walking the website docs on the test server: `python3 .agents/skills/automaton-verify-release/proof.py --docs-walk Pass <version> "note"`. To deploy anyway, start the run with `skip_docs_walk` set to the reason; the run summary shows it. Check the gate logic with `python3 .agents/tools/test_docs_walk_gate.py`.
+
 ## Publishing a server release
 
 Run `.github/workflows/server-release.yml` on the reviewed revision with a version such as `0.1.0`. It builds and pushes the API, Worker and domain-independent Studio images to GHCR, keeps the previous infrastructure image digests, runs an isolated first-administrator smoke test, and publishes the bundle, checksum, installer and updater as `server-v0.1.0` plus a distribution image for anonymous updates. All four GHCR packages must be public (the workflow checks anonymous pulls; on first publication of the distribution package change its visibility, then rerun). Runner images are published separately by `runner-image.yml`; each server release pins the current `automaton-runner:latest` digest. The configuration tests and smoke test are development validation: accept a release on a disposable server (public DNS, certificates, clean Ubuntu with Docker) before calling it supported.

@@ -9,6 +9,11 @@ on:
         description: Release to deploy, for example 0.2.103
         required: true
         type: string
+      skip_docs_walk:
+        description: Deploy without a passing docs walk. Say why; the reason shows on the run page. Leave empty normally.
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -19,13 +24,17 @@ concurrency:
 
 jobs:
   # Runs before the environment approval, so the run page shows the AI verdict and the report to read first.
-  # Red is a warning only; it never blocks the deploy.
+  # Red is a warning only; it never blocks the deploy. The docs walk is not: the job fails, and so blocks the deploy,
+  # unless the release notes say `## Docs walk` `Result: Pass` or skip_docs_walk gives a reason.
   report:
     name: Release report ${{ inputs.version }}
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Show the verdict
         env:
           VERSION: ${{ inputs.version }}
@@ -43,6 +52,20 @@ jobs:
             printf '%s\n' "$section"
             echo "[Full release report]($url)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require a passing docs walk
+        env:
+          VERSION: ${{ inputs.version }}
+          SKIP_REASON: ${{ inputs.skip_docs_walk }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 1; }
+          gh release view "server-v$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq .body > release-notes.md 2>/dev/null || : > release-notes.md
+          status=0
+          message=$(python3 .agents/tools/docs-walk-gate.py release-notes.md --skip-reason "$SKIP_REASON") || status=$?
+          { echo; echo "### Docs walk"; echo; printf '%s\n' "$message"; } >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$message"
+          exit "$status"
 
   deploy:
     name: Deploy ${{ inputs.version }}
