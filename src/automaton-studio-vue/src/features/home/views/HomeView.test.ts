@@ -12,6 +12,8 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
 }))
+const consoleService = vi.hoisted(() => ({ install: vi.fn() }))
+vi.mock('@/features/server/services/server-console.service', () => ({ serverConsoleService: consoleService }))
 const service = vi.hoisted(() => ({ get: vi.fn(), pin: vi.fn(), unpin: vi.fn(), reorder: vi.fn(), dismiss: vi.fn() }))
 vi.mock('../services/home.service', () => ({ homeService: service }))
 
@@ -51,6 +53,19 @@ describe('HomeView', () => {
     expect(wrapper.findAll('[data-testid="dismiss-card"]')).toHaveLength(1)
     expect(wrapper.findAll('[data-testid="pinned-app"]').map((el) => el.find('.pin__name').text())).toEqual(['Shop', 'Blog'])
     expect(wrapper.find('[data-testid="home-empty"]').exists()).toBe(false)
+  })
+
+  it('installs Server Console from the recommended card and the card goes away', async () => {
+    const recommended = { ...card('recommended:server-console', true), kind: 'recommended-app', catalogAppId: 'server-console', actionLabel: 'Install' }
+    service.get.mockResolvedValueOnce({ needsYou: [recommended], pinned: [] }).mockResolvedValueOnce({ needsYou: [], pinned: [] })
+    consoleService.install.mockResolvedValue({ appId: 'x' })
+    const wrapper = mountHome(['SysAdmin'])
+    await flushPromises()
+    await wrapper.find('[data-testid="need-recommended-app"] button').trigger('click')
+    await flushPromises()
+    expect(consoleService.install).toHaveBeenCalledOnce()
+    expect(push).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="need-recommended-app"]').exists()).toBe(false)
   })
 
   it('dismisses an optional card for good', async () => {

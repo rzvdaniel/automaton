@@ -19,8 +19,8 @@ public sealed class HomeTests
 {
     private sealed class StubNeedsYou : HomeNeedsYouService
     {
-        public StubNeedsYou() : base(null!, null!, null!, null!, null!, null!) { }
-        public override Task<List<HomeCard>> ServerCardsAsync(CancellationToken token)
+        public StubNeedsYou() : base(null!, null!, null!, null!, null!, null!, null!) { }
+        public override Task<List<HomeCard>> ServerCardsAsync(Guid userId, CancellationToken token)
             => Task.FromResult(new List<HomeCard>
             {
                 new(HomeCardKeys.NoSmtp, HomeCardKeys.NoSmtp, "info", "Set up email", "x", "Open", "/settings", true),
@@ -60,6 +60,34 @@ public sealed class HomeTests
 
         Assert.That(adminCards.Select(card => card.Key), Is.EquivalentTo(new[] { HomeCardKeys.NoSmtp, HomeCardKeys.NoRunner }));
         Assert.That(userCards, Is.Empty, "server cards are for system administrators only");
+    }
+
+    private static CatalogEntryDto Entry(string id, bool recommended = true, Guid? installed = null, string source = CatalogSourceStore.OfficialId, bool newer = false)
+        => new(id, id, "summary", "Monitoring", "r/r", id, "c", "0.0.1", [], newer, installed, source, source, false, null, null, recommended);
+
+    [Test]
+    public void RecommendedCardsListOnlyUninstalledRecommendedOfficialApps()
+    {
+        var cards = HomeNeedsYouService.RecommendedCards([
+            Entry("server-console"), Entry("plain", recommended: false), Entry("done", installed: Guid.NewGuid()),
+            Entry("other", source: "custom"), Entry("future", newer: true)]);
+
+        Assert.That(cards.Select(card => card.Key), Is.EqualTo(new[] { "recommended:server-console" }));
+        Assert.That(cards[0].CatalogAppId, Is.EqualTo("server-console"));
+        Assert.That(cards[0].Dismissible, Is.True);
+        Assert.That(HomeNeedsYouService.RecommendedCards([Entry("server-console", installed: Guid.NewGuid())]), Is.Empty, "installed: card is gone");
+    }
+
+    [Test]
+    public async Task DismissingARecommendedAppCardIsPermanentAndPerPerson()
+    {
+        Guid admin = Guid.NewGuid();
+        var (db, home) = Create(admin);
+        MakeSystemAdministrator(db, admin);
+
+        Assert.That(await home.Dismiss("recommended:server-console", default), Is.TypeOf<NoContentResult>());
+        Assert.That(await home.Dismiss("recommended:", default), Is.TypeOf<NotFoundResult>());
+        Assert.That(db.UserHomeDismissals.Count(item => item.UserId == admin && item.CardKey == "recommended:server-console"), Is.EqualTo(1));
     }
 
     [Test]

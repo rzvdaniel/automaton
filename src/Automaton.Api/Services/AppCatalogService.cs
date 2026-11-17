@@ -348,7 +348,7 @@ public sealed class AppCatalogService(
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
         Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id : null;
         return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon);
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended);
     }
 
     internal static Version? ParseVersion(string? text)
@@ -380,5 +380,7 @@ public sealed class AppCatalogService(
         public List<string> Permissions { get; set; } = [];
         public List<string> Tags { get; set; } = [];
         public string? Icon { get; set; }
+        /// <summary>Suggested to administrators on Studio Home until installed. Set in the catalog file, not in code.</summary>
+        public bool Recommended { get; set; }
     }
 }

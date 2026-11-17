@@ -1,5 +1,6 @@
 using Automaton.Api.Config;
 using Automaton.Api.Data;
+using Automaton.Api.Models;
 using Automaton.Api.ServerHealth;
 using Automaton.Api.Services;
 using Microsoft.EntityFrameworkCore;
@@ -13,12 +14,13 @@ public class HomeNeedsYouService(
     IConfiguration configuration,
     SmtpSettingsService smtpSettings,
     AdminAppDirectoryService appDirectory,
+    AppCatalogService catalog,
     LatestReleaseClient releases,
     IOptions<HostedRunnerOptions> runnerOptions)
 {
     private static readonly string[] FailedActionStatuses = ["Failed", "TimedOut", "Lost", "RunnerUnavailable"];
 
-    public virtual async Task<List<HomeCard>> ServerCardsAsync(CancellationToken token)
+    public virtual async Task<List<HomeCard>> ServerCardsAsync(Guid userId, CancellationToken token)
     {
         var cards = new List<HomeCard>();
         if (!await db.Runners.AnyAsync(runner => runner.DeletionRequestedAtUtc == null, token))
@@ -38,8 +40,31 @@ public class HomeNeedsYouService(
         if (!BackupRecent(await InstallationBackups.ReadAsync(configuration, token)))
             cards.Add(new(HomeCardKeys.NoBackup, HomeCardKeys.NoBackup, "info", "Back up this server",
                 "No recent successful backup was found.", "Open backups", "/admin/backups", true));
+        cards.AddRange(await RecommendedAppCardsAsync(userId, token));
         return cards;
     }
+
+    /// <summary>One optional card per recommended official-catalog app the administrator has not installed.</summary>
+    private async Task<List<HomeCard>> RecommendedAppCardsAsync(Guid userId, CancellationToken token)
+    {
+        try
+        {
+            var response = await catalog.GetAsync(userId, false, token,
+                new CatalogQuery { Source = CatalogSourceStore.OfficialId, PageSize = CatalogQuery.MaximumPageSize });
+            if (response.Unavailable) return [];
+            return RecommendedCards(response.Apps);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Recommended official-catalog apps that are not installed yet and run on this server.</summary>
+    public static List<HomeCard> RecommendedCards(IEnumerable<CatalogEntryDto> apps) => apps
+        .Where(app => app.Recommended && app.SourceId == CatalogSourceStore.OfficialId && app.InstalledAppId is null && !app.RequiresNewerServer)
+        .Select(app => new HomeCard($"{HomeCardKeys.RecommendedPrefix}{app.Id}", HomeCardKeys.RecommendedApp, "info", $"Install {app.Name}",
+            app.Summary, "Install", "/apps/catalog", true, null, app.Id)).ToList();
 
     /// <summary>Failed apps and apps whose Runner is offline, for apps the person can change.</summary>
     public static IEnumerable<HomeCard> AppCards(IEnumerable<Models.AppListItemDto> apps)

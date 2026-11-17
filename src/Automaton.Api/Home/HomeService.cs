@@ -27,7 +27,7 @@ public sealed class HomeService(
             .Select(pin => new HomePinnedApp(byId[pin.AppId], pin.PinnedAtUtc, cards.GetValueOrDefault(pin.AppId))).ToList();
 
         var needsYouCards = new List<HomeCard>();
-        if (await authorization.IsSystemAdministratorAsync(userId, token)) needsYouCards.AddRange(await needsYou.ServerCardsAsync(token));
+        if (await authorization.IsSystemAdministratorAsync(userId, token)) needsYouCards.AddRange(await needsYou.ServerCardsAsync(userId, token));
         needsYouCards.AddRange(HomeNeedsYouService.AppCards(listed));
         var dismissed = await db.UserHomeDismissals.AsNoTracking().Where(item => item.UserId == userId)
             .Select(item => item.CardKey).ToListAsync(token);
@@ -98,7 +98,7 @@ public sealed class HomeService(
     /// <summary>Dismisses an optional card. Returns false for a card that cannot be dismissed.</summary>
     public async Task<bool> DismissAsync(Guid userId, string cardKey, CancellationToken token)
     {
-        if (!HomeCardKeys.Dismissible.Contains(cardKey)) return false;
+        if (!HomeCardKeys.CanDismiss(cardKey)) return false;
         if (await db.UserHomeDismissals.AnyAsync(item => item.UserId == userId && item.CardKey == cardKey, token)) return true;
         db.UserHomeDismissals.Add(new UserHomeDismissal { UserId = userId, CardKey = cardKey, DismissedAtUtc = DateTime.UtcNow });
         try { await db.SaveChangesAsync(token); }

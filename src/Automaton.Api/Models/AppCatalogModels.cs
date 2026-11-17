@@ -19,7 +19,8 @@ public sealed record CatalogEntryDto(
     string SourceName,
     bool CustomSource,
     IReadOnlyList<string>? Tags = null,
-    string? Icon = null);
+    string? Icon = null,
+    bool Recommended = false);
 
 /// <summary>A filter option with the number of apps behind it (over the whole catalog, not the current filters).</summary>
 public sealed record CatalogFacet(string Value, string Label, int Count);

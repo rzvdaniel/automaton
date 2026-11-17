@@ -8,6 +8,8 @@ import { useToast } from 'primevue/usetoast'
 import AppMark from '@/features/apps/components/AppMark.vue'
 import { appState, formatShortTime } from '@/features/apps/utils/app-list-display'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { serverConsoleService } from '@/features/server/services/server-console.service'
+import type { HomeCard } from '../types/home.types'
 import { useHomeStore } from '../stores/home.store'
 import { appFacts, moved } from '../utils'
 
@@ -34,6 +36,21 @@ async function dismiss(key: string) {
     await store.dismiss(key)
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'The card could not be dismissed.', life: 5000 })
+  }
+}
+
+const installing = ref<string | null>(null)
+/** Server Console installs in place; any other recommended app opens in the catalog. */
+async function act(card: HomeCard) {
+  if (card.kind !== 'recommended-app' || card.catalogAppId !== 'server-console') return router.push(card.actionPath)
+  installing.value = card.key
+  try {
+    await serverConsoleService.install()
+    await store.load()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Server Console could not be installed.', life: 5000 })
+  } finally {
+    installing.value = null
   }
 }
 
@@ -115,7 +132,7 @@ function shift(index: number, by: number) {
               <p class="need__detail">{{ card.detail }}</p>
             </div>
             <div class="need__actions">
-              <Button :label="card.actionLabel" size="small" class="btn-ink" @click="router.push(card.actionPath)" />
+              <Button :label="card.actionLabel" size="small" class="btn-ink" :loading="installing === card.key" :disabled="installing !== null" @click="act(card)" />
               <Button
                 v-if="card.dismissible"
                 label="Dismiss"
