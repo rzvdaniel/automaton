@@ -17,7 +17,7 @@ namespace Automaton.Infrastructure.Migrations
                 {
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     Key = table.Column<string>(type: "citext", maxLength: 100, nullable: false),
-                    Fingerprint = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    Fingerprint = table.Column<string>(type: "citext", maxLength: 64, nullable: false),
                     AcknowledgedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>

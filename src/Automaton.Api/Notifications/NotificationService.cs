@@ -43,8 +43,9 @@ public class NotificationService(
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException)
         {
-            // A parallel request acknowledged it first.
+            // A parallel request acknowledged it first; anything else is a real failure.
             db.ChangeTracker.Clear();
+            if (!await db.UserNotificationAcks.AsNoTracking().AnyAsync(item => item.UserId == userId && item.Key == key && item.Fingerprint == found.Fingerprint, token)) throw;
         }
         return AcknowledgeResult.Done;
     }
@@ -61,7 +62,7 @@ public class NotificationService(
                 if (card.Kind == HomeCardKeys.ServerUpdate)
                     result.Add(Make(NotificationKinds.ServerUpdate, NotificationSeverity.Info, card.Title, card.Detail, card.ActionLabel, card.ActionPath, [card.Detail]));
                 else if (card.Kind == HomeCardKeys.PermissionRequests)
-                    result.Add(Make(NotificationKinds.PermissionRequests, NotificationSeverity.Warning, card.Title, card.Detail, card.ActionLabel, card.ActionPath, [card.Title]));
+                    result.Add(Make(NotificationKinds.PermissionRequests, NotificationSeverity.Warning, card.Title, card.Detail, card.ActionLabel, card.ActionPath, [card.Title, card.ActionPath]));
             }
             result.AddRange(await RunnersOfflineAsync(token));
             result.AddRange(await CertificatesAsync(token));
@@ -106,7 +107,7 @@ public class NotificationService(
         return [Make(NotificationKinds.CertificateExpiring, critical ? NotificationSeverity.Critical : NotificationSeverity.Warning,
             expiring.Count == 1 ? $"The certificate for {expiring[0].Host} expires soon" : $"{expiring.Count} certificates expire soon",
             soonest < 0 ? "A certificate has expired." : $"The first expires in {soonest} day{(soonest == 1 ? "" : "s")}. Renew it before visitors see warnings.",
-            "Open server", "/server", expiring.Select(cert => cert.Host).ToList(), expiring.Count, expiring.Select(cert => $"{cert.Host} ({cert.DaysRemaining} days)").ToList())];
+            "Open server", "/server", expiring.Select(cert => cert.Host).ToList(), expiring.Count, expiring.Select(cert => cert.DaysRemaining < 0 ? $"{cert.Host} (expired)" : $"{cert.Host} ({cert.DaysRemaining} days)").ToList())];
     }
 
     private async Task<(NotificationItem, string)?> BackupFailedAsync(CancellationToken token)
@@ -120,5 +121,5 @@ public class NotificationService(
     private static (NotificationItem, string) Make(string kind, string severity, string title, string detail, string label, string path,
         IReadOnlyList<string> fingerprint, int count = 1, IReadOnlyList<string>? subjects = null)
         => (new NotificationItem(kind, kind, severity, title, detail, label, path, count, subjects ?? [], severity != NotificationSeverity.Critical),
-            string.Join("|", fingerprint.Order(StringComparer.Ordinal)));
+            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("|", fingerprint.Order(StringComparer.Ordinal))))));
 }

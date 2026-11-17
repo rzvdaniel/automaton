@@ -3800,8 +3800,8 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("Fingerprint")
                         .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasMaxLength(64)
+                        .HasColumnType("citext");
 
                     b.HasKey("UserId", "Key");
 

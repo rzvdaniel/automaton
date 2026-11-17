@@ -111,7 +111,7 @@ internal static class ApplicationModelConfiguration
         {
             entity.HasKey(e => new { e.UserId, e.Key });
             entity.Property(e => e.Key).HasMaxLength(100);
-            entity.Property(e => e.Fingerprint).HasMaxLength(2000);
+            entity.Property(e => e.Fingerprint).HasMaxLength(64);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }

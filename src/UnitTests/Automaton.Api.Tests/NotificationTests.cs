@@ -130,6 +130,22 @@ public sealed class NotificationTests
     }
 
     [Test]
+    public async Task ManyOfflineRunnersStillAcknowledge()
+    {
+        var admin = Guid.NewGuid();
+        var db = AppAuthorizationTestData.CreateDbContext();
+        MakeSystemAdministrator(db, admin);
+        for (var i = 0; i < 120; i++) AddRunner(db, $"r{i}", online: false);
+        AddRunner(db, "up", online: true);
+        db.SaveChanges();
+
+        var feed = Create(admin, db);
+        Assert.That(await feed.Acknowledge("runner-offline", default), Is.TypeOf<NoContentResult>());
+        Assert.That(db.UserNotificationAcks.Single().Fingerprint, Has.Length.LessThanOrEqualTo(64));
+        Assert.That((await List(feed)).Select(item => item.Kind), Has.No.Member("runner-offline"));
+    }
+
+    [Test]
     public async Task ACriticalNoticeCannotBeAcknowledged()
     {
         var admin = Guid.NewGuid();
