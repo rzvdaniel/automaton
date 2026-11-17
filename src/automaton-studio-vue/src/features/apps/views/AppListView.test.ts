@@ -24,6 +24,7 @@ vi.mock('@/features/organizations/services/organizationsService', () => ({
 vi.mock('../services/apps.service', () => ({ appsService: {} }))
 const waitingCount = vi.hoisted(() => vi.fn())
 vi.mock('@/features/admin/services/adminAppsService', () => ({ adminAppsService: { waitingCount } }))
+vi.mock('@/features/home/services/home.service', () => ({ homeService: { get: vi.fn(async () => ({ needsYou: [], pinned: [] })) } }))
 vi.mock('../components/CatalogPanel.vue', () => ({ default: { template: '<div />' } }))
 
 const live = { name: 'Live', status: 'Running', isHostedRunner: false, runnerOnline: true, genericRuntimeDeployed: true, routePath: '/' }

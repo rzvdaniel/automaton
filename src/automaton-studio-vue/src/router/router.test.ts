@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import router from './index'
 
 describe('studio router', () => {
-  it('makes Apps the start page', () => {
+  it('makes Home the start page', () => {
     const resolved = router.resolve('/')
-    expect(resolved.matched.some((record) => record.name === 'apps' || record.redirect)).toBe(true)
+    expect(resolved.matched.some((record) => record.redirect)).toBe(true)
+    expect(router.resolve({ name: 'home' }).path).toBe('/home')
     expect(router.resolve({ name: 'apps' }).path).toBe('/apps')
   })
 

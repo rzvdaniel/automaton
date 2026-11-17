@@ -16,8 +16,9 @@ export interface RailItem {
 
 const startsWith = (prefix: string) => (path: string) => path === prefix || path.startsWith(`${prefix}/`)
 
-// The six places of Studio.
+// The places of Studio.
 const MAIN: RailItem[] = [
+  { label: 'Home', icon: 'pi pi-home', to: '/home', match: startsWith('/home') },
   { label: 'Apps', icon: 'pi pi-th-large', to: '/apps', match: (p) => startsWith('/apps')(p) && !startsWith('/apps/catalog')(p) },
   { label: 'Catalog', icon: 'pi pi-download', to: '/apps/catalog', match: startsWith('/apps/catalog'), hideForAppUser: true },
   { label: 'People', icon: 'pi pi-users', to: '/people', match: (p) => startsWith('/people')(p) || startsWith('/organizations')(p) || startsWith('/admin/users')(p) },

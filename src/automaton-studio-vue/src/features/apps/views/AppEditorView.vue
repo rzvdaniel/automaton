@@ -13,6 +13,8 @@ import AppDomainTab from '../components/AppDomainTab.vue'
 import AppSecrets from '../components/AppSecrets.vue'
 import AppStoreListing from '../components/AppStoreListing.vue'
 import AppMark from '../components/AppMark.vue'
+import PinToHomeButton from '@/features/home/components/PinToHomeButton.vue'
+import { useHomeStore } from '@/features/home/stores/home.store'
 import AppOverview from '../components/AppOverview.vue'
 import AppSettingsPage from '../components/AppSettingsPage.vue'
 import ShareDialog from '../components/ShareDialog.vue'
@@ -119,7 +121,9 @@ async function copyAddress() {
   }
 }
 
+const homeStore = useHomeStore()
 onMounted(async () => {
+  void homeStore.ensureLoaded()
   // ?share=1 (and the old ?view=publishing) open the Share dialog.
   const wantsShare = route.query.share === '1' || route.query.view === 'publishing'
   await router.replace({ query: withoutAuthoringQuery(route.query) })
@@ -340,6 +344,7 @@ async function handleSharingChanged() {
             <p v-if="app.summary" class="summary">{{ app.summary }}</p>
           </div>
           <div class="head-actions">
+            <PinToHomeButton :app-id="app.id" :app-name="app.name" />
             <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" icon="pi pi-share-alt" outlined data-testid="share-app" @click="showShareDialog = true" />
             <template v-if="kind === 'tool'">
               <Button

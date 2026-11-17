@@ -4,9 +4,9 @@ import { railItems, roleLabel } from './rail-items'
 const labels = (items: { label: string }[]) => items.map((item) => item.label)
 
 describe('railItems', () => {
-  it('shows exactly the six places to a system administrator', () => {
+  it('shows exactly the places to a system administrator', () => {
     const { main } = railItems({ roles: ['SysAdmin'], appUserOnly: false })
-    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Backups', 'Admin', 'Settings'])
+    expect(labels(main)).toEqual(['Home', 'Apps', 'Catalog', 'People', 'Server', 'Backups', 'Admin', 'Settings'])
   })
 
   it('keeps Backups and People for their admin pages and Admin for the rest', () => {
@@ -20,22 +20,23 @@ describe('railItems', () => {
 
   it('shows Admin, but not Backups, to a plain administrator', () => {
     const { main } = railItems({ roles: ['Admin'], appUserOnly: false })
-    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Admin', 'Settings'])
+    expect(labels(main)).toEqual(['Home', 'Apps', 'Catalog', 'People', 'Server', 'Admin', 'Settings'])
   })
 
   it('hides Backups from members', () => {
     const { main } = railItems({ roles: ['User'], appUserOnly: false })
-    expect(labels(main)).toEqual(['Apps', 'Catalog', 'People', 'Server', 'Settings'])
+    expect(labels(main)).toEqual(['Home', 'Apps', 'Catalog', 'People', 'Server', 'Settings'])
   })
 
   it('leaves app-only members with Apps, People and Settings', () => {
     const { main } = railItems({ roles: ['User'], appUserOnly: true })
-    expect(labels(main)).toEqual(['Apps', 'People', 'Settings'])
+    expect(labels(main)).toEqual(['Home', 'Apps', 'People', 'Settings'])
   })
 
   it('points each place at the page that exists today', () => {
     const { main } = railItems({ roles: ['SysAdmin'], appUserOnly: false })
     expect(Object.fromEntries(main.map((item) => [item.label, item.to]))).toEqual({
+      Home: '/home',
       Apps: '/apps',
       Catalog: '/apps/catalog',
       People: '/people',

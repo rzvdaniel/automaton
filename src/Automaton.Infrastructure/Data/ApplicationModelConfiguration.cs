@@ -16,6 +16,7 @@ internal static class ApplicationModelConfiguration
         ConfigureAppShare(modelBuilder);
         ConfigureAppCustomDomain(modelBuilder);
         ConfigureWebAppStar(modelBuilder);
+        ConfigureUserHome(modelBuilder);
         ConfigureWebAppScreenshot(modelBuilder);
         ConfigureAppVersion(modelBuilder);
         ConfigureRefreshToken(modelBuilder);
@@ -89,6 +90,23 @@ internal static class ApplicationModelConfiguration
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => e.WebAppId);
             });
+    }
+
+    private static void ConfigureUserHome(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserHomePin>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.AppId });
+            entity.HasIndex(e => new { e.UserId, e.SortOrder });
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<UserHomeDismissal>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.CardKey });
+            entity.Property(e => e.CardKey).HasMaxLength(100);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureWebAppScreenshot(ModelBuilder modelBuilder)
