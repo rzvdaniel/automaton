@@ -11,6 +11,8 @@ export interface HomeCard {
   actionPath: string
   dismissible: boolean
   appId?: string | null
+  /** Catalog id of the app a recommended-app card offers. */
+  catalogAppId?: string | null
 }
 
 export interface HomePinnedApp {
