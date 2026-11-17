@@ -193,6 +193,8 @@ internal sealed class HostContainerActionExecutor(
             "--log-opt", $"max-file={request.DockerLogMaxFiles}"
         };
         HostContainerResourcePolicy.AddContainerLimits(args, request.ContainerLimits);
+        // No swap beyond the memory limit, so a job that allocates past it is stopped instead of slowing the host.
+        if (request.ContainerLimits is { } limits) { args.Add("--memory-swap"); args.Add($"{limits.MemoryLimitMb}m"); }
         args.Add("--label"); args.Add("automaton.managed=true");
         args.Add("--label"); args.Add("automaton.resource=action-job");
         args.Add("--label"); args.Add($"automaton.machine-runner-id={request.Scope.MachineRunnerId:N}");

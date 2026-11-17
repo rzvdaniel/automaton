@@ -1,3 +1,4 @@
+using Automaton.Core.Logs;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Identity;
@@ -56,6 +57,8 @@ internal static class WorkerHostApplication
                 restrictedToMinimumLevel: LogEventLevel.Information,
                 shared: true,
                 outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}");
+
+            logConfig.AddOtlpIfConfigured(builder.Configuration, "automaton-worker");
         });
     }
 

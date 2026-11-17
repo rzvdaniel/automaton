@@ -20,11 +20,15 @@ public sealed class AppActionExecutionService
     private bool IsMachineManagement => RunnerApplicationProfiles.Normalize(
         Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE")) == RunnerApplicationProfiles.MachineManagement;
 
+    private readonly RunnerRuntimeRegistry? runtimeRegistry;
+
     public AppActionExecutionService(
         RunnerWorkspaceService workspace,
         AppActionExecutionCoordinator? coordinator = null,
-        MachineActionExecutionHandler? machineActionExecution = null)
+        MachineActionExecutionHandler? machineActionExecution = null,
+        RunnerRuntimeRegistry? runtimeRegistry = null)
     {
+        this.runtimeRegistry = runtimeRegistry;
         this.workspace = workspace;
         this.coordinator = coordinator ?? new AppActionExecutionCoordinator();
         this.machineActionExecution = machineActionExecution;
@@ -55,6 +59,7 @@ public sealed class AppActionExecutionService
         bool machineManagement,
         CancellationToken cancellationToken)
     {
+        AddAppInternalUrl(request, machineManagement);
         using var actionLock = await coordinator.EnterAsync(request.AppId, request.DeploymentTargetId, request.ActionKey, cancellationToken);
         if (active.TryGetValue(request.ExecutionId, out var existing))
             return await existing.Completion.Task.WaitAsync(cancellationToken);
@@ -76,6 +81,26 @@ public sealed class AppActionExecutionService
             return await ResolveDuplicateDispatchAsync(request, prepared, cancellationToken);
         WriteExecutionState(statePath, CreateRunningState(request, prepared));
         return await RunPreparedExecutionAsync(request, machineManagement, prepared, statePath, execution, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gives the Action the address of its own app's running runtime, <c>AUTOMATON_APP_INTERNAL_URL</c>. Only this
+    /// app's Actions get it, and only while the app's runtime is running. It is plain text, not a secret.
+    /// </summary>
+    internal void AddAppInternalUrl(ExecuteAppActionModuleRequest request, bool machineManagement)
+    {
+        const string name = "AUTOMATON_APP_INTERNAL_URL";
+        request.Secrets.Remove(name);
+        request.PlainValueNames.Remove(name);
+        if (runtimeRegistry is null || !runtimeRegistry.TryGet(request.AppId, request.DeploymentTargetId, out var runtime)) return;
+        string host;
+        try { host = RunnerRuntimeEndpointConfiguration.HostAddress; }
+        catch (InvalidOperationException) { return; }
+        // An Action container cannot reach a loopback address: that is the container itself.
+        if (machineManagement && System.Net.IPAddress.TryParse(host, out var address) && System.Net.IPAddress.IsLoopback(address)) return;
+        if (host.Contains(':')) host = $"[{host}]";
+        request.Secrets[name] = $"http://{host}:{runtime.Port}";
+        request.PlainValueNames.Add(name);
     }
 
     private async Task PersistImmediateResultAsync(

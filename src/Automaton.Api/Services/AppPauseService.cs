@@ -122,12 +122,25 @@ public sealed class AppPauseService(
     private async Task<int> ResumeSchedulesAsync(Guid appId, Guid userId, List<string> warnings, CancellationToken ct)
     {
         var paused = await db.ActionSchedules.Where(item => item.ApplicationId == appId && item.PausedByApp)
-            .Select(item => new { item.Id, item.Name }).ToListAsync(ct);
+            .Select(item => new { item.Id, item.Name, item.SystemIdentity, item.IntervalSeconds }).ToListAsync(ct);
         var count = 0;
         foreach (var item in paused)
         {
             try
             {
+                if (item.SystemIdentity?.StartsWith(HomeCardScheduleIdentity.Prefix, StringComparison.Ordinal) == true)
+                {
+                    // The platform's home-card schedule is not editable through the schedule service; turn it on directly.
+                    var platform = await db.ActionSchedules.SingleAsync(s => s.Id == item.Id, ct);
+                    var now = DateTime.UtcNow;
+                    platform.Enabled = true;
+                    platform.PausedByApp = false;
+                    platform.NextRunAtUtc = now + Home.HomeCardSchedules.Stagger(appId, item.IntervalSeconds ?? 900);
+                    platform.UpdatedAtUtc = now;
+                    await db.SaveChangesAsync(ct);
+                    count++;
+                    continue;
+                }
                 var schedule = await schedules.SetEnabledAsync(item.Id, true, userId, administrator: true, ct);
                 schedule.PausedByApp = false;
                 await db.SaveChangesAsync(ct);

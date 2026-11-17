@@ -48,7 +48,7 @@ public sealed record HostContainerResourceRef(
 public sealed record HostContainerResourceLimits(decimal CpuLimitCores, int MemoryLimitMb, int PidsLimit)
 {
     public bool IsValid() => CpuLimitCores is >= 0.10m and <= 8.0m
-        && MemoryLimitMb is >= 256 and <= 16_384
+        && MemoryLimitMb is >= 64 and <= 16_384
         && PidsLimit is >= 32 and <= 4096;
 }
 

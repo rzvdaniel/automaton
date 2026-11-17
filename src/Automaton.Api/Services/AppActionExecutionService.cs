@@ -5,6 +5,7 @@ using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Automaton.Api.Home;
 using Automaton.Api.Models;
 
 namespace Automaton.Api.Services;
@@ -161,11 +162,14 @@ public sealed class AppActionExecutionService
             request.Secrets = resolved.Values;
             request.PlainValueNames = [.. resolved.PlainNames];
         }
+        if (actionKey == AppHomeCardLimits.ActionKey)
+            request.TimeoutSeconds = machineResources?.HomeCardTimeoutSeconds ?? new MachineContainerResourceOptions().HomeCardTimeoutSeconds;
         if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
         {
             if (machineResources?.IsValid() != true)
                 throw new InvalidOperationException("Machine Action execution is paused because valid bounded container settings are unavailable.");
-            request.ContainerPolicy = machineResources.ToActionContainerPolicy();
+            var homeCard = actionKey == AppHomeCardLimits.ActionKey;
+            request.ContainerPolicy = homeCard ? machineResources.ToHomeCardContainerPolicy() : machineResources.ToActionContainerPolicy();
         }
         await runnerGateway.QueueExecutionAsync(runner.Id, userId ?? Guid.Empty, execution.Id, request, cancellationToken);
         if (resolved is not null)

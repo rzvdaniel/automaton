@@ -22,6 +22,7 @@ public sealed class ApplicationDeploymentService
     private readonly AppDeploymentTargetStateService deploymentTargetStateService;
     private readonly DeploymentPackageFinalizationService packageFinalizationService;
     private readonly AppPauseService pauseService;
+    private readonly Home.HomeCardScheduleService? homeCardSchedules;
     private readonly Serilog.ILogger logger;
 
     public ApplicationDeploymentService(
@@ -31,8 +32,10 @@ public sealed class ApplicationDeploymentService
         IAppDeploymentTargetResolver deploymentTargetResolver,
         AppDeploymentTargetStateService deploymentTargetStateService,
         DeploymentPackageFinalizationService packageFinalizationService,
-        AppPauseService pauseService)
+        AppPauseService pauseService,
+        Home.HomeCardScheduleService? homeCardSchedules = null)
     {
+        this.homeCardSchedules = homeCardSchedules;
         this.pauseService = pauseService;
         this.packageRunnerService = packageRunnerService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;
@@ -141,6 +144,7 @@ public sealed class ApplicationDeploymentService
                 targetStateFinalized = true;
                 pausedNote = await pauseService.KeepPausedAfterDeployAsync(
                     appId, target.Id, runner.Id, ownerId, CancellationToken.None);
+                await SyncHomeCardScheduleAsync(appId, ownerId, result.Actions, packageApplication);
             }
 
             return new DeployPackageResponse
@@ -174,6 +178,24 @@ public sealed class ApplicationDeploymentService
                 pendingRouteApplied,
                 deploymentException);
             throw;
+        }
+    }
+
+    /// <summary>Gives a deployed <c>home-card</c> Action its platform schedule, or removes it when the Action is gone.</summary>
+    private async Task SyncHomeCardScheduleAsync(
+        Guid appId, Guid ownerId, IEnumerable<AppActionDeploymentResult> actions, ApplicationContract application)
+    {
+        if (homeCardSchedules is null) return;
+        try
+        {
+            var present = actions.Any(action => action.ActionKey == Home.AppHomeCardLimits.ActionKey
+                && action.Status is "deployed" or "unchanged");
+            await homeCardSchedules.SyncAsync(appId, ownerId, present, Home.HomeCardSchedules.IntervalFor(application), CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // The deployment itself succeeded; the card schedule is repaired by the next deployment.
+            logger.Warning(ex, "Could not update the home-card schedule for AppId={AppId}", appId);
         }
     }
 
