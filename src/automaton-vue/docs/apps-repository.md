@@ -23,6 +23,8 @@ A system administrator then opens **Apps → Catalog → Catalog sources** in St
 
 Only add sources you trust: an app is code that runs on your Runners.
 
+The official catalog lists the essentials. Showcase apps, games and experiments (GoatCounter, linkding, Harbour and others) are in the [automaton.monster store](https://github.com/rzvdaniel/automaton-monster): add `https://github.com/rzvdaniel/automaton-monster` as a source to list them. An app you installed from the official catalog before it moved keeps running; it gets updates again once the store is a turned-on source.
+
 ## Manage sources from the terminal
 
 A system administrator (or an AI agent working for one) can manage sources with the CLI after `automaton login`:
@@ -71,6 +73,7 @@ You edit this file. Each entry names an app folder:
 - `category` (required): a short label shown on the entry.
 - `minServerVersion` (required): the oldest Automaton Server that can run the app, as `1.2.3`. Servers older than that show the entry but do not offer Install.
 - `repo` (optional): `owner/name`. When it is missing the build uses `--repo` or the `GITHUB_REPOSITORY` variable that GitHub Actions sets.
+- `movedFrom` (optional, `{ "repo": "rzvdaniel/automaton-apps", "folder": "…" }`): the app used to be in the official catalog at that folder. A server that installed it there finds it again here, shows it as installed, and updates it from this catalog (it then records this repository and folder). It works only when the source that lists it is turned on, only for apps that left the official catalog, and an exact match in another source always wins.
 
 ## Large catalogs
 

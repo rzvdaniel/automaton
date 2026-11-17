@@ -115,16 +115,28 @@ public sealed class AppCatalogService(
     }
 
     /// <summary>The commit the enabled catalogs pin for an app today, or null when no catalog lists that repository and folder.</summary>
-    public async Task<string?> PinnedCommitAsync(string repo, string? folder, CancellationToken cancellationToken, bool refresh = false)
+    public async Task<string?> PinnedCommitAsync(string repo, string? folder, CancellationToken cancellationToken, bool refresh = false) =>
+        (await PinnedAsync(repo, folder, cancellationToken, refresh))?.Commit;
+
+    /// <summary>
+    /// Where an installed app now lives and the commit pinned there. A catalog that lists the exact repository and folder wins
+    /// (the first enabled source, in display order); otherwise an app that moved to another repository is found through its
+    /// <c>movedFrom</c> entry, so apps installed before the move keep getting updates.
+    /// </summary>
+    public async Task<PinnedApp?> PinnedAsync(string repo, string? folder, CancellationToken cancellationToken, bool refresh = false)
     {
         var key = InstalledKey(repo, folder);
+        PinnedApp? moved = null;
         foreach (var source in await sources.EnabledAsync(cancellationToken))
         {
             var (entry, _) = await LoadSourceAsync(source, refresh, cancellationToken);
-            var app = entry?.Document.Apps.FirstOrDefault(item => InstalledKey(entry.Document.Repo, item.Folder) == key);
-            if (app is not null) return app.Commit;
+            if (entry is null) continue;
+            var exact = entry.Document.Apps.FirstOrDefault(item => InstalledKey(entry.Document.Repo, item.Folder) == key);
+            if (exact is not null) return new PinnedApp(entry.Document.Repo, exact.Folder, exact.Commit);
+            var successor = moved is null ? entry.Document.Apps.FirstOrDefault(item => item.MovedFrom is { } from && InstalledKey(from.Repo, from.Folder) == key) : null;
+            if (successor is not null) moved = new PinnedApp(entry.Document.Repo, successor.Folder, successor.Commit);
         }
-        return null;
+        return moved;
     }
 
     /// <summary>True when an enabled public catalog source lists this repository and folder.</summary>
@@ -282,8 +294,15 @@ public sealed class AppCatalogService(
             throw new InvalidDataException("The catalog has no repository.");
         // One bad entry must not hide the others.
         document.Apps.RemoveAll(app => !AppCatalogInstallService.IsValidSource(document.Repo, app.Folder, app.Commit));
+        // movedFrom only follows apps that used to be in the official catalog; a custom source cannot take over other installs.
+        foreach (var app in document.Apps.Where(app => app.MovedFrom is not null && !IsValidMovedFrom(app.MovedFrom)))
+            app.MovedFrom = null;
         return document;
     }
+
+    private static bool IsValidMovedFrom(MovedFromRef from) =>
+        string.Equals(from.Repo?.Trim(), CatalogSourceStore.OfficialRepo, StringComparison.OrdinalIgnoreCase)
+        && from.Folder is { Length: > 0 } folder && AppCatalogInstallService.IsValidSource(CatalogSourceStore.OfficialRepo, folder, new string('0', 40));
 
     private async Task<CacheEntry?> LoadCacheAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken)
     {
@@ -346,7 +365,8 @@ public sealed class AppCatalogService(
     {
         var minimum = ParseVersion(app.MinServerVersion);
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
-        Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id : null;
+        Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id
+            : app.MovedFrom is { } from && installed.TryGetValue(InstalledKey(from.Repo, from.Folder), out var previous) ? previous : null;
         return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
             app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended, app.RecommendedOrder);
     }
@@ -360,6 +380,15 @@ public sealed class AppCatalogService(
 
     internal sealed record CacheEntry(DateTime FetchedAt, string? ETag, string Body, CatalogDocument Document);
     private sealed record StoredCache(DateTime FetchedAt, string? ETag, string Body);
+
+    /// <summary>The repository and folder an app was installed from before it moved, and where it is pinned now.</summary>
+    public sealed record PinnedApp(string Repo, string Folder, string Commit);
+
+    internal sealed class MovedFromRef
+    {
+        public string Repo { get; set; } = string.Empty;
+        public string Folder { get; set; } = string.Empty;
+    }
 
     internal sealed class CatalogDocument
     {
@@ -380,6 +409,8 @@ public sealed class AppCatalogService(
         public List<string> Permissions { get; set; } = [];
         public List<string> Tags { get; set; } = [];
         public string? Icon { get; set; }
+        /// <summary>Set when the app used to live in the official catalog: servers that installed it there update it from here.</summary>
+        public MovedFromRef? MovedFrom { get; set; }
         /// <summary>Suggested to administrators on Studio Home until installed. Set in the catalog file, not in code.</summary>
         public bool Recommended { get; set; }
         /// <summary>Lower comes first among recommended apps; apps without one come last.</summary>
