@@ -114,3 +114,36 @@ jobs:
             echo "$url -> $code"
             [[ "$ok" == true ]] || exit 1
           done
+
+  # Always runs, even when the deploy failed or was never approved. Opens an issue assigned to the repository owner,
+  # so GitHub sends the owner an email or push notification (no extra service or secret). A failure here never
+  # changes the deploy result.
+  notice:
+    name: Notify the owner
+    needs: [report, deploy]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Open the deploy notice
+        env:
+          VERSION: ${{ inputs.version }}
+          REPORT_RESULT: ${{ needs.report.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "server-v$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq .body > release-notes.md 2>/dev/null || : > release-notes.md
+          python3 .agents/tools/deploy-notice.py "$VERSION" release-notes.md --deploy "$DEPLOY_RESULT" --report "$REPORT_RESULT" --run-url "$RUN_URL" > notice.md
+          title="$(head -n1 notice.md)"
+          tail -n +3 notice.md > notice-body.md
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file notice-body.md --assignee "$OWNER"
+          cat notice.md >> "$GITHUB_STEP_SUMMARY"
