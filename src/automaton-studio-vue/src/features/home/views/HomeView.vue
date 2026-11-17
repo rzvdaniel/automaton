@@ -44,9 +44,28 @@ const installing = ref<string | null>(null)
 /** Cards whose app was just installed here: card key to the new app's id. The card stays and offers Open. */
 const installed = ref<Record<string, string>>({})
 const isInstalled = (card: HomeCard) => card.key in installed.value
+/** Installed cards whose app is running; Open is offered only then (before, the first deploy is still going). */
+const live = ref<Set<string>>(new Set())
+const isLive = (card: HomeCard) => live.value.has(card.key)
+const isStarting = (card: HomeCard) => isInstalled(card) && !isLive(card)
+const pollMs = 3000
+const pollLimit = 100
+async function waitUntilRunning(key: string) {
+  for (let i = 0; i < pollLimit; i++) {
+    await new Promise((resolve) => setTimeout(resolve, pollMs))
+    try {
+      if ((await serverConsoleService.get()).running) break
+    } catch {
+      // keep waiting; a brief API error should not strand the card
+    }
+  }
+  // After the limit Open is offered anyway: the app page shows what the deploy is doing.
+  live.value = new Set(live.value).add(key)
+}
 const installedTitle = (card: HomeCard) => `${card.title.replace(/^Install /, '')} is installed`
 /** Server Console installs in place, then the card offers Open; any other recommended app opens in the catalog. */
 async function act(card: HomeCard) {
+  if (isStarting(card)) return
   if (isInstalled(card)) {
     window.open(getStudioApplicationUrl(installed.value[card.key]), '_blank', 'noopener')
     return
@@ -54,9 +73,12 @@ async function act(card: HomeCard) {
   if (card.kind !== 'recommended-app' || card.catalogAppId !== 'server-console') return router.push(card.actionPath)
   installing.value = card.key
   try {
-    const { appId } = await serverConsoleService.install()
-    if (appId) installed.value = { ...installed.value, [card.key]: appId }
-    else await store.load()
+    const { appId, running } = await serverConsoleService.install()
+    if (appId) {
+      installed.value = { ...installed.value, [card.key]: appId }
+      if (running) live.value = new Set(live.value).add(card.key)
+      else void waitUntilRunning(card.key)
+    } else await store.load()
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Server Console could not be installed.', life: 5000 })
   } finally {
@@ -143,13 +165,13 @@ function shift(index: number, by: number) {
             </div>
             <div class="need__actions">
               <Button
-                :label="isInstalled(card) ? 'Open' : card.actionLabel"
-                :icon="isInstalled(card) ? 'pi pi-external-link' : undefined"
+                :label="isStarting(card) ? 'Installing…' : isInstalled(card) ? 'Open' : card.actionLabel"
+                :icon="isLive(card) ? 'pi pi-external-link' : undefined"
                 icon-pos="right"
                 size="small"
                 class="btn-ink"
-                :loading="installing === card.key"
-                :disabled="installing !== null"
+                :loading="installing === card.key || isStarting(card)"
+                :disabled="installing !== null || isStarting(card)"
                 @click="act(card)"
               />
               <Button

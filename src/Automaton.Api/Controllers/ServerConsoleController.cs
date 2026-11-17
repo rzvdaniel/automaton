@@ -11,17 +11,20 @@ namespace Automaton.Api.Controllers;
 [Authorize(Policy = "DeveloperApiAccess", Roles = UserRole.SystemAdministrator)]
 public sealed class ServerConsoleController(ServerConsoleProvisioningService provisioning, UserContextService userContext) : ControllerBase
 {
-    public sealed record ServerConsoleStatus(Guid? AppId);
+    public sealed record ServerConsoleStatus(Guid? AppId, bool Running);
 
     [HttpGet]
     public async Task<ActionResult<ServerConsoleStatus>> Get(CancellationToken token)
-        => Ok(new ServerConsoleStatus(await provisioning.FindAsync(userContext.GetUserId(), token)));
+        => Ok(await StatusAsync(await provisioning.FindAsync(userContext.GetUserId(), token), token));
 
     [HttpPost("install")]
     public async Task<ActionResult<ServerConsoleStatus>> Install(CancellationToken token)
     {
-        try { return Ok(new ServerConsoleStatus(await provisioning.ProvisionAsync(userContext.GetUserId(), null, token))); }
+        try { return Ok(await StatusAsync(await provisioning.ProvisionAsync(userContext.GetUserId(), null, token), token)); }
         catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
     }
+
+    private async Task<ServerConsoleStatus> StatusAsync(Guid? appId, CancellationToken token)
+        => new(appId, appId is { } id && await provisioning.IsRunningAsync(id, token));
 }

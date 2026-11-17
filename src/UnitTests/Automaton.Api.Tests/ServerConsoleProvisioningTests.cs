@@ -118,6 +118,23 @@ public sealed class ServerConsoleProvisioningTests
     }
 
     [Test]
+    public async Task AnInstalledAppWithItsDefaultNotDeployedTargetStillNeedsItsFirstDeploy()
+    {
+        var db = AppAuthorizationTestData.CreateDbContext();
+        var appId = Guid.NewGuid();
+        AppAuthorizationTestData.SeedApp(db, appId, Guid.NewGuid(), "server-console");
+        // What the install leaves behind: the Runner assignment created a default target that was never deployed.
+        var target = new AppDeploymentTarget { Id = Guid.NewGuid(), WebAppId = appId, Name = "Default", Slug = "default", Status = DeploymentTargetStatus.NotDeployed };
+        db.AppDeploymentTargets.Add(target);
+        await db.SaveChangesAsync();
+        Assert.That(await ServerConsoleProvisioningService.NeedsDeployAsync(db, appId, default), Is.True);
+
+        target.Status = DeploymentTargetStatus.Running;
+        await db.SaveChangesAsync();
+        Assert.That(await ServerConsoleProvisioningService.NeedsDeployAsync(db, appId, default), Is.False);
+    }
+
+    [Test]
     public void TheInstallNoticeEndpointsAreForSystemAdministratorsOnly()
     {
         var authorize = typeof(ServerConsoleController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();
