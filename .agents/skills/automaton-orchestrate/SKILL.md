@@ -63,7 +63,7 @@ It does **not** write product code (exception: skills, docs and small chores the
   caught it (a test, a line in `REVIEW.md`, a clearer skill).
 - **Every workaround gets a lessons line.** When something goes wrong (a stuck gate, a lost task, a manual rerun, a
   check that failed for the wrong reason), comment on the open issue labelled `lessons`: what happened, what you did,
-  and whether it is fixed for good, patched or open. A few lines; the lessons-learned run turns them into fixes.
+  and whether it is fixed for good, patched or open. A few lines; the [lessons-learned run](../automaton-lessons-learned/SKILL.md) turns them into fixes.
 
 ## Delegating to an agent
 
