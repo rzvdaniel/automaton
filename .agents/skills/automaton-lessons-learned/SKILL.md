@@ -10,7 +10,7 @@ Turns what went wrong into fixes. Works on Desktop and on runner-01; `gh` is the
 
 ## 1. Collect (since the last run)
 
-Last run = date of your own newest "Lessons run" reply on the open issue labelled `lessons` (the inbox; none yet means everything).
+Last run = date of the newest inbox comment starting `Lessons run` (all agents share one GitHub account, so go by the prefix; none yet means everything).
 
 - New comments on the inbox.
 - Queue logs, if `~/agent-queue/logs` exists: `grep -il "error\|failed\|cancel\|stall" ` on logs newer than the last run; read only the tails.
@@ -40,4 +40,4 @@ One comment on the inbox, starting `Lessons run YYYY-MM-DD`: each change with it
 
 ## Schedule
 
-Nightly on runner-01: `0 3 * * * ... ~/bin/agent-queue add lessons-$(date +%Y%m%d)` with a prompt that says to follow this skill.
+Nightly on runner-01: the `agent` crontab pipes a one-line prompt that says to follow this skill into `~/bin/agent-queue add lessons-$(date +\%Y\%m\%d)` (cron needs `\%`).
