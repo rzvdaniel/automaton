@@ -2,6 +2,8 @@
 
 The **Deploy production** workflow (`.github/workflows/deploy-production.yml`) updates the production server over SSH after the owner approves. The run page shows the version, who started it and who approved it. Agents never hold the production key: it lives only in the `production` environment.
 
+After every run, approved or not, a final **Notify the owner** job opens an issue assigned to the repository owner ("Production deploy X: OK" or "needs attention") with the version, the AI check and docs walk results, the pull requests shipped and the deploy result, so GitHub sends the owner an email or push. It needs no secret. Close these issues when read.
+
 It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<version>` on the server, then checks that `https://api.automaton.monster/health`, Studio, the store and the website return 200.
 
 ## One-time setup (owner)

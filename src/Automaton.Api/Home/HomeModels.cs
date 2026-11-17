@@ -7,7 +7,7 @@ public sealed record HomeCard(
     string Key, string Kind, string Severity, string Title, string Detail,
     string ActionLabel, string ActionPath, bool Dismissible, Guid? AppId = null);
 
-public sealed record HomePinnedApp(AppListItemDto App, DateTime PinnedAtUtc);
+public sealed record HomePinnedApp(AppListItemDto App, DateTime PinnedAtUtc, AppHomeCardDto? Card = null);
 
 public sealed record HomeResponse(IReadOnlyList<HomeCard> NeedsYou, IReadOnlyList<HomePinnedApp> Pinned);
 

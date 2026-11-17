@@ -6,7 +6,7 @@ import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import { useToast } from 'primevue/usetoast'
 import AppMark from '@/features/apps/components/AppMark.vue'
-import { appState } from '@/features/apps/utils/app-list-display'
+import { appState, formatShortTime } from '@/features/apps/utils/app-list-display'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useHomeStore } from '../stores/home.store'
 import { appFacts, moved } from '../utils'
@@ -149,6 +149,23 @@ function shift(index: number, by: number) {
               <span class="pin__name">{{ item.app.name }}</span>
               <span class="pin__state" :class="`pin__state--${appState(item.app).tone}`">{{ appState(item.app).label }}</span>
             </RouterLink>
+            <div v-if="item.card" class="pin__card" :class="{ 'pin__card--stale': item.card.stale }" data-testid="app-card">
+              <p class="pin__card-status" data-testid="app-card-status">{{ item.card.card.status }}</p>
+              <dl v-if="item.card.card.facts.length > 0" class="pin__facts">
+                <div v-for="fact in item.card.card.facts" :key="fact.label">
+                  <dt>{{ fact.label }}</dt>
+                  <dd>{{ fact.value }}</dd>
+                </div>
+              </dl>
+              <ul v-if="item.card.card.alerts.length > 0" class="pin__alerts">
+                <li v-for="(alert, alertIndex) in item.card.card.alerts" :key="alertIndex" :class="`pin__alert--${alert.severity}`" data-testid="app-card-alert">
+                  <span class="pin__alert-level">{{ alert.severity }}</span> {{ alert.text }}
+                </li>
+              </ul>
+              <p class="pin__card-time" data-testid="app-card-time">
+                {{ item.card.stale ? 'Not up to date. Last update ' : 'Updated ' }}{{ formatShortTime(item.card.updatedAtUtc) }}
+              </p>
+            </div>
             <dl class="pin__facts">
               <div v-for="fact in appFacts(item.app)" :key="fact.label">
                 <dt>{{ fact.label }}</dt>
@@ -213,6 +230,15 @@ function shift(index: number, by: number) {
 .pin__facts div { display: flex; justify-content: space-between; gap: 8px; }
 .pin__facts dt { color: var(--ink-soft); }
 .pin__facts dd { margin: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin__card { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--row-line); }
+.pin__card--stale { opacity: 0.55; filter: grayscale(1); }
+.pin__card-status { margin: 0; font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.pin__alerts { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; overflow-wrap: anywhere; }
+.pin__alert-level { font-family: var(--mono); font-size: 11px; text-transform: uppercase; }
+.pin__alert--critical { color: var(--signal-ink); font-weight: 600; }
+.pin__alert--warning { color: var(--ink); }
+.pin__alert--info { color: var(--ink-soft); }
+.pin__card-time { margin: 0; font-size: 12px; color: var(--ink-soft); }
 .pin__actions { display: flex; justify-content: flex-end; gap: 2px; }
 .home-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 40px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; }
 .home-empty__title { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 600; }

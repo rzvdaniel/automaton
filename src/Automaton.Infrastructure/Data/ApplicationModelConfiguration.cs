@@ -114,6 +114,12 @@ internal static class ApplicationModelConfiguration
             entity.Property(e => e.Fingerprint).HasMaxLength(64);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
+        modelBuilder.Entity<AppHomeCard>(entity =>
+        {
+            entity.HasKey(e => e.AppId);
+            entity.Property(e => e.CardJson).IsRequired().HasMaxLength(8192);
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureWebAppScreenshot(ModelBuilder modelBuilder)

@@ -819,6 +819,30 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("AppDeploymentTargets");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppHomeCard", b =>
+                {
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CardJson")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("character varying(8192)");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastFailedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("AppId");
+
+                    b.ToTable("AppHomeCards");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AppModuleExecution", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4344,6 +4368,15 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("ExecutionRunner");
 
                     b.Navigation("WebApp");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppHomeCard", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AppModuleExecution", b =>
