@@ -66,6 +66,24 @@ public sealed class AutomatonApiClientCleanupTests
         Assert.That(Automaton.Core.Enums.RunnerApplicationProfiles.Normalize("machine-management"), Is.EqualTo("MachineManagement"));
     }
 
+    [Test]
+    public async Task SettingValuesAreSavedThroughTheReadableSettingsRoute()
+    {
+        string? method = null, path = null, body = null;
+        using var http = new HttpClient(new Handler(request =>
+        {
+            method = request.Method.Method; path = request.RequestUri!.AbsolutePath;
+            body = request.Content!.ReadAsStringAsync().Result;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+        })) { BaseAddress = new Uri("https://api.example.test/") };
+        using var client = new AutomatonApiClient(http, "key");
+
+        await client.SetSettingValueAsync("app-1", "SITES", "a.com,b.com");
+
+        Assert.That((method, path), Is.EqualTo(("PUT", "/api/apps/app-1/setting-values/SITES")));
+        Assert.That(body, Does.Contain("a.com,b.com"));
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
