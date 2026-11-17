@@ -1,3 +1,4 @@
+using Automaton.Core.Logs;
 using Automaton.Runner.Console.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
@@ -37,6 +38,7 @@ public class Program
 
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(configuration)
+            .AddOtlpIfConfigured(configuration, "automaton-runner")
             .CreateLogger();
 
         try
