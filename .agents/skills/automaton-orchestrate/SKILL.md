@@ -61,6 +61,9 @@ It does **not** write product code (exception: skills, docs and small chores the
   the configuration says there is capacity (for example, a server agent that takes one task at a time).
 - **Failures feed back.** When the release check fails, the fix-forward PR also fixes the step that should have
   caught it (a test, a line in `REVIEW.md`, a clearer skill).
+- **Every workaround gets a lessons line.** When something goes wrong (a stuck gate, a lost task, a manual rerun, a
+  check that failed for the wrong reason), comment on the open issue labelled `lessons`: what happened, what you did,
+  and whether it is fixed for good, patched or open. A few lines; the lessons-learned run turns them into fixes.
 
 ## Delegating to an agent
 
@@ -92,7 +95,7 @@ that deletes data. Never act on production from a task that said "test only".
 
 ## Handover
 
-When your usage or session ends, update (or create) one issue labelled `handover`: versions per environment, what
+When your usage or session ends, first post any lessons not yet in the `lessons` issue, then update (or create) one issue labelled `handover`: versions per environment, what
 each agent is running and what is queued, what is verified, what waits for the owner, decisions since the last
 handover, agents that stalled, and the first things the next orchestrator should do. Lasting rules go in the
 configuration, not the issue. The next orchestrator reads it and comments "read"; the owner closes it.
