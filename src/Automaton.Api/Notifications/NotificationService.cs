@@ -57,7 +57,7 @@ public class NotificationService(
         var result = new List<(NotificationItem, string)>();
         if (await authorization.IsSystemAdministratorAsync(userId, token))
         {
-            foreach (var card in await needsYou.ServerCardsAsync(token))
+            foreach (var card in await needsYou.ServerCardsAsync(userId, token))
             {
                 if (card.Kind == HomeCardKeys.ServerUpdate)
                     result.Add(Make(NotificationKinds.ServerUpdate, NotificationSeverity.Info, card.Title, card.Detail, card.ActionLabel, card.ActionPath, [card.Detail]));

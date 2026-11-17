@@ -21,8 +21,8 @@ public sealed class NotificationTests
 {
     private sealed class StubNeedsYou : HomeNeedsYouService
     {
-        public StubNeedsYou() : base(null!, null!, null!, null!, null!, null!) { }
-        public override Task<List<HomeCard>> ServerCardsAsync(CancellationToken token)
+        public StubNeedsYou() : base(null!, null!, null!, null!, null!, null!, null!) { }
+        public override Task<List<HomeCard>> ServerCardsAsync(Guid userId, CancellationToken token)
             => Task.FromResult(new List<HomeCard>
             {
                 new(HomeCardKeys.ServerUpdate, HomeCardKeys.ServerUpdate, "warn", "Update the server", "9.9.9 is available.", "Open server", "/server", false),
