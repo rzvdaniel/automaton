@@ -12,6 +12,7 @@ import { formatWhen } from '../utils/app-overview'
 const props = defineProps<{ appId: string; declared?: ApplicationSecretDeclaration[]; settingNames?: string[] }>()
 /** Secrets the app declares that have no value yet. */
 const missing = computed(() => (props.declared ?? []).filter((item) => !secrets.value.some((secret) => secret.name === item.name)))
+const describe = (secretName: string) => props.declared?.find((item) => item.name === secretName)?.description
 const confirm = useConfirm()
 const all = ref<AppSecretSummary[]>([])
 /** Settings are saved like secrets but listed on their own card. */
@@ -124,7 +125,10 @@ function message(failure: unknown, fallback: string) {
         <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
       </form>
       <div v-else class="row">
-      <code>{{ secret.name }}</code>
+      <span class="rowname">
+        <code>{{ secret.name }}</code>
+        <small v-if="describe(secret.name)" class="desc" data-testid="secret-description">{{ describe(secret.name) }}</small>
+      </span>
       <span class="hint">
         set {{ formatWhen(secret.updatedAtUtc) }} ·
         <button type="button" class="link" :aria-label="`Replace ${secret.name}`" @click="openForm(secret.name)">replace</button> ·
@@ -141,7 +145,10 @@ function message(failure: unknown, fallback: string) {
         <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
       </form>
       <div v-else class="row">
-        <span><code>{{ item.name }}</code> <span class="hint">{{ item.optional ? "optional, not set" : "needed, not set" }}<template v-if="item.description"> · {{ item.description }}</template></span></span>
+        <span class="rowname">
+          <span><code>{{ item.name }}</code> <span class="hint">{{ item.optional ? "optional, not set" : "needed, not set" }}</span></span>
+          <small v-if="item.description" class="desc" data-testid="secret-description">{{ item.description }}</small>
+        </span>
         <button type="button" class="link" @click="openForm(item.name)">set</button>
       </div>
       </template>
@@ -169,6 +176,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
 code { font-family: var(--mono); font-size: 13px; }
 .link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+.rowname { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.desc { color: var(--ink-soft); font-size: 12px; }
 .field { flex: 1 1 200px; min-width: 0; }
 .add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 6px; }
 .add label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
