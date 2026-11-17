@@ -21,7 +21,8 @@ Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_templ
 - **How verified** is evidence, not a claim: the commands and what came back. For a bug, name the test that failed
   before the fix. For a Studio or website change, include a screenshot in the proof (see automaton-verify-release).
 - **Check after release** is what the verifier will run on the test server, written so an agent that never saw your
-  work can follow it: who signs in, what they do, what they see. It comes from the issue's "Done when".
+  work can follow it: who signs in, what they do, what they see. It comes from the issue's "Done when". Every value in it (a setting, a limit, an input)
+  must pass this PR's own validation: check the minimum and maximum in the code before you write it.
 
 Never write `Closes #N` or `Fixes #N`: an issue closes only when its change is live on production. Use
 `Part of #N` when the PR delivers only part of the issue.
