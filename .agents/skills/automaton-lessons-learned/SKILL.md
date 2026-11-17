@@ -10,12 +10,14 @@ One run reads what went wrong since the last run and makes at most 3 changes. It
 
 ## 1. Read since the last run
 
-The last run is the date in your newest reply on the open issue labelled `lessons` (`gh issue list --label lessons`); none means the whole inbox. Read only what is newer:
+The last run is the timestamp of the newest comment starting `Lessons run` on the open issue labelled `lessons` (`gh issue list --label lessons`; all agents share one login, so match the text); none means the whole inbox. Read only what is newer (use `--created` for runs):
 
 - new comments on the lessons issue;
 - `~/agent-queue/logs` (tail of failed or long tasks, not whole logs; never print credentials);
 - failed `Merge gate` and release runs (`gh run list --status failure`);
 - issues labelled `verification-failed`, and tasks stalled in the queue.
+
+**Never paste log lines, tokens, passwords, keys, cookies or connection strings** into issues, PRs or the reply: describe the incident in your own words. The repository is public.
 
 ## 2. One root cause per incident
 
@@ -34,7 +36,7 @@ Over 3 changes: take the ones that stopped work most, list the rest in the reply
 
 ## 4. Reply
 
-Post one reply on the lessons issue: today's date (`Lessons run YYYY-MM-DD`), each incident with its change as a link (PR, issue, or "owner" / "orchestrator config" / "skipped: reason"). The next run starts from this date, so it skips what is already answered.
+Post one reply on the lessons issue, even when nothing is new ("nothing new"), starting `Lessons run YYYY-MM-DDTHH:MMZ` (UTC): each incident with its change as a link (PR, issue, or "owner" / "orchestrator config" / "skipped: reason"). The next run starts from this time, so it skips what is already answered.
 
 ## Nightly
 
