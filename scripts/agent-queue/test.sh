@@ -29,4 +29,11 @@ now=$(date +%s); ft="11am"; r=$(limit_reset "You've hit your limit · resets $ft
 (( r > now && r <= now + 86400 )) || fail "limit_reset 11am: $r"; [[ $(date -u -d @"$r" +%H:%M) == 11:00 ]] || fail "limit_reset not 11:00 UTC"
 past=$(date -u -d '2 hours ago' +%-I%P); r=$(limit_reset "hit your limit resets $past (UTC)"); (( r > now )) || fail "past reset not moved to next day"
 r=$(limit_reset "hit your limit resets soonish"); (( r >= now + 3590 && r <= now + 3700 )) || fail "unreadable reset not +1h: $r"
+eval "$(sed -n '/^limit_deadline() {/,/^}/p' "$d/agent-queue")"
+r=$(limit_deadline "hit your limit resets $past (UTC)"); (( r <= now + 21605 )) || fail "wait not capped at 6h: $((r-now))"
+r=$(limit_deadline "hit your limit resets soonish"); (( r >= now + 3890 && r <= now + 4000 )) || fail "short wait changed: $((r-now))"
+# the continue note is appended only once
+n='Note from agent-queue: the previous run stopped at the usage limit.'
+echo task > "$t/lt"; for i in 1 2; do grep -qF "$n" "$t/lt" || printf '\n\n%s more\n' "$n" >> "$t/lt"; done
+[[ $(grep -cF "$n" "$t/lt") == 1 ]] || fail "note duplicated"
 echo "ALL PASS"
