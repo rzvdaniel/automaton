@@ -261,9 +261,13 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh cleanup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py; do
+for script in backup.sh cleanup.sh restore.sh update-from-request.sh fail2ban.sh configure.py explain_certificate_failure.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
+if ! $configure_only && [[ -d "$bundle_dir/fail2ban" ]]; then
+    { rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle_dir/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"; } \
+        || echo 'Warning: the fail2ban files could not be copied.' >&2
+fi
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
 if [[ -f "$install_dir/update-from-request.sh" ]] && ! $configure_only; then
     bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
@@ -315,5 +319,10 @@ fi
 if [[ -f "$install_dir/cleanup.sh" ]]; then
     bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --remove-timer \
         || echo "Warning: the old host cleanup timer could not be removed. Run: sudo bash $install_dir/cleanup.sh --remove-timer" >&2
+fi
+# Scanners and password guessers are banned at the firewall by default (best effort: the install is complete without it).
+if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
+    bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \
+        || echo "Warning: fail2ban could not be set up. Run: sudo bash $install_dir/fail2ban.sh" >&2
 fi
 printf 'Backups: nightly database and key backups are kept in %s/backups/nightly. Also enable your provider'"'"'s server backups (snapshots) and copy %s off-host.\n' "$install_dir" "$config_dir"
