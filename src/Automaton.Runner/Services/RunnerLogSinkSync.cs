@@ -26,7 +26,8 @@ internal sealed class RunnerLogSinkSync(RunnerRuntimeRegistry? registry, ILogger
         }
         catch (Exception exception)
         {
-            // An older server does not know the method: logs then stay in the files, as before.
+            // An older server does not know the method, or the server is unreachable: stop sending until it answers again.
+            LogForwarding.SetAddress(null);
             logger.Debug(exception, "Could not sync the log receiver");
         }
     }

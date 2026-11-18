@@ -12,6 +12,7 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class LogSinkServiceTests
 {
+    private const string Host = "172.19.0.1";
     private const string Address = "http://172.19.0.1:32784";
 
     private sealed class Clock(DateTimeOffset now) : TimeProvider
@@ -50,7 +51,7 @@ public sealed class LogSinkServiceTests
     {
         var f = await CreateAsync();
 
-        var assignment = await f.Service.SyncAsync(f.RunnerId, [f.Report()], default);
+        var assignment = await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
 
         Assert.That(assignment, Is.EqualTo(new LogSinkAssignment(f.AppId, f.TargetId, Address)));
         Assert.That(await f.Service.ResolveAddressAsync(default), Is.EqualTo(Address));
@@ -60,9 +61,9 @@ public sealed class LogSinkServiceTests
     public async Task A_new_port_after_a_restart_replaces_the_address()
     {
         var f = await CreateAsync();
-        await f.Service.SyncAsync(f.RunnerId, [f.Report()], default);
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
 
-        await f.Service.SyncAsync(f.RunnerId, [f.Report("http://172.19.0.1:40000")], default);
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report("http://172.19.0.1:40000")], default);
 
         Assert.That(await f.Service.ResolveAddressAsync(default), Is.EqualTo("http://172.19.0.1:40000"));
     }
@@ -74,7 +75,7 @@ public sealed class LogSinkServiceTests
     {
         var f = await CreateAsync(status: status);
 
-        Assert.That(await f.Service.SyncAsync(f.RunnerId, [f.Report()], default), Is.Null);
+        Assert.That(await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default), Is.Null);
         Assert.That(await f.Service.ResolveAddressAsync(default), Is.Null);
     }
 
@@ -83,7 +84,7 @@ public sealed class LogSinkServiceTests
     {
         var f = await CreateAsync(requests: false);
 
-        Assert.That(await f.Service.SyncAsync(f.RunnerId, [f.Report()], default), Is.Null);
+        Assert.That(await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default), Is.Null);
     }
 
     [Test]
@@ -91,7 +92,7 @@ public sealed class LogSinkServiceTests
     {
         var f = await CreateAsync();
 
-        Assert.That(await f.Service.SyncAsync(Guid.NewGuid(), [f.Report()], default), Is.Null);
+        Assert.That(await f.Service.SyncAsync(Guid.NewGuid(), Host, [f.Report()], default), Is.Null);
         Assert.That(await f.Service.ResolveAddressAsync(default), Is.Null);
     }
 
@@ -99,7 +100,7 @@ public sealed class LogSinkServiceTests
     public async Task Pausing_revoking_or_a_silent_runner_stops_forwarding()
     {
         var f = await CreateAsync();
-        await f.Service.SyncAsync(f.RunnerId, [f.Report()], default);
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
         var app = await f.Db.WebApps.SingleAsync();
 
         app.IsPaused = true;
@@ -125,19 +126,20 @@ public sealed class LogSinkServiceTests
     public async Task A_runner_that_stops_hosting_the_app_clears_its_record_but_not_another_runners()
     {
         var f = await CreateAsync();
-        await f.Service.SyncAsync(f.RunnerId, [f.Report()], default);
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
 
-        await f.Service.SyncAsync(Guid.NewGuid(), [], default);
+        await f.Service.SyncAsync(Guid.NewGuid(), Host, [], default);
         Assert.That(await f.Service.ResolveAddressAsync(default), Is.EqualTo(Address), "another runner cannot clear it");
 
-        await f.Service.SyncAsync(f.RunnerId, [], default);
+        await f.Service.SyncAsync(f.RunnerId, Host, [], default);
         Assert.That(await f.Db.Settings.AnyAsync(), Is.False);
         Assert.That(await f.Service.ResolveAddressAsync(default), Is.Null);
     }
 
     [TestCase("http://172.19.0.1:32784", "http://172.19.0.1:32784")]
-    [TestCase("http://10.0.0.5:9000/", "http://10.0.0.5:9000")]
-    [TestCase("http://192.168.1.2:8080", "http://192.168.1.2:8080")]
+    [TestCase("http://172.19.0.1:9000/", "http://172.19.0.1:9000")]
+    [TestCase("http://10.0.0.5:9000", null)]
+    [TestCase("http://172.19.0.2:9000", null)]
     [TestCase("https://172.19.0.1:32784", null)]
     [TestCase("http://8.8.8.8:9000", null)]
     [TestCase("http://127.0.0.1:9000", null)]
@@ -149,17 +151,65 @@ public sealed class LogSinkServiceTests
     [TestCase("http://[fd00::1]:9000", null)]
     [TestCase(null, null)]
     public void Only_private_http_addresses_are_used(string? value, string? expected)
-        => Assert.That(LogSinkService.NormalizeAddress(value), Is.EqualTo(expected));
+        => Assert.That(LogSinkService.NormalizeAddress(value, Host), Is.EqualTo(expected));
 
     [Test]
     public async Task A_public_address_reported_by_a_runner_is_ignored()
     {
         var f = await CreateAsync();
 
-        Assert.That(await f.Service.SyncAsync(f.RunnerId, [f.Report("http://8.8.8.8:9000")], default), Is.Null);
+        Assert.That(await f.Service.SyncAsync(f.RunnerId, Host, [f.Report("http://8.8.8.8:9000")], default), Is.Null);
     }
 
     [Test]
     public void The_permission_is_supported_in_automaton_json()
         => Assert.That(ApplicationContractValidator.SupportedPermissions, Does.Contain("logs:receive"));
+
+    [Test]
+    public async Task An_address_on_another_machine_than_the_runner_is_ignored_and_so_is_a_runner_without_a_verified_host()
+    {
+        var f = await CreateAsync();
+
+        Assert.That(await f.Service.SyncAsync(f.RunnerId, Host, [f.Report("http://10.9.9.9:5432")], default), Is.Null);
+        Assert.That(await f.Service.SyncAsync(f.RunnerId, null, [f.Report()], default), Is.Null);
+        Assert.That(await f.Db.Settings.AnyAsync(), Is.False);
+    }
+
+    [Test]
+    public async Task The_runner_already_serving_keeps_the_receiver_when_a_second_runner_hosts_one_too()
+    {
+        var f = await CreateAsync();
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
+        var otherApp = Guid.NewGuid();
+        var otherRunner = Guid.NewGuid();
+        AppAuthorizationTestData.SeedApp(f.Db, otherApp, Guid.NewGuid(), "logs2");
+        var app = await f.Db.WebApps.SingleAsync(item => item.Id == otherApp);
+        app.ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract { Permissions = [AppPermissionApproval.LogsReceive] });
+        var target = await f.Db.AppDeploymentTargets.SingleAsync(item => item.WebAppId == otherApp);
+        f.Db.Runners.Add(new Runner { Id = otherRunner, Name = "r2", Purpose = RunnerPurposes.Managed, ConnectionId = "c2", Status = "online" });
+        target.ExecutionRunnerId = otherRunner;
+        f.Db.AppPermissionApprovals.Add(new AppPermissionApproval { Id = Guid.NewGuid(), AppId = otherApp, Permission = AppPermissionApproval.LogsReceive, Status = AppPermissionStatuses.Approved });
+        await f.Db.SaveChangesAsync();
+
+        var second = await f.Service.SyncAsync(otherRunner, Host, [new LogSinkRuntimeReport(otherApp, target.Id, "http://172.19.0.1:41000")], default);
+
+        Assert.That(second, Is.Null);
+        Assert.That(await f.Service.ResolveAddressAsync(default), Is.EqualTo(Address));
+    }
+
+    [Test]
+    public async Task An_unchanged_report_does_not_rewrite_the_record_until_it_is_about_to_look_stale()
+    {
+        var f = await CreateAsync();
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
+        var first = (await f.Db.Settings.SingleAsync()).Value;
+
+        f.Clock.Now += TimeSpan.FromSeconds(30);
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
+        Assert.That((await f.Db.Settings.SingleAsync()).Value, Is.EqualTo(first));
+
+        f.Clock.Now += LogSinkService.Freshness / 3;
+        await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
+        Assert.That((await f.Db.Settings.SingleAsync()).Value, Is.Not.EqualTo(first));
+    }
 }

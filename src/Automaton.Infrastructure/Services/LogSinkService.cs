@@ -31,41 +31,29 @@ public sealed class LogSinkService(ApplicationDbContext db, TimeProvider? clock 
     private sealed record Stored(Guid AppId, Guid DeploymentTargetId, Guid RunnerId, string Address, DateTime ReportedAtUtc);
 
     /// <summary>
-    /// Called by a Runner with the app runtimes it hosts. Records the approved log-receiving one (if any) and returns it,
-    /// or clears this Runner's earlier record when there is none.
+    /// Called by a Runner with the app runtimes it hosts. <paramref name="runnerHost"/> is the host address the server
+    /// already verified for this Runner (its probed gateway); only an address on that host is accepted, so a Runner
+    /// cannot point the server's logs at another machine. Records the approved log-receiving app (if any) and returns
+    /// it, or clears this Runner's earlier record when there is none.
     /// </summary>
-    public async Task<LogSinkAssignment?> SyncAsync(Guid runnerId, IReadOnlyList<LogSinkRuntimeReport>? running, CancellationToken token)
+    public async Task<LogSinkAssignment?> SyncAsync(Guid runnerId, string? runnerHost, IReadOnlyList<LogSinkRuntimeReport>? running, CancellationToken token)
     {
         var reports = (running ?? []).Take(MaxReports)
-            .Select(report => (Report: report, Address: NormalizeAddress(report.Address)))
+            .Select(report => (Report: report, Address: NormalizeAddress(report.Address, runnerHost)))
             .Where(item => item.Address is not null)
             .OrderBy(item => item.Report.AppId).ThenBy(item => item.Report.DeploymentTargetId)
             .ToList();
 
         var existing = await db.Settings.SingleOrDefaultAsync(setting => setting.Key == SettingKey, token);
-        LogSinkAssignment? chosen = null;
-        foreach (var item in reports)
-        {
-            if (await IsReceiverAsync(item.Report.AppId, item.Report.DeploymentTargetId, runnerId, token))
-            {
-                chosen = new LogSinkAssignment(item.Report.AppId, item.Report.DeploymentTargetId, item.Address!);
-                break;
-            }
-        }
+        var stored = existing is null ? null : Read(existing);
+        LogSinkAssignment? chosen = await ChooseAsync(runnerId, reports.Select(item => (item.Report, item.Address!)).ToList(), token);
+        // Two Runners hosting receivers: the one already serving keeps it while it is healthy.
+        if (chosen is not null && stored is not null && stored.RunnerId != runnerId && IsFresh(stored)
+            && await IsReceiverAsync(stored.AppId, stored.DeploymentTargetId, stored.RunnerId, token))
+            return null;
 
-        if (chosen is not null)
-        {
-            var value = JsonSerializer.Serialize(new Stored(chosen.AppId, chosen.DeploymentTargetId, runnerId, chosen.Address, clock.GetUtcNow().UtcDateTime));
-            if (existing is null)
-                db.Settings.Add(new Setting { Key = SettingKey, Value = value, Description = "The app that receives the server's logs (logs:receive)." });
-            else
-            {
-                existing.Value = value;
-                existing.UpdatedAt = clock.GetUtcNow().UtcDateTime;
-            }
-            await db.SaveChangesAsync(token);
-        }
-        else if (existing is not null && Read(existing) is { } stored && stored.RunnerId == runnerId)
+        if (chosen is not null) await StoreAsync(existing, stored, runnerId, chosen, token);
+        else if (existing is not null && stored?.RunnerId == runnerId)
         {
             db.Settings.Remove(existing);
             await db.SaveChangesAsync(token);
@@ -73,12 +61,48 @@ public sealed class LogSinkService(ApplicationDbContext db, TimeProvider? clock 
         return chosen;
     }
 
+    private async Task<LogSinkAssignment?> ChooseAsync(Guid runnerId, List<(LogSinkRuntimeReport Report, string Address)> reports, CancellationToken token)
+    {
+        if (reports.Count == 0) return null;
+        var ids = reports.Select(item => item.Report.AppId).Distinct().ToList();
+        var approved = await db.AppPermissionApprovals.AsNoTracking().Where(item => ids.Contains(item.AppId)
+            && item.Permission == AppPermissionApproval.LogsReceive && item.Status == AppPermissionStatuses.Approved)
+            .Select(item => item.AppId).ToListAsync(token);
+        foreach (var (report, address) in reports.Where(item => approved.Contains(item.Report.AppId)))
+        {
+            if (await IsReceiverAsync(report.AppId, report.DeploymentTargetId, runnerId, token))
+                return new LogSinkAssignment(report.AppId, report.DeploymentTargetId, address);
+        }
+        return null;
+    }
+
+    private async Task StoreAsync(Setting? existing, Stored? stored, Guid runnerId, LogSinkAssignment chosen, CancellationToken token)
+    {
+        var now = clock.GetUtcNow().UtcDateTime;
+        // A Runner reports every 30 seconds; the record is rewritten only when it changed or is about to look stale.
+        var unchanged = stored is not null && stored.RunnerId == runnerId && stored.AppId == chosen.AppId
+            && stored.DeploymentTargetId == chosen.DeploymentTargetId && stored.Address == chosen.Address
+            && now - stored.ReportedAtUtc < Freshness / 3;
+        if (unchanged) return;
+        var value = JsonSerializer.Serialize(new Stored(chosen.AppId, chosen.DeploymentTargetId, runnerId, chosen.Address, now));
+        if (existing is null)
+            db.Settings.Add(new Setting { Key = SettingKey, Value = value, Description = "The app that receives the server's logs (logs:receive)." });
+        else
+        {
+            existing.Value = value;
+            existing.UpdatedAt = now;
+        }
+        await db.SaveChangesAsync(token);
+    }
+
+    private bool IsFresh(Stored stored) => clock.GetUtcNow().UtcDateTime - stored.ReportedAtUtc <= Freshness;
+
     /// <summary>The address to ship logs to now, or null when no approved, running, unpaused app receives them.</summary>
     public async Task<string?> ResolveAddressAsync(CancellationToken token)
     {
         var setting = await db.Settings.AsNoTracking().SingleOrDefaultAsync(item => item.Key == SettingKey, token);
         if (setting is null || Read(setting) is not { } stored) return null;
-        if (clock.GetUtcNow().UtcDateTime - stored.ReportedAtUtc > Freshness) return null;
+        if (!IsFresh(stored)) return null;
         return await IsReceiverAsync(stored.AppId, stored.DeploymentTargetId, stored.RunnerId, token) ? stored.Address : null;
     }
 
@@ -108,15 +132,16 @@ public sealed class LogSinkService(ApplicationDbContext db, TimeProvider? clock 
     }
 
     /// <summary>
-    /// Only a plain http address with a private IPv4 literal and a port: the server never sends logs to names, public
-    /// hosts or paths a Runner chose.
+    /// Only a plain http address on <paramref name="requiredHost"/> (the Runner's own verified host) with a private IPv4
+    /// literal and a port: the server never sends logs to names, public hosts or other machines a Runner chose.
     /// </summary>
-    public static string? NormalizeAddress(string? address)
+    public static string? NormalizeAddress(string? address, string? requiredHost)
     {
         if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttp) return null;
         if (uri.AbsolutePath != "/" || uri.Query.Length > 0 || uri.UserInfo.Length > 0) return null;
         if (uri.IsDefaultPort || uri.Port < 1024) return null;
-        return IPAddress.TryParse(uri.Host, out var ip) && IsPrivateIPv4(ip) ? $"http://{ip}:{uri.Port}" : null;
+        if (!IPAddress.TryParse(uri.Host, out var ip) || !IsPrivateIPv4(ip)) return null;
+        return requiredHost is not null && ip.ToString() == requiredHost ? $"http://{ip}:{uri.Port}" : null;
     }
 
     private static bool IsPrivateIPv4(IPAddress ip)

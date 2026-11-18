@@ -195,7 +195,9 @@ public class AutomatonHub : Hub
             return null;
         }
 
-        return await services.GetRequiredService<LogSinkService>().SyncAsync(runner.Id, runtimes, Context.ConnectionAborted);
+        // Only a Runner whose gateway the server probed has a verified host; any other Runner receives nothing.
+        var host = services.GetRequiredService<RunnerGatewayRegistry>().Find(runner.Id)?.Url.Host;
+        return await services.GetRequiredService<LogSinkService>().SyncAsync(runner.Id, host, runtimes, Context.ConnectionAborted);
     }
 
     public async Task Heartbeat()
