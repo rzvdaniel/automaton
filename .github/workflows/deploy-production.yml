@@ -101,6 +101,34 @@ jobs:
             -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v$VERSION"
 
+      # The website is not part of the server bundle. Build it from the released commit, streamed from this runner as a
+      # `git archive`, so the host's /opt/automaton working checkout is never touched.
+      - name: Check out the released commit
+        uses: actions/checkout@v4
+        with:
+          ref: server-v${{ inputs.version }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Update the website
+        env:
+          VERSION: ${{ inputs.version }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          git merge-base --is-ancestor HEAD origin/main || { echo "server-v$VERSION is not on main."; exit 1; }
+          dir="$(mktemp -d)"
+          trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$PROD_SSH_KEY" > "$dir/key"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          git archive --format=tar HEAD | ssh -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "sudo /usr/local/bin/automaton-deploy-website $VERSION"
+
       - name: Check the public routes
         run: |
           set -euo pipefail

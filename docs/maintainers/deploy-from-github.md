@@ -4,7 +4,7 @@ The **Deploy production** workflow (`.github/workflows/deploy-production.yml`) u
 
 After every run, approved or not, a final **Notify the owner** job opens an issue assigned to the repository owner ("Production deploy X: OK" or "needs attention") with the version, the AI check and docs walk results, the pull requests shipped and the deploy result, so GitHub sends the owner an email or push. It needs no secret. Close these issues when read.
 
-It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<version>` on the server, then checks that `https://api.automaton.monster/health`, Studio, the store and the website return 200.
+It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<version>` on the server, then rebuilds and restarts the marketing website (`website-green`) from the released commit, then checks that `https://api.automaton.monster/health`, Studio, the store and the website return 200.
 
 ## One-time setup (owner)
 
@@ -25,9 +25,21 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
      ```bash
      #!/usr/bin/env bash
      set -euo pipefail
-     [[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+     [[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$ \
+       || "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/local/bin/automaton-deploy-website\ [0-9]+\.[0-9]+\.[0-9]+$ ]] \
        || { echo "refused"; exit 1; }
      exec $SSH_ORIGINAL_COMMAND
+     ```
+
+     The website step also needs `/usr/local/bin/automaton-deploy-website` (root-owned, mode 755, allowed in that user's sudoers like `update.sh`). The workflow streams `git archive` of `server-v<version>` to its stdin. It extracts it to a temp directory and runs the archive's `scripts/deploy-website-prod.sh`, which builds and restarts only `website-green` (`--no-deps`). It never checks out or pulls in `/opt/automaton`:
+
+     ```bash
+     #!/usr/bin/env bash
+     set -euo pipefail
+     [[ "${1:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "refused"; exit 1; }
+     dir="$(mktemp -d)"; trap 'rm -rf "$dir"' EXIT
+     tar -x -C "$dir"
+     bash "$dir/scripts/deploy-website-prod.sh" "$dir" "$1"
      ```
    - `PROD_SSH_KNOWN_HOSTS`: the server's host key line, from `ssh-keyscan -t ed25519 <host>` checked against the real server.
 5. Known limit: an agent working on your machine under your own GitHub login (not the bot) can start and approve a run as you. Only approve runs you started or asked for, and check the version and the actor on the run page.
