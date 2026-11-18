@@ -68,4 +68,15 @@ describe('AppOverview catalog update', () => {
     await flushPromises()
     expect(running.find('[data-testid="paused-reason"]').exists()).toBe(false)
   })
+
+  it('shows the short failure line and keeps the full log behind Show details', async () => {
+    const getUpdate = vi.mocked(appsService.getCatalogUpdate)
+    getUpdate.mockResolvedValue({ available: true, installedCommit: 'a1', latestCommit: 'a1', edited: false, deployFailed: true, deployError: 'Build failed:\nTraceback (most recent call last):\nValueError: bad pin', newSecrets: [], newSettings: [], newPermissions: [] } as never)
+    const wrapper = mountOverview({ installedFromRepo: 'o/apps' } as Partial<App>)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="update-deploy-error"]').text()).toContain('Build failed: ValueError: bad pin')
+    expect(wrapper.text()).not.toContain('Traceback')
+    await wrapper.get('[data-testid="update-deploy-details-toggle"]').trigger('click')
+    expect(wrapper.get('[data-testid="update-deploy-details"]').text()).toContain('Traceback (most recent call last)')
+  })
 })

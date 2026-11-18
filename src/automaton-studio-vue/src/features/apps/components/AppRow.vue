@@ -86,5 +86,7 @@ defineEmits<{ open: [] }>()
 @media (max-width: 640px) {
   .app-row { flex-wrap: wrap; }
   .app-row__text { flex-basis: calc(100% - 60px); }
+  /* The action (Open, Update, Install) sits on its own line, so a wide one never squeezes the name. */
+  .app-row--split .app-row__main { flex: 1 1 100%; }
 }
 </style>

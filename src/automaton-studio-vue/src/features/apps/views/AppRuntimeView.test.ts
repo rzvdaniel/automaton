@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import ToastService from 'primevue/toastservice'
 import AppRuntimeView from './AppRuntimeView.vue'
 
 const writeText = vi.fn().mockResolvedValue(undefined)
@@ -12,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   listDeploymentTargets: vi.fn(),
   createRuntimeLaunch: vi.fn(),
   canBeFramed: vi.fn(),
+  getCatalogUpdate: vi.fn(),
+  applyCatalogUpdate: vi.fn(),
 }))
 
 vi.mock('../services/apps.service', () => ({ appsService: mocks }))
@@ -28,7 +31,7 @@ async function mountView(requiresAuthentication: boolean, framable = true) {
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/apps/:id/application', component: AppRuntimeView }] })
   await router.push('/apps/app-id/application')
   await router.isReady()
-  const wrapper = mount(AppRuntimeView, { global: { plugins: [router], stubs: { ProgressSpinner: true } } })
+  const wrapper = mount(AppRuntimeView, { global: { plugins: [router, ToastService], stubs: { ProgressSpinner: true } } })
   await flushPromises()
   return wrapper
 }
@@ -71,7 +74,7 @@ describe('AppRuntimeView runtime bootstrap', () => {
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/apps/:id/application', component: AppRuntimeView }] })
     await router.push('/apps/app-id/application')
     await router.isReady()
-    const wrapper = mount(AppRuntimeView, { global: { plugins: [router], stubs: { ProgressSpinner: true } } })
+    const wrapper = mount(AppRuntimeView, { global: { plugins: [router, ToastService], stubs: { ProgressSpinner: true } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('bootstrap failed')
@@ -84,7 +87,7 @@ describe('AppRuntimeView runtime bootstrap', () => {
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/apps/:id/application', component: AppRuntimeView }] })
     await router.push('/apps/app-id/application')
     await router.isReady()
-    const wrapper = mount(AppRuntimeView, { global: { plugins: [router], stubs: { ProgressSpinner: true } } })
+    const wrapper = mount(AppRuntimeView, { global: { plugins: [router, ToastService], stubs: { ProgressSpinner: true } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('This app has not been deployed yet.')
@@ -92,5 +95,40 @@ describe('AppRuntimeView runtime bootstrap', () => {
     expect(wrapper.text()).toContain('Back to Studio')
     await wrapper.get('.copy-command__button').trigger('click')
     expect(writeText).toHaveBeenCalledWith('automaton deploy')
+  })
+
+  async function mountCatalogApp(update: unknown) {
+    mocks.get.mockResolvedValue({ id: 'app-id', installedFromRepo: 'o/apps' } as never)
+    mocks.listDeploymentTargets.mockResolvedValue([{ isDefault: true, genericRuntimeDeployed: false }])
+    mocks.getCatalogUpdate.mockResolvedValue(update)
+    mocks.applyCatalogUpdate.mockResolvedValue({})
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/apps/:id/application', component: AppRuntimeView }, { path: '/apps/:id', component: { template: '<div />' } }] })
+    await router.push('/apps/app-id/application')
+    await router.isReady()
+    const wrapper = mount(AppRuntimeView, { global: { plugins: [router, ToastService], stubs: { ProgressSpinner: true } } })
+    await flushPromises()
+    return { wrapper, router }
+  }
+
+  it('says the build failed and offers Retry and the log, not the CLI hint, for a failed catalog app', async () => {
+    const { wrapper, router } = await mountCatalogApp({ available: true, installedCommit: 'a1', latestCommit: 'a1', edited: false, deployFailed: true, deployError: 'Build failed:\nTraceback\nValueError: bad pin' })
+    expect(wrapper.text()).toContain('The build of this app failed.')
+    expect(wrapper.get('[data-testid="runtime-failure"]').text()).toBe('Build failed: ValueError: bad pin')
+    expect(wrapper.text()).not.toContain('automaton deploy')
+    expect(wrapper.get('[data-testid="runtime-update"]').text()).toBe('Retry')
+    await wrapper.get('[data-testid="runtime-update"]').trigger('click')
+    await flushPromises()
+    expect(mocks.applyCatalogUpdate).toHaveBeenCalledWith('app-id', false)
+    expect(router.currentRoute.value.path).toBe('/apps/app-id')
+    await router.push('/apps/app-id/application')
+    await wrapper.get('[data-testid="runtime-log"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/apps/app-id?view=activity')
+  })
+
+  it('offers Update for a catalog app that never deployed and has a newer version', async () => {
+    const { wrapper } = await mountCatalogApp({ available: true, installedCommit: 'a1', latestCommit: 'b2', edited: false })
+    expect(wrapper.get('[data-testid="runtime-update"]').text()).toBe('Update')
+    expect(wrapper.text()).not.toContain('automaton deploy')
   })
 })

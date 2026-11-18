@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { isAxiosError } from 'axios'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Drawer from 'primevue/drawer'
@@ -15,12 +16,15 @@ import CatalogSources from './CatalogSources.vue'
 import { appsService } from '../services/apps.service'
 import { getStudioApplicationUrl } from '../utils/public-app-url'
 import { catalogName } from '../utils/app-list-display'
+import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
+import type { CatalogUpdate } from '../services/apps.service'
 import type { CatalogEntry, CatalogQuery, CatalogResponse } from '../types/apps.types'
 
 const PAGE_SIZE = 24
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const toast = useToast()
 const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 const catalog = ref<CatalogResponse | null>(null)
 const loading = ref(true)
@@ -56,6 +60,37 @@ async function loadPrivate() {
 const sourceUrl = (app: CatalogEntry) => `https://github.com/${app.repo}/tree/${app.commit}${app.folder ? `/${app.folder}` : ''}`
 /** GitHub 404s for people without access, so a custom source's link shows only when an administrator knows it is public. */
 const showSourceLink = (app: CatalogEntry) => !app.customSource || (isSystemAdministrator.value && !privateSources.value.has(app.sourceId))
+/** Installed apps with a newer catalog version, or whose last deploy failed, by app id; the server answers for one app at a time. */
+const updates = ref<Record<string, CatalogUpdate>>({})
+const updating = ref<Set<string>>(new Set())
+async function loadUpdates(apps: CatalogEntry[]) {
+  await Promise.all(apps.filter((app) => app.installedAppId && !updates.value[app.installedAppId]).map(async (app) => {
+    const id = app.installedAppId!
+    try {
+      const result = await appsService.getCatalogUpdate(id)
+      if (result.available) updates.value = { ...updates.value, [id]: result }
+    } catch { /* the viewer cannot update this app, or the check failed: the row shows no update */ }
+  }))
+}
+const updateOf = (app: CatalogEntry) => (app.installedAppId ? updates.value[app.installedAppId] : undefined)
+const updateLabel = (update: CatalogUpdate) => (isRetryOnly(update) ? 'Retry' : 'Update')
+async function runUpdate(app: CatalogEntry) {
+  const id = app.installedAppId
+  const update = updateOf(app)
+  if (!id || !update || updating.value.has(id)) return
+  updating.value = new Set(updating.value).add(id)
+  try {
+    if (await applyCatalogUpdate(id, update, toast)) {
+      const rest = { ...updates.value }
+      delete rest[id]
+      updates.value = rest
+    }
+  } finally {
+    const next = new Set(updating.value)
+    next.delete(id)
+    updating.value = next
+  }
+}
 function reload() { load(); loadPrivate() }
 
 /** The address keeps the view, so a filtered page can be bookmarked or shared. */
@@ -105,7 +140,10 @@ async function load(refresh = false) {
   failed.value = false
   try {
     const response = await appsService.getCatalog(refresh, query.value)
-    if (mine === latest) catalog.value = response
+    if (mine === latest) {
+      catalog.value = response
+      void loadUpdates(response.apps)
+    }
   } catch {
     if (mine === latest) {
       catalog.value = null
@@ -192,6 +230,10 @@ async function installFromUrl() {
           @open="details = app"
         >
           <template #meta>
+            <span v-if="updateOf(app)" class="catalog-update" data-testid="catalog-update">
+              <span class="catalog-update__pill">{{ isRetryOnly(updateOf(app)!) ? 'Last deploy failed' : 'Update available' }}</span>
+              <template v-if="updateOf(app)!.deployFailed"> {{ shortReason(updateOf(app)!.deployError) }}</template>
+            </span>
             <span v-if="access(app)" class="catalog-access">{{ access(app) }}</span>
           </template>
           <template #tag>
@@ -200,6 +242,7 @@ async function installFromUrl() {
           <template #action>
             <span v-if="app.installedAppId" class="catalog-opened">
               <a :href="getStudioApplicationUrl(app.installedAppId)" target="_blank" rel="noopener" class="p-button p-component p-button-sm catalog-open" :aria-label="`Open ${catalogName(app.name)}`">Open <i class="pi pi-external-link" aria-hidden="true" /></a>
+              <Button v-if="updateOf(app)" :label="updateLabel(updateOf(app)!)" icon="pi pi-download" size="small" class="btn-small catalog-update-button" :loading="updating.has(app.installedAppId)" :aria-label="`${updateLabel(updateOf(app)!)} ${catalogName(app.name)}`" @click="runUpdate(app)" />
               <RouterLink :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="catalog-installed" :aria-label="`Manage ${catalogName(app.name)}`">Manage</RouterLink>
             </span>
             <span v-else-if="app.requiresNewerServer" class="catalog-access">Needs Automaton Server {{ app.minServerVersion }} or newer</span>
@@ -279,6 +322,9 @@ async function installFromUrl() {
 .catalog-category { flex: none; color: var(--ink-soft); font-size: 12.5px; }
 .catalog-access { color: var(--ink-soft); font-size: 12px; opacity: 0.85; }
 .catalog-opened { display: inline-flex; align-items: center; gap: 12px; }
+.catalog-update { display: block; margin-top: 2px; color: var(--ink-soft); font-size: 12px; overflow-wrap: anywhere; }
+.catalog-update__pill { padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); font-family: var(--mono); }
+.catalog-opened { flex-wrap: wrap; justify-content: flex-end; }
 .catalog-installed { flex: none; color: var(--ink-soft); font-family: var(--mono); font-size: 12px; text-decoration: none; }
 .catalog-installed:hover { color: var(--ink); text-decoration: underline; }
 .catalog-install.p-button { flex: none; min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; font-size: 13px; text-decoration: none; }
@@ -298,5 +344,7 @@ async function installFromUrl() {
 @media (max-width: 640px) {
   .catalog-category { display: none; }
   .catalog-install.p-button { min-height: 44px; }
+  .apps-card :deep(.app-row--split > :not(.app-row__main)) { margin: 0 0 12px 14px; }
+  .catalog-opened { justify-content: flex-start; }
 }
 </style>
