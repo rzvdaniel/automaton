@@ -10,7 +10,7 @@ Your AI agent can take an empty server to a working Automaton in a few minutes. 
 
 ## What you provide
 
-1. **A server you can reach with SSH.** A Linux server (Ubuntu 22.04 or 24.04, or Debian 12) with at least 2 GB of memory.
+1. **A server you can reach with SSH.** A Linux server (Ubuntu 22.04, 24.04 or 26.04, or Debian 12) with at least 2 GB of memory.
 2. **A domain with two DNS records** pointing to the server: `yourdomain.com` and `*.yourdomain.com`, DNS only (no proxy).
 3. **An email address** for certificate notices. It is not an account. Your AI will also ask which email you want for your administrator account.
 

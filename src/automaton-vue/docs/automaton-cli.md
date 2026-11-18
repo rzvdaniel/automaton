@@ -17,7 +17,7 @@ Use the API URL from [your server installation](./install-server) or your team a
 curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh
 ```
 
-On Windows (PowerShell): `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. The script puts `automaton` in `~/.local/bin` (Windows: `%LOCALAPPDATA%\Automaton\bin`) and checks its SHA-256. Set `AUTOMATON_VERSION=server-v<version>` to pick a release.
+On Windows (PowerShell): `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. The script puts `automaton` in `~/.local/bin` (Windows: `%LOCALAPPDATA%\Automaton\bin`) and checks its SHA-256. The script always installs the latest release unless you set `AUTOMATON_VERSION=server-v<version>`; a newer CLI works with an older server.
 
 If `automaton whoami` already names your server and user, skip login. If the CLI is older than the server (a command or option is missing), rerun the install script above, or `dotnet tool update -g Automaton.Cli`; check with `automaton --version`.
 
