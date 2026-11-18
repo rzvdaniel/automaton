@@ -43,6 +43,7 @@ internal static class ApiApplicationPipelineExtensions
         app.MapHub<AutomatonHub>("/api/workflow/hub");
         app.MapRunnerTunnel();
         app.MapApiNotFound();
+        app.MapDotfileNotFound();
         app.MapFallbackToPage("/_Host");
     }
 
@@ -50,6 +51,14 @@ internal static class ApiApplicationPipelineExtensions
     internal static void MapApiNotFound(this IEndpointRouteBuilder routes) =>
         routes.MapFallback("/api/{**path}", () =>
             Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not found", detail: "No API endpoint matches this request."));
+
+    /// <summary>
+    /// Scanner paths such as /.git/config or /.env.bak answer an empty 404 instead of the Studio page. Only unmatched paths
+    /// reach this fallback (it ranks just above the Studio page), and /.well-known stays reachable.
+    /// </summary>
+    internal static void MapDotfileNotFound(this IEndpointRouteBuilder routes) =>
+        routes.MapFallback("{**path:regex(^(.*/)?\\.(?!well-known(/|$)).*$)}", () => Results.StatusCode(StatusCodes.Status404NotFound))
+            .Add(builder => ((RouteEndpointBuilder)builder).Order = int.MaxValue - 1);
 
     /// <summary>The /health body: the release tag (server-vX.Y.Z) when the server knows it, nothing else.</summary>
     internal static object HealthResponse(string? installedVersion)
