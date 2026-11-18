@@ -64,7 +64,8 @@ public sealed class AppCatalogUpdateService(
         var (failure, hasDeployed) = await DeployStateAsync(dbContext, appId, cancellationToken);
         // Apps deployed before DeployedFromCommit existed have no recorded commit: say "previous version", never guess one.
         var running = app.DeployedFromCommit;
-        var latest = await catalog.PinnedCommitAsync(source.Repo, source.Folder, cancellationToken, refresh);
+        var pinned = await catalog.PinnedAsync(source.Repo, source.Folder, cancellationToken, refresh);
+        var latest = pinned?.Commit;
         // The last deploy failed: the app still runs the previous version, so it is not up to date, and an update retries the deploy.
         if (latest is null || latest == source.Commit)
             return failure is null ? None(source.Commit) with { RunningCommit = running, HasPreviousVersion = hasDeployed }
@@ -72,7 +73,7 @@ public sealed class AppCatalogUpdateService(
         // The edited flag changes when the app's files do, so the key includes their fingerprint (#1149).
         var key = $"catalog-update:{appId}:{source.Commit}:{latest}:{SourceFingerprint(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId))}";
         if (!fresh && cache.TryGetValue(key, out AppCatalogUpdateModel? cached) && cached is not null) return WithDeploy(cached, failure, running, hasDeployed);
-        var model = await CompareAsync(app, ownerId, source, latest, cancellationToken);
+        var model = await CompareAsync(app, ownerId, source, Target(pinned!), cancellationToken);
         cache.Set(key, model, CacheFor);
         return WithDeploy(model, failure, running, hasDeployed);
     }
@@ -119,16 +120,27 @@ public sealed class AppCatalogUpdateService(
         return $"{count}-{length}-{newest}";
     }
 
-    private async Task<AppCatalogUpdateModel> CompareAsync(WebApp app, Guid ownerId, GitAppSource source, string latest, CancellationToken cancellationToken)
+    /// <summary>The source to update to: the same repository and folder, or where the app moved to.</summary>
+    private static GitAppSource Target(AppCatalogService.PinnedApp pinned) => new(pinned.Repo, pinned.Folder, pinned.Commit);
+
+    /// <summary>Where the update comes from, read again right before it is applied.</summary>
+    private async Task<GitAppSource> CurrentTargetAsync(GitAppSource installed, string expectedCommit, CancellationToken cancellationToken)
+    {
+        var pinned = await catalog.PinnedAsync(installed.Repo, installed.Folder, cancellationToken);
+        return pinned?.Commit == expectedCommit ? Target(pinned) : throw new InvalidOperationException("The catalog changed while updating. Try again.");
+    }
+
+    private async Task<AppCatalogUpdateModel> CompareAsync(WebApp app, Guid ownerId, GitAppSource source, GitAppSource target, CancellationToken cancellationToken)
     {
         var appId = app.Id;
 
         using var installed = await installer.DownloadAsync(source, cancellationToken);
-        using var newer = await installer.DownloadAsync(source with { Commit = latest }, cancellationToken);
+        using var newer = await installer.DownloadAsync(target, cancellationToken);
         var current = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
-        var next = AppCatalogInstallService.ReadManifest(newer, source).Application;
-        return new AppCatalogUpdateModel(true, source.Commit, latest,
-            $"https://github.com/{source.Repo}/compare/{source.Commit}...{latest}",
+        var next = AppCatalogInstallService.ReadManifest(newer, target).Application;
+        var moved = !string.Equals(source.Repo, target.Repo, StringComparison.OrdinalIgnoreCase);
+        return new AppCatalogUpdateModel(true, source.Commit, target.Commit,
+            moved ? null : $"https://github.com/{source.Repo}/compare/{source.Commit}...{target.Commit}",
             IsEdited(installed, source, fileStorageService.GetAppSourceDirectoryPath(ownerId, appId)),
             Added(current.Secrets.Select(x => x.Name), next.Secrets.Select(x => x.Name)),
             Added(current.Settings.Select(x => x.Name), next.Settings.Select(x => x.Name)),
@@ -153,7 +165,7 @@ public sealed class AppCatalogUpdateService(
         if (update.LatestCommit == source.Commit)
             return await deployment.AcceptAsync(appId, userId, ownerId, null, false, cancellationToken);
 
-        var target = source with { Commit = update.LatestCommit! };
+        var target = await CurrentTargetAsync(source, update.LatestCommit!, cancellationToken);
         using (var package = await installer.DownloadAsync(target, cancellationToken))
         {
             // Extract next to the app first and swap only when that worked, so a failed download or extract leaves the
@@ -179,6 +191,8 @@ public sealed class AppCatalogUpdateService(
         }
 
         var entity = await dbContext.WebApps.FirstAsync(x => x.Id == appId, cancellationToken);
+        entity.InstalledFromRepo = target.Repo;
+        entity.InstalledFromFolder = target.Folder;
         entity.InstalledFromCommit = target.Commit;
         entity.Updated = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -188,10 +202,10 @@ public sealed class AppCatalogUpdateService(
             EntityType = AuditEntityTypes.App,
             EntityId = appId,
             EventType = AuditEventTypes.AppInstalledFromSource,
-            Message = $"App '{entity.Name}' was updated from {source.Repo} to {target.Commit[..7]}",
+            Message = $"App '{entity.Name}' was updated from {source.Repo} to {target.Commit[..7]}" + (target.Repo == source.Repo ? "" : $" ({target.Repo})"),
             Outcome = AuditOutcomes.Success,
             ActorUserId = userId,
-            Metadata = new { source.Repo, source.Folder, From = source.Commit, To = target.Commit }
+            Metadata = new { source.Repo, source.Folder, From = source.Commit, To = target.Commit, ToRepo = target.Repo, ToFolder = target.Folder }
         });
         return await deployment.AcceptAsync(appId, userId, ownerId, null, false, cancellationToken);
     }

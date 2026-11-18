@@ -233,6 +233,69 @@ public sealed class AppCatalogTests
         });
     }
 
+    private static string MovedJson(string from = "rzvdaniel/automaton-apps") => """
+        {"schemaVersion":1,"repo":"owner/store","apps":[
+          {"id":"goat","name":"GoatCounter","summary":"Stats.","category":"Analytics","folder":"analytics/goatcounter",
+           "commit":"0123456789abcdef0123456789abcdef01234567","minServerVersion":"0.2.55","permissions":[],
+           "movedFrom":{"repo":"__FROM__","folder":"analytics/goatcounter"}}]}
+        """.Replace("__FROM__", from);
+
+    [Test]
+    public async Task Pinned_FollowsAnAppThatMovedFromTheOfficialCatalog_ToItsNewRepoAndFolder()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(MovedJson(), null)), version: "0.2.55");
+
+        var pinned = await service.PinnedAsync("Rzvdaniel/Automaton-Apps", "analytics/goatcounter/", default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(pinned, Is.EqualTo(new AppCatalogService.PinnedApp("owner/store", "analytics/goatcounter", Commit)));
+            Assert.That(service.PinnedAsync("rzvdaniel/automaton-apps", "other", default).Result, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task Pinned_IgnoresMovedFromThatClaimsAnotherRepoThanTheOfficialOne()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(MovedJson("someone/else"), null)), version: "0.2.55");
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await service.PinnedAsync("someone/else", "analytics/goatcounter", default), Is.Null);
+            Assert.That(await service.PinnedAsync("rzvdaniel/automaton-apps", "analytics/goatcounter", default), Is.Null);
+        });
+    }
+
+    [Test]
+    public void Parse_KeepsMovedFromOnlyForTheOfficialSourceAndTheStore()
+    {
+        var body = MovedJson();
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogService.Parse(body).Apps.Single().MovedFrom, Is.Not.Null);
+            Assert.That(AppCatalogService.Parse(body, "rzvdaniel/automaton-monster").Apps.Single().MovedFrom, Is.Not.Null);
+            Assert.That(AppCatalogService.Parse(body, "someone/else").Apps.Single().MovedFrom, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task Get_MarksAMovedAppInstalledWhenItWasInstalledFromItsOldRepo()
+    {
+        await using var db = CreateDb();
+        var owner = Guid.NewGuid();
+        var app = new WebApp { Id = Guid.NewGuid(), Name = "GoatCounter", InstalledFromRepo = "rzvdaniel/automaton-apps", InstalledFromFolder = "analytics/goatcounter" };
+        db.WebApps.Add(app);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = app.Id, UserId = owner });
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeHandler(_ => Respond(MovedJson(), null)), version: "0.2.55");
+
+        var response = await service.GetAsync(owner, refresh: true, default);
+
+        Assert.That(response.Apps.Single().InstalledAppId, Is.EqualTo(app.Id));
+    }
+
     [Test]
     public async Task Get_MarksAnAppInstalledFromTheOfficialCatalogEvenWhenRepoCaseOrFolderSlashesDiffer()
     {
