@@ -344,11 +344,11 @@ internal static class ApiMessagingRegistration
         services.AddScoped<AdminAppDirectoryService>();
         services.AddScoped<AdminUserProvisioningService>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
-        services.AddHostedService<SecretGrantCleanupService>();
+        services.AddSupervisedHostedService<SecretGrantCleanupService>();
         services.AddScoped<Automaton.Api.ServerCleanup.ServerCleanupService>();
         services.AddScoped<Automaton.Api.ServerCleanup.RunnerMaintenanceService>();
         services.AddScoped<Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands, Automaton.Api.ServerCleanup.RunnerMaintenanceCommands>();
-        services.AddHostedService<Automaton.Api.ServerCleanup.ServerCleanupScheduler>();
+        services.AddSupervisedHostedService<Automaton.Api.ServerCleanup.ServerCleanupScheduler>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
         services.AddCap(options =>
         {
@@ -538,8 +538,8 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppCatalogInstallService>();
         services.AddScoped<AppCatalogBackfillService>();
         services.AddScoped<AppCatalogUpdateService>();
-        services.AddHostedService<EssentialCatalogBootstrapService>();
-        services.AddHostedService<SetupTokenRotationService>();
+        services.AddSupervisedHostedService<EssentialCatalogBootstrapService>();
+        services.AddSupervisedHostedService<SetupTokenRotationService>();
         services.AddScoped<AppMutationService>();
         services.AddScoped<AppMutationAuditService>();
         services.AddScoped<AppDeletionService>();
@@ -617,6 +617,8 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<DeploymentOperationService>();
         services.AddScoped<StoredSourceDeploymentService>();
         services.AddSingleton<DeploymentOperationDispatcher>();
+        // Safety net: a faulted background service is logged by the host and never stops the API.
+        services.Configure<HostOptions>(o => o.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
         services.AddHostedService(sp => sp.GetRequiredService<DeploymentOperationDispatcher>());
         services.AddScoped<AppActionExecutionService>();
         services.AddScoped<AppActionRunnerGateway>();
@@ -625,9 +627,9 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<ActionScheduleService>();
         services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
         services.AddScoped<ScheduledActionExecutionHandler>();
-        services.AddHostedService<AppModuleExecutionReconciliationService>();
-        services.AddHostedService<ManagedRuntimeRouteReconciliationService>();
-        services.AddHostedService<CustomDomainLiveCheckService>();
+        services.AddSupervisedHostedService<AppModuleExecutionReconciliationService>();
+        services.AddSupervisedHostedService<ManagedRuntimeRouteReconciliationService>();
+        services.AddSupervisedHostedService<CustomDomainLiveCheckService>();
         services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
         services.AddScoped(typeof(UserImpersonationServiceFactory<>));
         return services;
