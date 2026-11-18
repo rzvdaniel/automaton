@@ -172,7 +172,7 @@ class Proof(unittest.TestCase):
         self.assertEqual(self.verdict(ui, '<img src="a.png">')[0][0], "PASS")
 
     def test_api_cli_and_scripts_need_a_code_block(self):
-        for path in ("src/Automaton.Api/A.cs", "src/Automaton.Cli/B.cs", "scripts/x.sh", "deploy/compose.yml"):
+        for path in ("src/Automaton.Api/A.cs", "src/Automaton.Cli/B.cs", "scripts/x.sh", "docker/install/backup.sh", "docker/Dockerfile.server", "scripts/x.ps1", "docker-compose.prod.yml"):
             self.assertEqual(self.verdict([path], "ran it")[0][0], "FAIL", path)
             self.assertEqual(self.verdict([path], FENCED)[0][0], "PASS", path)
 
@@ -183,7 +183,8 @@ class Proof(unittest.TestCase):
 
     def test_no_proof_for_docs_tests_ci_and_dependabot(self):
         for paths in (["docs/a.md"], ["src/UnitTests/ATests.cs"], [".github/workflows/t.yml"],
-                      ["src/automaton-studio-vue/src/a.test.ts"]):
+                      ["src/automaton-studio-vue/src/a.test.ts"], ["src/automaton-vue/docs/.vitepress/config.ts"],
+                      ["docker/README.md"], ["src/automaton-vue/src/__tests__/a.ts"]):
             self.assertEqual(self.verdict(paths, "ran it"), [], paths)
         self.assertEqual(self.verdict(["src/automaton-studio-vue/package.json", "src/A/B.cs"], "x", "dependabot[bot]"), [])
 
@@ -191,6 +192,10 @@ class Proof(unittest.TestCase):
         paths = ["src/Automaton.Api/A.cs"]
         self.assertEqual(self.verdict(paths, "x\nProof: not possible, because it needs a fresh server")[0][0], "WARN")
         self.assertEqual(self.verdict(paths, "x\nProof: not possible, because")[0][0], "FAIL")
+
+    def test_bold_line_inside_a_code_block_does_not_end_the_section(self):
+        out = "\n```\n**Result:** ok\n$ run\n```"
+        self.assertEqual(self.verdict(["src/A/B.cs"], out)[0][0], "PASS")
 
     def test_proof_after_how_verified_does_not_count(self):
         body = "**How verified:** none\n**Risk:** low\n" + FENCED + "\n**How to revert:** r\n**Docs:** none, because t"

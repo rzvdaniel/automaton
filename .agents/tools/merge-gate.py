@@ -31,14 +31,17 @@ REMOVAL_LINES = 500
 # Proof "How verified" must contain, by what the PR changes: (area, matches a changed path, proof kind).
 # Docs, tests, CI and dependency bumps match no rule and need no extra proof.
 UI_ROOTS = ("src/automaton-studio-vue/", "src/automaton-vue/", "src/automaton-store-vue/")
+SCRIPT_EXT = (".sh", ".ps1", ".mjs", ".py")
 UI_FILES = re.compile(r"\.(vue|css|scss|html|[jt]sx?)$")
-TEST_FILE = re.compile(r"(/UnitTests/|/tests?/|\.(test|spec)\.[jt]s$)")
+NOT_UI = re.compile(r"/docs/")
+TEST_FILE = re.compile(r"(/UnitTests/|/tests?/|/__tests__/|\.(test|spec)\.(vue|[jt]sx?)$)")
 PROOF_RULES = (
-    ("UI", lambda p: p.startswith(UI_ROOTS) and bool(UI_FILES.search(p)) and not TEST_FILE.search(p), "image"),
+    ("UI", lambda p: p.startswith(UI_ROOTS) and bool(UI_FILES.search(p)) and not TEST_FILE.search(p) and not NOT_UI.search(p), "image"),
     ("app UI", lambda p: p.startswith(("app/", "apps/", "wallpapers/")) and bool(UI_FILES.search(p)), "image"),
     ("API/CLI/scripts", lambda p: (p.startswith("src/") and p.endswith(".cs") and not TEST_FILE.search(p))
-     or (p.startswith(("scripts/", "deploy/")) and p.endswith(".sh"))
-     or p.startswith(("deploy/", "docker-compose")) or p.endswith("Dockerfile"), "code"),
+     or (p.startswith(("scripts/", "docker/")) and p.endswith(SCRIPT_EXT) and not TEST_FILE.search(p))
+     or (p.startswith("docker/") and not p.endswith((".md", ".json")))
+     or p.startswith("docker-compose"), "code"),
 )
 PROOF_HINT = {"image": "a screenshot (markdown image or <img>)",
               "code": "a fenced code block with the command and its output"}
@@ -131,7 +134,7 @@ def security_row(tier: str, reviews: list[dict], review: dict | None, head: str)
 
 def how_verified(body: str) -> str:
     """The text from the "How verified" line to the next bold heading (Risk, Check after release, ...)."""
-    found = re.search(r"^\W*How verified\W*:(.*?)(?=^\*\*\w[^\n]*:|\Z)", body, re.I | re.M | re.S)
+    found = re.search(r"^\W*How verified\W*:(.*?)(?=^[ \t*#>_-]*(?:Risk|How to revert|Check after release|Not in this PR|Docs|Tests)[ \t*_]*:|\Z)", body, re.I | re.M | re.S)
     return found.group(1) if found else ""
 
 
