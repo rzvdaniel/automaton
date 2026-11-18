@@ -61,7 +61,10 @@ public class RunnersController : BaseController
         try
         {
             if (abandonOffline)
-                return Ok(new { skippedHostCleanup = await offlineDeletion!.DeleteAsync(id, cancellationToken) });
+            {
+                var skipped = await offlineDeletion!.DeleteAsync(id, cancellationToken);
+                return skipped is null ? NotFound() : Ok(new { skippedHostCleanup = skipped });
+            }
             await runnersService.Delete(id, cancellationToken, hostCleanupConfirmed);
         }
         catch (UnauthorizedAccessException)
