@@ -188,7 +188,7 @@ public sealed class ApplicationDeploymentService
         if (homeCardSchedules is null) return;
         try
         {
-            var present = actions.Any(action => action.ActionKey == Home.AppHomeCardLimits.ActionKey
+            var present = actions.Any(action => action.ActionKey == Core.Models.AppHomeCardLimits.ActionKey
                 && action.Status is "deployed" or "unchanged");
             await homeCardSchedules.SyncAsync(appId, ownerId, present, Home.HomeCardSchedules.IntervalFor(application), CancellationToken.None);
         }

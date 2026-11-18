@@ -1,3 +1,4 @@
+using Automaton.Core.Models;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Core.Models;
@@ -22,15 +23,11 @@ public sealed class AppHomeCardStore(ApplicationDbContext db)
         var isHomeCardAction = run.ModuleKey == AppHomeCardLimits.ActionKey;
         if (!succeeded && !isHomeCardAction) return;
 
-        var content = succeeded ? AppHomeCardValidator.TryParse(result.HomeCardJson) : null;
+        var check = succeeded ? AppHomeCardValidator.Check(result.HomeCardJson) : null;
+        var content = check?.Card;
         var at = result.CompletedAtUtc == default ? DateTime.UtcNow : result.CompletedAtUtc;
         var row = await db.AppHomeCards.SingleOrDefaultAsync(c => c.AppId == run.AppId, token);
-        if (content is null)
-        {
-            // Nothing valid came back: keep the previous card and mark it late.
-            if (row is null) return;
-            if (row.LastFailedAtUtc is null || row.LastFailedAtUtc < at) row.LastFailedAtUtc = at;
-        }
+        if (content is null) RecordNoCard(row, run.AppId, executionId, check, at);
         else if (row is null)
         {
             db.AppHomeCards.Add(new AppHomeCard
@@ -43,6 +40,7 @@ public sealed class AppHomeCardStore(ApplicationDbContext db)
             row.CardJson = AppHomeCardValidator.Serialize(content);
             row.UpdatedAtUtc = at;
             row.ExecutionId = executionId;
+            row.InvalidReason = null;
         }
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException)
@@ -50,5 +48,19 @@ public sealed class AppHomeCardStore(ApplicationDbContext db)
             // A parallel run stored its card first; the newer of the two wins on the next run.
             db.ChangeTracker.Clear();
         }
+    }
+
+    /// <summary>Nothing valid came back: keep the previous card and mark it late; a broken card also stores why, so Studio shows the default card.</summary>
+    private void RecordNoCard(AppHomeCard? row, Guid appId, Guid executionId, AppHomeCardCheck? check, DateTime at)
+    {
+        var reason = check is { Errors.Count: > 0 } ? AppHomeCardValidator.Reason(check.Errors) : null;
+        if (row is null)
+        {
+            if (reason is not null)
+                db.AppHomeCards.Add(new AppHomeCard { AppId = appId, CardJson = "{}", UpdatedAtUtc = at, ExecutionId = executionId, LastFailedAtUtc = at, InvalidReason = reason });
+            return;
+        }
+        if (reason is not null && at >= row.UpdatedAtUtc) row.InvalidReason = reason;
+        if (row.LastFailedAtUtc is null || row.LastFailedAtUtc < at) row.LastFailedAtUtc = at;
     }
 }

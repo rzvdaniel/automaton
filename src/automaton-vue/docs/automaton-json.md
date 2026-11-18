@@ -93,20 +93,44 @@ separate action and requires explicit approval.
 
 ## Home card: status on Studio Home
 
-An app shows a short live status on its card on Studio Home (pinned apps) through its Actions; there is nothing to push and no key.
+An app shows a short live card on Studio Home (pinned apps) through its Actions; there is nothing to push and no key. You send data only; Studio draws it in its own fonts and colours, in light and dark mode and at phone width. A card is a glance: detailed charts and statistics stay in the app itself.
 
 - **An Action named `home-card`** returns the card as its whole result. The platform runs it for you every 15 minutes (set `application.homeCard.intervalSeconds`, at least 300; the first run of each app is spread across the interval) from the next deployment that includes it. It runs in a lighter container than other Actions: 128 MB memory, 0.25 CPU, 64 processes and a 30-second limit (a server administrator can change these under `MachineContainerResources` as `HomeCardMemoryLimitMb`, `HomeCardCpuLimitCores`, `HomeCardPidsLimit` and `HomeCardTimeoutSeconds`). It works for static sites, web apps, APIs and Actions-only apps.
 - **Any other Action** can include a `homeCard` object in its result, so an app that already runs Actions (a backup, a monitor) updates its card whenever it runs.
 
-The card is plain text, shown as text and never as HTML:
+The card is plain text, shown as text and never as HTML. Tones are `ok`, `warning`, `critical` and `info`; a card never sends colours.
 
 ```json
-{ "status": "All good", "facts": [{ "label": "Disk", "value": "61% used" }], "alerts": [{ "severity": "warning", "text": "Last backup is 2 days old" }] }
+{
+  "status": "Healthy",
+  "detail": "3 sites checked",
+  "tone": "ok",
+  "blocks": [
+    { "type": "meter", "label": "Disk", "value": 61, "max": 100, "unit": "%", "warnAt": 75, "critAt": 90 },
+    { "type": "counters", "items": [{ "label": "Up", "value": 12, "tone": "ok" }, { "label": "Down", "value": 1, "tone": "critical" }] },
+    { "type": "chart", "kind": "line", "labels": ["Mon", "Tue", "Wed"], "series": [{ "name": "Response ms", "tone": "info", "values": [210, 190, 240] }] }
+  ]
+}
 ```
 
-`status` is required (at most 80 characters). `facts` has at most 3 entries (`label` up to 40, `value` up to 120 characters). `alerts` has at most 5 entries; `severity` is `info`, `warning` or `critical` and `text` is up to 240 characters. A card that breaks these rules, or a run that fails or times out, keeps the previous card: Home greys it and shows when it was last updated. Home reads stored cards only; it never calls the app.
+`status` is required (at most 80 characters); `detail` (240) and `tone` are optional and `tone` colours the card's top edge. `blocks` holds at most 6 blocks:
 
-Every Action of an app whose runtime is running also gets `AUTOMATON_APP_INTERNAL_URL`, the address of the running app on the Runner's private network (for example `http://10.0.0.5:32768`), so a `home-card` Action can ask its own app for numbers. Only that app's Actions receive it; it is not set when the app is not running. Alerts do not reach a notification feed yet.
+| Block | Fields |
+|---|---|
+| `fact` | `label` (40), `value` (120), `note`? |
+| `badge` | `label`, `text` (40), `tone`, `note`? |
+| `meter` | `label`, `value`, `max`, `unit`? (12), `warnAt`?, `critAt`?, `note`? |
+| `counters` | `items`: 2 to 4 of `label`, `value` (number or short text), `tone`? |
+| `list` | `rows`: up to 5 of `text`, `tone`?, `note`? |
+| `alert` | `severity` (`info`, `warning`, `critical`), `text` (240); also goes to the notification feed |
+| `buttons` | `items`: up to 2 of `label`, `path` (a page of the app itself, starting with `/`) |
+| `chart` | `kind` (`line`, `area`, `bar`, `stacked-bar`, `donut`, `gauge`), `labels` (up to 48), `series`: `[{ name, tone, values }]` with one number per label; a `gauge` has one series with one value and an optional `max` (default 100) |
+
+The older `facts` (up to 3 of `label`, `value`) and `alerts` (up to 5) lists keep working. An unknown block type is skipped. A card that breaks the rules (or is larger than 16 KB) shows the default card on Home with the reason, until the next valid card; a run that fails or times out keeps the previous card, which Home greys and shows when it was last updated. Home reads stored cards only; it never calls the app.
+
+The schema is published at `/schemas/home-card.schema.json`. `automaton action run home-card` checks the result against it and prints each problem (for example `card.blocks[1].items needs 2 to 4 counters`).
+
+Every Action of an app whose runtime is running also gets `AUTOMATON_APP_INTERNAL_URL`, the address of the running app on the Runner's private network (for example `http://10.0.0.5:32768`), so a `home-card` Action can ask its own app for numbers. Only that app's Actions receive it; it is not set when the app is not running.
 
 ## Open paths: webhooks and callbacks
 

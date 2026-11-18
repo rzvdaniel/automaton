@@ -47,7 +47,15 @@ To show a live status on the app's Studio Home card, add an Action named
 `home-card` that writes the card as its whole JSON result:
 `{"status": "All good", "facts": [{"label": "Disk", "value": "61%"}], "alerts": [{"severity": "warning", "text": "Backup is late"}]}`
 (status up to 80 characters, at most 3 facts, at most 5 alerts with severity
-`info`, `warning` or `critical`; plain text only). The platform runs it every 15
+`info`, `warning` or `critical`; plain text only). Richer cards add `detail`,
+`tone` (`ok`, `warning`, `critical`, `info`; never colours) and up to 6 `blocks`:
+`fact`, `badge`, `meter` (`label`, `value`, `max`, `unit`, `warnAt`, `critAt`),
+`counters` (2 to 4 `items`), `list` (up to 5 `rows`), `alert`, `buttons` (up to 2,
+`path` of the app's own page) and `chart` (`kind` line, area, bar, stacked-bar,
+donut or gauge; `labels`; `series` of `name`, `tone`, `values`; up to 48 points).
+Studio draws them; send data only. Keep it a glance: detailed charts stay in the
+app. `automaton action run home-card` checks the result and prints problems; the
+schema is at `/schemas/home-card.schema.json`. The platform runs it every 15
 minutes (change with `application.homeCard.intervalSeconds`, at least 300) in a
 small container (128 MB, 30 seconds). Any other Action may add a `homeCard`
 object to its result instead. A failed run keeps the previous card. A running

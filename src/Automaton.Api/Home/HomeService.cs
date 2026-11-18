@@ -1,3 +1,4 @@
+using Automaton.Core.Models;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Services;
@@ -48,7 +49,9 @@ public sealed class HomeService(
         var result = new Dictionary<Guid, AppHomeCardDto>();
         foreach (var row in rows)
         {
-            var content = AppHomeCardValidator.Deserialize(row.CardJson);
+            var content = row.InvalidReason is { } reason
+                ? new AppHomeCardContent("Card not shown", [], []) { Detail = reason, Tone = "warning" }
+                : AppHomeCardValidator.Deserialize(row.CardJson);
             if (content is null) continue;
             var interval = intervals.FirstOrDefault(item => item.ApplicationId == row.AppId)?.IntervalSeconds;
             var stale = row.LastFailedAtUtc > row.UpdatedAtUtc

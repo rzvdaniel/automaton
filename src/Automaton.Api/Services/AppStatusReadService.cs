@@ -1,3 +1,4 @@
+using Automaton.Core.Models;
 using Automaton.Api.Constants;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -45,7 +46,7 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
     /// <summary>The app's latest Action run; the platform's own card refreshes do not count.</summary>
     private Task<AppListActionRunDto?> LastRunAsync(Guid appId, CancellationToken token)
         => db.AppModuleExecutions.AsNoTracking()
-            .Where(execution => execution.AppId == appId && execution.ModuleKey != Automaton.Api.Home.AppHomeCardLimits.ActionKey)
+            .Where(execution => execution.AppId == appId && execution.ModuleKey != Automaton.Core.Models.AppHomeCardLimits.ActionKey)
             .OrderByDescending(execution => execution.CreatedAtUtc)
             .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
             .FirstOrDefaultAsync(token);

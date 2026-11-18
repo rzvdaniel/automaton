@@ -826,11 +826,15 @@ namespace Automaton.Infrastructure.Migrations
 
                     b.Property<string>("CardJson")
                         .IsRequired()
-                        .HasMaxLength(8192)
-                        .HasColumnType("character varying(8192)");
+                        .HasMaxLength(16384)
+                        .HasColumnType("character varying(16384)");
 
                     b.Property<Guid>("ExecutionId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("InvalidReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("citext");
 
                     b.Property<DateTime?>("LastFailedAtUtc")
                         .HasColumnType("timestamp with time zone");
