@@ -19,7 +19,11 @@ Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_templ
   follows the page you name when it runs your "Check after release" list.
 
 - **How verified** is evidence, not a claim: the commands and what came back. For a bug, name the test that failed
-  before the fix. For a Studio or website change, include a screenshot in the proof (see automaton-verify-release).
+  before the fix. The merge gate checks the proof by what the PR changes: a UI change (Studio, website, store, app
+  UI) needs a screenshot (markdown image or `<img>`); an API, CLI, script, installer or deploy change needs a fenced
+  code block with the command and its output (`curl -i` with the status code, or the CLI run); docs-only, tests-only,
+  CI-only and dependency bumps need none. If proof is truly impossible, add a line `Proof: not possible, because ...`;
+  the gate then warns and the reviewer judges it.
 - **Check after release** is what the verifier will run on the test server, written so an agent that never saw your
   work can follow it: who signs in, what they do, what they see. It comes from the issue's "Done when". Every value in it (a setting, a limit, an input)
   must pass this PR's own validation: check the minimum and maximum in the code before you write it.

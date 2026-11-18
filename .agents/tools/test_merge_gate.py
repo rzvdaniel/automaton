@@ -7,7 +7,7 @@ spec.loader.exec_module(gate)
 OWNERS = "# comment\n/src/Automaton.Identity/ @o\n/scripts/update-automaton.sh @o  # why\n\n# --- security pass ---\n/.github/workflows/ @o\n"
 PATTERNS = gate.owner_patterns(OWNERS)
 SECURITY = gate.security_patterns(OWNERS)
-BODY = "Refs #1.\n**How verified:** x\n**Risk:** medium\n**How to revert:** revert this PR\n**Docs:** none, because test"
+BODY = "Refs #1.\n**How verified:** x\n```\n$ run\nok\n```\n**Risk:** medium\n**How to revert:** revert this PR\n**Docs:** none, because test"
 GREEN = [{"name": "tests", "conclusion": "SUCCESS"}]
 
 
@@ -152,6 +152,50 @@ class Gate(unittest.TestCase):
         self.assertEqual(failed(gate.check(pr(["README.md"], checks=pending), PATTERNS)), ["ci"])
         self.assertEqual(failed(gate.check(pr(["README.md"], body=BODY + "\nFixes #12"), PATTERNS)), ["description"])
         self.assertEqual(failed(gate.check(pr(["README.md"], body="Refs #1"), PATTERNS)), ["description"])
+
+
+FENCED = "\n```text\n$ curl -i x\nHTTP/1.1 200\n```"
+IMG = "![shot](https://github.com/user-attachments/assets/1)"
+
+
+class Proof(unittest.TestCase):
+    def verdict(self, paths, verified, author=""):
+        body = "**How verified:** " + verified + "\n**Risk:** low\n**How to revert:** r\n**Docs:** none, because t"
+        item = dict(pr(paths, body=body), author={"login": author})
+        return [row for row in gate.check(item, PATTERNS)[1] if row[1] == "proof"]
+
+    def test_ui_needs_an_image(self):
+        ui = ["src/automaton-studio-vue/src/a.vue"]
+        self.assertEqual(self.verdict(ui, "ran it")[0][0], "FAIL")
+        self.assertEqual(self.verdict(ui, FENCED)[0][0], "FAIL")
+        self.assertEqual(self.verdict(ui, IMG)[0][0], "PASS")
+        self.assertEqual(self.verdict(ui, '<img src="a.png">')[0][0], "PASS")
+
+    def test_api_cli_and_scripts_need_a_code_block(self):
+        for path in ("src/Automaton.Api/A.cs", "src/Automaton.Cli/B.cs", "scripts/x.sh", "deploy/compose.yml"):
+            self.assertEqual(self.verdict([path], "ran it")[0][0], "FAIL", path)
+            self.assertEqual(self.verdict([path], FENCED)[0][0], "PASS", path)
+
+    def test_mixed_change_needs_both(self):
+        paths = ["src/automaton-vue/a.vue", "src/Automaton.Api/A.cs"]
+        self.assertEqual(self.verdict(paths, IMG)[0][0], "FAIL")
+        self.assertEqual(self.verdict(paths, IMG + FENCED)[0][0], "PASS")
+
+    def test_no_proof_for_docs_tests_ci_and_dependabot(self):
+        for paths in (["docs/a.md"], ["src/UnitTests/ATests.cs"], [".github/workflows/t.yml"],
+                      ["src/automaton-studio-vue/src/a.test.ts"]):
+            self.assertEqual(self.verdict(paths, "ran it"), [], paths)
+        self.assertEqual(self.verdict(["src/automaton-studio-vue/package.json", "src/A/B.cs"], "x", "dependabot[bot]"), [])
+
+    def test_excuse_turns_fail_into_warn(self):
+        paths = ["src/Automaton.Api/A.cs"]
+        self.assertEqual(self.verdict(paths, "x\nProof: not possible, because it needs a fresh server")[0][0], "WARN")
+        self.assertEqual(self.verdict(paths, "x\nProof: not possible, because")[0][0], "FAIL")
+
+    def test_proof_after_how_verified_does_not_count(self):
+        body = "**How verified:** none\n**Risk:** low\n" + FENCED + "\n**How to revert:** r\n**Docs:** none, because t"
+        item = dict(pr(["src/A/B.cs"], body=body), author=None)
+        self.assertIn("proof", failed(gate.check(item, PATTERNS)))
 
 
 if __name__ == "__main__":
