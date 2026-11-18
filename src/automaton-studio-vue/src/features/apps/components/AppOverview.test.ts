@@ -59,4 +59,13 @@ describe('AppOverview catalog update', () => {
     await flushPromises()
     expect(getUpdate).not.toHaveBeenCalled()
   })
+
+  it('shows why the app was paused next to the Paused status, and nothing once it runs again', async () => {
+    const paused = mountOverview({ isPaused: true, pausedReason: 'Sends spam' })
+    await flushPromises()
+    expect(paused.get('[data-testid="paused-reason"]').text()).toContain('Sends spam')
+    const running = mountOverview({ isPaused: false, pausedReason: null })
+    await flushPromises()
+    expect(running.find('[data-testid="paused-reason"]').exists()).toBe(false)
+  })
 })

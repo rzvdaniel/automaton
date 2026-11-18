@@ -17,8 +17,8 @@ public sealed class AppPauseController(
     // "starting"), so these actions ignore the request-aborted token and end on the Runner operation's own deadline.
     [HttpPost("pause")]
     [Authorize(Policy = "AllowApiKey")]
-    public Task<IActionResult> Pause(Guid id, CancellationToken cancellationToken) =>
-        RunAsync(() => pauseService.PauseAsync(id, User.IsInRole("Administrators"), CancellationToken.None));
+    public Task<IActionResult> Pause(Guid id, [FromBody] PauseAppRequest? request, CancellationToken cancellationToken) =>
+        RunAsync(() => pauseService.PauseAsync(id, User.IsInRole("Administrators"), CancellationToken.None, request?.Reason));
 
     [HttpPost("resume")]
     [Authorize(Policy = "AllowApiKey")]
@@ -31,6 +31,9 @@ public sealed class AppPauseController(
     public Task<IActionResult> Restart(Guid id, CancellationToken cancellationToken) =>
         RunAsync(async () => new { appId = id, restarted = await restartService.RestartAsync(id, User.IsInRole("Administrators"), CancellationToken.None) });
 
+    /// <summary>The optional body of a pause call. <c>Reason</c> is shown to the app's owner in Studio and the CLI.</summary>
+    public sealed record PauseAppRequest(string? Reason);
+
     private async Task<IActionResult> RunAsync<T>(Func<Task<T>> action)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
@@ -39,6 +42,7 @@ public sealed class AppPauseController(
         {
             return Ok(await action());
         }
+        catch (ArgumentException ex) { return BadRequest(new { message = ex.Message }); }
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
         catch (RuntimeCommandFailedException ex) { return StatusCode(StatusCodes.Status502BadGateway, new { message = ex.Message }); }

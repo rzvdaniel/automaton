@@ -149,7 +149,7 @@ automaton project list
 automaton publish --yes --slug NAME
 automaton share status           # who can open the app: me, people, a team, server or internet (same choices as the Share dialog)
 automaton share set server       # or: me, people, team --team NAME, internet --slug NAME [--list|--no-list] (store listing text: automaton listing); add/remove EMAIL manage "people"
-automaton pause                 # stop the linked app, switch its schedules off, show a paused page (also: automaton apps pause APP)
+automaton pause --reason "why"  # (reason optional; the owner sees it) stop the linked app, switch its schedules off, show a paused page (also: automaton apps pause APP)
 automaton resume                # start it again and turn its schedules back on (also: automaton apps resume APP); automaton deploy --resume resumes first
 automaton delete --yes          # permanently delete the linked remote app
 automaton apps delete <name-or-id> --yes   # delete any app you may delete, no linked folder needed (for example a catalog-installed app)

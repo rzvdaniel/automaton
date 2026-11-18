@@ -50,6 +50,8 @@ export interface App {
   isPublished: boolean
   /** Stopped on purpose: schedules off, address shows a paused page. */
   isPaused?: boolean
+  /** Why the app was paused, when the person who paused it said. */
+  pausedReason?: string | null
   /** No web runtime or static site: the app only has Actions (nothing to restart). */
   actionsOnly?: boolean
   canLaunchPublicly?: boolean
@@ -185,6 +187,8 @@ export interface AppListItem {
   tags: string[]
   isPublished: boolean
   isPaused?: boolean
+  /** Why the app was paused, when the person who paused it said. */
+  pausedReason?: string | null
   canLaunchPublicly?: boolean
   publicUrl?: string | null
   updatedAtUtc: string
@@ -656,6 +660,7 @@ export interface AppPauseState {
   appId: string
   paused: boolean
   pausedAt?: string | null
+  pausedReason?: string | null
   schedulesChanged: number
   warnings: string[]
 }

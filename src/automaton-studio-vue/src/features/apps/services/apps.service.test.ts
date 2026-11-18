@@ -46,6 +46,16 @@ describe('AppsService long-running actions', () => {
     expect(apiClient.post).toHaveBeenNthCalledWith(2, '/api/apps/a/resume', undefined, { timeout: 180000 })
   })
 
+  it('sends the pause reason as the request body, and nothing on resume', async () => {
+    apiClient.post.mockResolvedValue({ data: {} })
+    await appsService.setPaused('a', true, '  Sends spam ')
+    await appsService.setPaused('a', true)
+    await appsService.setPaused('a', false, 'ignored')
+    expect(apiClient.post).toHaveBeenNthCalledWith(1, '/api/apps/a/pause', { reason: 'Sends spam' }, { timeout: 180000 })
+    expect(apiClient.post).toHaveBeenNthCalledWith(2, '/api/apps/a/pause', undefined, { timeout: 180000 })
+    expect(apiClient.post).toHaveBeenNthCalledWith(3, '/api/apps/a/resume', undefined, { timeout: 180000 })
+  })
+
   it('reads the app after the browser drops a resume, and reports success once the server shows it', async () => {
     vi.useFakeTimers()
     apiClient.post.mockRejectedValue({ code: 'ERR_NETWORK' })

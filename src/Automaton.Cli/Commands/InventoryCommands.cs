@@ -143,6 +143,7 @@ internal static class InventoryCommands
             app.Name,
             runner = app.Runner?.Name,
             status = app.IsPaused ? "Paused" : app.LiveEnvironment?.Status ?? "Unassigned",
+            pausedReason = PausedReasonOf(app),
             publicUrl = app.CanLaunchPublicly && !string.IsNullOrWhiteSpace(app.PublicUrl)
                 ? CliAppUrlBuilder.BuildPublishedUrl(server, app.PublicUrl)
                 : null,
@@ -157,8 +158,17 @@ internal static class InventoryCommands
         Console.WriteLine("ID\tName\tRunner\tStatus\tPublic URL");
         foreach (var app in apps)
             Console.WriteLine($"{app.Id}\t{app.Name}\t{app.runner ?? "-"}\t{app.status}\t{app.publicUrl ?? "-"}");
+        WritePausedReasons(apps.Select(app => (app.Name, app.pausedReason)));
         foreach (var app in apps.Where(app => app.error is { Length: > 0 }))
             Console.WriteLine(DescribeFailedDeploy(app.Name, app.error!, app.hasRunningVersion));
+    }
+
+    private static string? PausedReasonOf(AppInventoryItem app) => app.IsPaused ? app.PausedReason : null;
+
+    private static void WritePausedReasons(IEnumerable<(string Name, string? Reason)> apps)
+    {
+        foreach (var (name, reason) in apps.Where(app => app.Reason is { Length: > 0 }))
+            Console.WriteLine($"\n{name}: paused. Reason: {reason}");
     }
 
     internal static string DescribeFailedDeploy(string name, string error, bool hasRunningVersion) =>

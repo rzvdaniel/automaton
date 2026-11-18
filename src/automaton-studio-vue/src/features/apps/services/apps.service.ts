@@ -250,9 +250,10 @@ class AppsService {
    * A browser can drop a long request (Chromium aborts every request in flight when the machine's network interfaces change,
    * which a container start can trigger) while the server carries on; then Studio reads the app until it shows the new state.
    */
-  async setPaused(id: string, paused: boolean): Promise<AppPauseState> {
+  async setPaused(id: string, paused: boolean, reason?: string): Promise<AppPauseState> {
     try {
-      return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })).data
+      const body = paused && reason?.trim() ? { reason: reason.trim() } : undefined
+      return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`, body, { timeout: APP_ACTION_TIMEOUT_MS })).data
     } catch (failure) {
       if (!isConnectionDropped(failure)) throw failure
       for (let attempt = 0; attempt < DROPPED_CALL_POLLS; attempt++) {
