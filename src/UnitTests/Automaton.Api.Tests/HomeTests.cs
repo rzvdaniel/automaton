@@ -167,6 +167,19 @@ public sealed class HomeTests
     }
 
     [Test]
+    public void FailedAppCardShowsOneShortLineNotTheWholeTraceback()
+    {
+        var error = "Application build failed (build_failed): The build exited with code 1. Last output:\n/tmp/x/vl.tar.gz: OK\nTraceback (most recent call last):\nFile \"<string>\", line 1\nOSError: [Errno 28] No space left on device.";
+        var failing = new AppListItemDto { Id = Guid.NewGuid(), Name = "Logs", CanUpdate = true, LiveEnvironment = new AppListEnvironmentDto { Status = "Failed", LastDeploymentError = error } };
+
+        var detail = HomeNeedsYouService.AppCards([failing]).Single().Detail;
+
+        Assert.That(detail, Does.Not.Contain("\n").And.Not.Contain("Traceback"));
+        Assert.That(detail, Does.StartWith("Application build failed").And.EndWith("No space left on device."));
+        Assert.That(HomeNeedsYouService.ShortReason(new string('x', 500)), Has.Length.EqualTo(200));
+    }
+
+    [Test]
     public void HomeIsForSignedInPeopleAndNotForScopedKeys()
     {
         var policy = typeof(HomeController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();

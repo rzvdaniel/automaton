@@ -155,7 +155,10 @@ public static class CatalogInstallCommand
     {
         var status = Text(deployment, "status");
         var error = Text(deployment, "error");
-        return string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase) || error.Length > 0 ? $"The deployment failed: {(error.Length > 0 ? error : "see the app page in Studio")}" : null;
+        // A finished operation answers with its result, which says success:false and the reason in "message".
+        var unsuccessful = deployment.ValueKind == JsonValueKind.Object && deployment.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False;
+        if (error.Length == 0 && unsuccessful) error = Text(deployment, "message");
+        return string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase) || unsuccessful || error.Length > 0 ? $"The deployment failed: {(error.Length > 0 ? error : "see the app page in Studio")}" : null;
     }
 
     private static JsonElement Pick(IReadOnlyList<JsonElement> entries, string id, string? sourceId)

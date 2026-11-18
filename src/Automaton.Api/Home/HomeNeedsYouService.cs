@@ -77,9 +77,18 @@ public class HomeNeedsYouService(
                 : app.LiveEnvironment?.Status is "Failed" or "RunnerOffline";
             if (!failed) continue;
             yield return new($"{HomeCardKeys.AppFailed}:{app.Id}", HomeCardKeys.AppFailed, "error", $"{app.Name} is failing",
-                app.ActionsOnly ? "Its last Action run failed." : app.LiveEnvironment?.LastDeploymentError ?? "It is not running.",
+                app.ActionsOnly ? "Its last Action run failed." : ShortReason(app.LiveEnvironment?.LastDeploymentError) ?? "It is not running.",
                 "Open app", $"/apps/{app.Id}", false, app.Id);
         }
+    }
+
+    /// <summary>One short line of a deployment error: its first line and, when it has more, the last (a traceback ends with the cause).</summary>
+    internal static string? ShortReason(string? error)
+    {
+        var lines = (error ?? "").Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length == 0) return null;
+        var text = lines.Length == 1 ? lines[0] : $"{lines[0].TrimEnd(':')}: {lines[^1]}";
+        return text.Length <= 200 ? text : text[..199] + "…";
     }
 
     private static bool BackupRecent(InstallationBackupStatus backup)

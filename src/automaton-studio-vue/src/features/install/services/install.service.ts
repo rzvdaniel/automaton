@@ -7,6 +7,12 @@ class InstallService {
     return data
   }
 
+  /** The running server version; signed-in users only (the anonymous status has none). */
+  async getVersion(): Promise<string | null> {
+    const { data } = await apiClient.get<{ version?: string | null }>('/api/install/version')
+    return data.version ?? null
+  }
+
   async check(setupToken = ''): Promise<InstallationCheck[]> {
     const { data } = await apiClient.post<InstallationCheck[]>('/api/install/checks', null, {
       headers: { 'X-Automaton-Setup-Token': setupToken },
