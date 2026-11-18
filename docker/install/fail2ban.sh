@@ -5,8 +5,8 @@
 #
 #   fail2ban.sh [--install-dir DIR]
 #
-# Never ban an address: put it after "ignoreip =" in /etc/fail2ban/jail.d/automaton-allowlist.local, then
-# run: sudo fail2ban-client reload
+# Never ban an address: add it to "ignoreip =" in the [DEFAULT] section of /etc/fail2ban/jail.local; every update
+# copies your ignoreip into the Automaton jails. Then run: sudo fail2ban-client reload
 set -euo pipefail
 umask 022
 
@@ -39,9 +39,14 @@ install -d -m 0755 "$(dirname "$traefik_log")"
 
 install -d "$f2b_dir/filter.d" "$f2b_dir/jail.d" "$logrotate_dir"
 for filter in "$source_dir"/filter.d/*.conf; do install -m 0644 "$filter" "$f2b_dir/filter.d/$(basename "$filter")"; done
-sed "s#@TRAEFIK_LOG@#$traefik_log#" "$source_dir/jail.conf.in" > "$f2b_dir/jail.d/automaton.conf"
-# The allowlist belongs to the owner: created once, never overwritten.
-[[ -e "$f2b_dir/jail.d/automaton-allowlist.local" ]] || install -m 0644 "$source_dir/allowlist.conf.in" "$f2b_dir/jail.d/automaton-allowlist.local"
+# The Automaton jails get the ignoreip you already configured (jail.local, jail.conf, other jail.d files), so an
+# existing allowlist keeps working; sshd and [DEFAULT] stay untouched.
+ignoreip=$(find "$f2b_dir" -maxdepth 2 \( -name jail.local -o -name jail.conf -o -path "$f2b_dir/jail.d/*" \) -type f ! -name automaton.conf -print0 2>/dev/null \
+    | xargs -0 -r sed -n 's/^[[:space:]]*ignoreip[[:space:]]*=//p' | tr ',' ' ' | tr -s '[:space:]' '\n' | awk 'NF && !seen[$0]++' | paste -sd' ')
+case " $ignoreip " in *" 127.0.0.1/8 "*) ;; *) ignoreip="127.0.0.1/8 ::1 $ignoreip" ;; esac
+sed -e "s#@TRAEFIK_LOG@#$traefik_log#" -e "s#@IGNOREIP@#${ignoreip% }#" "$source_dir/jail.conf.in" > "$f2b_dir/jail.d/automaton.conf"
+# An allowlist file from an earlier version was merged above; leaving it would override the merged value in the jails.
+rm -f "$f2b_dir/jail.d/automaton-allowlist.local"
 cat > "$logrotate_dir/automaton-traefik" <<LOGROTATE
 $traefik_log {
     daily
@@ -63,4 +68,4 @@ if [[ -z "${AUTOMATON_FAIL2BAN_ETC:-}" ]]; then
     systemctl enable --now fail2ban
     fail2ban-client reload >/dev/null
 fi
-echo "fail2ban protects this server: jails sshd, automaton-scanner and automaton-signin read $traefik_log. Allowlist: $f2b_dir/jail.d/automaton-allowlist.local"
+echo "fail2ban protects this server: jails sshd, automaton-scanner and automaton-signin read $traefik_log.. Never banned: $ignoreip"

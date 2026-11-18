@@ -50,7 +50,9 @@ Secret changes and uses (names, scopes and versions, never values) are recorded 
 
 The installer and every update set up [fail2ban](https://github.com/fail2ban/fail2ban) with three jails: `sshd`, `automaton-scanner` (20 requests for junk paths such as `/.env`, `/wp-admin` or `*credentials*` that answer 404, or 404 bursts on Studio, the API root and the store, within a minute) and `automaton-signin` (10 failed Automaton sign-ins within ten minutes). A banned address is blocked at the firewall for an hour, longer each time it returns. Real traffic is never limited: pages, published apps' links, Studio's live connection and uploads do not count. The jails read Traefik's access log (no headers), kept in the certificates volume and rotated daily.
 
-To never ban an address, for example an office behind one shared IP, add it after `ignoreip =` in `/etc/fail2ban/jail.d/automaton-allowlist.local` and run `sudo fail2ban-client reload`. List bans with `sudo fail2ban-client status automaton-scanner` and lift one with `sudo fail2ban-client unban <address>`.
+To never ban an address, for example an office behind one shared IP, add it to `ignoreip =` in the `[DEFAULT]` section of `/etc/fail2ban/jail.local` (the installer and every update copy the `ignoreip` you already have into the Automaton jails, and leave `sshd` as you set it) and run `sudo fail2ban-client reload`. List bans with `sudo fail2ban-client status automaton-scanner` and lift one with `sudo fail2ban-client unban <address>`.
+
+Behind a proxy or load balancer, Traefik sees the proxy's address, so allowlist the proxy or turn the Automaton jails off (`enabled = false` in a `jail.local` section for each of them).
 
 ## Out of scope
 

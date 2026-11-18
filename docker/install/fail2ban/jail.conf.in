@@ -1,10 +1,6 @@
 # Installed by Automaton (fail2ban.sh); rewritten on every update. Put your own changes in a separate file.
+# Addresses never banned come from your ignoreip in jail.local or jail.conf (merged on every update); sshd is left as you set it.
 # Traefik publishes ports through Docker, so bans go into the DOCKER-USER chain.
-[DEFAULT]
-bantime.increment = true
-bantime.factor = 4
-bantime.maxtime = 1w
-
 [sshd]
 enabled = true
 
@@ -17,6 +13,10 @@ banaction = iptables-multiport[chain=DOCKER-USER]
 maxretry = 20
 findtime = 60
 bantime = 1h
+bantime.increment = true
+bantime.factor = 4
+bantime.maxtime = 1w
+ignoreip = @IGNOREIP@
 
 [automaton-signin]
 enabled = true
@@ -27,3 +27,7 @@ banaction = iptables-multiport[chain=DOCKER-USER]
 maxretry = 10
 findtime = 600
 bantime = 1h
+bantime.increment = true
+bantime.factor = 4
+bantime.maxtime = 1w
+ignoreip = @IGNOREIP@

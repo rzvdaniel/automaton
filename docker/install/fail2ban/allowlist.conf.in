@@ -1,3 +1,0 @@
-# Addresses fail2ban never bans (all jails). Add yours after ::1, separated by spaces, then: sudo fail2ban-client reload
-[DEFAULT]
-ignoreip = 127.0.0.1/8 ::1

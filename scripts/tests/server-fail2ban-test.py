@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """fail2ban filters match scanner and failed sign-in lines of Traefik's JSON access log and never real traffic;
-the installer script writes the jails, allowlist and logrotate files without overwriting the allowlist."""
+the installer script writes the jails and logrotate files and carries the owner's ignoreip into the Automaton jails."""
 import json
 import os
 from pathlib import Path
@@ -47,7 +47,7 @@ class FilterTests(unittest.TestCase):
 
 
 class InstallScriptTests(unittest.TestCase):
-    def test_writes_jails_allowlist_and_logrotate_and_keeps_owner_allowlist(self):
+    def test_writes_jails_and_logrotate_and_keeps_owner_ignoreip(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             install, etc, rotate, bin_dir = tmp / 'install', tmp / 'etc', tmp / 'rotate', tmp / 'bin'
@@ -72,11 +72,15 @@ class InstallScriptTests(unittest.TestCase):
             self.assertTrue((etc / 'filter.d/automaton-scanner.conf').is_file())
             self.assertIn('copytruncate', (rotate / 'automaton-traefik').read_text())
             self.assertTrue((volume / 'logs/access.log').is_file())
-            allowlist = etc / 'jail.d/automaton-allowlist.local'
-            allowlist.write_text('[DEFAULT]\nignoreip = 127.0.0.1/8 ::1 203.0.113.7\n')
+            self.assertNotIn('[DEFAULT]', jail)
+            self.assertEqual(jail.count('bantime.increment = true'), 2)
+            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1\n'), 2)
+            (etc / 'jail.local').write_text('[DEFAULT]\nignoreip = 127.0.0.1/8 ::1 203.0.113.7, 10.0.0.0/8\n')
             self.assertEqual(run().returncode, 0)
-            self.assertIn('203.0.113.7', allowlist.read_text())
-
+            jail = (etc / 'jail.d/automaton.conf').read_text()
+            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8\n'), 2)
+            self.assertNotIn('[sshd]\nenabled = true\nignoreip', jail)
+            self.assertIn('203.0.113.7', (etc / 'jail.local').read_text())
 
 if __name__ == '__main__':
     unittest.main()
