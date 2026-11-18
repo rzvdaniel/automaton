@@ -56,6 +56,8 @@ wait; tail -n 3 "$OUT"; rm -f "$OUT"   # "Signed in as ..." once approved. If th
 
 An agent that just created the administrator skips the two `read` prompts: `EMAIL` and `PASSWORD` are already set in the same shell; it runs the script, then `unset`s them. Never print them.
 
+`POST /api/Account/LoginUser` with `{"email","password"}` returns JSON whose `accessToken` goes in `Authorization: Bearer`; do not rely on a cookie. The approve body is `{"userCode": "..."}`.
+
 The code is letters, digits and a dash (for example `ABCD-1234`), so it needs no URL decoding. `200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. The `--device` output contains the approval code: do not share it. Codes expire after a few minutes, so approve soon after `login` prints it.
 
 **API key.** Create a key in Studio (**API Keys**) or with `POST /api/ApiKeys` (`{"name": "my-cli"}`, bearer token as above; the response `apiKey` is shown once). Then:
@@ -72,7 +74,7 @@ an AI conversation.
 
 ## Install a Runner
 
-`automaton runners upgrade RUNNER [--wait]` upgrades an online Runner to the server's current image (non-zero exit if it rolled back); `automaton server update --runners` (it implies `--wait`) names every Runner with its state (current or on an old image) and upgrades the old ones; `--wait` alone only lists them with the upgrade command. `automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. Steps, options and errors: [Add a Runner](./deploy-runner).
+`automaton runners upgrade RUNNER [--wait]` upgrades an online Runner to the server's current image (non-zero exit if it rolled back); `automaton server update --runners` (it implies `--wait`) names every Runner with its state (current or on an old image) and upgrades the old ones; `--wait` alone only lists them with the upgrade command. `automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. `automaton runners delete RUNNER` removes one, including a Runner that is offline for good (`--abandon-offline --yes`): see [Remove a Runner](./deploy-runner#remove-a-runner). Steps, options and errors: [Add a Runner](./deploy-runner).
 
 ## Several servers
 

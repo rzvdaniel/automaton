@@ -20,6 +20,8 @@ Confirm the update (services are briefly unavailable) and, for the SSH fallback,
 
 ## Steps
 
+The `automaton` commands run from your own machine, signed in to the server; only the `.sh` scripts and `systemctl` run on the server host.
+
 1. Update and wait.
 
    ```bash

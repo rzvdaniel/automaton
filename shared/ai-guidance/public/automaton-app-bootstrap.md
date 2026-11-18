@@ -12,6 +12,8 @@ Every page below is one task with exact commands and a check after each step. Fo
 - Never print, read back or store the generated administrator password. Never ask for passwords or tokens in chat.
 - Finish with the one-time link from `server password-link` and show it in your last message.
 
+**Installing the CLI** (a single file, no .NET). Linux or macOS: `curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh`, then `export PATH="$HOME/.local/bin:$PATH"`. Windows (PowerShell): `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. Then sign in: [Install and authenticate the CLI](https://automaton.monster/docs/automaton-cli).
+
 **Runners.** [Add, upgrade or remove a Runner](https://automaton.monster/docs/deploy-runner): on the server, another Linux server or PC, or a Windows PC (WSL Ubuntu with Docker Engine, never Docker Desktop).
 
 - Ask which machine, its `user@host` SSH login (key based, root or passwordless sudo) and a Runner name. Never ask for SSH or sudo passwords, and never paste the one-time install command into chat.

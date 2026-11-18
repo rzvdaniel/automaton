@@ -14,7 +14,7 @@ Taking or listing a backup needs no input. Ask before a restore (it replaces the
 
 ## Prerequisites
 
-SSH access with sudo on the server for the `sudo` commands below; they run on the server host. Without sudo, use Studio's **Backups** page or `automaton server backup` and `automaton server backup-status` (they show times, not the folder name; the folder name `automaton-YYYYMMDDTHHMMSSZ` is listed by `backup.sh --list` or Studio's **Backups** page).
+SSH access with sudo on the server for the `sudo` commands below; they run on the server host, while the `automaton` commands run from your own machine, signed in to the server. Without sudo, use Studio's **Backups** page or `automaton server backup` and `automaton server backup-status` (they show times, not the folder name; the folder name `automaton-YYYYMMDDTHHMMSSZ` is listed by `backup.sh --list` or Studio's **Backups** page).
 
 ## What you get by default
 
@@ -30,7 +30,7 @@ Besides the database, protect `/etc/automaton`, the Docker volumes and, on each 
 
 ```bash
 sudo bash /opt/automaton-server/backup.sh            # back up now
-sudo bash /opt/automaton-server/backup.sh --list     # list backups
+sudo bash /opt/automaton-server/backup.sh --list     # list backups (as root, leave out sudo)
 sudo systemctl list-timers automaton-backup.timer    # next scheduled run
 ```
 
