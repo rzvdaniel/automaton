@@ -33,7 +33,7 @@ public class HomeNeedsYouService(
             cards.Add(new(HomeCardKeys.PermissionRequests, HomeCardKeys.PermissionRequests, "warn",
                 waiting.Count == 1 ? "An app asks for permissions" : $"{waiting.Count} apps ask for permissions",
                 "Apps wait for an administrator to approve or reject what they requested.", "Review requests",
-                waiting.Count == 1 ? $"/apps/{waiting.Keys.First()}?view=admin" : "/admin/apps", false));
+                "/admin/permission-requests", false));
         if (!await SmtpConfiguredAsync(token))
             cards.Add(new(HomeCardKeys.NoSmtp, HomeCardKeys.NoSmtp, "info", "Set up email",
                 "Invitations and password recovery need SMTP settings.", "Open settings", "/settings#server", true));

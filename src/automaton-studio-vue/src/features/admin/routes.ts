@@ -11,6 +11,7 @@ import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
 import AdminUserDetailView from './views/AdminUserDetailView.vue'
 import AdminUserAppsView from './views/AdminUserAppsView.vue'
 import AdminAppsView from './views/AdminAppsView.vue'
+import AdminPermissionRequestsView from './views/AdminPermissionRequestsView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -57,6 +58,15 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminUserAppsView,
         meta: {
           title: 'User Apps',
+        },
+      },
+      {
+        path: 'permission-requests',
+        name: 'admin-permission-requests',
+        component: AdminPermissionRequestsView,
+        meta: {
+          title: 'Permission requests',
+          requiresRole: ['SysAdmin'],
         },
       },
       {
