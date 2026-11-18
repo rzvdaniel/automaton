@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Installed by the owner as root at /usr/local/bin/automaton-deploy-website (root:root, mode 755).
+# Rebuilds and restarts website-green from a released commit. Usage: automaton-deploy-website X.Y.Z
+#
+# Trust: this script and the compose file next to it are root-owned and never come from the downloaded source.
+# The source is only the Docker build context. It is fetched by the exact commit sha of tag server-vX.Y.Z, and only
+# after GitHub says that commit is on main. It never touches the /opt/automaton working checkout.
+set -euo pipefail
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+repo=rzvdaniel/automaton
+env_file=/opt/automaton/.env
+compose_file=/usr/local/lib/automaton/docker-compose.website.yml
+project=automaton-prod
+version="${1:-}"
+
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "refused: version must look like 0.2.103" >&2; exit 1; }
+[[ -f "$env_file" && -f "$compose_file" ]] || { echo "Missing $env_file or $compose_file." >&2; exit 1; }
+
+fetch() { curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --max-time 120 "$@"; }
+field() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
+
+sha="$(fetch -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$repo/commits/server-v$version" | field sha)"
+[[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Could not resolve server-v$version to a commit." >&2; exit 1; }
+status="$(fetch -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$repo/compare/main...$sha" | field status)"
+[[ "$status" == behind || "$status" == identical ]] || { echo "refused: $sha is not on main (status $status)." >&2; exit 1; }
+
+dir="$(mktemp -d)"
+trap 'rm -rf "$dir"' EXIT
+fetch "https://github.com/$repo/archive/$sha.tar.gz" | tar -xz --strip-components=1 --no-same-owner --no-same-permissions -C "$dir"
+[[ -f "$dir/docker/Dockerfile.website" ]] || { echo "The archive for $sha has no website Dockerfile." >&2; exit 1; }
+
+export AUTOMATON_PRODUCTION_BUILD_CONTEXT="$dir"
+export AUTOMATON_PRODUCTION_IMAGE_TAG="$version"
+compose=(docker compose -p "$project" --env-file "$env_file" -f "$compose_file")
+"${compose[@]}" build website-green
+"${compose[@]}" up -d --no-deps --no-build --wait website-green
+echo "website-green runs automaton-prod-website:$version from $sha and reports healthy."

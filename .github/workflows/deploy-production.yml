@@ -101,6 +101,28 @@ jobs:
             -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v$VERSION"
 
+      # The website is not part of the server bundle. The root-owned host script resolves the tag to a commit, checks
+      # that it is on main and builds the website from that exact commit with its own compose file. Nothing from the
+      # tag is executed, and /opt/automaton is never touched.
+      - name: Update the website
+        env:
+          VERSION: ${{ inputs.version }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$(mktemp -d)"
+          trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$PROD_SSH_KEY" > "$dir/key"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          # The host downloads the tag's source from GitHub itself; nothing from this runner is executed there.
+          ssh -n -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "sudo /usr/local/bin/automaton-deploy-website $VERSION"
+
       - name: Check the public routes
         run: |
           set -euo pipefail
