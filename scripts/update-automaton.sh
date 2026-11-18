@@ -166,7 +166,8 @@ install_website_deploy() {
     local sudoers_dir="$website_host_root/etc/sudoers.d" user
     [[ -f "$files/automaton-deploy-website" && -f "$files/docker-compose.website.yml" ]] || return 0
     [[ -n "$(docker ps -aq --filter label=com.docker.compose.service=website-green)" ]] || return 0
-    install -d -o root -g root -m 755 "$bin" "$lib" "$sudoers_dir" || return 1
+    install -d -o root -g root -m 755 "$bin" "$lib" || return 1
+    [[ -d "$sudoers_dir" ]] || install -d -o root -g root -m 750 "$sudoers_dir" || return 1  # an existing directory keeps its mode
     put_root_file "$files/automaton-deploy-website" "$bin/automaton-deploy-website" 755 || return 1
     put_root_file "$files/docker-compose.website.yml" "$lib/docker-compose.website.yml" 644 || return 1
     if ! user=$(website_deploy_user); then
