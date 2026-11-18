@@ -12,6 +12,7 @@ const words: Record<string, { wants: string; allows: string }> = {
   'backups:read': { wants: 'read backups', allows: 'Lets the app list this server\'s backups.' },
   'backups:run': { wants: 'start backups', allows: 'Lets the app start a backup of this server.' },
   'server:read': { wants: 'read server status', allows: 'Lets the app read this server\'s health and settings status.' },
+  'security:read': { wants: 'read fail2ban bans', allows: 'Lets the app see which addresses fail2ban banned on this server. It gets no firewall access.' },
   'server:cleanup': { wants: 'clean up the server', allows: 'Lets the app free disk space on this server.' },
   'runner:maintain': { wants: 'maintain Runners', allows: 'Lets the app run maintenance on the Runners you approve.' },
 }

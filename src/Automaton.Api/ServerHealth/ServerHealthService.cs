@@ -20,7 +20,7 @@ public sealed class ServerHealthService(
     public async Task<ServerHealthResponse> GetAsync(DateTime nowUtc, CancellationToken token)
     {
         var host = await reports.LatestAsync(token);
-        host = host is null ? null : host with { AppDisk = null };
+        host = host is null ? null : host with { AppDisk = null, Fail2Ban = null };
         var backup = await InstallationBackups.ReadAsync(configuration, token);
         return new(nowUtc,
             await VersionAsync(token),
@@ -59,7 +59,7 @@ public sealed class ServerHealthService(
             var host = reported[index];
             var apps = host?.AppDisk?.Select(usage => AppDiskUsageResponse.From(usage, names.GetValueOrDefault(usage.AppId), host.MeasuredAtUtc))
                 .OrderByDescending(usage => usage.TotalBytes).ToArray();
-            host = host is null ? null : host with { AppDisk = null };
+            host = host is null ? null : host with { AppDisk = null, Fail2Ban = null };
             return new ServerRunnerInfo(item.Name, item.Status, item.Version, item.LastHeartbeatAtUtc,
                 !string.IsNullOrEmpty(item.InstallationId) && !RunnerUpgradeService.IsCurrent(item.ImageDigest, image),
                 host, host is null ? null : (int)Math.Max(0, (nowUtc - host.MeasuredAtUtc).TotalSeconds), apps);

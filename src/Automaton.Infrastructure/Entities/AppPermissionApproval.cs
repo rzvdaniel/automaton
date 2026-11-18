@@ -9,6 +9,7 @@ public sealed class AppPermissionApproval
     public const string BackupsRun = "backups:run";
     public const string ServerRead = "server:read";
     public const string AppsReadStatus = "apps:read-status";
+    public const string SecurityRead = "security:read";
     public const string NotifyEmail = "notify:email";
     public const string ServerCleanup = "server:cleanup";
     public const string RunnerMaintain = "runner:maintain";
