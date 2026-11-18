@@ -189,6 +189,7 @@ jobs:
           mkdir automaton-server
           cp docker/install/{compose.yaml,configure.py,check_dns.py,explain_certificate_failure.py,backup.sh,cleanup.sh,fail2ban.sh,restore.sh,update-from-request.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
           cp -r docker/install/fail2ban automaton-server/fail2ban
+          cp -r docker/production-host automaton-server/production-host
           cp scripts/install-automaton.sh automaton-server/install.sh
           cp scripts/update-automaton.sh automaton-server/update.sh
           cp src/automaton-vue/docs/install-server.md automaton-server/README.md
