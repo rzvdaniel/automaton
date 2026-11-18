@@ -15,6 +15,17 @@ public class CatalogInstallCommandTests
         """).RootElement;
 
     [Test]
+    public void DeploymentFailure_ReadsAFinishedOperationsResultWhichSaysSuccessFalse()
+    {
+        // `--wait` gets the operation's result, not its status: a failed build is success:false with the reason in "message".
+        var failed = JsonDocument.Parse("""{"success":false,"state":"ready","message":"Application build failed: No space left on device"}""").RootElement;
+        var ok = JsonDocument.Parse("""{"success":true,"state":"ready","message":null}""").RootElement;
+
+        Assert.That(CatalogInstallCommand.DeploymentFailure(failed), Is.EqualTo("The deployment failed: Application build failed: No space left on device"));
+        Assert.That(CatalogInstallCommand.DeploymentFailure(ok), Is.Null);
+    }
+
+    [Test]
     public void Install_TakesNoOptionThatCarriesASecretValue()
     {
         var install = CatalogInstallCommand.BuildInstall(new ConfigService());
