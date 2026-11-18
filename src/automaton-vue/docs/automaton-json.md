@@ -11,6 +11,8 @@ app and declares the application contract.
 
 ## Generic application shape
 
+This is the general shape. For a static site, `automaton new NAME --template static` writes a working one ([Build an Automaton app](./build-an-automaton-app#static-site)); its shape is the reference, so prefer it to hand-written variants.
+
 ```json
 {
   "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",

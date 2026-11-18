@@ -19,7 +19,7 @@ Ask for the app's name, whether to publish it (apps are private until published)
 
 ## Steps
 
-1. Validate and deploy. The deployment is asynchronous; the `Deploy complete` line means the package was applied, not that the app is running. Wait for `Running` in `automaton apps`.
+1. Validate and deploy. The deployment is asynchronous; the `Deploy complete` line means the package was applied, not that the app is running. Wait for `Running` in `automaton apps`. A static site (`--template static`) has no process: it answers only after `automaton publish` (step 3).
 
    ```bash
    automaton validate
@@ -46,7 +46,7 @@ Ask for the app's name, whether to publish it (apps are private until published)
 
    Open `https://my-app.apps.<domain>` once published and check the real behavior, not only the status.
 
-   `automaton deploy --publish` deploys and publishes in one step.
+   `automaton deploy --publish` deploys and publishes in one step. It has no `--slug`: it reuses the address of an earlier publish, so the first time run `automaton publish --yes --slug NAME` and use `--publish` for later deploys.
 
 ## Verify it worked
 
@@ -87,7 +87,7 @@ Summary up to 200 characters, description up to 500. Images are PNG, JPG, WEBP o
 automaton delete --yes
 ```
 
-This permanently deletes the linked remote app, its runtime and its data. Without a linked folder (for example a catalog-installed app), use `automaton apps delete <name-or-id> --yes`; it deletes any app you may delete.
+This permanently deletes the linked remote app, its runtime, its data and its public address, which stops answering. Without a linked folder (for example a catalog-installed app), use `automaton apps delete <name-or-id> --yes`; it deletes any app you may delete.
 
 ## Pause and resume an app
 
