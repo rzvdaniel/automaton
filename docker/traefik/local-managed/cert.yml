@@ -1,4 +1,0 @@
-tls:
-  certificates:
-    - certFile: "/etc/traefik/certs/apps.automaton.test.pem"
-      keyFile: "/etc/traefik/certs/apps.automaton.test-key.pem"

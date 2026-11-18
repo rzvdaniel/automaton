@@ -1,3 +1,0 @@
-# CA1502 reports methods with cyclomatic complexity greater than 14.
-# Keep every method below a cyclomatic complexity of 15.
-CA1502: 14

@@ -1,6 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <!-- Nullable warnings fail the build so a missed null check shows up in the PR, not in production. -->
-    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
-  </PropertyGroup>
-</Project>

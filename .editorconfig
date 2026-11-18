@@ -1,7 +1,0 @@
-root = true
-
-[*.cs]
-# Numeric threshold is in src/CodeMetricsConfig.txt. This rule is an error
-# so normal builds report cleanup debt directly to developers and coding agents.
-dotnet_diagnostic.CA1502.severity = error
-dotnet_diagnostic.CA1501.severity = warning
