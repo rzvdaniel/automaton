@@ -16,7 +16,7 @@ Ask only what you cannot find out:
 - For another machine: its address and SSH login (`user@host`), and whether that user is root or has passwordless sudo. SSH must work with a key, without a password prompt.
 - A name for the Runner (default `main`), and a project to add it to, if any.
 
-Never ask for, print or store: an SSH, sudo or administrator password, an API key or token, the `--device` code, or the one-time install command (it is a secret until it expires).
+Never ask for, print or store: an SSH, sudo or administrator password, an API key or token, the `--device` code, or the one-time install command (it is a secret until it expires). The one exception: with `--print-command` the CLI output goes to a private temporary file (see Steps), deleted once the Runner connects or the command expires.
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ automaton runners install --name main --ssh user@host --yes
 automaton runners install --name main --print-command --yes
 ```
 
-The CLI asks you to confirm the Docker access; `--yes` is required when there is no terminal. Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds (`--timeout`) for the Runner to connect and prints its Runner ID. With `--print-command` the CLI keeps waiting: run the printed command on the host within `--timeout` seconds. Run the CLI in the background (`automaton runners install --name main --print-command --yes > install.log 2>&1 &`), read the command from `install.log`, run it on the host, then wait for the CLI to finish and check `automaton runners`. A Linux PC uses `--local`. `--json` with `--ssh` or `--local` prints `{runnerId, name, status}`. Studio does the same under **Runners → Install Machine Management Runner**.
+The CLI asks you to confirm the Docker access; `--yes` is required when there is no terminal. Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds (`--timeout`) for the Runner to connect and prints its Runner ID. With `--print-command` the CLI keeps waiting: run the printed command on the host within `--timeout` seconds. Run the CLI in the background with the output in a private file (`umask 077; f=$(mktemp); nohup automaton runners install --name main --print-command --yes > "$f" 2>&1 &`), read the command from `$f`, run it on the host, then check `automaton runners` (or the end of `$f`) until the Runner is connected. Delete the file (`rm -f "$f"`) once the Runner connects or the command expires. A Linux PC uses `--local`. `--json` with `--ssh` or `--local` prints `{runnerId, name, status}`. Studio does the same under **Runners → Install Machine Management Runner**.
 
 ### A Windows PC
 
