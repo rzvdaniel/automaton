@@ -15,6 +15,7 @@ const words: Record<string, { wants: string; allows: string }> = {
   'security:read': { wants: 'read fail2ban bans', allows: 'Lets the app see which addresses fail2ban banned on this server. It gets no firewall access.' },
   'server:cleanup': { wants: 'clean up the server', allows: 'Lets the app free disk space on this server.' },
   'runner:maintain': { wants: 'maintain Runners', allows: 'Lets the app run maintenance on the Runners you approve.' },
+  'logs:receive': { wants: 'receive the server logs', allows: 'Lets the Automaton API, Worker and Runners send their logs to the app. Logs can contain addresses and user names; they go to the Runner that hosts the app, over the private network of the server.' },
 }
 
 /** What the app wants in plain words; unknown permissions show their own name. */

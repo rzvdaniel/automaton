@@ -53,7 +53,8 @@ public class HubService : IRuntimeTunnelReconnectRequester
         this.serviceProvider = serviceProvider;
         this.apiKeyAuthService = apiKeyAuthService;
         this.logger = Log.ForContext<HubService>();
-        heartbeatService = new HubHeartbeatService(() => connection, logger);
+        heartbeatService = new HubHeartbeatService(() => connection, logger,
+            (hub, token) => new RunnerLogSinkSync(serviceProvider.GetService<RunnerRuntimeRegistry>(), logger).SyncAsync(hub, token));
         this.appActionExecutionService = appActionExecutionService;
         this.tunnel = tunnel;
         tunnel.TryBeginRequest = tunnelReconnectState.TryBeginTunnelRequest;
