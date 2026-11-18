@@ -217,7 +217,8 @@ public sealed class HostContainerRuntimeTests
     public async Task EveryOperationRejectsWrongOwnershipBeforeMutationOrLogs(string label)
     {
         foreach (var operation in new[] { HostContainerOperationKinds.StartContainer, HostContainerOperationKinds.InspectContainer,
-            HostContainerOperationKinds.GetContainerLogs, HostContainerOperationKinds.RemoveContainer })
+            HostContainerOperationKinds.GetContainerLogs, HostContainerOperationKinds.RemoveContainer,
+            HostContainerOperationKinds.StopContainer })
         {
             calls.Clear();
             var state = Inspection();
@@ -229,6 +230,7 @@ public sealed class HostContainerRuntimeTests
     }
 
     [TestCase(HostContainerOperationKinds.StartContainer, "start")]
+    [TestCase(HostContainerOperationKinds.StopContainer, "stop")]
     [TestCase(HostContainerOperationKinds.GetContainerLogs, "logs")]
     [TestCase(HostContainerOperationKinds.RemoveContainer, "rm")]
     public async Task OperationsInspectThenUseFullIdInsteadOfCallerName(string operation, string command)

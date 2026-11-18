@@ -155,6 +155,7 @@ public sealed partial class HostContainerExecutionService
         var arguments = request.Operation switch
         {
             HostContainerOperationKinds.StartContainer => new[] { "docker", "start", inspection.ContainerId },
+            HostContainerOperationKinds.StopContainer => new[] { "docker", "stop", "--time", "20", inspection.ContainerId },
             HostContainerOperationKinds.GetContainerLogs => new[] { "docker", "logs", "--tail", "200", inspection.ContainerId },
             HostContainerOperationKinds.RemoveContainer => new[] { "docker", "rm", "-f", inspection.ContainerId },
             _ => throw new InvalidOperationException("Unsupported container operation.")
@@ -190,6 +191,8 @@ public sealed partial class HostContainerExecutionService
             await ReleaseImageAsync(inspection.Labels, cancellationToken);
             return new HostContainerExecutionResponse { Success = true, ContainerId = inspection.ContainerId };
         }
+        if (request.Operation == HostContainerOperationKinds.StopContainer)
+            return new HostContainerExecutionResponse { Success = true, Exists = true, ContainerId = inspection.ContainerId };
         var postStart = await InspectOwnedContainerAsync(inspection.ContainerId, request.Scope, cancellationToken, discoverEndpoint: true);
         if (!postStart.Success || !postStart.Exists || !postStart.Running || !postStart.HostPort.HasValue)
             return Failure("container_start_endpoint", "The application container started without a valid running private endpoint.") with

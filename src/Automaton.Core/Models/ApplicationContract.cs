@@ -240,12 +240,24 @@ public sealed class ApplicationBuildSpec
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
+public static class RuntimeUpdateModes
+{
+    /// <summary>The new container starts and becomes ready while the old one keeps serving (default).</summary>
+    public const string SideBySide = "side-by-side";
+    /// <summary>The old container stops before the new one starts; it starts again if the new one fails. For apps that lock their data folder.</summary>
+    public const string StopFirst = "stop-first";
+
+    public static bool IsValid(string? value) => value is null or SideBySide or StopFirst;
+}
+
 public sealed class ApplicationRuntimeSpec
 {
     /// <summary>OCI image that owns the application runtime process.</summary>
     public string? Image { get; set; }
     /// <summary>Optional numeric Linux UID or UID:GID for the runtime process.</summary>
     public string? User { get; set; }
+    /// <summary>How an update replaces the running container: <see cref="RuntimeUpdateModes.SideBySide"/> (default) or <see cref="RuntimeUpdateModes.StopFirst"/>.</summary>
+    public string? Update { get; set; }
     public ApplicationCommandSpec? Command { get; set; }
     public int Port { get; set; } = 8080;
 
@@ -577,6 +589,8 @@ public static class ApplicationContractValidator
         ValidatePort(runtime.Port, "runtime.port", errors);
         if (runtime.User is not null && !IsValidRuntimeUser(runtime.User))
             errors.Add("runtime.user must be a numeric UID or UID:GID");
+        if (!RuntimeUpdateModes.IsValid(runtime.Update))
+            errors.Add("runtime.update must be side-by-side or stop-first");
     }
 
     private static bool IsValidRuntimeUser(string value)

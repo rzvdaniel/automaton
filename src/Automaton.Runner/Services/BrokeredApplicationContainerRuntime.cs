@@ -180,6 +180,9 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
     public async Task StopAndRemoveAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
         => EnsureSuccess(await ExecuteExistingAsync(scope, HostContainerOperationKinds.RemoveContainer, id, cancellationToken));
 
+    public async Task StopAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        => EnsureSuccess(await ExecuteExistingAsync(scope, HostContainerOperationKinds.StopContainer, id, cancellationToken));
+
     public async Task RemoveTargetContainersAsync(ApplicationContainerScope application, CancellationToken cancellationToken = default)
     {
         var scope = await ScopeAsync(application.AppId, application.DeploymentTargetId, Guid.Empty);

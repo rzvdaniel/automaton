@@ -64,6 +64,7 @@ layout, build system, or application architecture.
 | `application.runtime.command` | Executable and arguments for the long-running app process. |
 | `application.runtime.image` | OCI image that executes the runtime command; required for new container deployments when `runtime.command` is present. Historical stored contracts remain readable until redeployed with an image. |
 | `application.runtime.user` | Optional numeric UID or UID:GID for the runtime process. Keep the identity stable when the app must update files it created in persistent storage. |
+| `application.runtime.update` | Optional, `side-by-side` (default) or `stop-first`. By default an update starts the new container while the old one keeps serving, and switches over when the new one is ready. An app that locks its data folder (a database or log store that holds a lock file) cannot run twice on it: set `stop-first`. The update then stops the old container, starts the new one, and starts the old one again if the new one fails. The app is down while it starts, so use it only when the app needs it. |
 | `application.runtime.port` | Port requested by the app contract. |
 | `application.health.path` | Optional HTTP readiness path. |
 | `application.health.startupTimeoutSeconds` | Maximum startup duration. |

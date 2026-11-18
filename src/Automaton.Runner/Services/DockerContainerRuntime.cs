@@ -133,6 +133,8 @@ public interface IScopedApplicationContainerRuntime
     Task<bool> IsRunningAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
     Task<string> GetLogsAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
     Task StopAndRemoveAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
+    /// <summary>Stops the container and keeps it, so <see cref="StartApplicationAsync(ApplicationContainerScope, string, CancellationToken)"/> can start it again.</summary>
+    Task StopAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
 }
 
 public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IApplicationContainerCleanupRuntime

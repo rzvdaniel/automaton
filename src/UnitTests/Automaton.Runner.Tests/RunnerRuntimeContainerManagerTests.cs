@@ -802,6 +802,8 @@ public sealed class RunnerRuntimeContainerManagerTests
             return Task.FromResult(string.Empty);
         }
 
+        public Task StopAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task StopAndRemoveAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
         {
             Scopes.Add(scope);
