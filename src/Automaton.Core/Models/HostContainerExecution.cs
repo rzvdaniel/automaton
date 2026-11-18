@@ -11,6 +11,7 @@ public static class HostContainerOperationKinds
     public const string InspectComposeProject = "inspect-compose-project";
     public const string RemoveComposeProject = "remove-compose-project";
     public const string StartContainer = "start-container";
+    public const string StopContainer = "stop-container";
     public const string InspectContainer = "inspect-container";
     public const string GetContainerLogs = "get-container-logs";
     public const string RemoveContainer = "remove-container";

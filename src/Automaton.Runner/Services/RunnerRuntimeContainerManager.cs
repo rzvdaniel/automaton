@@ -274,7 +274,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
 
     /// <summary>
     /// Replaces the running container with a new one from a copy of the deployed files, using the normal
-    /// start, readiness and promotion path; the old container keeps serving until the new one is ready.
+    /// start, readiness and promotion path; the old container keeps serving until the new one is ready (except for `runtime.update: stop-first`, which stops it first).
     /// The copy gets a fresh candidate identity because brokered hosts name (and reuse) containers by it.
     /// Compose runtimes receive no app secrets, so they are left alone.
     /// </summary>
@@ -503,9 +503,17 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         CancellationToken cancellationToken)
     {
         DockerApplicationContainer? started = null;
+        var previousStopped = false;
         try
         {
             started = await CreateCandidateContainerAsync(attempt, cancellationToken);
+            if (StopsPreviousFirst(attempt, previous))
+            {
+                // The old container holds a lock on the data folder, so it stops before the new one starts.
+                // Flag it first: a stop that fails halfway must still be undone.
+                previousStopped = true;
+                await attempt.ScopedRuntime!.StopAsync(new(attempt.AppId, attempt.TargetId), previous!.ContainerId!, cancellationToken);
+            }
             await StartCandidateRuntimeAsync(attempt, started, cancellationToken);
             await networkPolicy.WaitForReadinessAsync(attempt.EffectivePort, attempt.Contract.Health, cancellationToken,
                 token => IsRunningAsync(attempt.AppId, attempt.TargetId, started.Id, token));
@@ -516,7 +524,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
         catch (Exception deploymentError)
         {
-            var output = await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError);
+            var output = await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError, previousStopped);
             if (output.Length > 0)
             {
                 var message = $"{deploymentError.Message} Last output of the app:{Environment.NewLine}{output}";
@@ -524,6 +532,32 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 if (deploymentError is InvalidOperationException) throw new InvalidOperationException(message, deploymentError);
             }
             throw;
+        }
+    }
+
+    private static bool StopsPreviousFirst(RuntimeApplyAttempt attempt, RunnerRuntimeDeploymentMetadata? previous)
+        => attempt.Contract.Runtime.Update == RuntimeUpdateModes.StopFirst
+            && attempt.ScopedRuntime is not null
+            && !RunnerRuntimeMetadataPolicy.HasComposeContract(attempt.Contract)
+            && previous is { ComposeCandidateId: null } && !string.IsNullOrWhiteSpace(previous.ContainerId);
+
+    /// <summary>Starts the stopped previous version again after a failed stop-first update; returns a note when it cannot.</summary>
+    private async Task<string> RestartStoppedPreviousAsync(RuntimeApplyAttempt attempt, RunnerRuntimeDeploymentMetadata previous)
+    {
+        try
+        {
+            var endpoint = await attempt.ScopedRuntime!.StartApplicationAsync(
+                new(attempt.AppId, attempt.TargetId), previous.ContainerId!, CancellationToken.None);
+            // Docker assigns a new host port when a container starts again.
+            previous.EffectivePort = endpoint.HostPort;
+            Register(attempt.AppId, attempt.TargetId, previous.ContainerId!, previous.ContainerName, endpoint.HostPort);
+            return string.Empty;
+        }
+        catch (Exception restartError)
+        {
+            logger.LogWarning(restartError, "Could not start the previous version of {AppId}/{TargetId} again after a failed update.",
+                attempt.AppId, attempt.TargetId);
+            return $"The previous version could not be started again: {restartError.Message}";
         }
     }
 
@@ -597,7 +631,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         RuntimeApplyAttempt attempt,
         RunnerRuntimeDeploymentMetadata? previous,
         DockerApplicationContainer? started,
-        Exception deploymentError)
+        Exception deploymentError,
+        bool previousStopped = false)
     {
         var output = await LogFailedCandidateAsync(attempt, started);
         var cleanupWarnings = new List<string>();
@@ -608,6 +643,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 started?.Id ?? attempt.Candidate.ContainerName!, attempt.AppId, attempt.TargetId,
                 cleanupWarnings, "failed runtime candidate");
         foreach (var warning in cleanupWarnings) logger.LogWarning("{Warning}", warning);
+        if (previousStopped)
+        {
+            // After the candidate is gone, so a candidate that is still running cannot hold the lock.
+            var note = await RestartStoppedPreviousAsync(attempt, previous!);
+            if (note.Length > 0) output = output.Length > 0 ? $"{output}{Environment.NewLine}{note}" : note;
+        }
         try
         {
             await RestoreMetadataAfterFailureAsync(attempt, previous, cleaned, deploymentError);
