@@ -28,6 +28,25 @@ GREEN = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 # A pull request that deletes more than this many lines of src/ (or removes a project) is high: a revert brings the
 # code back but not what ran in between.
 REMOVAL_LINES = 500
+# Proof "How verified" must contain, by what the PR changes: (area, matches a changed path, proof kind).
+# Docs, tests, CI and dependency bumps match no rule and need no extra proof.
+UI_ROOTS = ("src/automaton-studio-vue/", "src/automaton-vue/", "src/automaton-store-vue/")
+SCRIPT_EXT = (".sh", ".ps1", ".mjs", ".py")
+UI_FILES = re.compile(r"\.(vue|css|scss|html|[jt]sx?)$")
+NOT_UI = re.compile(r"/docs/")
+TEST_FILE = re.compile(r"(/UnitTests/|/tests?/|/__tests__/|\.(test|spec)\.(vue|[jt]sx?)$)")
+PROOF_RULES = (
+    ("UI", lambda p: p.startswith(UI_ROOTS) and bool(UI_FILES.search(p)) and not TEST_FILE.search(p) and not NOT_UI.search(p), "image"),
+    ("app UI", lambda p: p.startswith(("app/", "apps/", "wallpapers/")) and bool(UI_FILES.search(p)), "image"),
+    ("API/CLI/scripts", lambda p: (p.startswith("src/") and p.endswith(".cs") and not TEST_FILE.search(p))
+     or (p.startswith(("scripts/", "docker/")) and p.endswith(SCRIPT_EXT) and not TEST_FILE.search(p))
+     or (p.startswith("docker/") and not p.endswith((".md", ".json")))
+     or p.startswith("docker-compose"), "code"),
+)
+PROOF_HINT = {"image": "a screenshot (markdown image or <img>)",
+              "code": "a fenced code block with the command and its output"}
+IMAGE = re.compile(r"!\[[^\]]*\]\([^)]+\)|<img\b", re.I)
+FENCE = re.compile(r"^[ \t]*(```|~~~)[^\n]*\n.*?\n[ \t]*(```|~~~)", re.M | re.S)
 
 
 def _patterns(lines) -> list[str]:
@@ -113,6 +132,34 @@ def security_row(tier: str, reviews: list[dict], review: dict | None, head: str)
     return ("PASS", "security", "separate security pass recorded")
 
 
+def how_verified(body: str) -> str:
+    """The text from the "How verified" line to the next bold heading (Risk, Check after release, ...)."""
+    found = re.search(r"^\W*How verified\W*:(.*?)(?=^[ \t*#>_-]*(?:Risk|How to revert|Check after release|Not in this PR|Docs|Tests)[ \t*_]*:|\Z)", body, re.I | re.M | re.S)
+    return found.group(1) if found else ""
+
+
+def proof_row(pr: dict, body: str) -> tuple[str, str, str] | None:
+    """Require the proof the changed areas call for; None when no area needs any."""
+    author = ((pr.get("author") or {}).get("login") or "").lower()
+    if author in ("dependabot[bot]", "app/dependabot"):
+        return None
+    section = how_verified(body)
+    needed = {}
+    for area, applies, kind in PROOF_RULES:
+        if any(applies(path) for path in pr["paths"]):
+            needed[area] = kind
+    if not needed:
+        return None
+    have = {"image": bool(IMAGE.search(section)), "code": bool(FENCE.search(section))}
+    lacking = [f"{area}: {PROOF_HINT[kind]}" for area, kind in needed.items() if not have[kind]]
+    if not lacking:
+        return ("PASS", "proof", "how verified shows the proof the changed areas need")
+    if re.search(r"^\W*Proof:\s*not possible, because\s+\S", section, re.I | re.M):
+        return ("WARN", "proof", "no proof (" + "; ".join(lacking) + "), excuse given; the review must judge it")
+    return ("FAIL", "proof", "How verified lacks " + "; ".join(lacking)
+            + ' (or a line "Proof: not possible, because ...")')
+
+
 def check(pr: dict, patterns: list[str], security: list[str] = (), skip_ci: bool = False) -> tuple[str, list[tuple[str, str, str]]]:
     """Return the tier and (result, name, detail) rows; result is PASS, FAIL or WARN."""
     rows = []
@@ -176,6 +223,10 @@ def check(pr: dict, patterns: list[str], security: list[str] = (), skip_ci: bool
     else:
         rows.append(("PASS", "description", "how verified, risk, how to revert and docs are there"))
 
+    proof = proof_row(pr, body)
+    if proof:
+        rows.append(proof)
+
     code = [path for path in paths if path.startswith("src/") and not path.endswith(".md")]
     tests = [path for path in code if "/UnitTests/" in path or re.search(r"\.(test|spec)\.[jt]s$", path)]
     if code and not tests:
@@ -207,7 +258,7 @@ def main() -> int:
     if len(args) != 1:
         print(__doc__)
         return 2
-    fields = "number,headRefOid,baseRefName,body,reviews,statusCheckRollup,comments,commits"
+    fields = "number,headRefOid,baseRefName,author,body,reviews,statusCheckRollup,comments,commits"
     pr = json.loads(gh("pr", "view", args[0], "--json", fields, *repo))
     slug = repo[1] if repo else "{owner}/{repo}"
     # Every changed file, with the old path of a rename: a file moved out of a protected folder still counts.
