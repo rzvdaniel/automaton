@@ -141,7 +141,7 @@ def how_verified(body: str) -> str:
 def proof_row(pr: dict, body: str) -> tuple[str, str, str] | None:
     """Require the proof the changed areas call for; None when no area needs any."""
     author = ((pr.get("author") or {}).get("login") or "").lower()
-    if "dependabot" in author:
+    if author in ("dependabot[bot]", "app/dependabot"):
         return None
     section = how_verified(body)
     needed = {}
