@@ -31,14 +31,15 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
      exec $SSH_ORIGINAL_COMMAND
      ```
 
-     The website step also needs `/usr/local/bin/automaton-deploy-website` (root-owned, mode 755, allowed in that user's sudoers like `update.sh`). The workflow streams `git archive` of `server-v<version>` to its stdin. It extracts it to a temp directory and runs the archive's `scripts/deploy-website-prod.sh`, which builds and restarts only `website-green` (`--no-deps`). It never checks out or pulls in `/opt/automaton`:
+     The website step also needs `/usr/local/bin/automaton-deploy-website` (root-owned, mode 755, allowed in that user's sudoers like `update.sh`). It ignores stdin and downloads the source of tag `server-v<version>` from GitHub itself, so the SSH key cannot make it run anything else as root. It runs the archive's `scripts/deploy-website-prod.sh`, which builds and restarts only `website-green` (`--no-deps`). It never checks out or pulls in `/opt/automaton`:
 
      ```bash
      #!/usr/bin/env bash
      set -euo pipefail
      [[ "${1:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "refused"; exit 1; }
      dir="$(mktemp -d)"; trap 'rm -rf "$dir"' EXIT
-     tar -x -C "$dir"
+     curl -fsSL --max-time 120 "https://github.com/rzvdaniel/automaton/archive/refs/tags/server-v$1.tar.gz" \
+       | tar -xz --strip-components=1 --no-same-owner --no-same-permissions -C "$dir"
      bash "$dir/scripts/deploy-website-prod.sh" "$dir" "$1"
      ```
    - `PROD_SSH_KNOWN_HOSTS`: the server's host key line, from `ssh-keyscan -t ed25519 <host>` checked against the real server.
