@@ -86,6 +86,19 @@ automaton runners delete main --ssh user@host      # runs the uninstall over SSH
 
 `--ssh` needs the same root or passwordless sudo and key login as the install (see Prerequisites). Without `--ssh` (for example no sudo): `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host as root, then `automaton runners delete main --host-cleanup-confirmed`. That flag only tells the server the uninstall ran; it does not touch the host, and it answers 409 "still online" while the Runner still connects. In Studio: **Runners**, remove the Runner; it shows the same uninstall command, then tick "I ran the command successfully" and **Confirm removal**.
 
+### A Runner that is offline for good
+
+When the machine is gone (destroyed, reinstalled or unreachable for good), neither the uninstall command nor the normal app delete can finish, because both need the Runner online. An administrator can skip cleanup on that machine, once the Runner has been offline:
+
+```bash
+automaton runners delete main --abandon-offline --yes     # deletes the Runner and every app assigned to it
+automaton apps delete my-app --abandon-offline-runtime --yes  # deletes one app whose Runner is offline
+```
+
+In Studio: **Runners**, the red cross on an offline Runner ("Delete offline Runner and its apps"), or **Delete** on an app whose Runner is offline and confirm "Delete without cleanup".
+
+The apps, their public addresses, secrets and server-side data are removed and the Runner registration is revoked, with an audit entry. Nothing is removed on the machine: the result lists each skipped environment, and containers and data may remain there until you clean it by hand. A Runner that is online is refused; use the normal removal above. The API is `DELETE /api/runners/{id}?abandonOffline=true` and `DELETE /api/apps/{id}?abandonOfflineRuntimes=true`.
+
 The uninstall removes the Runner's containers and its installation folder. Docker itself, images already pulled and your own files on the host stay. Servers released up to 0.2.130 leave `/opt/automaton/self-hosted-runners/...`; remove it by hand.
 
 Check: `automaton runners` no longer lists it, and `docker ps` on the host shows no container named `automaton-self-hosted-*` for it.
@@ -120,6 +133,6 @@ Studio can also deploy the source the server stores for an app: **Apps → open 
 
 ## Deleting an app
 
-**Apps → open an app → Settings → Danger Zone → Delete App** removes the app's runtimes, workspace, staging and persistent data, including its Compose volumes. Every assigned Runner must be online. If cleanup fails the app is kept: fix the reported problem and retry. Deleting an additional environment keeps the app's shared data. If an interrupted deletion stays blocked, an administrator can retry it with `DELETE /api/Apps/{appId}?recoverInterrupted=true`; if the Runner is permanently gone and you have removed its containers and storage yourself, add `&abandonOfflineRuntimes=true`.
+**Apps → open an app → Settings → Danger Zone → Delete App** removes the app's runtimes, workspace, staging and persistent data, including its Compose volumes. Every assigned Runner must be online, unless an administrator deletes it without cleanup (see "A Runner that is offline for good"). If cleanup fails the app is kept: fix the reported problem and retry. Deleting an additional environment keeps the app's shared data. If an interrupted deletion stays blocked, an administrator can retry it with `DELETE /api/Apps/{appId}?recoverInterrupted=true`; for a Runner that is permanently gone, an administrator adds `abandonOfflineRuntimes=true` (no recovery step needed).
 
 The trust boundary is in [Security overview](./security#runners-and-the-docker-socket). Next: [deploy an app](./deploy).

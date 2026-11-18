@@ -42,6 +42,17 @@ class RunnersService {
     await apiClient.delete(`/api/runners/${id}`, { params: { hostCleanupConfirmed: true } })
   }
 
+  /**
+   * Administrator: delete an offline Runner and the apps assigned to it without cleaning up its machine.
+   * DELETE /api/runners/{id}?abandonOffline=true
+   */
+  async deleteOffline(id: string): Promise<string[]> {
+    const { data } = await apiClient.delete<{ skippedHostCleanup: string[] }>(`/api/runners/${id}`, {
+      params: { abandonOffline: true },
+    })
+    return data.skippedHostCleanup
+  }
+
   /** The manual host command, for an offline or broken Runner. */
   async prepareUpgrade(id: string): Promise<RunnerUpgradeInstructions> {
     const { data } = await apiClient.post<RunnerUpgradeInstructions>(`/api/runners/${id}/upgrade-command`)

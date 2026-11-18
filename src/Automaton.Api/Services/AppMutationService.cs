@@ -194,7 +194,7 @@ public sealed class AppMutationService(
         entity.Tags = AppTagNormalizer.Serialize(app.Tags);
     }
 
-    public async Task Remove(Guid id, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
+    public async Task<IReadOnlyList<string>> Remove(Guid id, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
     {
         // Check if user can delete this app (must be personal owner AND not part of any project)
         if (!await authorizationService.CanDeleteAppAsync(id))
@@ -222,9 +222,11 @@ public sealed class AppMutationService(
 
         var ownerId = ResolveAppOwnerId(app) ?? UserId;
 
-        await appDeletionService.DeleteResourcesAsync(id, app, ownerId, recoverInterrupted, abandonOfflineRuntimes);
+        var skippedHostCleanup = new List<string>();
+        await appDeletionService.DeleteResourcesAsync(id, app, ownerId, recoverInterrupted, abandonOfflineRuntimes, skippedHostCleanup);
 
-        await mutationAuditService.RecordDeletedAsync(app, ownerId, abandonOfflineRuntimes);
+        await mutationAuditService.RecordDeletedAsync(app, ownerId, abandonOfflineRuntimes, skippedHostCleanup);
+        return skippedHostCleanup;
     }
 
     private Guid? ResolveAppOwnerId(Entities.WebApp appEntity)

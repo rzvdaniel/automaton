@@ -108,15 +108,19 @@ export const useAppsStore = defineStore('apps', () => {
     }
   }
 
-  async function deleteApp(id: string): Promise<void> {
+  /** With `abandonOffline` (administrators) cleanup on an offline Runner is skipped; returns what was skipped. */
+  async function deleteApp(id: string, abandonOffline = false): Promise<string[]> {
     try {
-      await appsService.delete(id)
+      let skipped: string[] = []
+      if (abandonOffline) skipped = await appsService.deleteAbandoningOfflineRuntimes(id)
+      else await appsService.delete(id)
 
       // Remove from local state
       apps.value = apps.value.filter((app) => app.id !== id)
       if (selectedApp.value?.id === id) {
         selectedApp.value = null
       }
+      return skipped
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
       throw new Error(errorMessage)

@@ -51,12 +51,17 @@ public class RunnersController : BaseController
     [HttpDelete("{id}")]
     [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken,
-        [FromQuery] bool hostCleanupConfirmed = false)
+        [FromQuery] bool hostCleanupConfirmed = false,
+        [FromQuery] bool abandonOffline = false,
+        [FromServices] OfflineRunnerDeletionService? offlineDeletion = null)
     {
         if (!AppChangeKeyScope.IsAllowed(User))
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot delete Runners. Use a key with the Developer scope." });
+        if (abandonOffline && !User.IsInRole("Admin") && !User.IsInRole("SysAdmin")) return Forbid();
         try
         {
+            if (abandonOffline)
+                return Ok(new { skippedHostCleanup = await offlineDeletion!.DeleteAsync(id, cancellationToken) });
             await runnersService.Delete(id, cancellationToken, hostCleanupConfirmed);
         }
         catch (UnauthorizedAccessException)

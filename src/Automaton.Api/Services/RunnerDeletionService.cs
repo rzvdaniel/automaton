@@ -18,12 +18,13 @@ public sealed class RunnerDeletionService(
     UserContextService userContextService,
     RunnerExecutionRevocationService executions)
 {
-    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken, bool hostCleanupConfirmed = false)
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken, bool hostCleanupConfirmed = false,
+        bool abandonOffline = false)
     {
         await using var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
-        await deletionPolicy.EnsureCanDeleteAsync(id, cancellationToken);
+        await deletionPolicy.EnsureCanDeleteAsync(id, cancellationToken, abandonOffline);
 
         var runner = await dbContext.Runners
             .Include(x => x.RunnerUsers)
@@ -32,10 +33,10 @@ public sealed class RunnerDeletionService(
         if (runner == null)
             return;
 
-        if (!runner.DeletionRequestedAtUtc.HasValue || !hostCleanupConfirmed)
+        if (!abandonOffline && (!runner.DeletionRequestedAtUtc.HasValue || !hostCleanupConfirmed))
             throw new InvalidOperationException("Prepare Runner removal and confirm its host cleanup before deleting the registration.");
         if (RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
-            throw new InvalidOperationException("The Runner is still online. Run its uninstall command on the server before confirming removal.");
+            throw new InvalidOperationException("The Runner is still online. Run its uninstall command on the server before confirming removal, or wait until it is offline.");
 
         await executions.RevokeAsync(id, cancellationToken);
         if (runner.ApiKeyId is Guid keyId)
@@ -47,19 +48,21 @@ public sealed class RunnerDeletionService(
         await dbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
-        await RecordDeletedAsync(runner, cancellationToken);
+        await RecordDeletedAsync(runner, abandonOffline, cancellationToken);
     }
 
-    private Task RecordDeletedAsync(Runner entity, CancellationToken cancellationToken)
+    private Task RecordDeletedAsync(Runner entity, bool abandonOffline, CancellationToken cancellationToken)
         => auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             Action = AuditActions.Deleted,
             EntityType = AuditEntityTypes.Runner,
             EntityId = entity.Id,
             EventType = AuditEventTypes.RunnerDeleted,
-            Message = $"Runner '{entity.Name}' was deleted after owner-confirmed host cleanup",
+            Message = abandonOffline
+                ? $"Runner '{entity.Name}' was deleted while offline; host cleanup was skipped"
+                : $"Runner '{entity.Name}' was deleted after owner-confirmed host cleanup",
             Outcome = AuditOutcomes.Success,
             ActorUserId = userContextService.GetUserId(),
-            Metadata = new { entity.Name, entity.Version, entity.MachineName, entity.IpAddress }
+            Metadata = new { entity.Name, entity.Version, entity.MachineName, entity.IpAddress, AbandonedOffline = abandonOffline }
         }, cancellationToken);
 }

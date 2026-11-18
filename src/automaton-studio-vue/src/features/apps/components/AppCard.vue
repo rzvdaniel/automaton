@@ -9,6 +9,7 @@ import Tag from 'primevue/tag'
 import Menu from 'primevue/menu'
 import type { AppListItem } from '../types/apps.types'
 import { useAppsStore } from '../stores/apps.store'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 import { getDeployedAppUrl, getDeploymentTargetUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
@@ -190,6 +191,32 @@ const handleExport = async () => {
   }
 }
 
+const isAdmin = computed(() => (useAuthStore().user?.roles ?? []).some((role) => role === 'Admin' || role === 'SysAdmin'))
+
+// An administrator can delete the app anyway when its Runner is offline for good; cleanup on that machine is skipped.
+const offerDeleteWithoutCleanup = () => {
+  confirm.require({
+    message: `The Runner of "${props.app.name}" is offline. Delete the app anyway? Cleanup on that machine is skipped: containers and files may remain there.`,
+    header: 'Delete without cleanup',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Delete without cleanup',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        const skipped = await appsStore.deleteApp(props.app.id, true)
+        toast.add({
+          severity: 'warn',
+          summary: 'Deleted',
+          detail: skipped.length ? `Skipped cleanup: ${skipped.join(' ')}` : `"${props.app.name}" has been deleted`,
+          life: 10000,
+        })
+      } catch (err: unknown) {
+        toast.add({ severity: 'error', summary: 'Error', detail: err instanceof Error ? err.message : 'Failed to delete app', life: 5000 })
+      }
+    },
+  })
+}
+
 const handleDelete = async () => {
   confirm.require({
     message: `Are you sure you want to delete "${props.app.name}"? This action cannot be undone.`,
@@ -213,6 +240,7 @@ const handleDelete = async () => {
           detail: message,
           life: 5000,
         })
+        if (isAdmin.value && /must be online|did not answer/i.test(message)) offerDeleteWithoutCleanup()
       }
     },
   })

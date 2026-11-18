@@ -76,6 +76,22 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(resp);
     }
 
+    /// <summary>Administrator: deletes an app whose Runner is offline for good; returns the host cleanup that was skipped.</summary>
+    public async Task<IReadOnlyList<string>> DeleteAppAbandoningOfflineRuntimesAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{Uri.EscapeDataString(appId)}?abandonOfflineRuntimes=true", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadSkippedHostCleanupAsync(resp, ct);
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadSkippedHostCleanupAsync(HttpResponseMessage resp, CancellationToken ct)
+    {
+        var body = await ReadJsonAsync(resp, ct);
+        return body.TryGetProperty("skippedHostCleanup", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().Select(item => item.GetString() ?? "").ToList()
+            : [];
+    }
+
     /// <summary>Pauses (POST /api/apps/{id}/pause) or resumes (POST /api/apps/{id}/resume) an app.</summary>
     public async Task<JsonElement> SetAppPausedAsync(string appId, bool paused, CancellationToken ct = default, string? reason = null)
     {
@@ -927,6 +943,14 @@ public class AutomatonApiClient : IDisposable
         using var resp = await _http.GetAsync($"api/runners/{Uri.EscapeDataString(runnerId)}/upgrade", ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Administrator: deletes an offline Runner and its apps without host cleanup; returns what was skipped.</summary>
+    public async Task<IReadOnlyList<string>> DeleteOfflineRunnerAsync(string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/runners/{Uri.EscapeDataString(runnerId)}?abandonOffline=true", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadSkippedHostCleanupAsync(resp, ct);
     }
 
     public async Task DeleteRunnerAsync(string runnerId, CancellationToken ct = default)

@@ -13,11 +13,16 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
     IRunnerActionCommands gateway)
 {
     public async Task<bool> CleanupForDeletionAsync(
-        AppDeploymentTarget target, bool abandonOfflineRuntime, CancellationToken cancellationToken)
+        AppDeploymentTarget target, bool abandonOfflineRuntime, CancellationToken cancellationToken,
+        List<string>? skippedHostCleanup = null)
     {
         if (abandonOfflineRuntime && !RunnerPresenceEvaluator.HasRecentHeartbeat(
                 target.ExecutionRunner?.LastHeartbeatAtUtc, DateTime.UtcNow))
+        {
+            skippedHostCleanup?.Add(
+                $"Environment '{target.Name}' on Runner '{target.ExecutionRunner?.Name}': containers and data may remain on that machine.");
             return false;
+        }
 
         await CleanupRuntimeAsync(target, cancellationToken);
         return true;
