@@ -27,7 +27,8 @@ public sealed record MachineHostHealth(
     DateTime? RebootRequiredSinceUtc,
     string? RunnerVersion,
     long? DockerUnusedImagesBytes = null,
-    IReadOnlyList<AppDiskUsage>? AppDisk = null);
+    IReadOnlyList<AppDiskUsage>? AppDisk = null,
+    Fail2BanStatus? Fail2Ban = null);
 
 /// <summary>
 /// Disk one app uses on a Runner's machine. Values the Runner cannot read are null.
@@ -40,3 +41,15 @@ public sealed record AppDiskUsage(
     long? LogsBytes,
     long? ContainerBytes,
     long? ImageBytes);
+
+/// <summary>
+/// What fail2ban on the host reports, read from its database (never its socket). <c>Running</c> is false when fail2ban is
+/// not installed or not started. A ban counts as current until its recorded expiry; a manual unban shows only after the
+/// ban would have expired.
+/// </summary>
+public sealed record Fail2BanStatus(bool Running, IReadOnlyList<Fail2BanJail> Jails);
+
+public sealed record Fail2BanJail(
+    string Name, bool Enabled, int BannedLastHour, int BannedLast24Hours, IReadOnlyList<Fail2BanBan> CurrentBans);
+
+public sealed record Fail2BanBan(string Ip, DateTime BannedAtUtc, DateTime? ExpiresAtUtc);

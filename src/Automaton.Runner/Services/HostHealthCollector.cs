@@ -25,13 +25,14 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
         var disk = ReadDisk();
         var (docker, dockerApps, apps) = await ReadDockerAsync(token);
         var files = HostFiles.From(await ReadHostFilesAsync(token));
+        var fail2Ban = await Fail2BanReader.ReadAsync(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE"), token);
 
         return new MachineHostHealth(
             DateTime.UtcNow, files.OsName, files.OsVersion, HostHealthParsers.ParseUptimeSeconds(Read("/proc/uptime")),
             cpus, cpuPercent, load?.Load1, load?.Load5, load?.Load15, memory?.Total, memory?.Available,
             disk?.Total, disk?.Available, docker?.Images, docker?.Containers, docker?.Volumes, docker?.BuildCache,
             files.Pending, files.Security, files.RebootRequired, files.RebootSince,
-            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps);
+            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps, fail2Ban);
     }
 
     private async Task<(
@@ -120,9 +121,9 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
         return [];
     }
 
-    private sealed record CommandResult(int ExitCode, string Output);
+    internal sealed record CommandResult(int ExitCode, string Output);
 
-    private static async Task<CommandResult?> RunAsync(string file, IEnumerable<string> arguments, CancellationToken token)
+    internal static async Task<CommandResult?> RunAsync(string file, IEnumerable<string> arguments, CancellationToken token)
     {
         var info = new ProcessStartInfo(file) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         foreach (var argument in arguments) info.ArgumentList.Add(argument);

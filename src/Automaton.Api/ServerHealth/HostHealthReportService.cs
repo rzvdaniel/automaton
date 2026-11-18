@@ -54,6 +54,7 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
         if (sizes.Any(value => value < 0) || report.UpdatesPending < 0 || report.SecurityUpdates < 0)
             throw new ArgumentException("Host health values must not be negative.");
         ValidateApps(report.AppDisk);
+        ValidateFail2Ban(report.Fail2Ban);
         if (report.MemoryAvailableBytes > report.MemoryTotalBytes || report.DiskAvailableBytes > report.DiskTotalBytes)
             throw new ArgumentException("Available space cannot exceed the total.");
         if (Length(report.OsName) > 200 || Length(report.OsVersion) > 100 || Length(report.RunnerVersion) > 80)
@@ -66,6 +67,15 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
         if (apps.Count > 2000 || apps.Any(app => app.AppId == Guid.Empty
             || new[] { app.FilesBytes, app.DataBytes, app.LogsBytes, app.ContainerBytes, app.ImageBytes }.Any(value => value < 0)))
             throw new ArgumentException("App disk values must not be negative, and at most 2000 apps are accepted.");
+    }
+
+    private static void ValidateFail2Ban(Fail2BanStatus? status)
+    {
+        if (status is null) return;
+        if (status.Jails.Count > 100 || status.Jails.Any(jail => jail.Name.Length is 0 or > 100 || jail.CurrentBans.Count > 1000
+                || jail.BannedLastHour < 0 || jail.BannedLast24Hours < 0
+                || jail.CurrentBans.Any(ban => !System.Net.IPAddress.TryParse(ban.Ip, out _))))
+            throw new ArgumentException("The fail2ban report is too large or has an invalid address.");
     }
 
     private static int Length(string? value) => value?.Length ?? 0;

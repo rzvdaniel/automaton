@@ -388,7 +388,7 @@ public static class ApplicationContractValidator
     public const string SupportedPermission = "backups:read";
 
     /// <summary>Every app permission an app can request.</summary>
-    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read", "notify:email", "server:cleanup", "runner:maintain", "backups:run", "apps:read-status"];
+    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read", "notify:email", "server:cleanup", "runner:maintain", "backups:run", "apps:read-status", "security:read"];
 
     public const int MaxOpenPaths = 20;
     public const int MaxDescriptionLength = 200;

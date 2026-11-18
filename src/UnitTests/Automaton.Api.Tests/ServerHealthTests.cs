@@ -218,6 +218,74 @@ public sealed class ServerHealthTests
         Assert.That(typeof(ServerHealthController).GetMethods().SelectMany(method => method.GetCustomAttributes(typeof(AllowAnonymousAttribute), true)), Is.Empty);
     }
 
+    [Test]
+    public async Task Fail2BanIsServedToSecurityReadOnly_AndNeverInsideServerHealth()
+    {
+        await using var db = CreateDb();
+        var (_, key) = SeedMachineRunner(db);
+        await db.SaveChangesAsync();
+        var reports = new HostHealthReportService(db);
+        var now = DateTime.UtcNow;
+        var status = new Fail2BanStatus(true,
+        [
+            new("sshd", true, 3, 12, [new("203.0.113.9", now.AddMinutes(-5), now.AddMinutes(55)), new("198.51.100.2", now.AddHours(-3), now.AddMinutes(-1))]),
+            new("recidive", true, 0, 1, [new("2001:db8::1", now.AddHours(-1), null)])
+        ]);
+        await reports.ReportAsync(key, Sample() with { Fail2Ban = status }, default);
+        var memory = new MemoryCache(new MemoryCacheOptions());
+        memory.Set(nameof(LatestReleaseClient), (string?)null);
+
+        var security = await new Fail2BanReadService(reports).GetAsync(now, default);
+        var health = await Service(db, memory, null).GetAsync(now, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(security.Reported, Is.True);
+            Assert.That(security.Running, Is.True);
+            Assert.That(security.BannedLastHour, Is.EqualTo(3));
+            Assert.That(security.BannedLast24Hours, Is.EqualTo(13));
+            Assert.That(security.Jails[0].CurrentBans.Select(ban => ban.Ip), Is.EqualTo(new[] { "203.0.113.9" }), "an expired ban is not current");
+            Assert.That(security.Jails[1].CurrentBans.Single().ExpiresAtUtc, Is.Null, "permanent ban");
+            Assert.That(health.Host!.Fail2Ban, Is.Null, "server:read does not carry fail2ban");
+            Assert.That(health.Runners.Single().Host!.Fail2Ban, Is.Null);
+        });
+        Assert.ThrowsAsync<ArgumentException>(() => reports.ReportAsync(key,
+            Sample(DateTime.UtcNow.AddSeconds(5)) with { Fail2Ban = new(true, [new("x", true, 0, 0, [new("not-an-ip", now, null)])]) }, default));
+    }
+
+    [Test]
+    public async Task Fail2BanIsNotReportedBeforeARunnerReadsIt()
+    {
+        await using var db = CreateDb();
+        var (_, key) = SeedMachineRunner(db);
+        await db.SaveChangesAsync();
+        var reports = new HostHealthReportService(db);
+        Assert.That((await new Fail2BanReadService(reports).GetAsync(DateTime.UtcNow, default)).Reported, Is.False, "no report yet");
+        await reports.ReportAsync(key, Sample(), default);
+        Assert.That((await new Fail2BanReadService(reports).GetAsync(DateTime.UtcNow, default)).Reported, Is.False, "the Runner could not read fail2ban");
+    }
+
+    [Test]
+    public async Task OnlyASecurityReadCredentialOrASystemAdministratorPassesTheSecurityPolicy()
+    {
+        var services = new ServiceCollection().AddLogging()
+            .AddAuthorization(options => AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.SecurityReadPolicy, AppPermissionApproval.SecurityRead)).BuildServiceProvider();
+        var authorization = services.GetRequiredService<IAuthorizationService>();
+        static ClaimsPrincipal App(params string[] permissions) => new(new ClaimsIdentity(
+            permissions.Select(permission => new Claim("app_permission", permission)), "AppPermission"));
+        async Task<bool> Allowed(ClaimsPrincipal user) =>
+            (await authorization.AuthorizeAsync(user, AppPermissionAuthenticationOptions.SecurityReadPolicy)).Succeeded;
+
+        Assert.That(await Allowed(App(AppPermissionApproval.SecurityRead)), Is.True);
+        Assert.That(await Allowed(App(AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRead)), Is.False, "server:read is not security:read");
+        Assert.That(await Allowed(App()), Is.False);
+        Assert.That(await Allowed(new ClaimsPrincipal(new ClaimsIdentity())), Is.False, "anonymous");
+        var policy = typeof(ServerSecurityController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();
+        Assert.That(policy.Policy, Is.EqualTo(AppPermissionAuthenticationOptions.SecurityReadPolicy));
+        Assert.That(ApplicationContractValidator.SupportedPermissions, Does.Contain("security:read"));
+    }
+
     private static ServerHealthService Service(ApplicationDbContext db, IMemoryCache memory, string? version)
     {
         var values = new Dictionary<string, string?>
