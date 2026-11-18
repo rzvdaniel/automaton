@@ -53,7 +53,8 @@ public sealed class ServerConsoleProvisioningService(
     /// </summary>
     internal static async Task<Guid> RunAsync(
         Func<Task<Guid?>> find, Func<Task<Guid>> install, Func<Guid, Task> approve,
-        Func<Guid, Task<bool>> needsDeploy, Func<Guid, Task> deploy, ILogger logger, CancellationToken token)
+        Func<Guid, Task<bool>> needsDeploy, Func<Guid, Task> deploy, ILogger logger, CancellationToken token,
+        string appName = "Server Console")
     {
         var appId = await find() ?? await install();
         await approve(appId);
@@ -63,7 +64,7 @@ public sealed class ServerConsoleProvisioningService(
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 // Installed and approved is useful on its own; the administrator can deploy from the app page.
-                logger.LogWarning(exception, "Server Console was installed but its first deploy could not be started.");
+                logger.LogWarning(exception, "{AppName} was installed but its first deploy could not be started.", appName);
             }
         }
         return appId;

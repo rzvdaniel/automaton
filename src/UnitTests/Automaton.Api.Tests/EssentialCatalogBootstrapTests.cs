@@ -49,6 +49,21 @@ public sealed class EssentialCatalogBootstrapTests
         Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Stale = true }, installed), Is.Null);
     }
 
+    [Test]
+    public async Task AnInstalledEssentialThatWasNeverDeployedIsDeployed()
+    {
+        var deployed = new List<Guid>();
+        var appId = Guid.NewGuid();
+        var result = await ServerConsoleProvisioningService.RunAsync(
+            find: () => Task.FromResult<Guid?>(appId), install: () => throw new InvalidOperationException(),
+            approve: _ => Task.CompletedTask, needsDeploy: _ => Task.FromResult(true),
+            deploy: id => { deployed.Add(id); return Task.CompletedTask; },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, default, "Website Monitor");
+
+        Assert.That(result, Is.EqualTo(appId));
+        Assert.That(deployed, Is.EqualTo(new[] { appId }));
+    }
+
     private static CatalogEntryDto Entry(string id, string commit, string source = "official") =>
         new(id, id, "", "", "rzvdaniel/automaton-apps", $"maintenance/{id}", commit, "0.0.1", [], false,
             null, source, source, source != "official");

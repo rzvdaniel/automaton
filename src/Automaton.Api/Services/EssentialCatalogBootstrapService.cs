@@ -107,9 +107,8 @@ public sealed class EssentialCatalogBootstrapService(
             .ToListAsync(cancellationToken);
         var missing = MissingEssentials(response, installed.Select(app => (app.Repo, app.Folder)).ToHashSet());
         if (missing is null) return false;
-        // A pass that stopped after installing Server Console must still approve and deploy it.
-        var console = response.Apps.Single(app => app.Id == ServerConsoleProvisioningService.AppId && app.SourceId == CatalogSourceStore.OfficialId);
-        if (!missing.Contains(console)) missing = [console, .. missing];
+        // Every step is safe to repeat: a pass that stopped after an install still deploys what was never deployed.
+        missing = AppIds.Select(id => response.Apps.Single(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId)).ToList();
         var installer = services.GetRequiredService<AppCatalogInstallService>();
         var userContext = services.GetRequiredService<UserContextService>();
         userContext.ImpersonateUser(adminId);
@@ -120,14 +119,31 @@ public sealed class EssentialCatalogBootstrapService(
                 if (entry.Id == ServerConsoleProvisioningService.AppId)
                     await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionAsync(adminId, entry, cancellationToken);
                 else
-                    await installer.InstallAsync(new CatalogInstallRequest
-                    {
-                        Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit
-                    }, cancellationToken);
+                    await InstallAndDeployAsync(services, db, installer, adminId, entry, cancellationToken);
                 logger.LogInformation("Installed or completed essential catalog app {AppName} for the first administrator.", entry.Name);
             }
             return true;
         }
         finally { userContext.ClearImpersonation(); }
+    }
+
+    /// <summary>Installs the app when missing and starts its first deploy, so it is Running and not just listed. A failed start is logged, not fatal.</summary>
+    private async Task InstallAndDeployAsync(
+        IServiceProvider services, ApplicationDbContext db, AppCatalogInstallService installer, Guid adminId,
+        CatalogEntryDto entry, CancellationToken token)
+    {
+        var deployer = services.GetRequiredService<StoredSourceDeploymentService>();
+        await ServerConsoleProvisioningService.RunAsync(
+            find: async () => await db.WebApps
+                .Where(app => app.InstalledFromRepo == entry.Repo && (app.InstalledFromFolder ?? "") == entry.Folder
+                    && app.WebAppUsers.Any(user => user.UserId == adminId))
+                .Select(app => (Guid?)app.Id)
+                .FirstOrDefaultAsync(token),
+            install: async () => (await installer.InstallAsync(
+                new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
+            approve: _ => Task.CompletedTask,
+            needsDeploy: appId => ServerConsoleProvisioningService.NeedsDeployAsync(db, appId, token),
+            deploy: appId => deployer.AcceptAsync(appId, adminId, adminId, null, false, token),
+            logger, token, entry.Name);
     }
 }
