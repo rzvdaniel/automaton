@@ -29,24 +29,36 @@ public sealed class EssentialCatalogBootstrapTests
     }
 
     [Test]
-    public void BootstrapSelectsOnlyMissingOfficialEntriesAtTheirCatalogCommits()
+    public void BootstrapInstallsOnlyServerConsoleAtItsCatalogCommit()
     {
         const string commit = "0123456789abcdef0123456789abcdef01234567";
-        var entries = EssentialCatalogBootstrapService.AppIds.Select(id => Entry(id, commit)).ToList();
+        var entries = new[] { "server-console", "website-monitor", "heartbeat" }.Select(id => Entry(id, commit)).ToList();
         entries.Add(Entry("server-console", "ffffffffffffffffffffffffffffffffffffffff", source: "custom"));
         var response = new CatalogResponse(entries, DateTime.UtcNow, false, false, null);
-        var installed = new HashSet<(string Repo, string Folder)> { ("rzvdaniel/automaton-apps", "maintenance/heartbeat") };
 
-        var missing = EssentialCatalogBootstrapService.MissingEssentials(response, installed);
+        Assert.That(EssentialCatalogBootstrapService.AppIds, Is.EqualTo(new[] { "server-console" }));
+        var missing = EssentialCatalogBootstrapService.MissingEssentials(response, new HashSet<(string Repo, string Folder)>());
+        Assert.That(missing!.Select(app => (app.Id, app.Commit)), Is.EqualTo(new[] { ("server-console", commit) }));
+        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response, new HashSet<(string Repo, string Folder)>
+            { ("rzvdaniel/automaton-apps", "maintenance/server-console") }), Is.Empty, "an existing install is kept");
+        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Unavailable = true }, new HashSet<(string Repo, string Folder)>()), Is.Null);
+        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Stale = true }, new HashSet<(string Repo, string Folder)>()), Is.Null);
+    }
 
-        Assert.That(missing!.Select(app => (app.Id, app.Commit)), Is.EqualTo(new[]
-        {
-            ("server-console", commit), ("website-monitor", commit)
-        }));
-        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response, entries.Take(3)
-            .Select(app => (app.Repo, app.Folder)).ToHashSet()), Is.Empty);
-        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Unavailable = true }, installed), Is.Null);
-        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Stale = true }, installed), Is.Null);
+    [Test]
+    public async Task ServerConsoleIsInstalledApprovedAndDeployed()
+    {
+        var steps = new List<string>();
+        var appId = Guid.NewGuid();
+        var result = await ServerConsoleProvisioningService.RunAsync(
+            find: () => Task.FromResult<Guid?>(null), install: () => { steps.Add("install"); return Task.FromResult(appId); },
+            approve: id => { steps.Add("approve"); return Task.CompletedTask; }, needsDeploy: _ => Task.FromResult(true),
+            deploy: id => { steps.Add("deploy"); return Task.CompletedTask; },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, default, "Server Console");
+
+        Assert.That(result, Is.EqualTo(appId));
+        Assert.That(steps, Is.EqualTo(new[] { "install", "approve", "deploy" }));
+        Assert.That(ServerConsoleProvisioningService.ApprovedPermissions, Is.EqualTo(new[] { "server:read", "notify:email", "server:cleanup" }));
     }
 
     [Test]

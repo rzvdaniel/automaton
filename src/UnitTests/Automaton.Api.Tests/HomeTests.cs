@@ -66,6 +66,24 @@ public sealed class HomeTests
         => new(id, id, "summary", "Monitoring", "r/r", id, "c", "0.0.1", [], newer, installed, source, source, false, null, null, recommended, order);
 
     [Test]
+    public void InstalledForYouNoteShowsOnlyForARecentFirstRunnerInstall()
+    {
+        var installedId = Guid.NewGuid();
+        var apps = new[] { Entry("server-console", installed: installedId), Entry("heartbeat", recommended: false) };
+
+        var note = HomeNeedsYouService.InstalledForYouCard(apps, DateTime.UtcNow.AddHours(-1))!;
+        Assert.That(note.Key, Is.EqualTo("installed-for-you"));
+        Assert.That(note.Title, Does.StartWith("Installed for you"));
+        Assert.That(note.ActionPath, Is.EqualTo($"/apps/{installedId}"));
+        Assert.That(note.Dismissible, Is.True);
+        Assert.That(HomeCardKeys.CanDismiss(note.Key), Is.True);
+        Assert.That(HomeNeedsYouService.InstalledForYouCard(apps, DateTime.UtcNow.AddDays(-60)), Is.Null, "existing servers: no note");
+        Assert.That(HomeNeedsYouService.InstalledForYouCard(apps, null), Is.Null, "nothing installed for them");
+        Assert.That(HomeNeedsYouService.InstalledForYouCard([Entry("server-console")], DateTime.UtcNow), Is.Null, "app was removed");
+        Assert.That(HomeNeedsYouService.RecommendedCards(apps).Select(card => card.CatalogAppId), Is.Empty, "Heartbeat is not recommended");
+    }
+
+    [Test]
     public void RecommendedCardsFollowTheCatalogOrder()
     {
         var cards = HomeNeedsYouService.RecommendedCards([Entry("last"), Entry("second", order: 2), Entry("server-console", order: 1)]);
