@@ -119,6 +119,9 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain($"slug-{appId}-runtime"));
             Assert.That(content, Does.Not.Contain($"slug-{appId}-auth"));
             Assert.That(content, Does.Contain($"private-{appId}-auth:"));
+            Assert.That(content, Does.Contain("viewer-strip:"));
+            Assert.That(content, Does.Contain($"slug-{appId}-runtime:"));
+            Assert.That(content, Does.Contain("middlewares: [\"viewer-strip\", \"slug-"));
         });
     }
 
@@ -139,7 +142,7 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain("&& Path(`/callback`) && !PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)\"" + Environment.NewLine + "      priority: 60"));
             Assert.That(content, Does.Contain("!PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)"));
             Assert.That(content, Does.Contain($"private-{appId}-open0-runtime"));
-            Assert.That(content, Does.Contain($"middlewares: [\"private-{appId}-rewrite\"]"));
+            Assert.That(content, Does.Contain($"middlewares: [\"viewer-strip\", \"private-{appId}-rewrite\"]"));
         });
     }
 
