@@ -14,11 +14,11 @@ Taking or listing a backup needs no input. Ask before a restore (it replaces the
 
 ## Prerequisites
 
-SSH access with sudo on the server.
+SSH access with sudo on the server for the `sudo` commands below; they run on the server host. Without sudo, use Studio's **Backups** page or `automaton server backup` and `automaton server backup-status` (they show times, not the folder name; the folder name `automaton-YYYYMMDDTHHMMSSZ` is listed by `backup.sh --list` or Studio's **Backups** page).
 
 ## What you get by default
 
-The installer turns on a nightly backup between 03:00 and 04:00 server time and keeps the newest 7 in `/opt/automaton-server/backups/nightly`. Each holds a PostgreSQL dump and the keys that decrypt it. The **Backups** page in Studio shows the last, next and offsite backup, lists them, gives the restore command and has a **Back up now** button for administrators (CLI: `automaton server backup`, and `automaton server backup-status` for the next scheduled run).
+The installer turns on a nightly backup between 03:00 and 04:00 server time and keeps the newest 7 in `/opt/automaton-server/backups/nightly`. Each holds a PostgreSQL dump and the keys that decrypt it. The **Backups** page in Studio shows the last, next and offsite backup, lists them, gives the restore command and has a **Back up now** button for administrators (CLI: `automaton server backup`, and `automaton server backup-status` for the next scheduled run; right after a backup it can show the old time for about 25 s).
 
 Each backup folder holds `database.dump` (custom-format `pg_dump`), the API and Worker Data Protection keys, the server version and checksums, plus an encrypted `.tar.age` archive. The X25519 private key is `/etc/automaton/secrets/backup-key` (root-only): save it separately in a password manager, an archive cannot be restored without it. Administrators can also start a backup from Studio or the CLI; the API never runs it as root (a systemd path unit `automaton-backup-request.path` runs it).
 
@@ -40,7 +40,7 @@ The **Backup Warden** app is available in **Apps → Catalog**. Install and conf
 
 ## Restore
 
-Restoring replaces the whole database and keys. Everything written after that backup is lost.
+Restoring replaces the whole database and keys. Everything written after that backup is lost. Runners keep their registration and apps keep running on them, but app data and deploys made after the backup are not restored, and apps created after it are unknown to the server. List names first with `sudo bash /opt/automaton-server/backup.sh --list`.
 
 ```bash
 sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z
@@ -73,7 +73,7 @@ curl -fsS https://api.example.com/health
 automaton installation-status
 ```
 
-Expected: `ok`, and your users and apps are counted.
+Expected: `{"status":"ok","version":"server-v0.2.164"}` (your version), and your users and apps are counted.
 
 ## Common errors
 

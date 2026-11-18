@@ -16,13 +16,13 @@ Ask only what you cannot find out:
 - For another machine: its address and SSH login (`user@host`), and whether that user is root or has passwordless sudo. SSH must work with a key, without a password prompt.
 - A name for the Runner (default `main`), and a project to add it to, if any.
 
-Never ask for, print or store: an SSH, sudo or administrator password, an API key or token, the `--device` code, or the one-time install command (it is a secret until it expires).
+Never ask for, print or store: an SSH, sudo or administrator password, an API key or token, the `--device` code, or the one-time install command (it is a secret until it expires). The one exception: with `--print-command` the CLI output goes to a private temporary file (see Steps), deleted once the Runner connects or the command expires.
 
 ## Prerequisites
 
 - A server with an administrator ([first administrator](./first-admin)) and the CLI signed in: `automaton login --server https://api.example.com` (see [Install with your AI agent](./install-with-ai) or [Your first app](./getting-started)). Check: `automaton whoami` names the right server.
 - An x86_64 Linux host (Ubuntu or Debian, systemd) running Docker Engine. It can be the server itself or another machine. Other distributions with Docker may work but are not tested. The Runner controls the host's Docker: install it only on machines you trust.
-- **Root or passwordless sudo on the host.** The installer needs it. Check on the host: `docker info` works, `uname -m` prints `x86_64`, and `sudo -n true` succeeds (or you are root). `--local` and `--ssh` run the installer as `sudo bash -s`, so `sudo` must exist even for root. Without sudo, use `--print-command` and run the printed command as root.
+- **Root or passwordless sudo on the host.** The installer needs it. Check on the host: `docker info` works, `uname -m` prints `x86_64`, and `sudo -n true` succeeds (or you are root). `--local` and `--ssh` run the installer as `sudo bash -s`, so `sudo` must exist even for root. Without passwordless sudo, `--local` and `--ssh` fail with "sudo: ... can't do that": use `--print-command` instead. Root is only needed when the user cannot reach `/var/run/docker.sock`.
 - **`--ssh` has no key option.** It runs plain `ssh -T -- user@host` without a terminal, so the key must work without any prompt: the default key (`~/.ssh/id_*`), a loaded `ssh-agent`, or a `Host` entry in `~/.ssh/config` (`HostName`, `User`, `IdentityFile`). Check first: `ssh user@host sudo -n true`. To use another key, add it to `~/.ssh/config` and pass that Host name as `--ssh`.
 - Port 5671 on the server's `api` host must be reachable from the Runner host ([Install the server](./install-server)).
 
@@ -43,7 +43,7 @@ automaton runners install --name main --ssh user@host --yes
 automaton runners install --name main --print-command --yes
 ```
 
-The CLI asks you to confirm the Docker access; `--yes` is required when there is no terminal. Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds (`--timeout`) for the Runner to connect and prints its Runner ID. With `--print-command` the CLI keeps waiting: run the printed command on the host within `--timeout` seconds. `--json` with `--ssh` or `--local` prints `{runnerId, name, status}`. Studio does the same under **Runners → Install Machine Management Runner**.
+The CLI asks you to confirm the Docker access; `--yes` is required when there is no terminal. Add `--project NAME` to also add the Runner to a project. The command waits up to 300 seconds (`--timeout`) for the Runner to connect and prints its Runner ID. With `--print-command` the CLI keeps waiting: run the printed command on the host within `--timeout` seconds. Run the CLI in the background with the output in a private file (`umask 077; f=$(mktemp); nohup automaton runners install --name main --print-command --yes > "$f" 2>&1 &`), read the command from `$f`, run it on the host, then check `automaton runners` (or the end of `$f`) until the Runner is connected. Delete the file (`rm -f "$f"`) once the Runner connects or the command expires. A Linux PC uses `--local`. `--json` with `--ssh` or `--local` prints `{runnerId, name, status}`. Studio does the same under **Runners → Install Machine Management Runner**.
 
 ### A Windows PC
 
@@ -84,7 +84,7 @@ Ask the user to confirm: apps on that Runner stop and lose their host-local data
 automaton runners delete main --ssh user@host      # runs the uninstall over SSH, then deletes the registration
 ```
 
-`--ssh` needs the same root or passwordless sudo and key login as the install (see Prerequisites). Without `--ssh` (for example no sudo): `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host as root, then `automaton runners delete main --host-cleanup-confirmed`. That flag only tells the server the uninstall ran; it does not touch the host, and it answers 409 "still online" while the Runner still connects. In Studio: **Runners**, remove the Runner; it shows the same uninstall command, then tick "I ran the command successfully" and **Confirm removal**.
+`--ssh` needs the same root or passwordless sudo and key login as the install (see Prerequisites). Without `--ssh` (for example no sudo): `automaton runners delete main --json` prints `uninstallCommand` (copy it from `--json`; the plain output is wrapped at the terminal width and breaks when pasted), run it on the host as root, then `automaton runners delete main --host-cleanup-confirmed`. Shortcut: `automaton runners delete main --json | jq -r .uninstallCommand`. Run the uninstall as non-root and it ends with `rm: Permission denied` but exit 0: the folder is left behind, so rerun it as root. `automaton runners delete main --json` only prepares the removal: it marks the Runner for removal (default placement stops choosing it) and prints `uninstallCommand` with `deleted: false`; the registration goes after the uninstall and `--host-cleanup-confirmed`. If apps are still assigned it answers 409 "Move or delete all assigned app environments": move or delete them first. A new Runner can be assigned to apps by default placement, so check `automaton apps` after adding one. The `--host-cleanup-confirmed` flag only tells the server the uninstall ran; it does not touch the host, and it answers 409 "still online" while the Runner still connects. In Studio: **Runners**, remove the Runner; it shows the same uninstall command, then tick "I ran the command successfully" and **Confirm removal**.
 
 ### A Runner that is offline for good
 
@@ -106,6 +106,7 @@ Check: `automaton runners` no longer lists it, and `docker ps` on the host shows
 ## Common errors
 
 - **`sudo: ... password is required` / installer exits 1.** The SSH user has no passwordless sudo. Use root, or `--print-command`.
+- **`rm: Permission denied` after the uninstall.** It was run without root and exited 0. Rerun as root.
 - **Docker not running on the host.** Start Docker, rerun the command.
 - **"Ports are not available" (Windows).** Docker Desktop: use WSL with Docker Engine, above.
 - **Times out waiting for connection.** Port 5671 must be reachable from the Runner machine. See [Install the server](./install-server).

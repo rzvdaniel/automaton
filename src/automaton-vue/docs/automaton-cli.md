@@ -19,6 +19,8 @@ curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/insta
 
 On Windows (PowerShell): `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. The script puts `automaton` in `~/.local/bin` (Windows: `%LOCALAPPDATA%\Automaton\bin`) and checks its SHA-256. Set `AUTOMATON_VERSION=server-v<version>` to pick a release.
 
+If `automaton whoami` already names your server and user, skip login. If the CLI is older than the server (a command or option is missing), rerun the install script above, or `dotnet tool update -g Automaton.Cli`; check with `automaton --version`.
+
 Already have the .NET 10 SDK? `dotnet tool install -g Automaton.Cli` installs the same CLI.
 
 ```bash

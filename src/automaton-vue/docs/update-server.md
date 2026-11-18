@@ -30,7 +30,7 @@ Confirm the update (services are briefly unavailable) and, for the SSH fallback,
 
 2. In Studio instead: **Admin → Installation → Update** (the **Update to the latest release** button).
 
-3. Upgrade the Runners. A server update does not change installed Runners; each keeps its old image until upgraded. From the CLI, `automaton server update --runners` waits for the update, names every Runner with its state and upgrades the ones on an old image (with only `--wait`, it lists them with the command to upgrade each; `automaton runners upgrade RUNNER --wait` needs a Developer API key).
+3. Upgrade the Runners (separate: the update is already complete without this step). A server update does not change installed Runners; each keeps its old image until upgraded. From the CLI, `automaton server update --runners` waits for the update, names every Runner with its state and upgrades the ones on an old image (with only `--wait`, it lists them with the command to upgrade each; `automaton runners upgrade RUNNER --wait` needs a Developer API key).
 
    In Studio, open **Runners**: a Runner on an old image shows **Update available**; select **Upgrade → Upgrade now**, and Studio says whether it reconnected or rolled back. An offline Runner, or one busy with a deploy or an Action, cannot upgrade; retry when idle, or use **Run it manually** (shown there) for a Runner too old to upgrade itself.
 
@@ -56,7 +56,7 @@ curl -fsS https://api.example.com/health
 automaton installation-status
 ```
 
-Expected: `ok`, and `Version:` shows the new release.
+Expected: `{"status":"ok","version":"server-vX.Y.Z"}`, and `Version:` shows the new release.
 
 ## Common errors
 

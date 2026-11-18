@@ -71,7 +71,7 @@ Every server lists installable apps under **Apps → Catalog**. The list is read
 
 To install, choose an entry and select **Install**, or paste a public GitHub address (`https://github.com/owner/name`, optionally `/tree/branch/folder`, where the branch name has no slash) under **Install from a Git address**. Studio shows the source repository, the pinned commit (the server fetches exactly that commit) and the requested permissions, then asks for the name, Runner, settings, secrets and schedules. A system administrator can approve the permissions right there. **Install** creates your own copy, deploys it on a Runner and shows each step. This needs an online Runner ([Add a Runner](./deploy-runner)). Installing the same app again makes an independent copy. Updates are never applied automatically.
 
-From a terminal or an AI agent: `automaton catalog list` shows the entries with their ids, and `automaton catalog install <id> --name NAME --runner RUNNER --setting NAME=VALUE --secrets-file FILE --wait` installs one, saves its settings and secrets and deploys it. Secrets come only from a file, standard input (`--secrets-stdin`) or a hidden prompt, never from an argument. See the [CLI reference](./automaton-cli).
+From a terminal or an AI agent: `automaton catalog list` shows the entries with their ids, and `automaton catalog install <id> --name NAME --runner RUNNER --setting NAME=VALUE --secrets-file FILE --wait` installs one, saves its settings and secrets and deploys it. Secrets come only from a file, standard input (`--secrets-stdin`) or a hidden prompt, never from an argument. See the [CLI reference](./automaton-cli). An app that needs secrets stops with "Missing secret(s): NAME" (for example `catalog install heartbeat` needs `ADMIN_TOKEN`): the entry's page in **Apps → Catalog** and the error list them, so put each `NAME=value` in the `--secrets-file` and rerun. Some catalog apps (Flow Check, Site Links) need a `GITHUB_TOKEN` secret to install.
 
 Installing a tool app that another user published on this server: the store's **Install** button opens the same install page.
 
@@ -99,7 +99,7 @@ automaton resume                 # or: automaton apps resume <app>
 automaton deploy --resume        # resume first, then deploy
 ```
 
-Pausing stops the app on its Runner, switches off its schedules and makes its public address answer 503 with a short "This app is paused" page. Its settings, secrets, data, publication and address are kept. Resuming starts it again and turns back on the schedules that were on before the pause. `automaton apps` shows `Paused` as the status. In Studio use **Pause** / **Resume** in the Apps list or on the app's Overview.
+Pausing stops the app on its Runner, switches off its schedules and makes its public address answer 503 with a short "This app is paused" page for browsers (a plain `curl` gets 503 JSON `Application runtime is unavailable.`). Its settings, secrets, data, publication and address are kept. Resuming starts it again and turns back on the schedules that were on before the pause. `automaton apps` shows `Paused` as the status. In Studio use **Pause** / **Resume** in the Apps list or on the app's Overview.
 
 ### Home, Needs you and pinned apps
 

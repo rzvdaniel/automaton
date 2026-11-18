@@ -63,7 +63,7 @@ Every declared secret shows `present` and the scope that provides it. `automaton
 ## Common errors
 
 - **Secret shows `missing`.** Set it in the right scope (`--project` needs `automaton project add-app` first).
-- **Static site cannot use secrets.** Its files go to the browser. Put secrets in an API or server-rendered app.
+- **Static site cannot use secrets.** Its files go to the browser. Put secrets in an API or server-rendered app. `secrets set`, `secrets status` and `deploy` do not refuse them for a static site, but the values never reach it.
 - **Values are never shown again.** Saving the same name replaces the value.
 
 The proxy removes any `X-Automaton-Viewer-Role` and `X-Automaton-Viewer-Token` a client sends, on every route including public apps and open paths. Your app receives them only on requests the platform signed in, so you can trust them; without them the request is anonymous.
