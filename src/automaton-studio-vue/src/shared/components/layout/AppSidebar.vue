@@ -25,7 +25,7 @@ watch(loading, (isLoading) => {
 })
 const serverVersion = ref<string | null>(null)
 onMounted(async () => {
-  installService.getStatus().then((s) => { serverVersion.value = s.version ?? null }).catch(() => {})
+  installService.getVersion().then((v) => { serverVersion.value = v }).catch(() => {})
   await loadOrganizations()
   ready.value = true
 })
