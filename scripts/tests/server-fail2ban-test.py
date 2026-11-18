@@ -75,7 +75,7 @@ class InstallScriptTests(unittest.TestCase):
             self.assertNotIn('[DEFAULT]', jail)
             self.assertEqual(jail.count('bantime.increment = true'), 2)
             self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1\n'), 2)
-            (etc / 'jail.local').write_text('[DEFAULT]\nignoreip = 127.0.0.1/8 ::1 203.0.113.7, 10.0.0.0/8\n')
+            (etc / 'jail.local').write_text('[DEFAULT]\nignoreip = 127.0.0.1/8 ::1 203.0.113.7, 10.0.0.0/8 # office #1\n')
             self.assertEqual(run().returncode, 0)
             jail = (etc / 'jail.d/automaton.conf').read_text()
             self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8\n'), 2)

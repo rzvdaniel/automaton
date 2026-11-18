@@ -42,9 +42,16 @@ for filter in "$source_dir"/filter.d/*.conf; do install -m 0644 "$filter" "$f2b_
 # The Automaton jails get the ignoreip you already configured (jail.local, jail.conf, other jail.d files), so an
 # existing allowlist keeps working; sshd and [DEFAULT] stay untouched.
 ignoreip=$(find "$f2b_dir" -maxdepth 2 \( -name jail.local -o -name jail.conf -o -path "$f2b_dir/jail.d/*" \) -type f ! -name automaton.conf -print0 2>/dev/null \
-    | xargs -0 -r sed -n 's/^[[:space:]]*ignoreip[[:space:]]*=//p' | tr ',' ' ' | tr -s '[:space:]' '\n' | awk 'NF && !seen[$0]++' | paste -sd' ')
+    | xargs -0 -r sed -n 's/^[[:space:]]*ignoreip[[:space:]]*=//p' | sed 's/[[:space:]][#;].*$//' | { grep -v '%' || true; } | tr ',' ' ' | tr -s '[:space:]' '\n' | awk 'NF && !seen[$0]++' | paste -sd' ')
 case " $ignoreip " in *" 127.0.0.1/8 "*) ;; *) ignoreip="127.0.0.1/8 ::1 $ignoreip" ;; esac
-sed -e "s#@TRAEFIK_LOG@#$traefik_log#" -e "s#@IGNOREIP@#${ignoreip% }#" "$source_dir/jail.conf.in" > "$f2b_dir/jail.d/automaton.conf"
+ignoreip=${ignoreip% }
+tmp_jail=$(mktemp "$f2b_dir/jail.d/.automaton.XXXXXX")
+python3 - "$source_dir/jail.conf.in" "$traefik_log" "$ignoreip" > "$tmp_jail" <<'PY'
+import sys
+print(open(sys.argv[1]).read().replace('@TRAEFIK_LOG@', sys.argv[2]).replace('@IGNOREIP@', sys.argv[3]), end='')
+PY
+chmod 0644 "$tmp_jail"
+mv "$tmp_jail" "$f2b_dir/jail.d/automaton.conf"
 # An allowlist file from an earlier version was merged above; leaving it would override the merged value in the jails.
 rm -f "$f2b_dir/jail.d/automaton-allowlist.local"
 cat > "$logrotate_dir/automaton-traefik" <<LOGROTATE
@@ -68,4 +75,4 @@ if [[ -z "${AUTOMATON_FAIL2BAN_ETC:-}" ]]; then
     systemctl enable --now fail2ban
     fail2ban-client reload >/dev/null
 fi
-echo "fail2ban protects this server: jails sshd, automaton-scanner and automaton-signin read $traefik_log.. Never banned: $ignoreip"
+echo "fail2ban protects this server: jails sshd, automaton-scanner and automaton-signin read $traefik_log. Never banned: $ignoreip"
