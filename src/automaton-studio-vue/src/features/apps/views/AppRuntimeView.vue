@@ -7,7 +7,7 @@ import { useToast } from 'primevue/usetoast'
 import { appsService, type CatalogUpdate } from '../services/apps.service'
 import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
 import type { App } from '../types/apps.types'
-import { getOpenAppUrl } from '../utils/public-app-url'
+import { getOpenAppUrl, withFirstPage } from '../utils/public-app-url'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,7 +61,7 @@ async function loadRuntimeView() {
     // A failed check keeps the framed view, which is what every app had before.
     canBeFramed.value = await appsService.canBeFramed(appId.value).catch(() => true)
 
-    applicationUrl.value = new URL(getOpenAppUrl(app.value), window.location.origin).toString()
+    applicationUrl.value = withFirstPage(new URL(getOpenAppUrl(app.value), window.location.origin).toString(), app.value)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load application.'
   } finally {

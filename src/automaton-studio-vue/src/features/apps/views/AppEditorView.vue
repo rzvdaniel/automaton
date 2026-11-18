@@ -30,7 +30,7 @@ import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { AppDeploymentTarget, AppSharing } from '../types/apps.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
-import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
+import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl, withFirstPage } from '../utils/public-app-url'
 import { accessLabel, appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
 import { useDeleteApp } from '../utils/use-delete-app'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -94,7 +94,7 @@ const privateAppUrl = computed(() =>
   app.value && kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed ? getDeployedAppUrl(app.value.id) : '')
 /** The address of the app itself (an API's base URL); empty until it is live. */
 const address = computed(() => (kind.value === 'tool' ? '' : publicAppUrl.value || privateAppUrl.value))
-const openAppUrl = computed(() => publicAppUrl.value || (privateAppUrl.value ? getStudioApplicationUrl(app.value!.id) : ''))
+const openAppUrl = computed(() => withFirstPage(publicAppUrl.value, app.value) || (privateAppUrl.value ? getStudioApplicationUrl(app.value!.id) : ''))
 const access = computed(() => kind.value === 'tool' || !sharing.value ? '' : accessLabel(sharing.value.audience))
 const apiReferenceUrl = computed(() => {
   const path = app.value?.application?.openApi

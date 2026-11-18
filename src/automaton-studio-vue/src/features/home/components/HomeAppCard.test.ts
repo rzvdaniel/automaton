@@ -56,4 +56,14 @@ describe('HomeAppCard', () => {
   it('greys a stale card', () => {
     expect(mountCard(item({}, true)).classes()).toContain('hc--stale')
   })
+
+  it('shows a card with only a reason as one line with a Set up link', () => {
+    const wrapper = mount(HomeAppCard, {
+      props: { appId: 'app1', item: item({ status: 'Card is off', detail: 'Set LOGS_URL to turn it on.', tone: 'warning' }) },
+      global: { stubs: { RouterLink: { props: ['to'], template: '<a data-testid="app-card-setup"><slot /></a>' } } },
+    })
+    expect(wrapper.get('[data-testid="app-card-nodata"]').text()).toContain('Set LOGS_URL to turn it on.')
+    expect(wrapper.find('[data-testid="app-card-setup"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="app-card-status"]').exists()).toBe(false)
+  })
 })

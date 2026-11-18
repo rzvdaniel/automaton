@@ -289,7 +289,7 @@ function shift(index: number, by: number) {
 .home-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; }
 .home-section { margin: 0 0 10px; font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--ink); }
 .home-skeleton, .home-cards { display: flex; flex-direction: column; gap: 8px; }
-.home-cards--apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.home-cards--apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
 .need {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
