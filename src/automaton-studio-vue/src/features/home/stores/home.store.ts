@@ -58,6 +58,27 @@ export const useHomeStore = defineStore('home', () => {
     }
   }
 
+  /** Runs the app's card once and reloads Home until its "Updated" time moves (or about 40 seconds pass). */
+  const refreshing = ref<Set<string>>(new Set())
+  async function refreshCard(appId: string) {
+    refreshing.value = new Set(refreshing.value).add(appId)
+    try {
+      await homeService.refreshCard(appId)
+      const before = pinned.value.find((item) => item.app.id === appId)?.card?.updatedAtUtc
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        const data = await homeService.get()
+        pinned.value = data.pinned
+        needsYou.value = data.needsYou
+        if (data.pinned.find((item) => item.app.id === appId)?.card?.updatedAtUtc !== before) break
+      }
+    } finally {
+      const next = new Set(refreshing.value)
+      next.delete(appId)
+      refreshing.value = next
+    }
+  }
+
   async function dismiss(cardKey: string) {
     await homeService.dismiss(cardKey)
     needsYou.value = needsYou.value.filter((card) => card.key !== cardKey)
@@ -68,5 +89,5 @@ export const useHomeStore = defineStore('home', () => {
     notifications.value = notifications.value.filter((item) => item.key !== key)
   }
 
-  return { notifications, acknowledge, needsYou, pinned, pinnedIds, isLoading, loaded, error, load, ensureLoaded, pin, unpin, reorder, dismiss }
+  return { notifications, acknowledge, needsYou, pinned, pinnedIds, isLoading, loaded, error, refreshing, refreshCard, load, ensureLoaded, pin, unpin, reorder, dismiss }
 })

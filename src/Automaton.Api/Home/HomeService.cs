@@ -15,6 +15,21 @@ public sealed class HomeService(
     private readonly AppListingService apps = new(db, authorization);
 
 
+    public enum RefreshOutcome { Started, NotFound, Forbidden, TooSoon, NoCard }
+
+    /// <summary>Runs an app's card Action once for someone who can manage the app; at most once a minute per app.</summary>
+    public async Task<(RefreshOutcome Outcome, TimeSpan? RetryAfter)> RefreshCardAsync(Guid userId, Guid appId, bool administrator, CancellationToken token)
+    {
+        if (!administrator)
+        {
+            if (!await authorization.CanAccessAppAsync(appId, userId, token)) return (RefreshOutcome.NotFound, null);
+            if (!await authorization.CanUpdateAppAsync(appId, userId, token)) return (RefreshOutcome.Forbidden, null);
+        }
+        else if (!await db.WebApps.AnyAsync(app => app.Id == appId && app.DeletionClaimId == null, token)) return (RefreshOutcome.NotFound, null);
+        var (started, retry) = await new HomeCardScheduleService(db).RunNowAsync(appId, token);
+        return !started ? (RefreshOutcome.NoCard, null) : retry is null ? (RefreshOutcome.Started, null) : (RefreshOutcome.TooSoon, retry);
+    }
+
     public async Task<HomeResponse> GetAsync(Guid userId, CancellationToken token)
     {
         var listed = await apps.ListAsync(null, token);
