@@ -55,6 +55,8 @@ describe('withFirstPage', () => {
     expect(withFirstPage('https://x.test/', web([{ path: '/x', method: 'POST' }]))).toBe('https://x.test/')
     expect(withFirstPage('https://x.test/', web([{ path: '//evil.test/' }]))).toBe('https://x.test/')
     expect(withFirstPage('https://x.test/', { application: { kind: 'api', pages: [{ path: '/a' }] } })).toBe('https://x.test/')
+    expect(withFirstPage('https://x.test/', web([{ path: '/\\evil.test/' }]))).toBe('https://x.test/')
+    expect(withFirstPage('https://x.test/', web([{ path: '/\t/evil.test' }]))).toBe('https://x.test/')
     expect(withFirstPage('', web([{ path: '/a' }]))).toBe('')
   })
 })

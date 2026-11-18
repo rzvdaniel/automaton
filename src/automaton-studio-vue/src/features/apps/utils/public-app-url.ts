@@ -119,5 +119,8 @@ export function withFirstPage(url: string, app?: { application?: { kind?: string
   const page = app?.application?.kind === 'web' ? app.application.pages?.find((p) => !p.method) : undefined
   if (!url || !page || !/^\/(?!\/)/.test(page.path) || page.path.includes('{') || page.path.includes('*')) return url
   const target = new URL(url)
-  return target.pathname === '/' ? new URL(page.path, target).toString() : url
+  if (target.pathname !== '/') return url
+  const next = new URL(page.path, target)
+  // Backslashes and tabs can turn a path into another host; stay on the app's own origin.
+  return next.origin === target.origin ? next.toString() : url
 }
