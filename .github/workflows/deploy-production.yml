@@ -101,15 +101,9 @@ jobs:
             -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v$VERSION"
 
-      # The website is not part of the server bundle. The host builds it from the released tag's source archive
-      # (downloaded from GitHub), so its /opt/automaton working checkout is never touched.
-      - name: Check out the released commit
-        uses: actions/checkout@v4
-        with:
-          ref: server-v${{ inputs.version }}
-          fetch-depth: 0
-          persist-credentials: false
-
+      # The website is not part of the server bundle. The root-owned host script resolves the tag to a commit, checks
+      # that it is on main and builds the website from that exact commit with its own compose file. Nothing from the
+      # tag is executed, and /opt/automaton is never touched.
       - name: Update the website
         env:
           VERSION: ${{ inputs.version }}
@@ -120,7 +114,6 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          git merge-base --is-ancestor HEAD origin/main || { echo "server-v$VERSION is not on main."; exit 1; }
           dir="$(mktemp -d)"
           trap 'rm -rf "$dir"' EXIT
           printf '%s\n' "$PROD_SSH_KEY" > "$dir/key"
