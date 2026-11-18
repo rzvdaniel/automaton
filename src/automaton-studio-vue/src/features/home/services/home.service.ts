@@ -15,6 +15,9 @@ export const homeService = {
   async reorder(appIds: string[]): Promise<void> {
     await apiClient.put('/api/home/pins/order', { appIds })
   },
+  async refreshCard(appId: string): Promise<void> {
+    await apiClient.post(`/api/home/cards/${appId}/refresh`)
+  },
   async dismiss(cardKey: string): Promise<void> {
     await apiClient.put(`/api/home/dismissals/${encodeURIComponent(cardKey)}`)
   },

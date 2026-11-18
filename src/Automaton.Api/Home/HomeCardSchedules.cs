@@ -58,11 +58,6 @@ public sealed class HomeCardScheduleService(ApplicationDbContext db)
             };
             db.ActionSchedules.Add(schedule);
         }
-        else if (schedule.IntervalSeconds == intervalSeconds && schedule.OwnerUserId == ownerId && schedule.ApplicationId == appId
-            && (schedule.Enabled || paused))
-        {
-            return;
-        }
         else if (!paused)
         {
             // Repairs a schedule a pause left off.
@@ -73,7 +68,36 @@ public sealed class HomeCardScheduleService(ApplicationDbContext db)
         schedule.ApplicationId = appId;
         schedule.IntervalSeconds = intervalSeconds;
         schedule.UpdatedAtUtc = now;
-        schedule.NextRunAtUtc = schedule.Enabled ? now + HomeCardSchedules.Stagger(appId, intervalSeconds) : null;
+        // A deployment just made the new version live, so the card runs now instead of waiting for the interval.
+        schedule.NextRunAtUtc = schedule.Enabled ? now : null;
         await db.SaveChangesAsync(token);
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, DateTime> LastManualRefresh = new();
+
+    /// <summary>The shortest time between two manual refreshes of one app's card.</summary>
+    public static readonly TimeSpan ManualRefreshInterval = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Runs the app's <c>home-card</c> Action once, now, on top of its normal interval. Returns how long to wait when the
+    /// card was refreshed by hand less than a minute ago, and <c>null</c> otherwise. <c>Started</c> is false
+    /// when the app has no running card schedule.
+    /// </summary>
+    public async Task<(bool Started, TimeSpan? RetryAfter)> RunNowAsync(Guid appId, CancellationToken token)
+    {
+        var identity = HomeCardSchedules.Identity(appId);
+        var schedule = await db.ActionSchedules.SingleOrDefaultAsync(s => s.SystemIdentity == identity, token);
+        if (schedule is null || !schedule.Enabled) return (false, null);
+        var now = DateTime.UtcNow;
+        if (LastManualRefresh.TryGetValue(appId, out var last) && now - last < ManualRefreshInterval)
+            return (true, ManualRefreshInterval - (now - last));
+        LastManualRefresh[appId] = now;
+        if (schedule.NextRunAtUtc is null || schedule.NextRunAtUtc > now)
+        {
+            schedule.NextRunAtUtc = now;
+            schedule.UpdatedAtUtc = now;
+            await db.SaveChangesAsync(token);
+        }
+        return (true, null);
     }
 }

@@ -62,6 +62,48 @@ public sealed class HomeTests
         Assert.That(userCards, Is.Empty, "server cards are for system administrators only");
     }
 
+    private static async Task<Guid> SeedCardAppAsync(ApplicationDbContext db, Guid owner)
+    {
+        var app = Guid.NewGuid();
+        AppAuthorizationTestData.SeedApp(db, app, owner, "app" + app.ToString("N")[..6]);
+        await new HomeCardScheduleService(db).SyncAsync(app, owner, true, 900, default);
+        var schedule = db.ActionSchedules.Single(item => item.ApplicationId == app);
+        schedule.NextRunAtUtc = DateTime.UtcNow.AddMinutes(10);
+        await db.SaveChangesAsync();
+        return app;
+    }
+
+    [Test]
+    public async Task RefreshCardRunsTheCardNowThenRefusesASecondClickWithinAMinute()
+    {
+        var owner = Guid.NewGuid();
+        var (db, home) = Create(owner);
+        var app = await SeedCardAppAsync(db, owner);
+
+        Assert.That(await home.RefreshCard(app, default), Is.TypeOf<AcceptedResult>());
+        Assert.That(db.ActionSchedules.Single(item => item.ApplicationId == app).NextRunAtUtc, Is.LessThanOrEqualTo(DateTime.UtcNow));
+
+        var second = await home.RefreshCard(app, default) as ObjectResult;
+        Assert.That(second!.StatusCode, Is.EqualTo(429));
+        Assert.That(home.Response.Headers.RetryAfter.ToString(), Is.Not.Empty);
+    }
+
+    [Test]
+    public async Task RefreshCardIsNotFoundForAnAppThePersonCannotSeeAndConflictWithoutACard()
+    {
+        Guid owner = Guid.NewGuid(), stranger = Guid.NewGuid();
+        var (db, _) = Create(owner);
+        var app = await SeedCardAppAsync(db, owner);
+        var (_, strangerHome) = Create(stranger, db);
+        Assert.That(await strangerHome.RefreshCard(app, default), Is.TypeOf<NotFoundObjectResult>());
+
+        var plain = Guid.NewGuid();
+        AppAuthorizationTestData.SeedApp(db, plain, owner, "plain");
+        var (_, ownerHome) = Create(owner, db);
+        Assert.That(await ownerHome.RefreshCard(plain, default), Is.TypeOf<ConflictObjectResult>());
+        Assert.That(await ownerHome.RefreshCard(Guid.NewGuid(), default), Is.TypeOf<NotFoundObjectResult>());
+    }
+
     private static CatalogEntryDto Entry(string id, bool recommended = true, Guid? installed = null, string source = CatalogSourceStore.OfficialId, bool newer = false, int? order = null)
         => new(id, id, "summary", "Monitoring", "r/r", id, "c", "0.0.1", [], newer, installed, source, source, false, null, null, recommended, order);
 

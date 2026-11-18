@@ -33,6 +33,19 @@ async function acknowledge(key: string) {
   }
 }
 
+async function refreshCard(appId: string) {
+  try {
+    await store.refreshCard(appId)
+  } catch (caught) {
+    const response = (caught as { response?: { status?: number; data?: { message?: string } } }).response
+    const polite = response?.status === 429 || response?.status === 403
+    toast.add({
+      severity: polite ? 'info' : 'error', summary: polite ? 'Not now' : 'Error',
+      detail: response?.data?.message ?? 'The card could not be refreshed.', life: 5000,
+    })
+  }
+}
+
 async function dismiss(key: string) {
   try {
     await store.dismiss(key)
@@ -216,6 +229,14 @@ function shift(index: number, by: number) {
               </div>
             </dl>
             <div class="pin__actions">
+              <Button
+                v-if="item.card && item.app.canUpdate"
+                :label="store.refreshing.has(item.app.id) ? 'Refreshing…' : 'Refresh card'"
+                icon="pi pi-refresh" size="small" text severity="secondary"
+                :disabled="store.refreshing.has(item.app.id)"
+                :aria-label="`Refresh the card of ${item.app.name}`" data-testid="refresh-card"
+                @click="refreshCard(item.app.id)"
+              />
               <Button icon="pi pi-arrow-left" size="small" text severity="secondary" :disabled="index === 0" :aria-label="`Move ${item.app.name} earlier`" @click="shift(index, -1)" />
               <Button icon="pi pi-arrow-right" size="small" text severity="secondary" :disabled="index === store.pinned.length - 1" :aria-label="`Move ${item.app.name} later`" @click="shift(index, 1)" />
               <Button icon="pi pi-bookmark-fill" size="small" text severity="secondary" :aria-label="`Unpin ${item.app.name}`" data-testid="unpin" @click="store.unpin(item.app.id)" />

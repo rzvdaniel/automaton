@@ -199,6 +199,12 @@ public sealed class AppHomeCardTests
         await service.SyncAsync(app, owner, true, 1800, default);
         Assert.That((await db.ActionSchedules.SingleAsync()).IntervalSeconds, Is.EqualTo(1800));
 
+        // A later deployment makes the card run right away, not at the next interval.
+        (await db.ActionSchedules.SingleAsync()).NextRunAtUtc = DateTime.UtcNow.AddMinutes(14);
+        await db.SaveChangesAsync();
+        await service.SyncAsync(app, owner, true, 1800, default);
+        Assert.That((await db.ActionSchedules.SingleAsync()).NextRunAtUtc, Is.LessThanOrEqualTo(DateTime.UtcNow));
+
         await service.SyncAsync(app, owner, false, 900, default);
         Assert.That(await db.ActionSchedules.CountAsync(), Is.Zero);
     }
