@@ -14,23 +14,28 @@ internal static class Fail2BanReader
     private const string PidFile = "/run/fail2ban/fail2ban.pid";
     private const int MaxBansPerJail = 200;
 
-    // Runs inside the helper with the Runner image's python. Prints one JSON object, or nothing when the database is unreadable.
+    // Runs inside the helper with the Runner image's python. Prints one JSON object; {"error": true} when the database cannot be read.
     private const string Script = """
         import json, os, sqlite3, time
         now = time.time()
         out = {"running": os.path.exists("/host/fail2ban.pid"), "jails": []}
-        if os.path.exists("/host/fail2ban.sqlite3"):
-            db = sqlite3.connect("file:/host/fail2ban.sqlite3?mode=ro&immutable=1", uri=True)
-            jails = {n: {"name": n, "enabled": bool(e), "lastHour": 0, "last24Hours": 0, "bans": []}
-                     for n, e in db.execute("select name, enabled from jails")}
-            for jail, ip, at, length in db.execute("select jail, ip, timeofban, bantime from bans order by timeofban desc"):
-                item = jails.get(jail)
-                if item is None: continue
-                if at >= now - 86400: item["last24Hours"] += 1
-                if at >= now - 3600: item["lastHour"] += 1
-                if (length < 0 or at + length > now) and len(item["bans"]) < 200:
-                    item["bans"].append({"ip": ip, "at": at, "until": None if length < 0 else at + length})
-            out["jails"] = list(jails.values())
+        try:
+            if os.path.exists("/host/fail2ban.sqlite3"):
+                db = sqlite3.connect("file:/host/fail2ban.sqlite3?mode=ro", uri=True, timeout=10)
+                jails = {n: {"name": n, "enabled": bool(e), "lastHour": 0, "last24Hours": 0, "bans": [], "seen": set()}
+                         for n, e in db.execute("select name, enabled from jails")}
+                for jail, ip, at, length in db.execute("select jail, ip, timeofban, bantime from bans order by timeofban desc"):
+                    item = jails.get(jail)
+                    if item is None: continue
+                    if at >= now - 86400: item["last24Hours"] += 1
+                    if at >= now - 3600: item["lastHour"] += 1
+                    if (length < 0 or at + length > now) and ip not in item["seen"] and len(item["bans"]) < 200:
+                        item["seen"].add(ip)
+                        item["bans"].append({"ip": ip, "at": at, "until": None if length < 0 else at + length})
+                for item in jails.values(): del item["seen"]
+                out["jails"] = list(jails.values())
+        except Exception:
+            out = {"error": True}
         print(json.dumps(out))
         """;
 
@@ -61,6 +66,7 @@ internal static class Fail2BanReader
         {
             using var document = JsonDocument.Parse(output ?? "");
             var root = document.RootElement;
+            if (root.TryGetProperty("error", out _)) return null; // the database exists but could not be read: unknown, never "no bans"
             var jails = root.GetProperty("jails").EnumerateArray().Select(jail => new Fail2BanJail(
                 jail.GetProperty("name").GetString() ?? "", jail.GetProperty("enabled").GetBoolean(),
                 jail.GetProperty("lastHour").GetInt32(), jail.GetProperty("last24Hours").GetInt32(),

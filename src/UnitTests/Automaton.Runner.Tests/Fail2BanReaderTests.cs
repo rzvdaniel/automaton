@@ -28,6 +28,7 @@ public class Fail2BanReaderTests
     public void AbsentFail2Ban_IsOffWithNoJails_AndGarbageIsUnknown()
     {
         Assert.That(Fail2BanReader.Parse("""{"running": false, "jails": []}""", DateTime.UtcNow)!.Running, Is.False);
+        Assert.That(Fail2BanReader.Parse("""{"error": true}""", DateTime.UtcNow), Is.Null, "an unreadable database is unknown, not no bans");
         Assert.That(Fail2BanReader.Parse("not json", DateTime.UtcNow), Is.Null);
         Assert.That(Fail2BanReader.Parse(null, DateTime.UtcNow), Is.Null);
     }
