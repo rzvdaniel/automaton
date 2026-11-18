@@ -22,8 +22,6 @@ export interface InstallationStatusResponse {
   setupTokenRequired: boolean
   gitHubEnabled: boolean
   userSignUp: boolean
-  /** The running server version; absent on servers older than this field. */
-  version?: string | null
 }
 
 /**

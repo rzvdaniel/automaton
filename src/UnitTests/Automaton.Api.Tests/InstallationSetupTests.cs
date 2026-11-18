@@ -185,6 +185,25 @@ public sealed class InstallationEndpointTests
     }
 
     [Test]
+    public async Task AnonymousStatusHasNoVersionAndSignedInVersionEndpointDoes()
+    {
+        await using var db = Database();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Installation:Version"] = "0.2.110" }).Build();
+        var controller = new InstallController(Service(db), configuration, new SetupEnvironment(), db, null!, null!);
+
+        var status = System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)await controller.GetInstallationStatus()).Value);
+        Assert.That(status, Does.Not.Contain("ersion").And.Not.Contain("0.2.110"));
+
+        var authorize = typeof(InstallController).GetMethod(nameof(InstallController.GetVersion))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true).Single();
+        Assert.That(typeof(InstallController).GetMethod(nameof(InstallController.GetVersion))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), true), Is.Empty);
+        Assert.That(authorize, Is.Not.Null);
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)controller.GetVersion()).Value), Does.Contain("0.2.110"));
+    }
+
+    [Test]
     public void OnlySystemAdministratorsCanReadTheSummary()
     {
         var authorize = typeof(InstallController).GetMethod(nameof(InstallController.GetSummary))!

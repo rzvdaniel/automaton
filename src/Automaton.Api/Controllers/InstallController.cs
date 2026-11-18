@@ -30,9 +30,13 @@ public class InstallController(InstallService installService, IConfiguration con
             GitHubEnabled = !string.IsNullOrWhiteSpace(configuration["GitHub:ClientId"])
                 && !string.IsNullOrWhiteSpace(configuration["GitHub:ClientSecret"]),
             UserSignUp = configuration.GetValue<bool>("AppConfig:UserSignUp"),
-            Version = configuration["Installation:Version"],
             SetupTokenRequired = !environment.IsDevelopment() || !string.IsNullOrWhiteSpace(InstallationSetupAccess.ExpectedToken(configuration))
         });
+
+    /// <summary>The running server version for any signed-in user (the anonymous status does not carry it).</summary>
+    [HttpGet("version")]
+    [Authorize]
+    public IActionResult GetVersion() => Ok(new { Version = configuration["Installation:Version"] });
 
     [HttpGet("summary")]
     [Authorize(Policy = "DeveloperApiAccess", Roles = UserRole.SystemAdministrator)]
