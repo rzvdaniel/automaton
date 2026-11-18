@@ -1,4 +1,3 @@
-using Automaton.Core.Models;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Core.Models;
