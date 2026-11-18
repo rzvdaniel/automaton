@@ -402,7 +402,8 @@ for tool in configure.py explain_certificate_failure.py fail2ban.sh; do
     [[ ! -f "$bundle/$tool" ]] || install -m 0700 "$bundle/$tool" "$install_dir/$tool"
 done
 if [[ -d "$bundle/fail2ban" ]]; then
-    rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"
+    { rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"; } \
+        || echo 'Warning: the fail2ban files could not be copied.' >&2
 fi
 echo "Updated to $version. Recovery backup: $backup"
 ensure_backups

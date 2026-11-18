@@ -56,6 +56,10 @@ $traefik_log {
 LOGROTATE
 if [[ -z "${AUTOMATON_FAIL2BAN_ETC:-}" ]]; then
     fail2ban-client -t >/dev/null || { echo 'The fail2ban configuration did not validate; the Automaton jails were not activated.' >&2; rm -f "$f2b_dir/jail.d/automaton.conf"; exit 1; }
+    # Bans live in Docker's DOCKER-USER chain, so fail2ban must start after Docker at boot.
+    install -d /etc/systemd/system/fail2ban.service.d
+    printf '[Unit]\nAfter=docker.service\n' > /etc/systemd/system/fail2ban.service.d/automaton.conf
+    systemctl daemon-reload
     systemctl enable --now fail2ban
     fail2ban-client reload >/dev/null
 fi

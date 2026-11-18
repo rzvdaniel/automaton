@@ -264,8 +264,9 @@ if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.
 for script in backup.sh cleanup.sh restore.sh update-from-request.sh fail2ban.sh configure.py explain_certificate_failure.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
-if [[ -d "$bundle_dir/fail2ban" ]]; then
-    rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle_dir/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"
+if ! $configure_only && [[ -d "$bundle_dir/fail2ban" ]]; then
+    { rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle_dir/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"; } \
+        || echo 'Warning: the fail2ban files could not be copied.' >&2
 fi
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
 if [[ -f "$install_dir/update-from-request.sh" ]] && ! $configure_only; then
