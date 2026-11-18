@@ -92,6 +92,12 @@ class InstallScriptTests(unittest.TestCase):
             self.assertEqual(run().returncode, 0)
             jail = (etc / 'jail.d/automaton.conf').read_text()
             self.assertIn('[sshd]\nenabled = true\nignoreip = %(known/ignoreip)s 127.0.0.1/8 ::1 198.51.100.9 198.51.100.10\n', jail)
+            # An IPv6 scope suffix is stripped: "%" would break fail2ban's config parsing.
+            env['SSH_CONNECTION'] = 'fe80::1%eth0 50000 fe80::2 22'
+            self.assertEqual(run().returncode, 0)
+            jail = (etc / 'jail.d/automaton.conf').read_text()
+            self.assertNotIn('%eth0', jail)
+            self.assertIn('198.51.100.10 fe80::1\n', jail)
             self.assertIn('203.0.113.7', (etc / 'jail.local').read_text())
 
 if __name__ == '__main__':

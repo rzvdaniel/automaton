@@ -46,6 +46,8 @@ for filter in "$source_dir"/filter.d/*.conf; do install -m 0644 "$filter" "$f2b_
 admin_ips=$(sed -n 's/^# admin-ssh-ip://p' "$f2b_dir/jail.d/automaton.conf" 2>/dev/null | tr -s '[:space:]' ' ' || true)
 ssh_client=${SSH_CONNECTION:-}; ssh_client=${ssh_client%% *}
 [[ -n "$ssh_client" ]] || ssh_client=$(who -m 2>/dev/null | sed -n 's/.*(\(.*\)).*/\1/p' || true)
+# An IPv6 scope suffix (fe80::1%eth0) is dropped: "%" breaks fail2ban's config parsing.
+ssh_client=${ssh_client%%\%*}
 # Only a real IPv4/IPv6 address counts ("who -m" can print ":0" for a local session).
 python3 -c 'import ipaddress,sys; ipaddress.ip_address(sys.argv[1])' "$ssh_client" 2>/dev/null || ssh_client=
 admin_ips=$(printf '%s\n' $admin_ips $ssh_client | awk 'NF && !seen[$0]++' | paste -sd' ')
