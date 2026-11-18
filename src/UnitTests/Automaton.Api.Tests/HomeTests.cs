@@ -104,6 +104,28 @@ public sealed class HomeTests
         Assert.That(await ownerHome.RefreshCard(Guid.NewGuid(), default), Is.TypeOf<NotFoundObjectResult>());
     }
 
+    [Test]
+    public async Task RefreshCardIsForbiddenForAProjectViewerAndAllowedForADeveloper()
+    {
+        Guid owner = Guid.NewGuid(), viewer = Guid.NewGuid(), developer = Guid.NewGuid(), projectId = Guid.NewGuid();
+        var (db, _) = Create(owner);
+        var app = await SeedCardAppAsync(db, owner);
+        db.Projects.Add(AppAuthorizationTestData.CreateProject(projectId, owner, "team"));
+        db.ProjectApps.Add(new ProjectApp { ProjectId = projectId, WebAppId = app });
+        db.ProjectMembers.AddRange(
+            new ProjectMember { ProjectId = projectId, UserId = viewer, Role = ProjectRole.Viewer, IsActive = true },
+            new ProjectMember { ProjectId = projectId, UserId = developer, Role = ProjectRole.Developer, IsActive = true });
+        await db.SaveChangesAsync();
+        var due = db.ActionSchedules.Single(item => item.ApplicationId == app).NextRunAtUtc;
+
+        var (_, viewerHome) = Create(viewer, db);
+        Assert.That((await viewerHome.RefreshCard(app, default) as ObjectResult)!.StatusCode, Is.EqualTo(403));
+        Assert.That(db.ActionSchedules.Single(item => item.ApplicationId == app).NextRunAtUtc, Is.EqualTo(due));
+
+        var (_, developerHome) = Create(developer, db);
+        Assert.That(await developerHome.RefreshCard(app, default), Is.TypeOf<AcceptedResult>());
+    }
+
     private static CatalogEntryDto Entry(string id, bool recommended = true, Guid? installed = null, string source = CatalogSourceStore.OfficialId, bool newer = false, int? order = null)
         => new(id, id, "summary", "Monitoring", "r/r", id, "c", "0.0.1", [], newer, installed, source, source, false, null, null, recommended, order);
 

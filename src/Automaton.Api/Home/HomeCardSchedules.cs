@@ -91,6 +91,8 @@ public sealed class HomeCardScheduleService(ApplicationDbContext db)
         var now = DateTime.UtcNow;
         if (LastManualRefresh.TryGetValue(appId, out var last) && now - last < ManualRefreshInterval)
             return (true, ManualRefreshInterval - (now - last));
+        foreach (var old in LastManualRefresh.Where(item => now - item.Value >= ManualRefreshInterval).Select(item => item.Key))
+            LastManualRefresh.TryRemove(old, out _);
         LastManualRefresh[appId] = now;
         if (schedule.NextRunAtUtc is null || schedule.NextRunAtUtc > now)
         {

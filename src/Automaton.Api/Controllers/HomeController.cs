@@ -33,7 +33,7 @@ public sealed class HomeController(HomeService home) : BaseController
             case HomeService.RefreshOutcome.Started: return Accepted();
             case HomeService.RefreshOutcome.NotFound: return NotFound(new { message = "App not found." });
             case HomeService.RefreshOutcome.Forbidden: return StatusCode(StatusCodes.Status403Forbidden, new { message = "You do not have permission to refresh this card." });
-            case HomeService.RefreshOutcome.NoCard: return Conflict(new { message = "This app has no card to refresh." });
+            case HomeService.RefreshOutcome.NoCard: return Conflict(new { message = "This app has no card to refresh, or it is paused. Resume it to refresh the card." });
             default:
                 var seconds = (int)Math.Ceiling(retryAfter!.Value.TotalSeconds);
                 Response.Headers.RetryAfter = seconds.ToString();
