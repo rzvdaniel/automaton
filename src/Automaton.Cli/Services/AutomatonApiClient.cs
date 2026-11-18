@@ -279,17 +279,43 @@ public class AutomatonApiClient : IDisposable
             body.GetProperty("expiresAt").GetDateTimeOffset());
     }
 
-    /// <summary>The API's /health status ("ok") and, on servers that report it, the release (server-vX.Y.Z).</summary>
+    /// <summary>
+    /// The API's /health status ("ok") and the release (server-vX.Y.Z). Current servers keep the release out of the
+    /// anonymous /health, so it comes from the signed-in version endpoint; null when that is not available.
+    /// </summary>
     internal async Task<(string Status, string? Version)> GetHealthReportAsync(CancellationToken ct = default)
+    {
+        var (status, version) = await GetHealthStatusAsync(ct);
+        return (status, version ?? await TryGetServerVersionAsync(ct));
+    }
+
+    internal async Task<string> GetHealthAsync(CancellationToken ct = default) => (await GetHealthStatusAsync(ct)).Status;
+
+    private async Task<(string Status, string? Version)> GetHealthStatusAsync(CancellationToken ct)
     {
         using var response = await _http.GetAsync("health", ct);
         await EnsureSuccessAsync(response);
         return ParseHealth(await response.Content.ReadAsStringAsync(ct));
     }
 
-    internal async Task<string> GetHealthAsync(CancellationToken ct = default) => (await GetHealthReportAsync(ct)).Status;
+    private async Task<string?> TryGetServerVersionAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var response = await _http.GetAsync("api/install/version", ct);
+            if (!response.IsSuccessStatusCode) return null;
+            var body = await ReadJsonAsync(response, ct);
+            var version = body.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()?.Trim() : null;
+            if (string.IsNullOrEmpty(version)) return null;
+            return version.StartsWith("server-v", StringComparison.Ordinal) ? version : "server-v" + version;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
 
-    /// <summary>Older servers answer a plain "ok"; newer ones answer {"status":"ok","version":"server-vX.Y.Z"}.</summary>
+    /// <summary>Older servers answer a plain "ok" or also carry the version: {"status":"ok","version":"server-vX.Y.Z"}.</summary>
     internal static (string Status, string? Version) ParseHealth(string body)
     {
         body = body.Trim();

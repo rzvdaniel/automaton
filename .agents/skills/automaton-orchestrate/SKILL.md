@@ -93,7 +93,7 @@ switches it on; if a post-deploy check fails, roll back and report instead of fi
 
 ## Closing issues
 
-`verified` plus the merge gate: update production, then run `python .agents/tools/close-released-issues.py` (dry
+`verified` plus the merge gate: update production, then run `python .agents/tools/close-released-issues.py --version server-vX.Y.Z` (dry
 run, then `--apply`) to add `live` and close naming the version. `verified-partial`: if an agent can run the missing
 check, send it back; only what truly cannot be checked goes to the owner, on the list above, and closes when the
 owner accepts the gap in a comment. `verification-failed` goes back to an agent. Do not accept gaps yourself.

@@ -99,7 +99,7 @@ internal static class ServerCommand
         {
             var (status, version) = await client.GetHealthReportAsync(ct);
             if (asJson) CliJson.Write(new { success = status == "ok", status, version });
-            else Console.WriteLine($"Status: {status}{Environment.NewLine}Version: {version ?? "not reported by this server"}");
+            else Console.WriteLine($"Status: {status}{Environment.NewLine}Version: {version ?? "not available (sign in to see it)"}");
             return status == "ok";
         }, json));
         return command;
