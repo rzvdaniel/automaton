@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { publicAppConfig } from '@/config/publicAppConfig'
+import { SHOW_PREVIEW_BADGE } from '@/config/preview'
 </script>
 
 <template>
   <nav class="top" aria-label="Main">
     <div class="wrap">
       <RouterLink class="logo" to="/" aria-label="Automaton home"><i>&gt;_</i>Automaton</RouterLink>
+      <RouterLink v-if="SHOW_PREVIEW_BADGE" class="preview-pill" :to="{ path: '/', hash: '#preview' }">Preview</RouterLink>
       <ul>
         <li><RouterLink to="/product">Product</RouterLink></li>
         <li><RouterLink to="/use-cases">Use cases</RouterLink></li>

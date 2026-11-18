@@ -30,6 +30,7 @@ public class InstallController(InstallService installService, IConfiguration con
             GitHubEnabled = !string.IsNullOrWhiteSpace(configuration["GitHub:ClientId"])
                 && !string.IsNullOrWhiteSpace(configuration["GitHub:ClientSecret"]),
             UserSignUp = configuration.GetValue<bool>("AppConfig:UserSignUp"),
+            Version = configuration["Installation:Version"],
             SetupTokenRequired = !environment.IsDevelopment() || !string.IsNullOrWhiteSpace(InstallationSetupAccess.ExpectedToken(configuration))
         });
 

@@ -7,6 +7,8 @@ import { useOrganizationRole } from '@/features/organizations/composables/useOrg
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { adminAppsService } from '@/features/admin/services/adminAppsService'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
+import { installService } from '@/features/install/services/install.service'
+import { SHOW_PREVIEW_BADGE, previewTitle } from '@/shared/preview'
 import { DOCS_LINK, railItems, roleLabel, type RailItem } from './rail-items'
 
 const router = useRouter()
@@ -21,7 +23,9 @@ const appUserOnly = ref(false)
 watch(loading, (isLoading) => {
   if (!isLoading) appUserOnly.value = isAppUserOnly.value
 })
+const serverVersion = ref<string | null>(null)
 onMounted(async () => {
+  installService.getStatus().then((s) => { serverVersion.value = s.version ?? null }).catch(() => {})
   await loadOrganizations()
   ready.value = true
 })
@@ -80,6 +84,7 @@ const userMenuItems = computed<MenuItem[]>(() => [
       <div class="rail-brand">
         <span class="rail-mark" aria-hidden="true">&gt;_</span>
         <span class="rail-name">Studio</span>
+        <span v-if="SHOW_PREVIEW_BADGE" class="preview-pill" :title="previewTitle(serverVersion)" :aria-label="previewTitle(serverVersion)" role="note">Preview</span>
       </div>
 
       <nav class="rail-nav" aria-label="Main">
@@ -165,6 +170,19 @@ const userMenuItems = computed<MenuItem[]>(() => [
   font: 700 1.15rem var(--display);
   letter-spacing: -0.01em;
   color: var(--rail-ink);
+}
+
+/* Same look as the website pill (src/automaton-vue/src/assets/site-b.css). */
+.preview-pill {
+  font: 700 11px/1 var(--body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--signal) 55%, transparent);
+  background: color-mix(in srgb, var(--signal) 12%, transparent);
+  color: var(--rail-active-ink);
+  cursor: default;
 }
 
 .rail-nav {

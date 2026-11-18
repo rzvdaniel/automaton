@@ -123,6 +123,9 @@ useSiteTheme()
   </div>
   <p style="margin-top:24px"><RouterLink class="btn" to="/how-setup-works">How setup works, step by step →</RouterLink></p>
 </div></section>
+<section id="preview" class="band"><div class="wrap">
+  <div class="head"><p class="eyebrow">Preview</p><h2>What preview means</h2><p>Automaton works and runs real apps. Things may still change between releases, so back up your data and tell us what breaks.</p></div>
+</div></section>
     </main>
     <BFinal />
     <BFooter />
