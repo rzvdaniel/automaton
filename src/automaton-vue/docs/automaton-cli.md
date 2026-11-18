@@ -96,16 +96,17 @@ The shared file `~/.automaton/config.json` changed format (version 2, with a `pr
 ## Create or link
 
 ```bash
-automaton new "My App"
+automaton new "My App" --template node   # or python, dotnet, static
 automaton link <app-id-or-slug>
 ```
 
-`automaton new` creates a valid local `automaton.json`, creates a remote app,
+`automaton new --template ...` creates a local `automaton.json` with a runtime command, creates a remote app,
 and records its ID in the selected local profile. It also syncs the generated
 AI guidance. `automaton link` requires an existing valid `automaton.json` and
 records the remote app ID in the selected profile without downloading or
 changing local source or guidance files. After linking, deploy the local source
-with `automaton deploy`.
+with `automaton deploy`. Without `--template`, `automaton new` writes an empty
+contract and `automaton deploy` fails with "runtime command is required".
 
 `automaton pull <app-id-or-slug>` creates a new local project from portable
 remote source. App IDs work for accessible apps; exact public slugs are resolved
