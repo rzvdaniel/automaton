@@ -37,7 +37,7 @@ internal static class ApiApplicationPipelineExtensions
         app.UseMiddleware<PasswordChangeRequirement>();
         app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
-        app.MapGet("/health", (IConfiguration configuration) => Results.Json(HealthResponse(configuration["Installation:Version"]))).AllowAnonymous();
+        app.MapGet("/health", () => Results.Json(HealthResponse())).AllowAnonymous();
         app.MapControllers();
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
@@ -60,13 +60,8 @@ internal static class ApiApplicationPipelineExtensions
         routes.MapFallback("{**path:regex(^(.*/)?\\.(?!well-known(/|$)).*$)}", () => Results.StatusCode(StatusCodes.Status404NotFound))
             .Add(builder => ((RouteEndpointBuilder)builder).Order = int.MaxValue - 1);
 
-    /// <summary>The /health body: the release tag (server-vX.Y.Z) when the server knows it, nothing else.</summary>
-    internal static object HealthResponse(string? installedVersion)
-    {
-        var version = installedVersion?.Trim();
-        if (string.IsNullOrEmpty(version) || version.Length > 40) return new { status = "ok" };
-        return new { status = "ok", version = version.StartsWith("server-v", StringComparison.Ordinal) ? version : "server-v" + version };
-    }
+    /// <summary>The anonymous /health body: only the status. The release is for signed-in users (GET /api/install/version).</summary>
+    internal static object HealthResponse() => new { status = "ok" };
 }
 
 internal static class ApiCorsMiddleware
