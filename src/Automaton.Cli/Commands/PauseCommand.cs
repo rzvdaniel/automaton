@@ -121,7 +121,7 @@ public static class PauseCommand
         AnsiConsole.MarkupLine(paused
             ? $"[green]Paused {Markup.Escape(label)}.[/] It is stopped, {changed} schedule(s) are off and its address shows a paused page. Resume it with: automaton resume"
             : $"[green]Resumed {Markup.Escape(label)}.[/] {changed} schedule(s) are on again.");
-        if (paused && !string.IsNullOrWhiteSpace(reasonText)) AnsiConsole.MarkupLine($"Reason: {Markup.Escape(reasonText)}");
+        if (paused && !string.IsNullOrWhiteSpace(reasonText)) AnsiConsole.MarkupLine($"Reason: {Markup.Escape(InventoryCommands.StripControlCharacters(reasonText))}");
         foreach (var warning in warnings)
             AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(warning)}");
     }

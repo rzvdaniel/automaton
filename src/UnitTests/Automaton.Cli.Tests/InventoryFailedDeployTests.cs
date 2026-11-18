@@ -36,3 +36,17 @@ public sealed class CatalogUpdateFailureTextTests
         });
     }
 }
+
+[TestFixture]
+public sealed class PausedReasonControlCharacterTests
+{
+    [Test]
+    public void StripControlCharacters_DropsEscapesAndBells_ButKeepsNewlinesAndText()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(InventoryCommands.StripControlCharacters("a\u001b[2Jb\u0007c\r\td\ne"), Is.EqualTo("a[2Jbcd\ne"));
+            Assert.That(InventoryCommands.StripControlCharacters("Billing overdue"), Is.EqualTo("Billing overdue"));
+        });
+    }
+}

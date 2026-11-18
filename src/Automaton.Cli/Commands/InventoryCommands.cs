@@ -177,8 +177,12 @@ internal static class InventoryCommands
     private static void WritePausedReasons(IEnumerable<(string Name, string? Reason)> apps)
     {
         foreach (var (name, reason) in apps.Where(app => app.Reason is { Length: > 0 }))
-            Console.WriteLine($"\n{name}: paused. Reason: {reason}");
+            Console.WriteLine($"\n{name}: paused. Reason: {StripControlCharacters(reason!)}");
     }
+
+    /// <summary>Drops terminal control characters (such as escape sequences) from text another person wrote; newlines stay.</summary>
+    internal static string StripControlCharacters(string text) =>
+        string.Concat(text.Where(c => c == '\n' || !char.IsControl(c)));
 
     internal static string DescribeFailedDeploy(string name, string error, bool hasRunningVersion) =>
         $"\n{name}: the last deploy failed: {error.TrimEnd('.')}.{(hasRunningVersion ? " The app still runs the previous version." : "")}";
