@@ -84,7 +84,7 @@ const userMenuItems = computed<MenuItem[]>(() => [
       <div class="rail-brand">
         <span class="rail-mark" aria-hidden="true">&gt;_</span>
         <span class="rail-name">Studio</span>
-        <span v-if="SHOW_PREVIEW_BADGE" class="preview-pill" :title="previewTitle(serverVersion)" tabindex="0">Preview</span>
+        <span v-if="SHOW_PREVIEW_BADGE" class="preview-pill" :title="previewTitle(serverVersion)" :aria-label="previewTitle(serverVersion)" role="note">Preview</span>
       </div>
 
       <nav class="rail-nav" aria-label="Main">

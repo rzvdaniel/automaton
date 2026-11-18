@@ -36,7 +36,7 @@
 .site.b .logo { display: flex; align-items: center; gap: 10px; font: 800 18px var(--display); text-decoration: none }
 .site.b .logo i { width: 28px; height: 28px; border-radius: 8px; background: var(--ink); display: grid; place-items: center; color: var(--brand); font: 700 13px var(--mono); font-style: normal }
 /* Preview pill: one look with Studio (the .preview-pill rule in AppSidebar.vue). */
-.site.b .preview-pill { font: 700 11px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 5px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--signal) 55%, transparent); background: color-mix(in srgb, var(--signal) 12%, transparent); color: var(--signal-ink); margin-left: -14px }
+.site.b .preview-pill { font: 700 11px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 5px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--signal) 55%, transparent); background: color-mix(in srgb, var(--signal) 12%, transparent); color: var(--signal-ink); margin-left: -14px /* closes the 28px nav gap */ }
 .site.b .preview-pill:hover { background: color-mix(in srgb, var(--signal) 22%, transparent) }
 .site.b .preview-pill:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px }
 .site.b nav.top ul { display: flex; gap: 22px; list-style: none; padding: 0; font-weight: 500 }
