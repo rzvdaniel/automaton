@@ -70,25 +70,28 @@ class InstallScriptTests(unittest.TestCase):
             self.assertNotIn('@TRAEFIK_LOG@', jail)
             self.assertEqual(jail.count('banaction = iptables-multiport\nchain = DOCKER-USER\n'), 2)
             self.assertNotIn('[chain=', jail)
-            self.assertIn('[sshd]\nenabled = true\nignoreip = 127.0.0.1/8 ::1\n', jail)
+            self.assertIn('[sshd]\nenabled = true\nignoreip = %(known/ignoreip)s 127.0.0.1/8 ::1 \n', jail)
             self.assertTrue((etc / 'filter.d/automaton-scanner.conf').is_file())
             self.assertIn('copytruncate', (rotate / 'automaton-traefik').read_text())
             self.assertTrue((volume / 'logs/access.log').is_file())
-            self.assertNotIn('[DEFAULT]', jail)
+            self.assertEqual(jail.count('\n[DEFAULT]\n'), 1)
             self.assertEqual(jail.count('bantime.increment = true'), 2)
-            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1\n'), 3)
-            (etc / 'jail.local').write_text('[DEFAULT]\nignoreip = 127.0.0.1/8 ::1 203.0.113.7, 10.0.0.0/8 # office #1\n')
+            self.assertEqual(jail.count('ignoreip = %(known/ignoreip)s 127.0.0.1/8 ::1\n'), 2)
+            # The owner's jail.local is never copied into the jails: they extend it live.
+            (etc / 'jail.local').write_text('[DEFAULT]\nignoreip = 203.0.113.7\n')
             self.assertEqual(run().returncode, 0)
-            jail = (etc / 'jail.d/automaton.conf').read_text()
-            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8\n'), 3)
+            self.assertNotIn('203.0.113.7', (etc / 'jail.d/automaton.conf').read_text())
+            # Only real addresses count: ":0" from "who -m" is dropped.
+            env['SSH_CONNECTION'] = ':0 1 2 3'
+            self.assertEqual(run().returncode, 0)
+            self.assertNotIn(':0', (etc / 'jail.d/automaton.conf').read_text().split('[sshd]')[1].split('[automaton')[0].split('::1')[1])
             # The administrator's SSH address is allowlisted for sshd and kept by later runs from elsewhere.
             env['SSH_CONNECTION'] = '198.51.100.9 50000 192.0.2.1 22'
             self.assertEqual(run().returncode, 0)
             env['SSH_CONNECTION'] = '198.51.100.10 50000 192.0.2.1 22'
             self.assertEqual(run().returncode, 0)
             jail = (etc / 'jail.d/automaton.conf').read_text()
-            self.assertIn('[sshd]\nenabled = true\nignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8 198.51.100.9 198.51.100.10\n', jail)
-            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8\n'), 2)
+            self.assertIn('[sshd]\nenabled = true\nignoreip = %(known/ignoreip)s 127.0.0.1/8 ::1 198.51.100.9 198.51.100.10\n', jail)
             self.assertIn('203.0.113.7', (etc / 'jail.local').read_text())
 
 if __name__ == '__main__':
