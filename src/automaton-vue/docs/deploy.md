@@ -107,6 +107,8 @@ Studio opens on **Home**. **Needs you** lists what is waiting for you: an admini
 
 A deploy while the app is paused uploads the new version but keeps the app stopped and says so; use `--resume` (or resume first) to start it. You need the same rights as for deploying the app; others get 403. An API key works too: `POST /api/apps/{id}/pause` and `POST /api/apps/{id}/resume`.
 
+Give a reason when you pause: `automaton pause --reason "Sends spam"` (up to 500 characters; the body of the pause call is `{ "reason": "…" }`). Administrators type it under **Pause app…** on the app's Admin tab. The owner and everyone who can open the app see it on the app's Overview next to **Paused** and in `automaton apps`; the public paused page never shows it. Resuming clears it.
+
 ## Common errors
 
 - **No Runner available.** Deploy can upload but cannot start the app. Add or start a Runner, then deploy again.

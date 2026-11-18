@@ -19,6 +19,8 @@ public sealed class AppListItemDto
     public bool CanUpdate { get; init; }
     /// <summary>The app is paused: stopped, schedules off, address answers "paused".</summary>
     public bool IsPaused { get; init; }
+    /// <summary>Why the app was paused, when the person who paused it said.</summary>
+    public string? PausedReason { get; init; }
     public AppListRunnerDto? Runner { get; init; }
     public AppListEnvironmentDto? LiveEnvironment { get; init; }
     public AppListRuntimeDto Runtime { get; init; } = new();
@@ -33,7 +35,7 @@ public sealed class AppListItemDto
         {
             Id = Id, Name = Name, Summary = Summary, Description = Description, ThumbnailUrl = ThumbnailUrl, Tags = Tags,
             IsPublished = IsPublished, CanLaunchPublicly = CanLaunchPublicly, PublicUrl = PublicUrl, UpdatedAtUtc = UpdatedAtUtc,
-            CanDelete = CanDelete, CanUpdate = CanUpdate, IsPaused = IsPaused, Runner = Runner, LiveEnvironment = LiveEnvironment, Runtime = Runtime,
+            CanDelete = CanDelete, CanUpdate = CanUpdate, IsPaused = IsPaused, PausedReason = PausedReason, Runner = Runner, LiveEnvironment = LiveEnvironment, Runtime = Runtime,
             ActionsOnly = ActionsOnly, LastActionRun = run, NextActionRunAtUtc = nextRunAtUtc,
         };
 }

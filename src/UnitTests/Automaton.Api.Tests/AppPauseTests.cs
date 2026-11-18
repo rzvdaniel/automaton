@@ -115,6 +115,40 @@ public sealed class AppPauseTests
     }
 
     [Test]
+    public async Task Pause_StoresTheTrimmedReason_ResumeClearsIt_AndARepeatKeepsIt()
+    {
+        await using var h = new Harness();
+        h.AddRunningTarget();
+        var service = h.ServiceFor(OwnerId);
+
+        var paused = await service.PauseAsync(AppId, administrator: false, default, "  Sends spam  ");
+        Assert.That(paused.PausedReason, Is.EqualTo("Sends spam"));
+        Assert.That((await h.Db.WebApps.SingleAsync()).PausedReason, Is.EqualTo("Sends spam"));
+
+        var repeated = await service.PauseAsync(AppId, administrator: false, default);
+        Assert.That(repeated.PausedReason, Is.EqualTo("Sends spam"), "A repeat without a reason keeps the one on record.");
+
+        var changed = await service.PauseAsync(AppId, administrator: false, default, "Abuse report 7");
+        Assert.That(changed.PausedReason, Is.EqualTo("Abuse report 7"));
+
+        var resumed = await service.ResumeAsync(AppId, administrator: false, default);
+        Assert.That(resumed.PausedReason, Is.Null);
+        Assert.That((await h.Db.WebApps.SingleAsync()).PausedReason, Is.Null);
+    }
+
+    [Test]
+    public async Task Pause_WithoutAReason_StoresNone_AndATooLongReasonIsRefused()
+    {
+        await using var h = new Harness();
+        h.AddRunningTarget();
+        var service = h.ServiceFor(OwnerId);
+
+        Assert.That((await service.PauseAsync(AppId, administrator: false, default, "   ")).PausedReason, Is.Null);
+        Assert.That(async () => await service.PauseAsync(AppId, administrator: false, default, new string('x', AppPauseService.MaxReasonLength + 1)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public async Task Resume_TurnsTheHomeCardPlatformScheduleBackOn()
     {
         await using var h = new Harness();

@@ -4004,6 +4004,9 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<DateTime?>("PausedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("PausedReason")
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");
 

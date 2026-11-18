@@ -12,7 +12,7 @@ namespace Automaton.Api.Services;
 /// <param name="SchedulesChanged">Schedules turned off by a pause, or turned on again by a resume.</param>
 /// <param name="Warnings">Anything that could not be done, such as a schedule that cannot be enabled again.</param>
 public sealed record AppPauseState(
-    Guid AppId, bool Paused, DateTime? PausedAt, int SchedulesChanged, IReadOnlyList<string> Warnings);
+    Guid AppId, bool Paused, DateTime? PausedAt, string? PausedReason, int SchedulesChanged, IReadOnlyList<string> Warnings);
 
 /// <summary>
 /// Pauses an app without deleting it: its runtime stops on the Runner, its schedules are switched off and its address
@@ -32,12 +32,15 @@ public sealed class AppPauseService(
     public const string PauseCommandKind = "pause-runtime";
     public const string ResumeCommandKind = "resume-runtime";
 
-    public Task<AppPauseState> PauseAsync(Guid appId, bool administrator, CancellationToken ct) => ChangeAsync(appId, administrator, pause: true, ct);
+    public const int MaxReasonLength = 500;
 
-    public Task<AppPauseState> ResumeAsync(Guid appId, bool administrator, CancellationToken ct) => ChangeAsync(appId, administrator, pause: false, ct);
+    public Task<AppPauseState> PauseAsync(Guid appId, bool administrator, CancellationToken ct, string? reason = null) => ChangeAsync(appId, administrator, pause: true, ct, reason);
 
-    private async Task<AppPauseState> ChangeAsync(Guid appId, bool administrator, bool pause, CancellationToken ct)
+    public Task<AppPauseState> ResumeAsync(Guid appId, bool administrator, CancellationToken ct) => ChangeAsync(appId, administrator, pause: false, ct, null);
+
+    private async Task<AppPauseState> ChangeAsync(Guid appId, bool administrator, bool pause, CancellationToken ct, string? reason)
     {
+        reason = NormalizeReason(reason);
         var userId = user.GetUserId();
         var app = await db.WebApps.FirstOrDefaultAsync(item => item.Id == appId && item.DeletionClaimId == null, ct)
             ?? throw new KeyNotFoundException("App not found");
@@ -52,15 +55,7 @@ public sealed class AppPauseService(
         var warnings = new List<string>();
         // A resume starts the runtime first: when the Runner cannot, nothing changes and the app stays paused.
         if (!pause) await QueueRuntimeCommandsAsync(appId, userId, pause: false, warnings, ct);
-        var stateChanged = app.IsPaused != pause;
-        if (stateChanged)
-        {
-            app.IsPaused = pause;
-            app.PausedAt = pause ? DateTime.UtcNow : null;
-            app.Updated = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-            await RefreshRoutesAsync(ct);
-        }
+        var stateChanged = await ApplyStateAsync(app, pause, reason, ct);
         // Schedules are handled on every call, so repeating a call finishes anything an earlier call left undone.
         var changed = pause ? await PauseSchedulesAsync(appId, ct) : await ResumeSchedulesAsync(appId, userId, warnings, ct);
         if (stateChanged)
@@ -79,7 +74,30 @@ public sealed class AppPauseService(
         }
         // Repeating the call also repeats the Runner command, so a Runner that missed it catches up.
         if (pause) await QueueRuntimeCommandsAsync(appId, userId, pause, warnings, ct);
-        return new AppPauseState(appId, app.IsPaused, app.PausedAt, changed, warnings);
+        return new AppPauseState(appId, app.IsPaused, app.PausedAt, app.PausedReason, changed, warnings);
+    }
+
+    private static string? NormalizeReason(string? reason)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (trimmed is { Length: > MaxReasonLength })
+            throw new ArgumentException($"The reason can be at most {MaxReasonLength} characters.");
+        return trimmed;
+    }
+
+    /// <summary>Stores the paused state and reason. Pausing a paused app with a new reason updates the reason; a plain repeat keeps it.</summary>
+    private async Task<bool> ApplyStateAsync(WebApp app, bool pause, string? reason, CancellationToken ct)
+    {
+        var stateChanged = app.IsPaused != pause;
+        var reasonChanged = pause && reason is not null && app.PausedReason != reason;
+        if (!stateChanged && !reasonChanged) return false;
+        app.IsPaused = pause;
+        if (stateChanged) app.PausedAt = pause ? DateTime.UtcNow : null;
+        app.PausedReason = pause ? reason ?? app.PausedReason : null;
+        app.Updated = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        if (stateChanged) await RefreshRoutesAsync(ct);
+        return stateChanged;
     }
 
     // A paused app's address is served by the tunnel (its "paused" page), not directly by the Runner's gateway (#1181).

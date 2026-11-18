@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
@@ -71,7 +71,20 @@ describe('AppAdminTab', () => {
     await flushPromises()
     await wrapper.get('[data-testid="pause-app"]').trigger('click')
     await flushPromises()
-    expect(appsService.setPaused).toHaveBeenCalledWith('app-1', false)
+    expect(appsService.setPaused).toHaveBeenCalledWith('app-1', false, undefined)
+    expect(wrapper.emitted('paused-changed')).toHaveLength(1)
+  })
+
+  it('pauses with the reason the administrator typed', async () => {
+    vi.mocked(appsService.setPaused).mockResolvedValue({} as never)
+    const wrapper = open('SysAdmin')
+    await flushPromises()
+    await wrapper.get('[data-testid="pause-app"]').trigger('click');
+    (wrapper.findComponent('[data-testid="pause-reason"]') as VueWrapper).vm.$emit('update:modelValue', 'Sends spam')
+    await flushPromises()
+    await wrapper.get('[data-testid="pause-confirm"]').trigger('click')
+    await flushPromises()
+    expect(appsService.setPaused).toHaveBeenCalledWith('app-1', true, 'Sends spam')
     expect(wrapper.emitted('paused-changed')).toHaveLength(1)
   })
 })

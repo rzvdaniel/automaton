@@ -20,10 +20,12 @@ public static class PauseCommand
     private static Command Build(ConfigService config, bool paused)
     {
         var json = new Option<bool>("--json", "Print the result as JSON");
+        var reason = new Option<string?>("--reason", "Why the app is paused; its owner sees it (pause only, up to 500 characters)");
         var command = new Command(paused ? "pause" : "resume", paused
             ? "Pause the linked app: stop it, switch its schedules off and show a paused page at its address. Data and settings are kept."
             : "Resume the linked app and turn its schedules back on")
         { json };
+        if (paused) command.AddOption(reason);
         command.SetHandler(async (InvocationContext context) =>
         {
             var asJson = context.ParseResult.GetValueForOption(json);
@@ -31,7 +33,7 @@ public static class PauseCommand
             {
                 var appId = ResolveLinkedAppId(config, out var server, out var apiKey);
                 using var client = new AutomatonApiClient(server, apiKey);
-                Write(await client.SetAppPausedAsync(appId, paused, context.GetCancellationToken()), appId, null, asJson);
+                Write(await client.SetAppPausedAsync(appId, paused, context.GetCancellationToken(), context.ParseResult.GetValueForOption(reason)), appId, null, asJson);
             }
             catch (Exception exception)
             {
@@ -46,10 +48,12 @@ public static class PauseCommand
     {
         var app = new Argument<string>("app", "App ID, exact slug or exact name");
         var json = new Option<bool>("--json", "Print the result as JSON");
+        var reason = new Option<string?>("--reason", "Why the app is paused; its owner sees it (pause only, up to 500 characters)");
         var command = new Command(paused ? "pause" : "resume", paused
             ? "Pause an app: stop it, switch its schedules off and show a paused page at its address. Data and settings are kept."
             : "Resume a paused app and turn its schedules back on")
         { app, json };
+        if (paused) command.AddOption(reason);
         command.SetHandler(async (InvocationContext context) =>
         {
             var asJson = context.ParseResult.GetValueForOption(json);
@@ -62,7 +66,7 @@ public static class PauseCommand
                 var inventory = await client.ListAppInventoryAsync(context.GetCancellationToken());
                 var id = InventoryCommands.ResolveAppId(inventory, context.ParseResult.GetValueForArgument(app));
                 var name = inventory.FirstOrDefault(item => item.Id.ToString() == id.ToLowerInvariant())?.Name;
-                Write(await client.SetAppPausedAsync(id, paused, context.GetCancellationToken()), id, name, asJson);
+                Write(await client.SetAppPausedAsync(id, paused, context.GetCancellationToken(), context.ParseResult.GetValueForOption(reason)), id, name, asJson);
             }
             catch (Exception exception)
             {
@@ -104,18 +108,20 @@ public static class PauseCommand
     {
         var paused = state.GetProperty("paused").GetBoolean();
         var changed = state.TryGetProperty("schedulesChanged", out var count) ? count.GetInt32() : 0;
+        var reasonText = state.TryGetProperty("pausedReason", out var why) && why.ValueKind == JsonValueKind.String ? why.GetString() : null;
         var warnings = state.TryGetProperty("warnings", out var list) && list.ValueKind == JsonValueKind.Array
             ? list.EnumerateArray().Select(item => item.GetString() ?? string.Empty).ToArray()
             : [];
         if (asJson)
         {
-            CliJson.Write(new { success = true, appId, name, paused, schedulesChanged = changed, warnings });
+            CliJson.Write(new { success = true, appId, name, paused, pausedReason = reasonText, schedulesChanged = changed, warnings });
             return;
         }
         var label = name ?? appId;
         AnsiConsole.MarkupLine(paused
             ? $"[green]Paused {Markup.Escape(label)}.[/] It is stopped, {changed} schedule(s) are off and its address shows a paused page. Resume it with: automaton resume"
             : $"[green]Resumed {Markup.Escape(label)}.[/] {changed} schedule(s) are on again.");
+        if (paused && !string.IsNullOrWhiteSpace(reasonText)) AnsiConsole.MarkupLine($"Reason: {Markup.Escape(reasonText)}");
         foreach (var warning in warnings)
             AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(warning)}");
     }

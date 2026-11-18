@@ -1,6 +1,7 @@
 using Automaton.Core.Models;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Authentication;
 using System.Net.Sockets;
 using System.Text;
@@ -76,10 +77,11 @@ public class AutomatonApiClient : IDisposable
     }
 
     /// <summary>Pauses (POST /api/apps/{id}/pause) or resumes (POST /api/apps/{id}/resume) an app.</summary>
-    public async Task<JsonElement> SetAppPausedAsync(string appId, bool paused, CancellationToken ct = default)
+    public async Task<JsonElement> SetAppPausedAsync(string appId, bool paused, CancellationToken ct = default, string? reason = null)
     {
         using var resp = await _http.PostAsync(
-            $"api/apps/{Uri.EscapeDataString(appId)}/{(paused ? "pause" : "resume")}", content: null, ct);
+            $"api/apps/{Uri.EscapeDataString(appId)}/{(paused ? "pause" : "resume")}",
+            paused && !string.IsNullOrWhiteSpace(reason) ? JsonContent.Create(new { reason }) : null, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }

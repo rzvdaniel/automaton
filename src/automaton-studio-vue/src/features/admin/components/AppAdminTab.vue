@@ -4,7 +4,6 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
-import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { appsService } from '@/features/apps/services/apps.service'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -16,7 +15,6 @@ const props = defineProps<{ appId: string; appName: string; paused: boolean }>()
 const emit = defineEmits<{ 'paused-changed': [] }>()
 
 const toast = useToast()
-const confirm = useConfirm()
 // Only system administrators approve permissions (the endpoint is SysAdmin-only).
 const canApprove = computed(() => useAuthStore().user?.roles?.includes('SysAdmin') ?? false)
 
@@ -104,28 +102,27 @@ async function saveModeration() {
   }
 }
 
-async function setPaused(pause: boolean) {
+const pauseReason = ref('')
+const askingReason = ref(false)
+
+async function setPaused(pause: boolean, reason?: string) {
   pausing.value = true
   try {
-    await appsService.setPaused(props.appId, pause)
+    await appsService.setPaused(props.appId, pause, reason)
     toast.add({ severity: 'success', summary: pause ? 'Paused' : 'Resumed', life: 3000 })
     emit('paused-changed')
   } catch (error) {
     toast.add({ severity: 'error', summary: pause ? 'The app could not be paused' : 'The app could not be resumed', detail: error instanceof Error ? error.message : undefined, life: 5000 })
   } finally {
     pausing.value = false
+    askingReason.value = false
+    pauseReason.value = ''
   }
 }
 
 function askPause() {
   if (props.paused) return void setPaused(false)
-  confirm.require({
-    header: 'Pause this app?',
-    message: `Pausing ${props.appName} stops it and shows visitors a paused page.`,
-    icon: 'pi pi-pause',
-    acceptLabel: 'Pause',
-    accept: () => setPaused(true),
-  })
+  askingReason.value = !askingReason.value
 }
 </script>
 
@@ -166,6 +163,13 @@ function askPause() {
           <p class="hint">Owner: {{ details?.ownerName || '…' }}<template v-if="details?.ownerEmail"> ({{ details.ownerEmail }})</template>. Pausing stops the app and shows visitors a paused page.</p>
         </div>
         <Button :label="paused ? 'Resume app' : 'Pause app…'" :icon="paused ? 'pi pi-play' : 'pi pi-pause'" severity="secondary" outlined :loading="pausing" data-testid="pause-app" @click="askPause" />
+      </div>
+      <div v-if="askingReason && !paused" class="field" data-testid="pause-form">
+        <label>Reason (the owner sees it)<Textarea v-model="pauseReason" rows="2" auto-resize maxlength="500" placeholder="Why is this app being paused? Optional" data-testid="pause-reason" /></label>
+        <div class="line">
+          <Button label="Pause app" icon="pi pi-pause" severity="danger" :loading="pausing" data-testid="pause-confirm" @click="setPaused(true, pauseReason)" />
+          <Button label="Cancel" severity="secondary" text @click="askingReason = false" />
+        </div>
       </div>
       <div class="fields">
         <label>Review status<Select v-model="reviewStatus" :options="REVIEW" option-label="label" option-value="value" class="w-full" /></label>
