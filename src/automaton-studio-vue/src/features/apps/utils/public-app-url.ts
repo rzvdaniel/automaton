@@ -113,3 +113,11 @@ export function getOpenAppUrl(app: { id?: string | null; isPublished?: boolean; 
     ? getPublishedAppUrl(app.publicUrl)
     : getDeployedAppUrl(app.id)
 }
+
+/** Where Open app lands: the app's first declared page (for example a web UI under /select/vmui/), else its root. */
+export function withFirstPage(url: string, app?: { application?: { kind?: string | null; pages?: { path: string; method?: string | null }[] | null } | null } | null): string {
+  const page = app?.application?.kind === 'web' ? app.application.pages?.find((p) => !p.method) : undefined
+  if (!url || !page || !/^\/(?!\/)/.test(page.path) || page.path.includes('{') || page.path.includes('*')) return url
+  const target = new URL(url)
+  return target.pathname === '/' ? new URL(page.path, target).toString() : url
+}

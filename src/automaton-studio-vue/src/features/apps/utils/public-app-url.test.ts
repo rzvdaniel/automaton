@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getDeployedAppUrl, getDeploymentTargetUrl, getPublishedAppUrl } from './public-app-url'
+import { getDeployedAppUrl, getDeploymentTargetUrl, getPublishedAppUrl, withFirstPage } from './public-app-url'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -42,5 +42,19 @@ describe('deployment target URLs', () => {
     expect(targetUrl.origin).toBe(deployedAppUrl.origin)
     expect(targetUrl.hostname).toBe('app-71db73ba6f484fc9abd052a4a44564c8.apps.automaton.example')
     expect(targetUrl.pathname).toBe(`/a/${appId}/t/${targetId}/`)
+  })
+})
+
+describe('withFirstPage', () => {
+  const web = (pages: { path: string; method?: string }[]) => ({ application: { kind: 'web', pages } })
+  it('opens the first declared page of a web app at its root', () => {
+    expect(withFirstPage('https://app-1.apps.example.test/', web([{ path: '/select/vmui/' }]))).toBe('https://app-1.apps.example.test/select/vmui/')
+  })
+  it('keeps the address when there is no usable page', () => {
+    expect(withFirstPage('https://x.test/', web([]))).toBe('https://x.test/')
+    expect(withFirstPage('https://x.test/', web([{ path: '/x', method: 'POST' }]))).toBe('https://x.test/')
+    expect(withFirstPage('https://x.test/', web([{ path: '//evil.test/' }]))).toBe('https://x.test/')
+    expect(withFirstPage('https://x.test/', { application: { kind: 'api', pages: [{ path: '/a' }] } })).toBe('https://x.test/')
+    expect(withFirstPage('', web([{ path: '/a' }]))).toBe('')
   })
 })

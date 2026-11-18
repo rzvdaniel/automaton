@@ -31,6 +31,8 @@ onBeforeUnmount(() => observer?.disconnect())
 const card = computed(() => props.item.card)
 const toneOf = (value?: CardTone | null) => value ?? 'info'
 const blocks = computed<CardBlock[]>(() => card.value.blocks ?? [])
+/** A card with nothing to draw but a reason (for example a missing setting): one line and a link to the fix. */
+const noData = computed(() => !!card.value.detail && blocks.value.length === 0 && card.value.facts.length === 0 && card.value.alerts.length === 0)
 
 /** Meter state from its thresholds: critical at critAt, warning at warnAt, else ok. */
 function meterTone(block: Extract<CardBlock, { type: 'meter' }>): CardTone {
@@ -50,8 +52,14 @@ const link = (path: string) => getLaunchTargetUrl(props.appId, path)
     :class="[`hc--${card.tone ?? 'none'}`, { 'hc--stale': item.stale }]"
     data-testid="app-card"
   >
-    <p class="hc__status" data-testid="app-card-status">{{ card.status }}</p>
-    <p v-if="card.detail" class="hc__detail">{{ card.detail }}</p>
+    <p v-if="noData" class="hc__nodata" data-testid="app-card-nodata">
+      <span class="hc__nodata-text"><strong>{{ card.status }}.</strong> {{ card.detail }}</span>
+      <RouterLink :to="{ path: `/apps/${appId}`, query: { view: 'settings' } }" class="hc__nodata-link" data-testid="app-card-setup">Set up</RouterLink>
+    </p>
+    <template v-else>
+      <p class="hc__status" data-testid="app-card-status">{{ card.status }}</p>
+      <p v-if="card.detail" class="hc__detail">{{ card.detail }}</p>
+    </template>
 
     <template v-for="(block, index) in blocks" :key="index">
       <div v-if="block.type === 'fact'" class="hc-fact" data-testid="card-fact">
@@ -133,6 +141,11 @@ const link = (path: string) => getLaunchTargetUrl(props.appId, path)
 .hc--stale { opacity: 0.55; filter: grayscale(1); }
 .hc__status { margin: 0; font-family: var(--display); font-weight: 700; font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; color: var(--ink); }
 .hc__detail { margin: -6px 0 0; font-size: 13px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.hc__nodata { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; color: var(--ink-soft); }
+.hc__nodata-text { flex: 1 1 14ch; min-width: 0; overflow-wrap: anywhere; }
+.hc__nodata-text strong { color: var(--ink); }
+.hc__nodata-link { font-weight: 600; color: var(--ink); }
+.hc__nodata-link:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 .hc__time { margin: 0; font-size: 12px; color: var(--ink-soft); }
 .hc-tone--ok { --hc-tone: var(--hc-ok); }
 .hc-tone--warning { --hc-tone: var(--hc-warning); }
