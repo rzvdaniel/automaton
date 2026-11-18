@@ -69,7 +69,11 @@ public static class ActionCommand
             {
                 var artifact = await client.GetAppActionArtifactAsync(appId, executionId, result: true);
                 if (artifact.TryGetProperty("available", out var available) && available.GetBoolean())
-                    Console.WriteLine(artifact.GetProperty("content").GetString());
+                {
+                    var content = artifact.GetProperty("content").GetString();
+                    Console.WriteLine(content);
+                    if (actionKey == AppHomeCardLimits.ActionKey) ReportCardProblems(content);
+                }
             }
             else
             {
@@ -77,6 +81,21 @@ public static class ActionCommand
             }
         }, key, input);
         return command;
+    }
+
+    /// <summary>Checks a <c>home-card</c> result against the card language and prints each problem; the exit code is 1 when the card is invalid.</summary>
+    internal static void ReportCardProblems(string? result)
+    {
+        var check = AppHomeCardValidator.Check(result);
+        foreach (var warning in check.Warnings) Console.Error.WriteLine($"Home card warning: {warning}");
+        if (check.Card is not null)
+        {
+            Console.Error.WriteLine("Home card is valid.");
+            return;
+        }
+        foreach (var error in check.Errors) Console.Error.WriteLine($"Home card problem: {error}");
+        Console.Error.WriteLine("Studio will show the default card until this is fixed.");
+        Environment.ExitCode = 1;
     }
 
     /// <summary>Turns "API error 409 Conflict: {problem json}" into the problem's title, or the text as it is.</summary>

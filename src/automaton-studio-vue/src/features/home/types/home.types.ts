@@ -1,3 +1,4 @@
+import type { CardBlock, CardTone } from './home-card.types'
 import type { AppListItem } from '@/features/apps/types/apps.types'
 
 export interface HomeCard {
@@ -21,6 +22,9 @@ export interface AppHomeCard {
     status: string
     facts: { label: string; value: string }[]
     alerts: { severity: 'info' | 'warning' | 'critical'; text: string }[]
+    detail?: string | null
+    tone?: CardTone | null
+    blocks?: CardBlock[]
   }
   updatedAtUtc: string
   /** The last card run failed or the card was not refreshed in time. */

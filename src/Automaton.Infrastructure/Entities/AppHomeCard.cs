@@ -11,4 +11,6 @@ public class AppHomeCard
     public Guid ExecutionId { get; set; }
     /// <summary>The newest <c>home-card</c> run that failed or returned an invalid card; the card is greyed while it is newer.</summary>
     public DateTime? LastFailedAtUtc { get; set; }
+    /// <summary>Why the newest card the app sent was not valid; Studio then shows the default card. Null when the newest card was valid.</summary>
+    public string? InvalidReason { get; set; }
 }

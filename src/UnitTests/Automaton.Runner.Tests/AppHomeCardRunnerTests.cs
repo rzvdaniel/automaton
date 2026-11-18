@@ -22,7 +22,7 @@ public class AppHomeCardRunnerTests
 
     [Test]
     public void ACardOverTheSizeLimitIsMarkedSoItNeverValidates()
-        => Assert.That(AppActionProcessExecutor.ExtractHomeCard("home-card", $$"""{"status":"{{new string('a', 9000)}}"}"""), Is.EqualTo("!too-large"));
+        => Assert.That(AppActionProcessExecutor.ExtractHomeCard("home-card", $$"""{"status":"{{new string('a', 17000)}}"}"""), Is.EqualTo("!too-large"));
 
     [Test]
     public void ActionsGetTheirOwnAppsAddressOnlyWhileItRuns()

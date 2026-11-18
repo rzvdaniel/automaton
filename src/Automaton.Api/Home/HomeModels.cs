@@ -1,3 +1,4 @@
+using Automaton.Core.Models;
 using Automaton.Api.Models;
 
 namespace Automaton.Api.Home;

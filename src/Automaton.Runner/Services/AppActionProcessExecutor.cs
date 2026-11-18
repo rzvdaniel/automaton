@@ -202,7 +202,7 @@ internal static class AppActionProcessExecutor
     }
 
     internal const string HomeCardActionKey = "home-card";
-    private const int MaximumHomeCardBytes = 8192;
+    private const int MaximumHomeCardBytes = 16384;
 
     private static AppActionExecutionResult CreateFailedResult(
         ExecuteAppActionModuleRequest request,

@@ -27,6 +27,76 @@ public sealed class AppHomeCardTests
         return id;
     }
 
+    private const string Rich = """
+        {"status":"Healthy","detail":"3 sites","tone":"ok","blocks":[
+          {"type":"meter","label":"Disk","value":61,"max":100,"unit":"%","warnAt":75,"critAt":90},
+          {"type":"counters","items":[{"label":"Up","value":12,"tone":"ok"},{"label":"Down","value":1,"tone":"critical"}]},
+          {"type":"alert","severity":"warning","text":"Slow"},
+          {"type":"buttons","items":[{"label":"Open","path":"/status"}]},
+          {"type":"chart","kind":"line","labels":["a","b"],"series":[{"name":"ms","tone":"info","values":[1,2]}]},
+          {"type":"hologram","x":1}]}
+        """;
+
+    [Test]
+    public void RichCardKeepsKnownBlocksSkipsUnknownAndMovesAlertBlocksToAlerts()
+    {
+        var check = AppHomeCardValidator.Check(Rich);
+        Assert.That(check.Errors, Is.Empty);
+        Assert.That(check.Card!.Blocks.Select(b => b["type"]), Is.EqualTo(new[] { "meter", "counters", "buttons", "chart" }));
+        Assert.That(check.Card.Alerts.Single().Text, Is.EqualTo("Slow"));
+        Assert.That(check.Warnings.Single(), Does.Contain("hologram"));
+        var roundTrip = AppHomeCardValidator.Deserialize(AppHomeCardValidator.Serialize(check.Card))!;
+        Assert.That(roundTrip.Blocks, Has.Count.EqualTo(4));
+        Assert.That(roundTrip.Tone, Is.EqualTo("ok"));
+    }
+
+    [TestCase("""{"status":"a","tone":"red"}""", "tone", TestName = "ColourInsteadOfTone")]
+    [TestCase("""{"status":"a","blocks":[{"type":"meter","label":"x","value":1,"max":0}]}""", "max must be greater than 0", TestName = "MeterMaxZero")]
+    [TestCase("""{"status":"a","blocks":[{"type":"meter","label":"x","value":1,"max":10,"warnAt":9,"critAt":5}]}""", "warnAt cannot be above critAt", TestName = "MeterThresholdsReversed")]
+    [TestCase("""{"status":"a","blocks":[{"type":"counters","items":[{"label":"x","value":1}]}]}""", "2 to 4", TestName = "OneCounter")]
+    [TestCase("""{"status":"a","blocks":[{"type":"buttons","items":[{"label":"x","path":"https://evil.example/"}]}]}""", "path", TestName = "ExternalButton")]
+    [TestCase("""{"status":"a","blocks":[{"type":"buttons","items":[{"label":"x","path":"//evil.example"}]}]}""", "path", TestName = "ProtocolRelativeButton")]
+    [TestCase("""{"status":"a","blocks":[{"type":"chart","kind":"pie","labels":["a"],"series":[]}]}""", "kind", TestName = "UnknownChartKind")]
+    [TestCase("""{"status":"a","blocks":[{"type":"chart","kind":"line","labels":["a","b"],"series":[{"name":"s","values":[1]}]}]}""", "one per label", TestName = "ChartValuesMismatch")]
+    [TestCase("""{"status":"a","blocks":[{"type":"fact","label":"x"}]}""", "value is required", TestName = "FactWithoutValue")]
+    [TestCase("""{"status":"a","blocks":[{"type":"fact","label":"a","value":"b"},{"type":"fact","label":"a","value":"b"},{"type":"fact","label":"a","value":"b"},{"type":"fact","label":"a","value":"b"},{"type":"fact","label":"a","value":"b"},{"type":"fact","label":"a","value":"b"},{"type":"fact","label":"a","value":"b"}]}""", "at most 6", TestName = "SevenBlocks")]
+    public void BrokenBlocksAreReportedWithAPath(string json, string expected)
+    {
+        var check = AppHomeCardValidator.Check(json);
+        Assert.That(check.Card, Is.Null);
+        Assert.That(string.Join("|", check.Errors), Does.Contain(expected));
+    }
+
+    [Test]
+    public void ChartAllows48PointsAndNoMore()
+    {
+        string Card(int points) => JsonSerializer.Serialize(new { status = "a", blocks = new[] { new { type = "chart", kind = "bar",
+            labels = Enumerable.Range(0, points).Select(i => $"{i}"), series = new[] { new { name = "s", tone = "info", values = Enumerable.Range(0, points) } } } } });
+        Assert.That(AppHomeCardValidator.TryParse(Card(48)), Is.Not.Null);
+        Assert.That(AppHomeCardValidator.TryParse(Card(49)), Is.Null);
+    }
+
+    [Test]
+    public async Task ABrokenCardShowsTheDefaultCardWithTheReasonUntilAValidOneArrives()
+    {
+        var db = AppAuthorizationTestData.CreateDbContext();
+        var app = Guid.NewGuid();
+        await RunAsync(db, app, "home-card", "Succeeded", Valid, DateTime.UtcNow.AddMinutes(-20));
+        await RunAsync(db, app, "home-card", "Succeeded", """{"status":"x","blocks":[{"type":"meter","label":"d","value":1,"max":0}]}""", DateTime.UtcNow.AddMinutes(-10));
+        Assert.That((await db.AppHomeCards.AsNoTracking().SingleAsync()).InvalidReason, Does.Contain("blocks[0].max"));
+
+        await RunAsync(db, app, "home-card", "Succeeded", """{"status":"Fixed"}""");
+        Assert.That((await db.AppHomeCards.AsNoTracking().SingleAsync()).InvalidReason, Is.Null);
+    }
+
+    [Test]
+    public async Task AFirstBrokenCardIsStoredWithItsReason()
+    {
+        var db = AppAuthorizationTestData.CreateDbContext();
+        await RunAsync(db, Guid.NewGuid(), "home-card", "Succeeded", """{"status":"x","tone":"purple"}""");
+        Assert.That((await db.AppHomeCards.SingleAsync()).InvalidReason, Does.Contain("tone"));
+    }
+
     [Test]
     public void ValidCardIsParsedAndHtmlStaysText()
     {

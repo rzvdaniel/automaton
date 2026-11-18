@@ -112,7 +112,7 @@ public sealed class AiGuidanceSeedExportTests
             "base|shared|automaton-app-contract|531014b837b6f3aed563bb9dab285e7d723a8f16500d97b6dd7ac4e5847fcecf",
             "req|studio|automaton-studio-editor|2933c8cf7b268f92e1b3bf9388d08a572a1e5d9e6b64bf9b423bf9eb3aeee93e",
             "key|automaton-mcp|69551aad488292d9c727a288ecb2ea59677c96d0889457c257fee139a72e626c",
-            "key|automaton-actions|ccef5fbf623e016e9f69913824a472ffa6fcf6ceba043db44c16e6c6e526d8f2",
+            "key|automaton-actions|63bfb3cae8f5c1c424631e2e874a7fda299ab795d4e686a267b78976b42c3334",
             "key|automaton-studio-editor|2933c8cf7b268f92e1b3bf9388d08a572a1e5d9e6b64bf9b423bf9eb3aeee93e"
         };
         var service = CreateRuntimeService();

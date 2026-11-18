@@ -117,7 +117,8 @@ internal static class ApplicationModelConfiguration
         modelBuilder.Entity<AppHomeCard>(entity =>
         {
             entity.HasKey(e => e.AppId);
-            entity.Property(e => e.CardJson).IsRequired().HasMaxLength(8192);
+            entity.Property(e => e.CardJson).IsRequired().HasMaxLength(16384);
+            entity.Property(e => e.InvalidReason).HasMaxLength(300);
             entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
         });
     }
