@@ -46,6 +46,12 @@ An app that needs platform access declares permissions in `automaton.json` (for 
 
 Secret changes and uses (names, scopes and versions, never values) are recorded in the platform audit log and kept for 180 days; app permission requests, approvals and revocations are recorded there too. App owners see their app's history under **Secrets → Show history**; administrators see all events under **Admin → Audit Events**.
 
+## Scanners and password guessing
+
+The installer and every update set up [fail2ban](https://github.com/fail2ban/fail2ban) with three jails: `sshd`, `automaton-scanner` (20 requests for junk paths such as `/.env`, `/wp-admin` or `*credentials*` that answer 404, or 404 bursts on Studio, the API root and the store, within a minute) and `automaton-signin` (10 failed Automaton sign-ins within ten minutes). A banned address is blocked at the firewall for an hour, longer each time it returns. Real traffic is never limited: pages, published apps' links, Studio's live connection and uploads do not count. The jails read Traefik's access log (no headers), kept in the certificates volume and rotated daily.
+
+To never ban an address, for example an office behind one shared IP, add it after `ignoreip =` in `/etc/fail2ban/jail.d/automaton-allowlist.local` and run `sudo fail2ban-client reload`. List bans with `sudo fail2ban-client status automaton-scanner` and lift one with `sudo fail2ban-client unban <address>`.
+
 ## Out of scope
 
 - Public multi-tenant hosting: letting strangers run code on a shared machine.

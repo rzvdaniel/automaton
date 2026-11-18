@@ -211,6 +211,22 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertEqual(module.ensure_custom_domain_resolver(self.root), 'unchanged')
         self.assertEqual(before, self.snapshot())
 
+    def test_access_log_is_json_without_headers_and_migrates_existing_installation_once(self):
+        module.configure(self.root, 'example.com', 'owner@example.com')
+        traefik_path = self.root / 'traefik.yml'
+        access_log = json.loads(traefik_path.read_text())['accessLog']
+        self.assertEqual(access_log['format'], 'json')
+        self.assertEqual(access_log['filePath'], '/certificates/logs/access.log')
+        self.assertEqual(access_log['fields']['headers']['defaultMode'], 'drop')
+        before = json.loads(traefik_path.read_text())
+        del before['accessLog']
+        traefik_path.write_text(json.dumps(before))
+        self.assertEqual(module.ensure_access_log(self.root), 'changed')
+        self.assertEqual(json.loads(traefik_path.read_text())['accessLog'], access_log)
+        self.assertEqual(module.ensure_access_log(self.root), 'unchanged')
+        traefik_path.write_text('entryPoints: {}  # hand written\n')
+        self.assertEqual(module.ensure_access_log(self.root), 'skipped')
+
     def test_ensure_custom_domain_resolver_skips_hand_written_traefik_and_http_mode(self):
         module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
         (self.root / 'traefik.yml').write_text('entryPoints: {}\n')

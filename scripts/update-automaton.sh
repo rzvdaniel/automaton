@@ -317,6 +317,13 @@ fi
 printf '%s\n' "$resolver_output" | grep -v '^RESULT=' || true
 restart_traefik=false
 if [[ "$resolver_output" == *'RESULT=changed'* ]]; then restart_traefik=true; fi
+echo 'Turning on the Traefik access log for fail2ban if missing.'
+if ! access_log_output=$(python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-access-log); then
+    echo "Access log configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
+    exit 1
+fi
+printf '%s\n' "$access_log_output" | grep -v '^RESULT=' || true
+if [[ "$access_log_output" == *'RESULT=changed'* ]]; then restart_traefik=true; fi
 echo 'Giving remote Runners the public broker address if a private one is set.'
 if ! broker_output=$(python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-runner-broker-host); then
     echo "Runner broker configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
@@ -391,11 +398,19 @@ install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
 install -m 0644 "$bundle/version" "$install_dir/version"
 install -m 0700 "$bundle/update.sh" "$install_dir/update.sh"
 install -m 0700 "$bundle/install.sh" "$install_dir/install.sh"
-for tool in configure.py explain_certificate_failure.py; do
+for tool in configure.py explain_certificate_failure.py fail2ban.sh; do
     [[ ! -f "$bundle/$tool" ]] || install -m 0700 "$bundle/$tool" "$install_dir/$tool"
 done
+if [[ -d "$bundle/fail2ban" ]]; then
+    rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"
+fi
 echo "Updated to $version. Recovery backup: $backup"
 ensure_backups
+# Scanners and password guessers are banned at the firewall by default; the update is complete without it.
+if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
+    bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \
+        || echo "Warning: fail2ban could not be set up. Run: sudo bash $install_dir/fail2ban.sh" >&2
+fi
 # Housekeeping runs only after success; a failure here never affects the completed update.
 # Only directories this updater created (server-v<version>-<UTC time>-<random>) are rotated.
 mapfile -t old_backups < <(find "$backup_root" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended \
