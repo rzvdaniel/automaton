@@ -137,6 +137,9 @@ server {
     }
 
     location ~ ^/([^/]+)$ {
+        if (!-d $document_root$uri) {
+            return 404;
+        }
         return 301 /$1/;
     }
 
@@ -157,6 +160,6 @@ server {
 
     location ~ ^/([^/]+)/ {
         add_header Cache-Control "no-cache" always;
-        try_files $uri $uri/ /$1/index.html;
+        try_files $uri $uri/ /$1/index.html =404;
     }
 }
