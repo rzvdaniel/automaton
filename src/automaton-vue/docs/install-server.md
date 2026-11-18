@@ -14,7 +14,7 @@ Measured times, memory and cost are in [Automaton by the numbers](./numbers): ab
 
 ## Prerequisites
 
-- An x86_64 Linux server with systemd, sudo access, outbound internet, at least 2 GB of RAM and 10 GiB of free disk space. Ubuntu and Debian 12 are supported (Ubuntu 22.04, Ubuntu 24.04 and Debian 12 have been tested); the installer adds Docker itself there. On other distributions, [install Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/) first (not tested).
+- An x86_64 Linux server with systemd, sudo access, outbound internet, at least 2 GB of RAM and 10 GiB of free disk space. Ubuntu and Debian 12 are supported (Ubuntu 22.04, 24.04, 26.04 and Debian 12 have been tested); the installer adds Docker itself there. On other distributions, [install Docker Engine and the Compose plugin](https://docs.docker.com/engine/install/) first (not tested).
 - `curl` and `python3` (3.8 or newer). `jq` is needed only for the headless snippets in [first administrator](./first-admin) and [CLI login](./automaton-cli#log-in-without-a-browser); fresh Ubuntu and Debian lack it: `sudo apt-get install -y jq`.
 - A domain you can edit DNS for, and an email for certificate notices (passed as `--email`; Let's Encrypt uses it for the HTTPS certificates; it is not an account).
 - Inbound TCP ports 80 and 443 (HTTPS) and 5671 (TLS Runner broker). Keep the `api` hostname directly reachable on 5671.
