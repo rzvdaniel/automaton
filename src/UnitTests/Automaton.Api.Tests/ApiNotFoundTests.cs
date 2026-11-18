@@ -26,6 +26,7 @@ public sealed class ApiNotFoundTests
                 {
                     endpoints.MapGet("/api/known", () => "known");
                     endpoints.MapApiNotFound();
+                    endpoints.MapDotfileNotFound();
                     // Stands in for the Studio page fallback.
                     endpoints.MapFallback("{*path:nonfile}", () => Microsoft.AspNetCore.Http.Results.Content("<html>studio</html>", "text/html"));
                 });
@@ -65,5 +66,26 @@ public sealed class ApiNotFoundTests
 
         Assert.That((int)response.StatusCode, Is.EqualTo(200));
         Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("studio"));
+    }
+
+    [TestCase("/.git/config")]
+    [TestCase("/.env")]
+    [TestCase("/.env.bak")]
+    [TestCase("/app/.aws/credentials")]
+    public async Task DotfilePath_Answers404WithEmptyBody(string path)
+    {
+        var response = await client.GetAsync(path);
+
+        Assert.That((int)response.StatusCode, Is.EqualTo(404));
+        Assert.That(await response.Content.ReadAsStringAsync(), Is.Empty);
+    }
+
+    [TestCase("/.well-known/acme-challenge/x")]
+    [TestCase("/apps/1.2/edit")]
+    public async Task NonDotfilePaths_KeepStudioFallback(string path)
+    {
+        var response = await client.GetAsync(path);
+
+        Assert.That((int)response.StatusCode, Is.EqualTo(200));
     }
 }
