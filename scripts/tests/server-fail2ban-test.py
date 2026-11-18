@@ -59,7 +59,7 @@ class InstallScriptTests(unittest.TestCase):
             (bin_dir / 'docker').write_text(f'#!/bin/sh\ncase "$2" in ls) echo automaton-server_certificates;; *) echo {volume};; esac\n')
             for stub in bin_dir.iterdir():
                 stub.chmod(0o755)
-            env = os.environ | {'PATH': f'{bin_dir}:{os.environ["PATH"]}', 'AUTOMATON_FAIL2BAN_ETC': str(etc),
+            env = {k: v for k, v in os.environ.items() if k != 'SSH_CONNECTION'} | {'PATH': f'{bin_dir}:{os.environ["PATH"]}', 'AUTOMATON_FAIL2BAN_ETC': str(etc),
                                 'AUTOMATON_LOGROTATE_DIR': str(rotate)}
             run = lambda: subprocess.run(['bash', str(REPO / 'docker/install/fail2ban.sh'), '--install-dir', str(install)],
                                          env=env, capture_output=True, text=True)
@@ -68,18 +68,27 @@ class InstallScriptTests(unittest.TestCase):
             jail = (etc / 'jail.d/automaton.conf').read_text()
             self.assertIn(f'logpath = {volume}/logs/access.log', jail)
             self.assertNotIn('@TRAEFIK_LOG@', jail)
-            self.assertIn('DOCKER-USER', jail)
+            self.assertEqual(jail.count('banaction = iptables-multiport\nchain = DOCKER-USER\n'), 2)
+            self.assertNotIn('[chain=', jail)
+            self.assertIn('[sshd]\nenabled = true\nignoreip = 127.0.0.1/8 ::1\n', jail)
             self.assertTrue((etc / 'filter.d/automaton-scanner.conf').is_file())
             self.assertIn('copytruncate', (rotate / 'automaton-traefik').read_text())
             self.assertTrue((volume / 'logs/access.log').is_file())
             self.assertNotIn('[DEFAULT]', jail)
             self.assertEqual(jail.count('bantime.increment = true'), 2)
-            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1\n'), 2)
+            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1\n'), 3)
             (etc / 'jail.local').write_text('[DEFAULT]\nignoreip = 127.0.0.1/8 ::1 203.0.113.7, 10.0.0.0/8 # office #1\n')
             self.assertEqual(run().returncode, 0)
             jail = (etc / 'jail.d/automaton.conf').read_text()
+            self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8\n'), 3)
+            # The administrator's SSH address is allowlisted for sshd and kept by later runs from elsewhere.
+            env['SSH_CONNECTION'] = '198.51.100.9 50000 192.0.2.1 22'
+            self.assertEqual(run().returncode, 0)
+            env['SSH_CONNECTION'] = '198.51.100.10 50000 192.0.2.1 22'
+            self.assertEqual(run().returncode, 0)
+            jail = (etc / 'jail.d/automaton.conf').read_text()
+            self.assertIn('[sshd]\nenabled = true\nignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8 198.51.100.9 198.51.100.10\n', jail)
             self.assertEqual(jail.count('ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.0.0.0/8\n'), 2)
-            self.assertNotIn('[sshd]\nenabled = true\nignoreip', jail)
             self.assertIn('203.0.113.7', (etc / 'jail.local').read_text())
 
 if __name__ == '__main__':

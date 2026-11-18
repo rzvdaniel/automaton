@@ -5,6 +5,8 @@
 #
 #   fail2ban.sh [--install-dir DIR]
 #
+# The address this script is run from over SSH is added to the sshd jail's ignoreip (failed logins before the
+# install would otherwise ban the administrator).
 # Never ban an address: add it to "ignoreip =" in the [DEFAULT] section of /etc/fail2ban/jail.local; every update
 # copies your ignoreip into the Automaton jails. Then run: sudo fail2ban-client reload
 set -euo pipefail
@@ -14,7 +16,7 @@ install_dir=/opt/automaton-server
 while (($#)); do
     case "$1" in
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
-        --help) sed -n '2,10p' "$0"; exit 0 ;;
+        --help) sed -n '2,12p' "$0"; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -45,10 +47,19 @@ ignoreip=$(find "$f2b_dir" -maxdepth 2 \( -name jail.local -o -name jail.conf -o
     | xargs -0 -r sed -n 's/^[[:space:]]*ignoreip[[:space:]]*=//p' | sed 's/[[:space:]][#;].*$//' | { grep -v '%' || true; } | tr ',' ' ' | tr -s '[:space:]' '\n' | awk 'NF && !seen[$0]++' | paste -sd' ')
 case " $ignoreip " in *" 127.0.0.1/8 "*) ;; *) ignoreip="127.0.0.1/8 ::1 $ignoreip" ;; esac
 ignoreip=${ignoreip% }
+# The address this script runs from over SSH is never banned from sshd: failed logins before the install (a wrong key)
+# are still in the journal and would lock the administrator out. Addresses added earlier stay (kept in a comment line).
+admin_ips=$(sed -n 's/^# admin-ssh-ip://p' "$f2b_dir/jail.d/automaton.conf" 2>/dev/null | tr -s '[:space:]' ' ' || true)
+ssh_client=${SSH_CONNECTION:-}; ssh_client=${ssh_client%% *}
+[[ -n "$ssh_client" ]] || ssh_client=$(who -m 2>/dev/null | sed -n 's/.*(\(.*\)).*/\1/p' || true)
+[[ "$ssh_client" =~ ^[0-9a-fA-F:.]+$ ]] || ssh_client=
+admin_ips=$(printf '%s\n' $admin_ips $ssh_client | awk 'NF && !seen[$0]++' | paste -sd' ')
+ssh_ignoreip="$ignoreip${admin_ips:+ $admin_ips}"
 tmp_jail=$(mktemp "$f2b_dir/jail.d/.automaton.XXXXXX")
-python3 - "$source_dir/jail.conf.in" "$traefik_log" "$ignoreip" > "$tmp_jail" <<'PY'
+python3 - "$source_dir/jail.conf.in" "$traefik_log" "$ignoreip" "$ssh_ignoreip" "$admin_ips" > "$tmp_jail" <<'PY'
 import sys
-print(open(sys.argv[1]).read().replace('@TRAEFIK_LOG@', sys.argv[2]).replace('@IGNOREIP@', sys.argv[3]), end='')
+text = open(sys.argv[1]).read().replace('@TRAEFIK_LOG@', sys.argv[2]).replace('@IGNOREIP@', sys.argv[3]).replace('@SSH_IGNOREIP@', sys.argv[4])
+print(text + (f'\n# admin-ssh-ip: {sys.argv[5]}\n' if sys.argv[5] else ''), end='')
 PY
 chmod 0644 "$tmp_jail"
 mv "$tmp_jail" "$f2b_dir/jail.d/automaton.conf"
@@ -74,5 +85,10 @@ if [[ -z "${AUTOMATON_FAIL2BAN_ETC:-}" ]]; then
     systemctl daemon-reload
     systemctl enable --now fail2ban
     fail2ban-client reload >/dev/null
+    # Earlier versions ignored the chain setting and hooked the jails into INPUT, where bans do not reach Docker's ports.
+    if command -v iptables >/dev/null; then
+        while read -r rule; do iptables $(sed 's/^-A/-D/' <<<"$rule") || true; done \
+            < <(iptables -S INPUT 2>/dev/null | grep -E -- '^-A INPUT .*-j f2b-automaton-' || true)
+    fi
 fi
 echo "fail2ban protects this server: jails sshd, automaton-scanner and automaton-signin read $traefik_log. Never banned: $ignoreip"
