@@ -179,6 +179,25 @@ public class AutomatonHub : Hub
         }
     }
 
+    /// <summary>
+    /// Runner → API, with each heartbeat: the app runtimes this Runner hosts. Returns the approved app that receives the
+    /// server's logs (<c>logs:receive</c>) when this Runner hosts it, so the Runner can send its own logs there too.
+    /// </summary>
+    public async Task<LogSinkAssignment?> SyncLogSink(LogSinkRuntimeReport[]? runtimes)
+    {
+        var runner = GetRunner();
+        var services = Context.GetHttpContext()!.RequestServices;
+        try { await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Rejected log sink sync for runner {RunnerId}", runner.Id);
+            Context.Abort();
+            return null;
+        }
+
+        return await services.GetRequiredService<LogSinkService>().SyncAsync(runner.Id, runtimes, Context.ConnectionAborted);
+    }
+
     public async Task Heartbeat()
     {
         var runner = GetRunner();

@@ -58,6 +58,7 @@ internal static class AutomatonApiServiceRegistration
     {
         var configurationService = new ConfigurationService(applicationBuilder.Configuration);
         services.AddAutomatonInfrastructure(applicationBuilder.Configuration);
+        services.AddAutomatonLogForwarding();
         services.AddApiHostingServices(applicationBuilder, configurationService);
         services.AddApiFeatureServices(applicationBuilder, configurationService, corsOrigins);
         return services;

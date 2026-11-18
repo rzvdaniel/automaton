@@ -66,6 +66,7 @@ internal static class WorkerHostApplication
     {
         var services = builder.Services;
         services.AddAutomatonInfrastructure(builder.Configuration);
+        services.AddAutomatonLogForwarding();
         services.AddAutomatonWorkerIdentity();
         ConfigureDataProtection(builder);
         services.AddSingleton<IEventPublisher, CapEventPublisher>();

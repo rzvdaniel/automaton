@@ -39,6 +39,12 @@ public sealed class RunnerRuntimeRegistry
             registrations.Remove(new DeploymentRuntimeKey(appId, deploymentTargetId));
     }
 
+    public IReadOnlyList<RunnerRuntimeRegistration> Snapshot()
+    {
+        lock (gate)
+            return registrations.Values.ToArray();
+    }
+
     public bool IsPortRegistered(int port)
     {
         lock (gate)

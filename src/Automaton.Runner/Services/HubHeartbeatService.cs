@@ -3,7 +3,10 @@ using Serilog;
 
 namespace Automaton.Runner.Console.Services;
 
-internal sealed class HubHeartbeatService(Func<HubConnection?> connectionAccessor, ILogger logger)
+internal sealed class HubHeartbeatService(
+    Func<HubConnection?> connectionAccessor,
+    ILogger logger,
+    Func<HubConnection, CancellationToken, Task>? afterHeartbeat = null)
 {
     private const string HeartbeatMethod = "Heartbeat";
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
@@ -79,6 +82,7 @@ internal sealed class HubHeartbeatService(Func<HubConnection?> connectionAccesso
         try
         {
             await currentConnection.SendAsync(HeartbeatMethod, cancellationToken);
+            if (afterHeartbeat is not null) await afterHeartbeat(currentConnection, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -387,8 +387,11 @@ public static class ApplicationContractValidator
     /// <summary>The first supported app permission, read access to the server's backups.</summary>
     public const string SupportedPermission = "backups:read";
 
+    /// <summary>The app receives the server's own logs over OpenTelemetry (OTLP/HTTP).</summary>
+    public const string LogsReceivePermission = "logs:receive";
+
     /// <summary>Every app permission an app can request.</summary>
-    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read", "notify:email", "server:cleanup", "runner:maintain", "backups:run", "apps:read-status", "security:read"];
+    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read", "notify:email", "server:cleanup", "runner:maintain", "backups:run", "apps:read-status", "security:read", LogsReceivePermission];
 
     public const int MaxOpenPaths = 20;
     public const int MaxDescriptionLength = 200;
