@@ -14,6 +14,8 @@ import type { HomeCard } from '../types/home.types'
 import HomeAppCard from '../components/HomeAppCard.vue'
 import { useHomeStore } from '../stores/home.store'
 import { appFacts, moved } from '../utils'
+import PermissionRequestRow from '@/features/admin/components/PermissionRequestRow.vue'
+import { usePermissionRequests } from '@/features/admin/composables/usePermissionRequests'
 
 const router = useRouter()
 const store = useHomeStore()
@@ -23,7 +25,14 @@ const toast = useToast()
 const isAdmin = computed(() => auth.user?.roles?.includes('SysAdmin') === true)
 const empty = computed(() => store.pinned.length === 0 && store.needsYou.length === 0 && store.notifications.length === 0)
 
-onMounted(() => store.load())
+const permissions = usePermissionRequests()
+const visibleRequests = computed(() => permissions.requests.value.slice(0, 3))
+const hasPermissionCard = computed(() => store.needsYou.some((card) => card.kind === 'permission-requests'))
+onMounted(async () => {
+  await store.load()
+  // The card names each request; it needs the list only when the server says some wait.
+  if (hasPermissionCard.value && isAdmin.value) await permissions.load()
+})
 
 async function acknowledge(key: string) {
   try {
@@ -163,10 +172,21 @@ function shift(index: number, by: number) {
             <div class="need__text">
               <p class="need__title">{{ isInstalled(card) ? installedTitle(card) : card.title }}</p>
               <p v-if="!isInstalled(card)" class="need__detail">{{ card.detail }}</p>
+              <ul v-if="card.kind === 'permission-requests' && visibleRequests.length > 0" class="need__requests" data-testid="home-permission-requests">
+                <li v-for="request in visibleRequests" :key="`${request.appId}:${request.permission}`">
+                  <PermissionRequestRow
+                    :request="request"
+                    :busy="permissions.busy.value"
+                    show-app
+                    @decide="async (approved) => { await permissions.decide([request], approved); await store.load() }"
+                  />
+                </li>
+              </ul>
+              <p v-if="card.kind === 'permission-requests' && permissions.actionFailed.value" class="need__detail" role="alert">The change could not be saved.</p>
             </div>
             <div class="need__actions">
               <Button
-                :label="isStarting(card) ? 'Installing…' : isInstalled(card) ? 'Open' : card.actionLabel"
+                :label="isStarting(card) ? 'Installing…' : isInstalled(card) ? 'Open' : card.kind === 'permission-requests' && permissions.count.value > 3 ? `See all ${permissions.count.value}` : card.actionLabel"
                 :icon="isLive(card) ? 'pi pi-external-link' : undefined"
                 icon-pos="right"
                 size="small"
@@ -258,6 +278,8 @@ function shift(index: number, by: number) {
 .need__text { min-width: 0; }
 .need__title { margin: 0; font-weight: 600; font-size: 15px; color: var(--ink); }
 .need__detail { margin: 2px 0 0; color: var(--ink-soft); font-size: 13px; }
+.need__requests { list-style: none; margin: 6px 0 0; padding: 0; }
+.need__requests li + li { border-top: 1px solid var(--row-line); }
 .need__actions { display: flex; align-items: center; gap: 4px; }
 .pin { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
 .pin:hover { border-color: var(--signal); }

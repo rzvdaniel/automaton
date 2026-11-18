@@ -69,6 +69,12 @@ function openApp(app: AdminAppListItem) {
   void router.push({ name: 'app-editor', params: { id: app.id }, query: { view: 'admin' } })
 }
 
+function review(app: AdminAppListItem) {
+  if (isSystemAdministrator.value && app.waitingPermissions.length > 0) {
+    void router.push({ name: 'admin-permission-requests', query: { app: app.id } })
+  } else openApp(app)
+}
+
 function openOwner(app: AdminAppListItem) {
   if (!app.ownerUserId) return
   void router.push({ name: 'admin-user-detail', params: { userId: app.ownerUserId } })
@@ -179,7 +185,7 @@ onMounted(() => {
                 icon="pi pi-arrow-right"
                 icon-pos="right"
                 link
-                @click="openApp(data)"
+                @click="review(data)"
               />
             </template>
           </Column>

@@ -17,6 +17,9 @@ vi.mock('@/features/server/services/server-console.service', () => ({ serverCons
 const service = vi.hoisted(() => ({ get: vi.fn(), pin: vi.fn(), unpin: vi.fn(), reorder: vi.fn(), dismiss: vi.fn() }))
 vi.mock('../services/home.service', () => ({ homeService: service }))
 
+const adminApps = vi.hoisted(() => ({ listApps: vi.fn(), setPermission: vi.fn() }))
+vi.mock('@/features/admin/services/adminAppsService', () => ({ adminAppsService: adminApps }))
+
 const notifications = vi.hoisted(() => ({ list: vi.fn(), acknowledge: vi.fn() }))
 vi.mock('../services/notifications.service', () => ({ notificationsService: notifications }))
 
@@ -53,6 +56,34 @@ describe('HomeView', () => {
     expect(wrapper.findAll('[data-testid="dismiss-card"]')).toHaveLength(1)
     expect(wrapper.findAll('[data-testid="pinned-app"]').map((el) => el.find('.pin__name').text())).toEqual(['Shop', 'Blog'])
     expect(wrapper.find('[data-testid="home-empty"]').exists()).toBe(false)
+  })
+
+  it('names each waiting request on the permission card and approves it there', async () => {
+    const requests = { ...card('permission-requests', false), title: 'An app asks for permissions', actionLabel: 'Review requests', actionPath: '/admin/permission-requests' }
+    service.get.mockResolvedValue({ needsYou: [requests], pinned: [] })
+    adminApps.listApps
+      .mockResolvedValueOnce({ items: [{ id: 'a1', name: 'e2e-heartbeat', waitingPermissions: ['notify:email'] }], total: 1, waitingForApprovalTotal: 1 })
+      .mockResolvedValue({ items: [], total: 0, waitingForApprovalTotal: 0 })
+    adminApps.setPermission.mockResolvedValue([])
+    const wrapper = mountHome(['SysAdmin'])
+    await flushPromises()
+    expect(wrapper.find('[data-testid="home-permission-requests"]').text()).toContain('e2e-heartbeat wants to send email (notify:email)')
+    await wrapper.find('[aria-label="Approve notify:email for e2e-heartbeat"]').trigger('click')
+    await flushPromises()
+    expect(adminApps.setPermission).toHaveBeenCalledWith('a1', 'notify:email', true)
+    expect(wrapper.find('[data-testid="home-permission-requests"]').exists()).toBe(false)
+  })
+
+  it('shows three requests and "See all N" when more wait', async () => {
+    const requests = { ...card('permission-requests', false), actionLabel: 'Review requests' }
+    service.get.mockResolvedValue({ needsYou: [requests], pinned: [] })
+    adminApps.listApps.mockResolvedValue({
+      items: ['a', 'b', 'c', 'd'].map((id) => ({ id, name: `app-${id}`, waitingPermissions: ['notify:email'] })), total: 4, waitingForApprovalTotal: 4,
+    })
+    const wrapper = mountHome(['SysAdmin'])
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="permission-request"]')).toHaveLength(3)
+    expect(wrapper.text()).toContain('See all 4')
   })
 
   it('installs Server Console from the recommended card, then the card offers Open in a new tab', async () => {

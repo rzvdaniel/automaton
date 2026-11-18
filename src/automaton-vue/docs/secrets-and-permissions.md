@@ -37,7 +37,7 @@ Declare `application.permissions` (`backups:read`, `server:read`, `server:cleanu
 automaton permissions status
 ```
 
-A system administrator approves it in Studio (the command prints the approval link). Nothing is granted before that, and revoking stops the next call.
+A system administrator approves it in Studio: Home names each request with Approve and Reject, and Admin > Permission requests lists every waiting request by app (the command prints the approval link). Nothing is granted before that, and revoking stops the next call.
 
 ### Email people with `notify:email`
 
