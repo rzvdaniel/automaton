@@ -20,6 +20,7 @@ import type { AppDiskUsage } from '../types/apps.types'
 import AppRestartButton from './AppRestartButton.vue'
 import AppRunsOn from './AppRunsOn.vue'
 import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
+import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { DeploymentTargetStatus } from '../types/apps.types'
 
@@ -42,7 +43,8 @@ const toast = useToast()
 
 const secretNames = ref<string[] | null>(null)
 const update = ref<CatalogUpdate | null>(null)
-const retryOnly = computed(() => !!update.value?.deployFailed && update.value.installedCommit === update.value.latestCommit)
+const retryOnly = computed(() => !!update.value && isRetryOnly(update.value))
+const showDetails = ref(false)
 const updateBusy = ref(false)
 const permissions = ref<AppPermissionStatus[]>([])
 const disk = ref<AppDiskUsage | null>(null)
@@ -75,15 +77,12 @@ const canShare = computed(() => props.app.canUpdate !== false)
 async function applyUpdate() {
   const current = update.value
   if (!current || updateBusy.value) return
-  if (current.edited && !window.confirm('You edited this app after installing it. Updating replaces your changes with the new version. Update anyway?')) return
   updateBusy.value = true
   try {
-    await appsService.applyCatalogUpdate(props.app.id, current.edited)
-    update.value = null
-    toast.add({ severity: 'success', summary: 'Updating', detail: 'The new version is being deployed.', life: 5000 })
-    emit('paused-changed')
-  } catch (error) {
-    toast.add({ severity: 'error', summary: 'Update failed', detail: appActionErrorMessage(error, 'The app could not be updated.'), life: 8000 })
+    if (await applyCatalogUpdate(props.app.id, current, toast)) {
+      update.value = null
+      emit('paused-changed')
+    }
   } finally {
     updateBusy.value = false
   }
@@ -173,8 +172,10 @@ const source = computed(() => {
       <div class="row">
         <span>
           <span class="pill pill--bad">{{ retryOnly ? 'Last deploy failed' : 'Update available' }}</span>
-          <span v-if="update.deployFailed" class="hint" data-testid="update-deploy-error"> · {{ update.deployError?.replace(/\.$/, '') }}.<template v-if="update.runningCommit"> Still running {{ update.runningCommit.slice(0, 7) }}.</template><template v-else-if="update.hasPreviousVersion"> Still running the previous version.</template></span>
+          <span v-if="update.deployFailed" class="hint" data-testid="update-deploy-error"> · {{ shortReason(update.deployError).replace(/\.$/, '') }}.<template v-if="update.runningCommit"> Still running {{ update.runningCommit.slice(0, 7) }}.</template><template v-else-if="update.hasPreviousVersion"> Still running the previous version.</template></span>
           <span v-if="!retryOnly" class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
+          <button v-if="update.deployError && update.deployError !== shortReason(update.deployError)" type="button" class="link link--button" data-testid="update-deploy-details-toggle" :aria-expanded="showDetails" @click="showDetails = !showDetails"> {{ showDetails ? 'Hide details' : 'Show details' }}</button>
+          <pre v-if="showDetails" class="details" data-testid="update-deploy-details">{{ update.deployError }}</pre>
           <a v-if="update.compareUrl" class="link" :href="update.compareUrl" target="_blank" rel="noopener noreferrer"> What changed</a>
           <template v-if="update.newSettings.length || update.newSecrets.length || update.newPermissions.length">
             <br><span class="hint">New:
@@ -314,5 +315,7 @@ p.hint { margin: 0; }
 .pill { padding: 3px 10px; border-radius: 999px; font-family: var(--mono); font-size: 12px; }
 .pill--ok { border: 1px solid var(--ok); color: var(--ok); }
 .pill--bad { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
+.link--button { margin-left: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; cursor: pointer; }
+.details { margin: 8px 0 0; padding: 10px 12px; max-height: 280px; overflow: auto; border: 1px solid var(--row-line); border-radius: 10px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .source { margin: 0; color: var(--ink-soft); font-size: 13px; }
 </style>

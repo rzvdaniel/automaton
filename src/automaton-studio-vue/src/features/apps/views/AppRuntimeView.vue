@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
 import CopyCommand from '../components/CopyCommand.vue'
-import { appsService } from '../services/apps.service'
+import { useToast } from 'primevue/usetoast'
+import { appsService, type CatalogUpdate } from '../services/apps.service'
+import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
 import type { App } from '../types/apps.types'
 import { getOpenAppUrl } from '../utils/public-app-url'
 
@@ -17,6 +19,13 @@ const isLoading = ref(true)
 const error = ref('')
 const isNotDeployed = ref(false)
 const canBeFramed = ref(true)
+const toast = useToast()
+/** A catalog app has no local project: when it never deployed, the way forward is its update (or retry), not the CLI. */
+const isCatalogApp = computed(() => !!app.value?.installedFromRepo)
+const catalogUpdate = ref<CatalogUpdate | null>(null)
+const updateBusy = ref(false)
+const updateLabel = computed(() => (catalogUpdate.value && isRetryOnly(catalogUpdate.value) ? 'Retry' : 'Update'))
+const failureLine = computed(() => shortReason(catalogUpdate.value?.deployError))
 
 async function loadRuntimeView() {
   if (!appId.value) {
@@ -35,8 +44,14 @@ async function loadRuntimeView() {
     const targets = await appsService.listDeploymentTargets(appId.value)
     const liveTarget = targets.find((target) => target.isDefault)
     if (!liveTarget?.genericRuntimeDeployed) {
-      error.value = 'This app has not been deployed yet.'
+      catalogUpdate.value = null
       isNotDeployed.value = true
+      if (isCatalogApp.value) {
+        catalogUpdate.value = await appsService.getCatalogUpdate(appId.value).then((result) => (result.available ? result : null)).catch(() => null)
+        error.value = catalogUpdate.value?.deployFailed ? 'The build of this app failed.' : 'This app has not been deployed yet.'
+      } else {
+        error.value = 'This app has not been deployed yet.'
+      }
       return
     }
 
@@ -51,6 +66,16 @@ async function loadRuntimeView() {
     error.value = err instanceof Error ? err.message : 'Failed to load application.'
   } finally {
     isLoading.value = false
+  }
+}
+
+async function runUpdate() {
+  if (!catalogUpdate.value || updateBusy.value) return
+  updateBusy.value = true
+  try {
+    if (await applyCatalogUpdate(appId.value, catalogUpdate.value, toast)) await router.push(`/apps/${appId.value}`)
+  } finally {
+    updateBusy.value = false
   }
 }
 
@@ -73,13 +98,20 @@ onMounted(() => {
     <div v-else-if="error" class="runtime-state">
       <i class="pi pi-exclamation-triangle runtime-state__icon"></i>
       <p>{{ error }}</p>
-      <div v-if="isNotDeployed" class="runtime-state__source-guidance">
+      <p v-if="failureLine" class="runtime-state__failure" data-testid="runtime-failure">{{ failureLine }}</p>
+      <div v-if="isNotDeployed && isCatalogApp" class="runtime-state__source-guidance" data-testid="runtime-catalog-guidance">
+        <p v-if="catalogUpdate">{{ updateLabel === 'Retry' ? 'Retry builds this version again.' : 'A newer version is in the catalog.' }} Its data, settings and secrets are kept.</p>
+        <p v-else>Open its page in Studio to see why, or check its Activity.</p>
+      </div>
+      <div v-else-if="isNotDeployed" class="runtime-state__source-guidance">
         <p>Edit and deploy from your local project with Automaton CLI.</p>
         <CopyCommand command="automaton deploy" button-label="Copy automaton deploy" />
       </div>
       <div class="runtime-state__actions">
         <button class="runtime-action" type="button" @click="router.push(`/apps/${appId}`)">Back to Studio</button>
-        <button class="runtime-action runtime-action--primary" type="button" @click="loadRuntimeView">Retry</button>
+        <button v-if="isNotDeployed && isCatalogApp" class="runtime-action" type="button" data-testid="runtime-log" @click="router.push({ path: `/apps/${appId}`, query: { view: 'activity' } })">View log</button>
+        <button v-if="isNotDeployed && isCatalogApp && catalogUpdate" class="runtime-action runtime-action--primary" type="button" data-testid="runtime-update" :disabled="updateBusy" @click="runUpdate">{{ updateLabel }}</button>
+        <button v-else class="runtime-action runtime-action--primary" type="button" @click="loadRuntimeView">Retry</button>
       </div>
     </div>
 
@@ -118,6 +150,8 @@ onMounted(() => {
   gap: 0.75rem;
 }
 
+.runtime-state__failure { margin: 0; max-width: 40rem; color: var(--p-text-muted-color); overflow-wrap: anywhere; }
+.runtime-state__actions { flex-wrap: wrap; justify-content: center; }
 .runtime-state__source-guidance p {
   margin: 0 0 0.75rem;
   color: var(--p-text-muted-color);
@@ -149,9 +183,9 @@ onMounted(() => {
 
 .runtime-action {
   appearance: none;
-  border: 1px solid var(--p-surface-300);
-  background: var(--p-surface-0);
-  color: var(--p-text-color);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
   border-radius: 0.5rem;
   padding: 0.625rem 0.9rem;
   cursor: pointer;

@@ -5,23 +5,26 @@ import { flushPromises, mount } from '@vue/test-utils'
 const getCatalog = vi.fn()
 const getCatalogSources = vi.fn()
 const resolveGitUrl = vi.fn()
+const getCatalogUpdate = vi.fn()
+const applyCatalogUpdate = vi.fn()
 const push = vi.fn()
 const replace = vi.fn()
 const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }))
 const roles = vi.hoisted(() => ({ value: [] as string[] }))
 vi.mock('@/features/auth/stores/auth.store', () => ({ useAuthStore: () => ({ user: { roles: roles.value } }) }))
-vi.mock('../services/apps.service', () => ({ appsService: { getCatalogSources: (...a: unknown[]) => getCatalogSources(...a), getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a) } }))
+vi.mock('../services/apps.service', () => ({ appsService: { getCatalogSources: (...a: unknown[]) => getCatalogSources(...a), getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a), getCatalogUpdate: (...a: unknown[]) => getCatalogUpdate(...a), applyCatalogUpdate: (...a: unknown[]) => applyCatalogUpdate(...a) } }))
 vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push, replace }), useRoute: () => ({ query: routeQuery.value }) }))
 
 import source from './CatalogPanel.vue?raw'
 import { readFileSync } from 'node:fs'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import CatalogPanel from './CatalogPanel.vue'
 
 const RouterLink = { props: ['to'], template: '<a class="link" :data-to="JSON.stringify(to)"><slot /></a>' }
 const pageFamily = readFileSync('src/assets/styles/page-family.css', 'utf8')
 const entry = { id: 'backup', name: 'Off-site Backup', summary: 'Copies backups away', category: 'Maintenance', repo: 'o/apps', folder: 'm/backup', commit: '0123456789abcdef0123456789abcdef01234567', minServerVersion: '0.2.31', permissions: ['backups:read'], requiresNewerServer: false, installedAppId: null, sourceId: 'official', sourceName: 'Official', customSource: false }
-const mountPanel = () => mount(CatalogPanel, { attachTo: document.body, global: { plugins: [PrimeVue], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
+const mountPanel = () => mount(CatalogPanel, { attachTo: document.body, global: { plugins: [PrimeVue, ToastService], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
 const button = (label: string) => document.body.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
 
 describe('CatalogPanel', () => {
@@ -248,5 +251,43 @@ describe('CatalogPanel', () => {
     expect(wrapper.text()).toContain('No apps match')
     await wrapper.findAll('button').find((b) => b.text() === 'Clear filters')!.trigger('click')
     expect(replace).toHaveBeenCalledWith({ query: {} })
+  })
+
+  it('shows Update available with an Update button on an installed app whose catalog version is newer', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    getCatalogUpdate.mockResolvedValue({ available: true, installedCommit: 'aaaaaaa1', latestCommit: 'bbbbbbb2', edited: false })
+    applyCatalogUpdate.mockResolvedValue({})
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(getCatalogUpdate).toHaveBeenCalledWith('app-7')
+    expect(wrapper.get('[data-testid="catalog-update"]').text()).toContain('Update available')
+    await wrapper.get('button[aria-label="Update Off-site Backup"]').trigger('click')
+    await flushPromises()
+    expect(applyCatalogUpdate).toHaveBeenCalledWith('app-7', false)
+    expect(wrapper.find('[data-testid="catalog-update"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('offers Retry with one short failure line for a failed catalog app on its installed commit', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    getCatalogUpdate.mockResolvedValue({ available: true, installedCommit: 'aaaaaaa1', latestCommit: 'aaaaaaa1', edited: false, deployFailed: true, deployError: 'Build failed:\n  File "x.py", line 1\nValueError: bad pin' })
+    const wrapper = mountPanel()
+    await flushPromises()
+    const note = wrapper.get('[data-testid="catalog-update"]').text()
+    expect(note).toContain('Last deploy failed')
+    expect(note).toContain('Build failed: ValueError: bad pin')
+    expect(note).not.toContain('File "x.py"')
+    expect(wrapper.find('button[aria-label="Retry Off-site Backup"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('shows no update row when the app is current or the check fails', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    getCatalogUpdate.mockRejectedValue(new Error('403'))
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="catalog-update"]').exists()).toBe(false)
+    expect(wrapper.find('a.catalog-open').exists()).toBe(true)
+    wrapper.unmount()
   })
 })
