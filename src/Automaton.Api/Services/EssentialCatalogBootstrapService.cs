@@ -6,14 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-/// <summary>Installs the starter apps for a new server after an administrator and Runner exist.</summary>
+/// <summary>Installs Server Console, the one app every server needs, after an administrator and Runner exist. The other apps are only recommended on Home.</summary>
 public sealed class EssentialCatalogBootstrapService(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
     ILogger<EssentialCatalogBootstrapService> logger) : BackgroundService
 {
     internal const string CompletionKey = "Apps.Catalog.EssentialsInstalled";
-    internal static readonly string[] AppIds = ["server-console", "website-monitor", "heartbeat"];
+    internal static readonly string[] AppIds = [ServerConsoleProvisioningService.AppId];
     private const long LockId = 827;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -101,49 +101,20 @@ public sealed class EssentialCatalogBootstrapService(
         var catalog = services.GetRequiredService<AppCatalogService>();
         var response = await catalog.GetAsync(adminId, false, cancellationToken,
             new CatalogQuery { Source = CatalogSourceStore.OfficialId, PageSize = CatalogQuery.MaximumPageSize });
-        var installed = await db.WebApps
-            .Where(app => app.InstalledFromRepo != null && app.WebAppUsers.Any(user => user.UserId == adminId))
-            .Select(app => new { Repo = app.InstalledFromRepo!, Folder = app.InstalledFromFolder ?? "" })
-            .ToListAsync(cancellationToken);
-        var missing = MissingEssentials(response, installed.Select(app => (app.Repo, app.Folder)).ToHashSet());
-        if (missing is null) return false;
+        if (MissingEssentials(response, new HashSet<(string Repo, string Folder)>()) is null) return false;
         // Every step is safe to repeat: a pass that stopped after an install still deploys what was never deployed.
-        missing = AppIds.Select(id => response.Apps.Single(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId)).ToList();
-        var installer = services.GetRequiredService<AppCatalogInstallService>();
+        var missing = AppIds.Select(id => response.Apps.Single(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId)).ToList();
         var userContext = services.GetRequiredService<UserContextService>();
         userContext.ImpersonateUser(adminId);
         try
         {
             foreach (var entry in missing)
             {
-                if (entry.Id == ServerConsoleProvisioningService.AppId)
-                    await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionAsync(adminId, entry, cancellationToken);
-                else
-                    await InstallAndDeployAsync(services, db, installer, adminId, entry, cancellationToken);
+                await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionAsync(adminId, entry, cancellationToken);
                 logger.LogInformation("Installed or completed essential catalog app {AppName} for the first administrator.", entry.Name);
             }
             return true;
         }
         finally { userContext.ClearImpersonation(); }
-    }
-
-    /// <summary>Installs the app when missing and starts its first deploy, so it is Running and not just listed. A failed start is logged, not fatal.</summary>
-    private async Task InstallAndDeployAsync(
-        IServiceProvider services, ApplicationDbContext db, AppCatalogInstallService installer, Guid adminId,
-        CatalogEntryDto entry, CancellationToken token)
-    {
-        var deployer = services.GetRequiredService<StoredSourceDeploymentService>();
-        await ServerConsoleProvisioningService.RunAsync(
-            find: async () => await db.WebApps
-                .Where(app => app.InstalledFromRepo == entry.Repo && (app.InstalledFromFolder ?? "") == entry.Folder
-                    && app.WebAppUsers.Any(user => user.UserId == adminId))
-                .Select(app => (Guid?)app.Id)
-                .FirstOrDefaultAsync(token),
-            install: async () => (await installer.InstallAsync(
-                new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
-            approve: _ => Task.CompletedTask,
-            needsDeploy: appId => ServerConsoleProvisioningService.NeedsDeployAsync(db, appId, token),
-            deploy: appId => deployer.AcceptAsync(appId, adminId, adminId, null, false, token),
-            logger, token, entry.Name);
     }
 }

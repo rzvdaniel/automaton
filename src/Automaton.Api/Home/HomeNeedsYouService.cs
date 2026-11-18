@@ -40,19 +40,36 @@ public class HomeNeedsYouService(
         if (!BackupRecent(await InstallationBackups.ReadAsync(configuration, token)))
             cards.Add(new(HomeCardKeys.NoBackup, HomeCardKeys.NoBackup, "info", "Back up this server",
                 "No recent successful backup was found.", "Open backups", "/admin/backups", true));
-        cards.AddRange(await RecommendedAppCardsAsync(userId, token));
+        cards.AddRange(await CatalogCardsAsync(userId, token));
         return cards;
     }
 
+    /// <summary>How long after the first-Runner install the "Installed for you" note is offered.</summary>
+    internal static readonly TimeSpan InstalledNoteWindow = TimeSpan.FromDays(14);
+
+    /// <summary>The note that tells an administrator of a fresh server what was installed for them: Server Console, once, while the install is recent.</summary>
+    internal static HomeCard? InstalledForYouCard(IEnumerable<CatalogEntryDto> apps, DateTime? installedAtUtc)
+    {
+        if (installedAtUtc is not { } at || DateTime.UtcNow - at > InstalledNoteWindow) return null;
+        var app = apps.FirstOrDefault(item => item.Id == ServerConsoleProvisioningService.AppId
+            && item.SourceId == CatalogSourceStore.OfficialId && item.InstalledAppId is not null);
+        return app is null ? null : new(HomeCardKeys.InstalledForYou, HomeCardKeys.InstalledForYou, "info", $"Installed for you: {app.Name}",
+            $"{app.Name} watches this server and is ready to use. To remove it, open its Settings > Danger Zone.", "Open", $"/apps/{app.InstalledAppId}", true, app.InstalledAppId);
+    }
+
     /// <summary>One optional card per recommended official-catalog app the administrator has not installed.</summary>
-    private async Task<List<HomeCard>> RecommendedAppCardsAsync(Guid userId, CancellationToken token)
+    private async Task<List<HomeCard>> CatalogCardsAsync(Guid userId, CancellationToken token)
     {
         try
         {
             var response = await catalog.GetAsync(userId, false, token,
                 new CatalogQuery { Source = CatalogSourceStore.OfficialId, PageSize = CatalogQuery.MaximumPageSize });
             if (response.Unavailable) return [];
-            return RecommendedCards(response.Apps);
+            var cards = RecommendedCards(response.Apps);
+            var installedAt = await db.Settings.AsNoTracking().Where(setting => setting.Key == EssentialCatalogBootstrapService.CompletionKey)
+                .Select(setting => (DateTime?)setting.UpdatedAt).FirstOrDefaultAsync(token);
+            if (InstalledForYouCard(response.Apps, installedAt) is { } note) cards.Insert(0, note);
+            return cards;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
