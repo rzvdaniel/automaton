@@ -274,7 +274,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
 
     /// <summary>
     /// Replaces the running container with a new one from a copy of the deployed files, using the normal
-    /// start, readiness and promotion path; the old container keeps serving until the new one is ready.
+    /// start, readiness and promotion path; the old container keeps serving until the new one is ready (except for `runtime.update: stop-first`, which stops it first).
     /// The copy gets a fresh candidate identity because brokered hosts name (and reuse) containers by it.
     /// Compose runtimes receive no app secrets, so they are left alone.
     /// </summary>
