@@ -110,6 +110,24 @@ public sealed class AppDeletionCleanupTests
         Assert.That(fixture.Context.Commands.Requests.Count, Is.EqualTo(online ? 2 : 0));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task FreshDeletion_AbandonsOnlyOfflineRunnerAndListsSkippedCleanup(bool online)
+    {
+        await using var fixture = await AppDeletionRecoveryFixture.CreateAsync(online);
+        var app = await fixture.Context.Db.WebApps.SingleAsync(a => a.Id == fixture.Context.App.Id);
+        app.DeletionClaimId = null;
+        (await fixture.Context.Db.AppDeploymentTargets.SingleAsync(t => t.WebAppId == app.Id)).Status = DeploymentTargetStatus.Running;
+        await fixture.Context.Db.SaveChangesAsync();
+        var skipped = new List<string>();
+
+        await fixture.DeleteAsync(recover: false, abandonOfflineRuntimes: true, skippedHostCleanup: skipped);
+
+        Assert.That(await fixture.Context.Db.WebApps.AnyAsync(a => a.Id == app.Id), Is.False);
+        Assert.That(fixture.Context.Commands.Requests.Count, Is.EqualTo(online ? 2 : 0));
+        Assert.That(skipped, online ? Is.Empty : Has.Count.EqualTo(1).And.Some.Contain("containers and data may remain"));
+    }
+
     [Test]
     public async Task DeletionClaim_RejectsNewTargetAndDeploymentFromAnotherApiDuringCleanup()
     {

@@ -21,8 +21,10 @@ internal static class InventoryCommands
     {
         var app = new Argument<string>("app", "App ID, exact slug or exact name");
         var yes = new Option<bool>("--yes", "Confirm permanent deletion of the app, its runtime and its data");
+        var abandon = new Option<bool>("--abandon-offline-runtime",
+            "Administrator: the app's Runner is offline for good; delete the app without cleaning up that machine (containers may remain)");
         var json = new Option<bool>("--json", "Print the result as JSON");
-        var command = new Command("delete", "Permanently delete an app, its runtime and its data") { app, yes, json };
+        var command = new Command("delete", "Permanently delete an app, its runtime and its data") { app, yes, abandon, json };
         command.SetHandler(async (InvocationContext context) =>
         {
             var asJson = context.ParseResult.GetValueForOption(json);
@@ -38,9 +40,16 @@ internal static class InventoryCommands
                 var inventory = await client.ListAppInventoryAsync(context.GetCancellationToken());
                 var id = ResolveAppId(inventory, identifier);
                 var name = inventory.FirstOrDefault(item => item.Id.ToString() == id.ToLowerInvariant())?.Name;
-                await client.DeleteAppAsync(id, context.GetCancellationToken());
-                if (asJson) CliJson.Write(new { success = true, appId = id, name, deleted = true });
-                else Console.WriteLine($"Deleted app {name ?? id} ({id}) with its runtime and data.");
+                IReadOnlyList<string> skipped = [];
+                if (context.ParseResult.GetValueForOption(abandon))
+                    skipped = await client.DeleteAppAbandoningOfflineRuntimesAsync(id, context.GetCancellationToken());
+                else await client.DeleteAppAsync(id, context.GetCancellationToken());
+                if (asJson) CliJson.Write(new { success = true, appId = id, name, deleted = true, skippedHostCleanup = skipped });
+                else
+                {
+                    Console.WriteLine($"Deleted app {name ?? id} ({id}) with its runtime and data.");
+                    foreach (var line in skipped) Console.WriteLine($"Skipped cleanup: {line}");
+                }
             }
             catch (Exception exception)
             {

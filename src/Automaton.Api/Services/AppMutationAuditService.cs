@@ -103,7 +103,8 @@ public sealed class AppMutationAuditService(
         }
     }
 
-    public async Task RecordDeletedAsync(WebApp app, Guid ownerId, bool abandonedOfflineRuntimes = false)
+    public async Task RecordDeletedAsync(WebApp app, Guid ownerId, bool abandonedOfflineRuntimes = false,
+        IReadOnlyList<string>? skippedHostCleanup = null)
     {
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, app.Name, app.Id);
         await auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -122,7 +123,8 @@ public sealed class AppMutationAuditService(
                 app.PublicUrl,
                 ExecutionRunnerId = GetDefaultRunnerId(app),
                 OwnerUserId = ownerId,
-                AbandonedOfflineRuntimes = abandonedOfflineRuntimes
+                AbandonedOfflineRuntimes = abandonedOfflineRuntimes,
+                SkippedHostCleanup = skippedHostCleanup ?? []
             }
         });
     }

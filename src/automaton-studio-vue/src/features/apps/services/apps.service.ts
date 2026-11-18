@@ -246,6 +246,17 @@ class AppsService {
   }
 
   /**
+   * Administrator: delete an app whose Runner is offline for good, skipping cleanup on that machine.
+   * DELETE /api/apps/{id}?abandonOfflineRuntimes=true
+   */
+  async deleteAbandoningOfflineRuntimes(id: string): Promise<string[]> {
+    const { data } = await apiClient.delete<{ skippedHostCleanup: string[] }>(`/api/apps/${id}`, {
+      params: { abandonOfflineRuntimes: true },
+    })
+    return data.skippedHostCleanup
+  }
+
+  /**
    * Pause (stop, schedules off, paused page) or resume an app. POST /api/apps/{id}/pause and /resume
    * A browser can drop a long request (Chromium aborts every request in flight when the machine's network interfaces change,
    * which a container start can trigger) while the server carries on; then Studio reads the app until it shows the new state.

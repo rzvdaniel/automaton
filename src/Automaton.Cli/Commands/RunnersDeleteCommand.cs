@@ -13,8 +13,11 @@ public static class RunnersDeleteCommand
         var runner = new Argument<string>("runner", "Personal Runner ID or exact name");
         var confirmed = new Option<bool>("--host-cleanup-confirmed", "Confirm the uninstall command completed on the Runner host");
         var ssh = new Option<string?>("--ssh", "Run the uninstall command on the host over SSH as user@host, then delete the registration");
+        var abandon = new Option<bool>("--abandon-offline",
+            "Administrator: the Runner is offline for good; delete it and the apps assigned to it without cleaning up its machine (containers may remain)");
+        var yes = new Option<bool>("--yes", "Confirm permanent deletion of the apps with --abandon-offline");
         var json = new Option<bool>("--json", "Print the result as JSON");
-        var command = new Command("delete", "Prepare Runner removal, then confirm host cleanup to delete its registration") { runner, confirmed, ssh, json };
+        var command = new Command("delete", "Prepare Runner removal, then confirm host cleanup to delete its registration") { runner, confirmed, ssh, abandon, yes, json };
         command.SetHandler(async (InvocationContext context) =>
         {
             var reference = context.ParseResult.GetValueForArgument(runner);
@@ -28,6 +31,12 @@ public static class RunnersDeleteCommand
                 var runnerId = RunnerReferenceResolver.Pick(await client.ListRunnersAsync(), reference, "id", "name");
                 if (sshTarget is not null && (sshTarget.Length == 0 || sshTarget.StartsWith('-') || sshTarget.Any(char.IsWhiteSpace)))
                     throw new ArgumentException("--ssh requires a user@host without whitespace or options.");
+                if (context.ParseResult.GetValueForOption(abandon))
+                {
+                    await DeleteOfflineAsync(client, runnerId, context.ParseResult.GetValueForOption(yes), asJson, context.GetCancellationToken());
+                    context.ExitCode = 0;
+                    return;
+                }
                 var removal = await client.PrepareRunnerRemovalAsync(runnerId);
                 if (sshTarget is not null)
                 {
@@ -62,6 +71,19 @@ public static class RunnersDeleteCommand
             }
         });
         return command;
+    }
+
+    private static async Task DeleteOfflineAsync(AutomatonApiClient client, string runnerId, bool confirmed, bool asJson, CancellationToken ct)
+    {
+        if (!confirmed)
+            throw new InvalidOperationException("Pass --yes to delete the offline Runner and every app assigned to it without cleaning up its machine. This cannot be undone.");
+        var skipped = await client.DeleteOfflineRunnerAsync(runnerId, ct);
+        if (asJson) CliJson.Write(new { success = true, runnerId, deleted = true, skippedHostCleanup = skipped });
+        else
+        {
+            AnsiConsole.MarkupLine($"[green]Deleted Runner registration {Markup.Escape(runnerId)} and its apps.[/]");
+            foreach (var line in skipped) AnsiConsole.MarkupLine($"[yellow]Skipped cleanup:[/] {Markup.Escape(line)}");
+        }
     }
 
     /// <summary>Prints the command as one line; Spectre would wrap it at the terminal width and break copy and paste.</summary>

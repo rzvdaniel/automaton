@@ -728,6 +728,7 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerAuditService>();
         services.AddScoped<RunnerRegistrationService>();
         services.AddScoped<RunnerDeletionService>();
+        services.AddScoped<OfflineRunnerDeletionService>();
         services.AddScoped<RunnerDeletionPolicy>();
         services.AddScoped<RunnerConnectionSessionService>();
         services.AddScoped<RunnerQueryService>();

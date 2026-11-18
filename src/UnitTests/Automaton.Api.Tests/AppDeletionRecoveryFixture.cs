@@ -28,10 +28,10 @@ internal sealed class AppDeletionRecoveryFixture : IAsyncDisposable
         return fixture;
     }
 
-    internal async Task DeleteAsync(bool recover, bool abandonOfflineRuntimes = false)
+    internal async Task DeleteAsync(bool recover, bool abandonOfflineRuntimes = false, List<string>? skippedHostCleanup = null)
     {
         var app = await Context.Db.WebApps.SingleAsync(a => a.Id == Context.App.Id);
-        await deletion!.DeleteResourcesAsync(app.Id, app, Context.UserId, recover, abandonOfflineRuntimes);
+        await deletion!.DeleteResourcesAsync(app.Id, app, Context.UserId, recover, abandonOfflineRuntimes, skippedHostCleanup);
     }
 
     internal void ProbeAdmissionDuringCleanup()

@@ -82,7 +82,7 @@ public class AppsService
 
     public Task Update(Guid id, AppModel app) => appMutationService.Update(id, app);
 
-    public Task Remove(Guid id, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
+    public Task<IReadOnlyList<string>> Remove(Guid id, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
         => appMutationService.Remove(id, recoverInterrupted, abandonOfflineRuntimes);
     public Task Publish(
         Guid id,
