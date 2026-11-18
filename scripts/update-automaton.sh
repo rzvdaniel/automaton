@@ -139,6 +139,61 @@ ensure_update_trigger() {
     bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
         || { echo "Updates from Studio could not be enabled; nothing was changed. Fix it, then rerun: sudo bash $install_dir/update-from-request.sh --install-units" >&2; exit 1; }
 }
+# automaton.monster only: the "Deploy production" website step needs a root-owned script, compose file and sudoers line,
+# and the deploy key's forced command must allow it. They come from this checksum-verified bundle, never from a download.
+# Only a host with a website-green compose container gets them; self-hosted servers are not changed. Failures only warn.
+# AUTOMATON_UPDATE_TEST lets the script tests use a temporary root and passwd file.
+website_host_root=''
+website_passwd=/etc/passwd
+if [[ -n "${AUTOMATON_UPDATE_TEST:-}" ]]; then website_host_root=${AUTOMATON_HOST_ROOT:-}; website_passwd=${AUTOMATON_PASSWD_FILE:-/etc/passwd}; fi
+put_root_file() {  # source destination mode: replace atomically unless it is already identical, root-owned, with that mode
+    local source=$1 destination=$2 mode=$3
+    if [[ ! -L "$destination" ]] && cmp -s "$source" "$destination" && [[ "$(stat -c '%a %U:%G' "$destination")" == "$mode root:root" ]]; then return 0; fi
+    install -o root -g root -m "$mode" "$source" "$destination.new" && mv -f "$destination.new" "$destination" || { rm -f "$destination.new"; return 1; }
+    echo "Installed $destination"
+}
+website_deploy_user() {  # the one account whose authorized_keys has a key locked to the deploy forced command
+    local name home uid matches=()
+    while IFS=: read -r name _ uid _ _ home _; do
+        [[ "$uid" =~ ^[0-9]+$ && "$uid" != 0 && "$name" =~ ^[a-z_][a-z0-9_-]*$ && -f "$home/.ssh/authorized_keys" ]] || continue
+        if grep -Eq '^[^#]*command="/usr/local/bin/automaton-deploy"' "$home/.ssh/authorized_keys"; then matches+=("$name"); fi
+    done < "$website_passwd"
+    [[ ${#matches[@]} == 1 ]] || return 1
+    printf '%s\n' "${matches[0]}"
+}
+install_website_deploy() {
+    local files="$bundle/production-host" bin="$website_host_root/usr/local/bin" lib="$website_host_root/usr/local/lib/automaton"
+    local sudoers_dir="$website_host_root/etc/sudoers.d" user
+    [[ -f "$files/automaton-deploy-website" && -f "$files/docker-compose.website.yml" ]] || return 0
+    [[ -n "$(docker ps -aq --filter label=com.docker.compose.service=website-green)" ]] || return 0
+    install -d -o root -g root -m 755 "$bin" "$lib" "$sudoers_dir" || return 1
+    put_root_file "$files/automaton-deploy-website" "$bin/automaton-deploy-website" 755 || return 1
+    put_root_file "$files/docker-compose.website.yml" "$lib/docker-compose.website.yml" 644 || return 1
+    if ! user=$(website_deploy_user); then
+        echo 'No single account has an authorized_keys line locked to /usr/local/bin/automaton-deploy; the sudoers line for the website deploy was not installed.' >&2
+        return 1
+    fi
+    # No argument wildcard (sudo-rs rejects it): the script and the forced command both check the version themselves.
+    printf '%s ALL=(root) NOPASSWD: /usr/local/bin/automaton-deploy-website\n' "$user" > "$working/sudoers"
+    if ! visudo -cf "$working/sudoers" >/dev/null; then
+        echo 'The sudoers line for the website deploy did not validate; it was not installed.' >&2
+        return 1
+    fi
+    put_root_file "$working/sudoers" "$sudoers_dir/automaton-deploy-website" 440 || return 1
+    [[ -f "$bin/automaton-deploy" && ! -L "$bin/automaton-deploy" ]] || return 0
+    cat > "$working/automaton-deploy" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$ \
+  || "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/local/bin/automaton-deploy-website\ [0-9]+\.[0-9]+\.[0-9]+$ ]] \
+  || { echo "refused"; exit 1; }
+exec $SSH_ORIGINAL_COMMAND
+SCRIPT
+    put_root_file "$working/automaton-deploy" "$bin/automaton-deploy" 755
+}
+ensure_website_deploy() {
+    install_website_deploy || echo 'Warning: the website deploy step could not be set up on this host. Fix it, then rerun the update.' >&2
+}
 # Releases run on PostgreSQL. An installation that still runs MySQL must not be switched silently:
 # its data has to be migrated first, and the old backup and restore scripts stay in place until then.
 if grep -q '^MYSQL_IMAGE=' "$install_dir/release.env"; then
@@ -150,6 +205,7 @@ if cmp -s "$bundle/release.env" "$install_dir/release.env"; then
     echo 'This release is already installed.'
     ensure_backups
     ensure_update_trigger
+    ensure_website_deploy
     exit 0
 fi
 if [[ -f "$install_dir/version" ]]; then
@@ -407,6 +463,7 @@ if [[ -d "$bundle/fail2ban" ]]; then
 fi
 echo "Updated to $version. Recovery backup: $backup"
 ensure_backups
+ensure_website_deploy
 # Scanners and password guessers are banned at the firewall by default; the update is complete without it.
 if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
     bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \

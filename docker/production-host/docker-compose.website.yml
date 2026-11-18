@@ -1,4 +1,4 @@
-# Installed by the owner as root at /usr/local/lib/automaton/docker-compose.website.yml (root:root, mode 644).
+# Installed as root by update.sh from the verified release bundle at /usr/local/lib/automaton/docker-compose.website.yml (root:root, mode 644).
 # Used only by /usr/local/bin/automaton-deploy-website. It defines website-green alone, so a release tag cannot
 # change what the deploy runs: the downloaded source is the build context and nothing else.
 name: automaton-prod

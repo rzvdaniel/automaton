@@ -20,7 +20,7 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
      restrict,command="/usr/local/bin/automaton-deploy" ssh-ed25519 AAAA... deploy-production
      ```
 
-     `/usr/local/bin/automaton-deploy` (root-owned, mode 755) accepts only the workflow's command:
+     The first time, create `/usr/local/bin/automaton-deploy` (root-owned, mode 755) as below; after that, `update.sh` keeps it current. It accepts only the workflow's commands:
 
      ```bash
      #!/usr/bin/env bash
@@ -31,20 +31,9 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
      exec $SSH_ORIGINAL_COMMAND
      ```
 
-     The website step also needs two root-owned files copied from this repository by the owner (never from a release archive), and one sudoers line:
+     **The website step sets itself up.** Nothing to install by hand: `update.sh` (root, from the sha256-verified release bundle, never from another download) installs, only on a host that has a `website-green` container, `/usr/local/bin/automaton-deploy-website` (755), `/usr/local/lib/automaton/docker-compose.website.yml` (644) and `/etc/sudoers.d/automaton-deploy-website` (440, checked with `visudo -cf` first). The sudoers line has no argument wildcard (sudo-rs rejects it); the forced command and the script itself both require a plain `X.Y.Z` version. The sudoers user is the one account whose `authorized_keys` has the key locked to `/usr/local/bin/automaton-deploy`. If `/usr/local/bin/automaton-deploy` exists, it is rewritten atomically with the two regexes above. Re-runs change nothing that is current; a failure only warns, and the next update retries. In **Deploy production** `update.sh` runs before the website step, so the first deploy of the release that adds this sets it up and the website step works in the same run. Self-hosted servers are not changed.
 
-     ```bash
-     sudo install -o root -g root -m 755 docker/production-host/automaton-deploy-website /usr/local/bin/automaton-deploy-website
-     sudo install -d -o root -g root -m 755 /usr/local/lib/automaton
-     sudo install -o root -g root -m 644 docker/production-host/docker-compose.website.yml /usr/local/lib/automaton/docker-compose.website.yml
-     ```
-
-     ```
-     # /etc/sudoers.d/automaton-deploy-website (visudo -f), replace <user> with PROD_SSH_USER
-     <user> ALL=(root) NOPASSWD: /usr/local/bin/automaton-deploy-website [0-9]*.[0-9]*.[0-9]*
-     ```
-
-     The script resolves tag `server-v<version>` to a commit, asks GitHub whether that commit is on `main`, and downloads the source by that exact sha (never by tag name, over HTTPS only). The source is only the Docker build context: the script and compose file that run are the root-owned ones, which define `website-green` alone and attach it to the existing `automaton-prod_automaton-prod` network (check the name with `docker network ls`). It builds and restarts only `website-green` (`--no-deps`) and never checks out or pulls in `/opt/automaton`. Re-install the two files when they change in the repository. Recommended extra protection, your decision: a GitHub tag ruleset for `server-v*` so only the release workflow can create or move those tags. Check the script with `bash scripts/tests/deploy-website-test.sh`.
+     The script resolves tag `server-v<version>` to a commit, asks GitHub whether that commit is on `main`, and downloads the source by that exact sha (never by tag name, over HTTPS only). The source is only the Docker build context: the script and compose file that run are the root-owned ones, which define `website-green` alone and attach it to the existing `automaton-prod_automaton-prod` network (check the name with `docker network ls`). It builds and restarts only `website-green` (`--no-deps`) and never checks out or pulls in `/opt/automaton`. Recommended extra protection, your decision: a GitHub tag ruleset for `server-v*` so only the release workflow can create or move those tags. Check the script with `bash scripts/tests/deploy-website-test.sh`.
    - `PROD_SSH_KNOWN_HOSTS`: the server's host key line, from `ssh-keyscan -t ed25519 <host>` checked against the real server.
 5. Known limit: an agent working on your machine under your own GitHub login (not the bot) can start and approve a run as you. Only approve runs you started or asked for, and check the version and the actor on the run page.
 6. Keep agent accounts without admin rights, so they cannot edit environments or secrets. Changes to `.github/workflows/` are High tier and listed as risky in the release report you read before approving a deploy.

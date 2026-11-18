@@ -79,6 +79,8 @@ elif args[0]=='cp':
         data=b'key-or-data'
         item=tarfile.TarInfo('entry'); item.size=len(data)
         archive.addfile(item, io.BytesIO(data))
+elif args[0]=='ps':
+    if os.environ.get('FAKE_WEBSITE_HOST')=='1' and 'label=com.docker.compose.service=website-green' in args: print('abc123')
 elif args[0]=='compose':
     if 'config' in args and '--format' in args: print(open(args[args.index('-f')+1]).read())
     elif 'config' in args and '--services' in args: print(*json.load(open(args[args.index('-f')+1]))['services'], sep=chr(10))
@@ -121,6 +123,11 @@ free=29000000
 if [ -n "$FAKE_DF_LOW_KB" ] && [ ! -e "$FAKE_PRUNED" ]; then free=$FAKE_DF_LOW_KB; fi
 printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 %s 4%% /\\n" "$free"
 ''')
+        # visudo -cf: fail on request, otherwise accept only the one expected line.
+        (self.bin / 'visudo').write_text('''#!/bin/sh
+[ "$FAKE_VISUDO_FAIL" != 1 ] || { echo "visudo: syntax error" >&2; exit 1; }
+grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-deploy-website$' "$2"
+''')
         for tool in self.bin.iterdir():
             tool.chmod(0o755)
         self.update_dir = self.root / 'update'
@@ -143,6 +150,7 @@ printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 3000000
         shutil.copy2(REPO / 'docker/install/cleanup.sh', source / 'cleanup.sh')
         if with_update_trigger:
             shutil.copy2(REPO / 'docker/install/update-from-request.sh', source / 'update-from-request.sh')
+        shutil.copytree(REPO / 'docker/production-host', source / 'production-host', dirs_exist_ok=True)
         archive = self.root / 'automaton-server.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
             tar.add(source, arcname='automaton-server')
@@ -475,6 +483,96 @@ printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 3000000
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('non-symlink', result.stderr)
         self.assertFalse((self.install / 'backups').exists())
+
+    def website_host(self, authorized_keys_line='restrict,command="/usr/local/bin/automaton-deploy" ssh-ed25519 AAAA deploy-production', forced_command=True):
+        """A temporary host root with a deploy account, and an existing forced-command script on request."""
+        host = self.root / 'host'
+        home = self.root / 'home/deployer'
+        (home / '.ssh').mkdir(parents=True, exist_ok=True)
+        (home / '.ssh/authorized_keys').write_text(authorized_keys_line + '\n')
+        other = self.root / 'home/other'
+        other.mkdir(parents=True, exist_ok=True)
+        passwd = self.root / 'passwd'
+        passwd.write_text(f'root:x:0:0::/root:/bin/bash\ndeployer:x:1001:1001::{home}:/bin/bash\nother:x:1002:1002::{other}:/bin/bash\n')
+        (host / 'usr/local/bin').mkdir(parents=True, exist_ok=True)
+        if forced_command:
+            (host / 'usr/local/bin/automaton-deploy').write_text('#!/bin/sh\necho old\n')
+        return host, self.environment | {'AUTOMATON_HOST_ROOT': str(host), 'AUTOMATON_PASSWD_FILE': str(passwd), 'FAKE_WEBSITE_HOST': '1'}
+
+    def installed(self, host):
+        return {name: (host / name).stat() for name in (
+            'usr/local/bin/automaton-deploy-website', 'usr/local/lib/automaton/docker-compose.website.yml',
+            'etc/sudoers.d/automaton-deploy-website', 'usr/local/bin/automaton-deploy')}
+
+    def test_website_host_installs_the_deploy_step_from_the_verified_bundle(self):
+        host, environment = self.website_host()
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        files = {name: stat.st_mode & 0o777 for name, stat in self.installed(host).items()}
+        self.assertEqual(files, {'usr/local/bin/automaton-deploy-website': 0o755, 'usr/local/lib/automaton/docker-compose.website.yml': 0o644,
+                                 'etc/sudoers.d/automaton-deploy-website': 0o440, 'usr/local/bin/automaton-deploy': 0o755})
+        for stat in self.installed(host).values():
+            self.assertEqual((stat.st_uid, stat.st_gid), (0, 0))
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy-website').read_bytes(), (REPO / 'docker/production-host/automaton-deploy-website').read_bytes())
+        self.assertEqual((host / 'etc/sudoers.d/automaton-deploy-website').read_text(),
+                         'deployer ALL=(root) NOPASSWD: /usr/local/bin/automaton-deploy-website\n')
+        forced = (host / 'usr/local/bin/automaton-deploy').read_text()
+        self.assertIn(r'^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$', forced)
+        self.assertIn(r'^sudo\ /usr/local/bin/automaton-deploy-website\ [0-9]+\.[0-9]+\.[0-9]+$', forced)
+        self.assertEqual(sorted(path.name for path in (host / 'usr/local/bin').iterdir()), ['automaton-deploy', 'automaton-deploy-website'])
+        self.assertEqual(sorted(path.name for path in (host / 'etc/sudoers.d').iterdir()), ['automaton-deploy-website'])
+
+    def test_forced_command_is_only_rewritten_when_it_exists(self):
+        host, environment = self.website_host(forced_command=False)
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((host / 'usr/local/bin/automaton-deploy-website').is_file())
+        self.assertFalse((host / 'usr/local/bin/automaton-deploy').exists())
+
+    def test_normal_host_gets_nothing_new(self):
+        host, environment = self.website_host()
+        result = self.update(*self.bundle(), extra=environment | {'FAKE_WEBSITE_HOST': '0'})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy').read_text(), '#!/bin/sh\necho old\n')
+        self.assertEqual([path.name for path in (host / 'usr/local/bin').iterdir()], ['automaton-deploy'])
+        self.assertFalse((host / 'etc').exists())
+        self.assertFalse((host / 'usr/local/lib').exists())
+
+    def test_website_deploy_setup_is_idempotent(self):
+        host, environment = self.website_host()
+        archive, checksum = self.bundle()
+        self.assertEqual(self.update(archive, checksum, extra=environment).returncode, 0)
+        before = {name: (stat.st_mtime_ns, stat.st_ino) for name, stat in self.installed(host).items()}
+        (self.install / 'release.env').write_text(manifest('2'))  # same release again: the re-run path
+        result = self.update(archive, checksum, extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('Installed ', result.stdout)
+        self.assertEqual(before, {name: (stat.st_mtime_ns, stat.st_ino) for name, stat in self.installed(host).items()})
+
+    def test_stale_website_files_are_replaced(self):
+        host, environment = self.website_host()
+        (host / 'usr/local/bin/automaton-deploy-website').write_text('old')
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Installed ' + str(host / 'usr/local/bin/automaton-deploy-website'), result.stdout)
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy-website').read_bytes(), (REPO / 'docker/production-host/automaton-deploy-website').read_bytes())
+
+    def test_sudoers_that_fails_validation_is_not_installed_and_the_forced_command_is_kept(self):
+        host, environment = self.website_host()
+        result = self.update(*self.bundle(), extra=environment | {'FAKE_VISUDO_FAIL': '1'})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)  # the update itself still completes
+        self.assertIn('did not validate', result.stderr)
+        self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.2')
+        self.assertEqual(list((host / 'etc/sudoers.d').iterdir()), [])
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy').read_text(), '#!/bin/sh\necho old\n')
+
+    def test_no_single_deploy_account_means_no_sudoers_line(self):
+        host, environment = self.website_host(authorized_keys_line='ssh-ed25519 AAAA ordinary-key')
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('No single account', result.stderr)
+        self.assertEqual(list((host / 'etc/sudoers.d').iterdir()), [])
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy').read_text(), '#!/bin/sh\necho old\n')
 
     def test_no_version_selects_latest_stable_distribution(self):
         (self.bin / 'curl').write_text('''#!/bin/sh

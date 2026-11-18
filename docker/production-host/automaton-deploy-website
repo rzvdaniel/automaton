@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installed by the owner as root at /usr/local/bin/automaton-deploy-website (root:root, mode 755).
+# Installed as root by update.sh from the verified release bundle at /usr/local/bin/automaton-deploy-website (root:root, mode 755).
 # Rebuilds and restarts website-green from a released commit. Usage: automaton-deploy-website X.Y.Z
 #
 # Trust: this script and the compose file next to it are root-owned and never come from the downloaded source.
