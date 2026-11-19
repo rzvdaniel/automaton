@@ -77,13 +77,32 @@ public sealed class ServerConsoleProvisioningTests
     }
 
     [Test]
-    public async Task ARetryApprovesOnlyWhatTheAppAskedAtInstallNotWhatAnUpdateAdded()
+    public async Task AnInstallRecordsWhatWasPendingAndARetryApprovesOnlyThat()
     {
-        // Permissions pending at install were recorded; an update in the retry window added backups:run.
-        var (service, _, appId) = await CreateAsync(AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRun);
-        var recorded = EssentialCatalogBootstrapService.ParseApproved("server:read");
+        var (service, audit, appId) = await CreateAsync(AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRead);
+        IReadOnlyCollection<string>? recorded = null;
+        Task<Guid?> Run(Guid? found, Guid? marked, IReadOnlyCollection<string> approvedAtInstall) => ServerConsoleProvisioningService.RunRecordedInstallerAsync(
+            service, () => Task.FromResult(found), () => Task.FromResult(appId), marked, approvedAtInstall,
+            (_, asked) => { recorded = asked; return Task.CompletedTask; },
+            _ => Task.FromResult(false), _ => Task.CompletedTask, NullLogger.Instance, default, "Server Keeper");
 
-        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, recorded, default);
+        await Run(null, null, []);
+        Assert.That(recorded, Is.EquivalentTo(new[] { AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRead }));
+        Assert.That((await service.GetStatusAsync(appId, default)).Select(s => s.Status), Is.All.EqualTo(AppPermissionStatuses.Approved));
+        Assert.That(audit.Requests.Select(r => r.Metadata?.ToString()), Is.All.Contain("Approved by the installer"));
+    }
+
+    [Test]
+    public async Task ARetryDoesNotApproveWhatAnUpdateAskedAfterTheInstall()
+    {
+        // The install recorded server:read; an update in the retry window then asked for backups:run. The deploy never started.
+        var (service, _, appId) = await CreateAsync(AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRun);
+
+        await ServerConsoleProvisioningService.RunRecordedInstallerAsync(
+            service, () => Task.FromResult<Guid?>(appId), () => throw new InvalidOperationException(), appId,
+            EssentialCatalogBootstrapService.ParseApproved(AppPermissionApproval.ServerRead),
+            (_, _) => throw new InvalidOperationException("already marked"),
+            _ => Task.FromResult(true), _ => Task.CompletedTask, NullLogger.Instance, default, "Server Keeper");
 
         var statuses = (await service.GetStatusAsync(appId, default)).ToDictionary(s => s.Permission, s => s.Status);
         Assert.That(statuses[AppPermissionApproval.ServerRead], Is.EqualTo(AppPermissionStatuses.Approved));
@@ -95,9 +114,29 @@ public sealed class ServerConsoleProvisioningTests
     {
         var (service, _, appId) = await CreateAsync(AppPermissionApproval.ServerRead);
 
-        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, EssentialCatalogBootstrapService.ParseApproved(null), default);
+        await ServerConsoleProvisioningService.RunRecordedInstallerAsync(
+            service, () => Task.FromResult<Guid?>(appId), () => throw new InvalidOperationException(), appId,
+            EssentialCatalogBootstrapService.ParseApproved(null), (_, _) => Task.CompletedTask,
+            _ => Task.FromResult(true), _ => Task.CompletedTask, NullLogger.Instance, default, "Server Keeper");
 
         Assert.That((await service.GetStatusAsync(appId, default)).Single().Status, Is.EqualTo(AppPermissionStatuses.Pending));
+    }
+
+    [Test]
+    public async Task TheOneButtonInstallApprovesEverythingTheAppAsksButLeavesAnInstalledAppAlone()
+    {
+        var all = new[] { AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRead, AppPermissionApproval.BackupsRun,
+            AppPermissionApproval.RunnerMaintain, AppPermissionApproval.AppsReadStatus };
+        var (service, _, appId) = await CreateAsync(all);
+        Task<Guid> Run(Guid? found) => ServerConsoleProvisioningService.RunOneButtonAsync(
+            service, () => Task.FromResult(found), () => Task.FromResult(appId),
+            _ => Task.FromResult(false), _ => Task.CompletedTask, NullLogger.Instance, default, "Server Keeper");
+
+        await Run(appId);
+        Assert.That((await service.GetStatusAsync(appId, default)).Select(s => s.Status), Is.All.EqualTo(AppPermissionStatuses.Pending), "already installed: nothing approved");
+
+        await Run(null);
+        Assert.That((await service.GetStatusAsync(appId, default)).Select(s => s.Status), Is.All.EqualTo(AppPermissionStatuses.Approved));
     }
 
     [Test]

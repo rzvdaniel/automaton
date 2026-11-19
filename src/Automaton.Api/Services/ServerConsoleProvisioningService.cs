@@ -53,19 +53,26 @@ public sealed class ServerConsoleProvisioningService(
     public async Task<Guid> ProvisionAsync(Guid userId, CatalogEntryDto? entry, CancellationToken token)
     {
         entry ??= await EntryAsync(userId, AppId, token) ?? throw new InvalidOperationException("Server Console is not available in the official catalog.");
-        var installedNow = false;
-        return await RunAsync(
+        return await RunOneButtonAsync(
+            permissions,
             find: () => FindInstalledAsync(userId, entry, token),
-            install: async () =>
-            {
-                var id = (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id;
-                installedNow = true;
-                return id;
-            },
-            approve: appId => installedNow ? ApprovePendingAsync(permissions, appId, null, token, InstallerReason) : Task.CompletedTask,
+            install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
             needsDeploy: appId => NeedsDeployAsync(db, appId, token),
             deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
             logger, token, entry.Name);
+    }
+
+    /// <summary>The one-button install: approves everything the app asks right after installing it, and nothing for an app that was already there.</summary>
+    internal static async Task<Guid> RunOneButtonAsync(
+        AppPermissionService permissions, Func<Task<Guid?>> find, Func<Task<Guid>> install,
+        Func<Guid, Task<bool>> needsDeploy, Func<Guid, Task> deploy, ILogger logger, CancellationToken token, string appName)
+    {
+        var installedNow = false;
+        return await RunAsync(
+            find,
+            async () => { var id = await install(); installedNow = true; return id; },
+            appId => installedNow ? ApprovePendingAsync(permissions, appId, null, token) : Task.CompletedTask,
+            needsDeploy, deploy, logger, token, appName);
     }
 
     /// <summary>
@@ -102,11 +109,24 @@ public sealed class ServerConsoleProvisioningService(
     public async Task<Guid?> ProvisionByInstallerAsync(
         Guid userId, CatalogEntryDto entry, Guid? installedAppId, IReadOnlyCollection<string> approvedAtInstall,
         Func<Guid, IReadOnlyCollection<string>, Task> markInstalled, CancellationToken token)
+        => await RunRecordedInstallerAsync(
+            permissions,
+            find: () => FindInstalledAsync(userId, entry, token),
+            install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
+            installedAppId, approvedAtInstall, markInstalled,
+            needsDeploy: appId => NeedsDeployAsync(db, appId, token),
+            deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
+            logger, token, entry.Name);
+
+    /// <summary>The installer pass with its record: a new install notes what the app has pending and approves exactly that; a retry approves only the noted set.</summary>
+    internal static async Task<Guid?> RunRecordedInstallerAsync(
+        AppPermissionService permissions, Func<Task<Guid?>> find, Func<Task<Guid>> install, Guid? installedAppId,
+        IReadOnlyCollection<string> approvedAtInstall, Func<Guid, IReadOnlyCollection<string>, Task> markInstalled,
+        Func<Guid, Task<bool>> needsDeploy, Func<Guid, Task> deploy, ILogger logger, CancellationToken token, string appName)
     {
         var allowed = approvedAtInstall;
         return await RunInstallerAsync(
-            find: () => FindInstalledAsync(userId, entry, token),
-            install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
+            find, install,
             markInstalled: async appId =>
             {
                 allowed = (await permissions.GetStatusAsync(appId, token)).Where(s => s.Status == AppPermissionStatuses.Pending).Select(s => s.Permission).ToArray();
@@ -114,9 +134,7 @@ public sealed class ServerConsoleProvisioningService(
             },
             installedAppId,
             approve: appId => ApprovePendingAsync(permissions, appId, allowed, token, InstallerReason),
-            needsDeploy: appId => NeedsDeployAsync(db, appId, token),
-            deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
-            logger, token, entry.Name);
+            needsDeploy, deploy, logger, token, appName);
     }
 
     internal static async Task<Guid?> RunInstallerAsync(
