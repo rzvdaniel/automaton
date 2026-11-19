@@ -70,6 +70,25 @@ public sealed class AppDeletionCleanupTests
     }
 
     [Test]
+    public async Task AppDeletion_WhoseRunnerWasDeleted_RemovesTheAppWithoutRunnerCleanup()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        var runner = fixture.AddRunner(online: false);
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(t => t.WebAppId == fixture.App.Id);
+        target.ExecutionRunnerId = runner.Id;
+        target.Status = DeploymentTargetStatus.Running;
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.Runners.Remove(await fixture.Db.Runners.SingleAsync(r => r.Id == runner.Id));
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.ChangeTracker.Clear();
+
+        await DeleteAppAsync(fixture, false);
+
+        Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.False);
+        Assert.That(fixture.Commands.Requests, Is.Empty);
+    }
+
+    [Test]
     public async Task WholeAppCleanup_OfflineAssignedRunnerPreventsStorageDeletionEvenWithoutRuntime()
     {
         await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);

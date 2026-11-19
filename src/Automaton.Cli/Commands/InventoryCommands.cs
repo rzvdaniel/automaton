@@ -53,8 +53,12 @@ internal static class InventoryCommands
             }
             catch (Exception exception)
             {
-                if (asJson) CliJson.Write(new { success = false, error = exception.Message });
-                else Console.Error.WriteLine(exception.Message);
+                var message = exception.Message;
+                if (System.Text.RegularExpressions.Regex.IsMatch(message, "must be online|did not answer", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                    && !context.ParseResult.GetValueForOption(abandon))
+                    message += " If the Runner is offline for good, delete anyway with --abandon-offline-runtime (an administrator; the container and its data may stay on that machine).";
+                if (asJson) CliJson.Write(new { success = false, error = message });
+                else Console.Error.WriteLine(message);
                 context.ExitCode = 1;
             }
         });
