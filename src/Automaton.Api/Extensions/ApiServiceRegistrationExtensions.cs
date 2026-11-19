@@ -294,6 +294,8 @@ internal static class ApiAuthorizationRegistration
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.SecurityReadPolicy, AppPermissionApproval.SecurityRead);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.SecurityManagePolicy, AppPermissionApproval.SecurityManage);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.AppsReadStatusPolicy, AppPermissionApproval.AppsReadStatus);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.ServerCleanupPolicy, AppPermissionApproval.ServerCleanup);
@@ -653,6 +655,7 @@ internal static class ApiRunnerRegistration
         services.AddScoped<Automaton.Api.ServerHealth.HostHealthReportService>();
         services.AddScoped<Automaton.Api.ServerHealth.ServerHealthService>();
         services.AddScoped<Automaton.Api.ServerHealth.Fail2BanReadService>();
+        services.AddScoped<Automaton.Api.ServerHealth.Fail2BanManageService>();
         services.AddScoped<Automaton.Api.Services.AppStatusReadService>();
         services.AddScoped<Automaton.Api.ServerHealth.AppDiskUsageService>();
         services.AddSingleton<Automaton.Api.ServerHealth.LatestReleaseClient>();
