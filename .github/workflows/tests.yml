@@ -73,8 +73,10 @@ jobs:
       - run: bash -n docker/install/migrate-to-postgresql.sh
       - run: bash -n docker/install/update-from-request.sh
       - run: bash -n docker/install/restart-from-request.sh
+      - run: bash -n docker/install/os-update-from-request.sh
       - run: python3 scripts/tests/server-update-request-test.py
       - run: python3 scripts/tests/server-restart-request-test.py
+      - run: python3 scripts/tests/server-os-update-request-test.py
       - run: bash scripts/tests/deploy-website-test.sh
       - run: bash -n scripts/uninstall-automaton.sh
       - run: bash scripts/tests/uninstall-automaton-test.sh

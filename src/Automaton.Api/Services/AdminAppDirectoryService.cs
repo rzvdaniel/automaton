@@ -122,6 +122,7 @@ public sealed class AdminAppDirectoryService(ApplicationDbContext db, AdminAutho
         AppPermissionApproval.BackupsRead,
         AppPermissionApproval.BackupsRun,
         AppPermissionApproval.ServerRestart,
+        AppPermissionApproval.ServerUpdateOs,
         AppPermissionApproval.ServerRead,
         AppPermissionApproval.NotifyEmail,
         AppPermissionApproval.ServerCleanup,

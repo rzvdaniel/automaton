@@ -8,6 +8,7 @@ public sealed class AppPermissionApproval
     public const string BackupsRead = "backups:read";
     public const string BackupsRun = "backups:run";
     public const string ServerRestart = "server:restart";
+    public const string ServerUpdateOs = "server:update-os";
     public const string ServerRead = "server:read";
     public const string AppsReadStatus = "apps:read-status";
     public const string SecurityRead = "security:read";

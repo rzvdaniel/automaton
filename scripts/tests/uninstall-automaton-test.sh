@@ -14,7 +14,7 @@ printf '#!/bin/sh\necho "docker called" >> "%s/docker-called"\nexit 1\n' "$t" > 
 printf 'name: automaton-server\n' > "$t/inst/compose.yaml"; touch "$t/inst/update.sh"
 mkdir -p "$t/generic" "$t/cfg2"; printf 'name: other\n' > "$t/generic/compose.yaml"; touch "$t/generic/update.sh" "$t/cfg2/x"
 printf 'name: automaton-server\n' > "$t/nomark.yaml"
-mkdir -p "$t/systemd"; touch "$t/systemd/automaton-restart.path" "$t/systemd/automaton-restart.service"
+mkdir -p "$t/systemd"; touch "$t/systemd/automaton-restart.path" "$t/systemd/automaton-restart.service" "$t/systemd/automaton-os-update.path" "$t/systemd/automaton-os-update.service"
 touch "$t/other/precious" "$t/inst/x" "$t/inst/backups/b" "$t/cfg/installation.json" "$t/cfg/secrets/backup-key" "$t/cfg/secrets/s" "$t/state/update/u" "$t/state/apps/data"
 expect_fail --install-dir /opt/../etc --config-dir "$t/cfg"
 expect_fail --install-dir "$t/inst/../other" --config-dir "$t/cfg"
@@ -47,7 +47,7 @@ expect_ok --install-dir "$t/inst" --config-dir "$t/cfg"
 [[ -e $t/inst/x ]] && { echo "FAIL: install file kept"; fail=1; }
 [[ -e $t/inst/backups/b && -e $t/cfg/secrets/backup-key && -e $t/state/apps/data ]] || { echo "FAIL: data not kept"; fail=1; }
 [[ -e $t/state/update/u || -e $t/cfg/secrets/s ]] && { echo "FAIL: state/secret kept"; fail=1; }
-[[ -e $t/systemd/automaton-restart.path || -e $t/systemd/automaton-restart.service ]] && { echo "FAIL: restart units kept"; fail=1; }
+[[ -e $t/systemd/automaton-restart.path || -e $t/systemd/automaton-restart.service || -e $t/systemd/automaton-os-update.path || -e $t/systemd/automaton-os-update.service ]] && { echo "FAIL: restart units kept"; fail=1; }
 expect_ok --install-dir "$t/inst" --config-dir "$t/cfg"   # second run: nothing left to remove
 grep -q 'except backups' "$t/out" && { echo "FAIL: '(except backups)' printed with nothing removed"; fail=1; }
 grep -q 'volumes could not be checked' "$t/out" || { echo "FAIL: keep mode silent about unchecked volumes"; fail=1; }
