@@ -297,6 +297,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     private static readonly TimeSpan ProbeInterval = TimeSpan.FromMinutes(2);
     private DateTimeOffset nextProbe = DateTimeOffset.MinValue;
     private int probeOffset;
+    private readonly Dictionary<DeploymentRuntimeKey, int> probedRestartCounts = [];
 
     /// <summary>
     /// A container Docker keeps restarting (a crash loop) is reported failed, and live again once it stays up.
@@ -323,7 +324,15 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             {
                 var identity = await InspectAsync(item.AppId, item.TargetId, item.ContainerId, cancellationToken);
                 if (!identity.Exists) continue;
-                if (identity.Restarting) registry.MarkFailed(item.AppId, item.TargetId, "The app keeps crashing and Docker keeps restarting it.");
+                // Docker resets its restart delay once a container ran 10 s, so a slow crash is seen as running: the count catches it.
+                var key = new DeploymentRuntimeKey(item.AppId, item.TargetId);
+                bool countedRestart;
+                lock (gate)
+                {
+                    countedRestart = probedRestartCounts.TryGetValue(key, out var last) && identity.RestartCount > last;
+                    probedRestartCounts[key] = identity.RestartCount;
+                }
+                if (identity.Restarting || countedRestart) registry.MarkFailed(item.AppId, item.TargetId, "The app keeps crashing and Docker keeps restarting it.");
                 else if (identity.Running) registry.MarkRecovered(item.AppId, item.TargetId);
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)

@@ -243,12 +243,13 @@ public sealed partial class HostContainerExecutionService
             RejectDuplicateProperties(root);
             var inspection = ReadContainerIdentity(root, scope);
             if (inspection.Failure is not null) return inspection.Failure;
-            if (!discoverEndpoint) return CreateInspectionResponse(inspection.Id!, inspection.Running, inspection.Labels!, inspection.Restarting);
+            var restartCount = root.TryGetProperty("RestartCount", out var count) && count.TryGetInt32(out var n) ? n : 0;
+            if (!discoverEndpoint) return CreateInspectionResponse(inspection.Id!, inspection.Running, inspection.Labels!, inspection.Restarting) with { RestartCount = restartCount };
             if (inspection.Labels!.ContainsKey("com.automaton.compose-candidate"))
                 return HostContainerComposeProjectExecutor.ReadComposeEndpoint(
                     root, inspection.Id!, inspection.Running, inspection.Labels,
                     HostContainerRuntimeEndpoint.GetPrivateRuntimeHostAddress());
-            return HostContainerRuntimeEndpoint.Read(root, inspection.Id!, inspection.Running, inspection.Labels!, inspection.Restarting);
+            return HostContainerRuntimeEndpoint.Read(root, inspection.Id!, inspection.Running, inspection.Labels!, inspection.Restarting) with { RestartCount = restartCount };
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
         {

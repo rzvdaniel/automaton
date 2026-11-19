@@ -161,7 +161,7 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
     {
         var result = await ExecuteExistingAsync(scope, HostContainerOperationKinds.InspectContainer, id, cancellationToken);
         EnsureSuccess(result);
-        return new(result.ContainerId, result.Exists, result.Running, result.Labels, result.HostAddress, result.HostPort, result.ContainerPort, result.Restarting);
+        return new(result.ContainerId, result.Exists, result.Running, result.Labels, result.HostAddress, result.HostPort, result.ContainerPort, result.Restarting, result.RestartCount);
     }
 
     public async Task<bool> IsRunningAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)

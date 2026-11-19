@@ -113,6 +113,8 @@ public sealed record HostContainerExecutionResponse
     public bool Running { get; init; }
     /// <summary>Docker is waiting to start the container again after it exited (a crash loop).</summary>
     public bool Restarting { get; init; }
+    /// <summary>Docker's count of automatic restarts of this container.</summary>
+    public int RestartCount { get; init; }
     public bool Exists { get; init; }
     public string? HostAddress { get; init; }
     public int? HostPort { get; init; }
