@@ -64,6 +64,37 @@ public sealed class ServerConsoleProvisioningTests
     }
 
     [Test]
+    public async Task TheInstallerApprovesEveryPendingPermissionAndRecordsItsReason()
+    {
+        var (service, audit, appId) = await CreateAsync(
+            AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRead, AppPermissionApproval.BackupsRun,
+            AppPermissionApproval.RunnerMaintain, AppPermissionApproval.AppsReadStatus);
+
+        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, null, default, "Approved by the installer when it installed this default app");
+
+        Assert.That((await service.GetStatusAsync(appId, default)).Select(s => s.Status), Is.All.EqualTo(AppPermissionStatuses.Approved));
+        Assert.That(audit.Requests.Select(r => r.Metadata?.ToString()), Is.All.Contain("Approved by the installer"));
+    }
+
+    [Test]
+    public async Task OnlyTheFirstInstallApprovesAndALaterUpdateLeavesNewPermissionsPending()
+    {
+        var steps = new List<string>();
+        Task<Guid?> Run(Guid? found, Guid? marked) => ServerConsoleProvisioningService.RunInstallerAsync(
+            () => Task.FromResult(found), () => Task.FromResult(Guid.NewGuid()), _ => Task.CompletedTask, marked,
+            _ => { steps.Add("approve"); return Task.CompletedTask; }, _ => Task.FromResult(false), _ => Task.CompletedTask,
+            NullLogger.Instance, default, "Server Keeper");
+
+        var appId = (await Run(null, null))!.Value;
+        Assert.That(steps, Is.EqualTo(new[] { "approve" }));
+        steps.Clear();
+        await Run(appId, appId);
+        Assert.That(steps, Is.Empty, "a later pass over the marked app never approves");
+        await Run(appId, null);
+        Assert.That(steps, Is.Empty, "an app the administrator installed is never approved");
+    }
+
+    [Test]
     public async Task AFreshInstallInstallsApprovesAndDeploysInOrder()
     {
         var steps = new List<string>();

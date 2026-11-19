@@ -8,7 +8,7 @@ namespace Automaton.Api.Services;
 
 /// <summary>
 /// Installs a default app (Server Console, VictoriaLogs) from the official catalog for one system administrator (private to them), approves the
-/// permissions it asks for (only those listed here, each recorded in the audit log) and deploys it. Used for a new
+/// permissions it asks for (the installer approves all on the first install, a person's one-button install only those listed here; each is recorded in the audit log) and deploys it. Used for a new
 /// server and for the one-button install on an existing server; it never runs without one of those two triggers.
 /// </summary>
 public sealed class ServerConsoleProvisioningService(
@@ -33,6 +33,8 @@ public sealed class ServerConsoleProvisioningService(
         [AppId] = ApprovedPermissions,
         ["victorialogs"] = ["logs:receive"]
     };
+
+    private const string InstallerReason = "Approved by the installer when it installed this default app";
 
     private const string Reason = "Default app provisioning for the system administrator";
 
@@ -92,7 +94,7 @@ public sealed class ServerConsoleProvisioningService(
             find: () => FindInstalledAsync(userId, entry, token),
             install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
             markInstalled, installedAppId,
-            approve: appId => ApprovePendingAsync(permissions, appId, DefaultApps.GetValueOrDefault(entry.Id, []), token),
+            approve: appId => ApprovePendingAsync(permissions, appId, null, token, InstallerReason),
             needsDeploy: appId => NeedsDeployAsync(db, appId, token),
             deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
             logger, token, entry.Name);
@@ -106,8 +108,12 @@ public sealed class ServerConsoleProvisioningService(
         // Marked: only that very app is ours (a removed one, or one the administrator installed again, is left alone).
         if (installedAppId is { } marked ? existing != marked : existing is not null) return null;
         var appId = existing ?? await install();
+        var installedNow = existing is null;
         if (installedAppId is null) await markInstalled(appId);
-        return await RunAsync(() => Task.FromResult<Guid?>(appId), install, approve, needsDeploy, deploy, logger, token, appName);
+        // Approval belongs to the first install: this pass, or a retry of one that never got its first deploy. Permissions an
+        // update asks for later (the app was deployed by then) stay pending, as for any app.
+        var firstInstall = installedNow || await needsDeploy(appId);
+        return await RunAsync(() => Task.FromResult<Guid?>(appId), install, firstInstall ? approve : _ => Task.CompletedTask, needsDeploy, deploy, logger, token, appName);
     }
 
     /// <summary>
@@ -123,11 +129,12 @@ public sealed class ServerConsoleProvisioningService(
     public async Task<bool> IsRunningAsync(Guid appId, CancellationToken token)
         => await db.AppDeploymentTargets.AnyAsync(target => target.WebAppId == appId && target.Status == DeploymentTargetStatus.Running, token);
 
-    internal static async Task ApprovePendingAsync(AppPermissionService permissions, Guid appId, IReadOnlyCollection<string> allowed, CancellationToken token)
+    /// <summary>Approves the pending permissions in <paramref name="allowed"/>, or every pending one when it is null.</summary>
+    internal static async Task ApprovePendingAsync(AppPermissionService permissions, Guid appId, IReadOnlyCollection<string>? allowed, CancellationToken token, string reason = Reason)
     {
         var statuses = await permissions.GetStatusAsync(appId, token);
-        foreach (var status in statuses.Where(s => s.Status == AppPermissionStatuses.Pending && allowed.Contains(s.Permission)))
-            await permissions.SetApprovalAsync(appId, status.Permission, true, token, Reason);
+        foreach (var status in statuses.Where(s => s.Status == AppPermissionStatuses.Pending && (allowed is null || allowed.Contains(s.Permission))))
+            await permissions.SetApprovalAsync(appId, status.Permission, true, token, reason);
     }
 
     private async Task<CatalogEntryDto?> EntryAsync(Guid userId, string id, CancellationToken token)
