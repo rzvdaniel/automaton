@@ -58,6 +58,8 @@ public class HubService : IRuntimeTunnelReconnectRequester
             {
                 var registry = serviceProvider.GetService<RunnerRuntimeRegistry>();
                 await new RunnerLogSinkSync(registry, logger).SyncAsync(hub, token);
+                if (serviceProvider.GetService<RunnerRuntimeContainerManager>() is { } manager)
+                    await manager.ProbeRestartingAsync(token);
                 await new RunnerRuntimeStateSync(registry, logger).SyncAsync(hub, token);
             });
         this.appActionExecutionService = appActionExecutionService;

@@ -271,7 +271,7 @@ public sealed class DockerContainerRuntimeBoundaryTests
         var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
             new DockerContainerRuntime.CommandResult(
                 0,
-                $"container-1|true|{{\"com.automaton.managed\":\"true\",\"com.automaton.app-id\":\"{appId}\",\"com.automaton.deployment-target-id\":\"{targetId}\",\"com.automaton.runtime-kind\":\"generic\",\"image.label\":\"a;b|c=d\"}}",
+                $"container-1|true|false|{{\"com.automaton.managed\":\"true\",\"com.automaton.app-id\":\"{appId}\",\"com.automaton.deployment-target-id\":\"{targetId}\",\"com.automaton.runtime-kind\":\"generic\",\"image.label\":\"a;b|c=d\"}}",
                 string.Empty)));
 
         var identity = await runtime.InspectAsync("container-1");
