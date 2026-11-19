@@ -6,14 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-/// <summary>Installs Server Console, the one app every server needs, after an administrator and Runner exist. The other apps are only recommended on Home.</summary>
+/// <summary>Installs the default apps (Server Keeper, VictoriaLogs) once, after an administrator and Runner exist; an app removed later is never installed again. The other apps are only recommended on Home.</summary>
 public sealed class EssentialCatalogBootstrapService(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
     ILogger<EssentialCatalogBootstrapService> logger) : BackgroundService
 {
     internal const string CompletionKey = "Apps.Catalog.EssentialsInstalled";
-    internal static readonly string[] AppIds = [ServerConsoleProvisioningService.AppId];
+    internal static readonly string[] AppIds = [.. ServerConsoleProvisioningService.DefaultApps.Keys];
     private const long LockId = 827;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

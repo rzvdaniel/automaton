@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Automaton.Api.Services;
 
 /// <summary>
-/// Installs Server Console from the official catalog for one system administrator (private to them), approves the
+/// Installs a default app (Server Console, VictoriaLogs) from the official catalog for one system administrator (private to them), approves the
 /// permissions it asks for (only those listed here, each recorded in the audit log) and deploys it. Used for a new
 /// server and for the one-button install on an existing server; it never runs without one of those two triggers.
 /// </summary>
@@ -21,15 +21,25 @@ public sealed class ServerConsoleProvisioningService(
 {
     public const string AppId = "server-console";
 
-    /// <summary>The only permissions approved at install. The app reads server state, sends email and reads the cleanup.</summary>
+    /// <summary>The only permissions approved at install of Server Keeper. The app reads server state, sends email and reads the cleanup.</summary>
     internal static readonly string[] ApprovedPermissions = ["server:read", "notify:email", "server:cleanup"];
 
-    private const string Reason = "Server Console provisioning for the system administrator";
+    /// <summary>
+    /// The apps a new server gets on its first Runner: only apps that work with no setup, each with the only permissions
+    /// approved for it. Add an app here when it ships and needs no setup; existing servers are never changed by this list.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string[]> DefaultApps = new Dictionary<string, string[]>
+    {
+        [AppId] = ApprovedPermissions,
+        ["victorialogs"] = ["logs:receive"]
+    };
+
+    private const string Reason = "Default app provisioning for the system administrator";
 
     /// <summary>The user's own Server Console app (installed from the official catalog entry), if any.</summary>
     public async Task<Guid?> FindAsync(Guid userId, CancellationToken token)
     {
-        var entry = await EntryAsync(userId, token);
+        var entry = await EntryAsync(userId, AppId, token);
         if (entry is null) return null;
         return await FindInstalledAsync(userId, entry, token);
     }
@@ -37,14 +47,14 @@ public sealed class ServerConsoleProvisioningService(
     /// <summary>Installs when missing, approves still-pending permissions and deploys a newly installed app. Impersonate or run as <paramref name="userId"/>.</summary>
     public async Task<Guid> ProvisionAsync(Guid userId, CatalogEntryDto? entry, CancellationToken token)
     {
-        entry ??= await EntryAsync(userId, token) ?? throw new InvalidOperationException("Server Console is not available in the official catalog.");
+        entry ??= await EntryAsync(userId, AppId, token) ?? throw new InvalidOperationException("Server Console is not available in the official catalog.");
         return await RunAsync(
             find: () => FindInstalledAsync(userId, entry, token),
             install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
-            approve: appId => ApprovePendingAsync(permissions, appId, token),
+            approve: appId => ApprovePendingAsync(permissions, appId, DefaultApps.GetValueOrDefault(entry.Id, []), token),
             needsDeploy: appId => NeedsDeployAsync(db, appId, token),
             deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
-            logger, token);
+            logger, token, entry.Name);
     }
 
     /// <summary>
@@ -83,19 +93,19 @@ public sealed class ServerConsoleProvisioningService(
     public async Task<bool> IsRunningAsync(Guid appId, CancellationToken token)
         => await db.AppDeploymentTargets.AnyAsync(target => target.WebAppId == appId && target.Status == DeploymentTargetStatus.Running, token);
 
-    internal static async Task ApprovePendingAsync(AppPermissionService permissions, Guid appId, CancellationToken token)
+    internal static async Task ApprovePendingAsync(AppPermissionService permissions, Guid appId, IReadOnlyCollection<string> allowed, CancellationToken token)
     {
         var statuses = await permissions.GetStatusAsync(appId, token);
-        foreach (var status in statuses.Where(s => s.Status == AppPermissionStatuses.Pending && ApprovedPermissions.Contains(s.Permission)))
+        foreach (var status in statuses.Where(s => s.Status == AppPermissionStatuses.Pending && allowed.Contains(s.Permission)))
             await permissions.SetApprovalAsync(appId, status.Permission, true, token, Reason);
     }
 
-    private async Task<CatalogEntryDto?> EntryAsync(Guid userId, CancellationToken token)
+    private async Task<CatalogEntryDto?> EntryAsync(Guid userId, string id, CancellationToken token)
     {
         var response = await catalog.GetAsync(userId, false, token,
             new CatalogQuery { Source = CatalogSourceStore.OfficialId, PageSize = CatalogQuery.MaximumPageSize });
         if (response.Unavailable || response.Stale) return null;
-        var entry = response.Apps.SingleOrDefault(app => app.Id == AppId && app.SourceId == CatalogSourceStore.OfficialId);
+        var entry = response.Apps.SingleOrDefault(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId);
         return entry is null || entry.RequiresNewerServer ? null : entry;
     }
 

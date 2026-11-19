@@ -47,15 +47,32 @@ public class HomeNeedsYouService(
     /// <summary>How long after the first-Runner install the "Installed for you" note is offered.</summary>
     internal static readonly TimeSpan InstalledNoteWindow = TimeSpan.FromDays(14);
 
-    /// <summary>The note that tells an administrator of a fresh server what was installed for them: Server Console, once, while the install is recent.</summary>
+    /// <summary>The note that tells an administrator of a fresh server what was installed for them: the default apps still installed, while the install is recent.</summary>
     internal static HomeCard? InstalledForYouCard(IEnumerable<CatalogEntryDto> apps, DateTime? installedAtUtc)
     {
         if (installedAtUtc is not { } at || DateTime.UtcNow - at > InstalledNoteWindow) return null;
-        var app = apps.FirstOrDefault(item => item.Id == ServerConsoleProvisioningService.AppId
-            && item.SourceId == CatalogSourceStore.OfficialId && item.InstalledAppId is not null);
-        return app is null ? null : new(HomeCardKeys.InstalledForYou, HomeCardKeys.InstalledForYou, "info", $"Installed for you: {app.Name}",
-            $"{app.Name} watches this server and is ready to use. To remove it, open its Settings > Danger Zone.", "Open", $"/apps/{app.InstalledAppId}", true, app.InstalledAppId);
+        var installed = apps.Where(item => ServerConsoleProvisioningService.DefaultApps.ContainsKey(item.Id)
+            && item.SourceId == CatalogSourceStore.OfficialId && item.InstalledAppId is not null).ToList();
+        if (installed.Count == 0) return null;
+        var names = string.Join(", ", installed.Select(app => app.Name));
+        return new(HomeCardKeys.InstalledForYou, HomeCardKeys.InstalledForYou, "info", $"Installed for you: {names}",
+            $"{names} {(installed.Count == 1 ? "is" : "are")} ready to use. To remove one, open its Settings > Danger Zone; it is not installed again.",
+            "Open", $"/apps/{installed[0].InstalledAppId}", true, installed[0].InstalledAppId);
     }
+
+    /// <summary>
+    /// Backups record only a local folder, never a destination, so "backups never left this server" is judged by the
+    /// Offsite Backup app: offered while the official catalog has it and the administrator has not installed it.
+    /// </summary>
+    internal static HomeCard? OffsiteBackupCard(IEnumerable<CatalogEntryDto> apps)
+    {
+        var app = apps.FirstOrDefault(item => item.Id == OffsiteBackupAppId && item.SourceId == CatalogSourceStore.OfficialId);
+        return app is null || app.InstalledAppId is not null || app.RequiresNewerServer ? null
+            : new(HomeCardKeys.OffsiteBackup, HomeCardKeys.OffsiteBackup, "warn", "Your backups only live on this server",
+                "If the server is lost, so are its backups. Offsite Backup copies them to another place.", "Install Offsite Backup", "/apps/catalog", true, null, app.Id);
+    }
+
+    internal const string OffsiteBackupAppId = "offsite-backup";
 
     /// <summary>One optional card per recommended official-catalog app the administrator has not installed.</summary>
     private async Task<List<HomeCard>> CatalogCardsAsync(Guid userId, CancellationToken token)
@@ -66,6 +83,7 @@ public class HomeNeedsYouService(
                 new CatalogQuery { Source = CatalogSourceStore.OfficialId, PageSize = CatalogQuery.MaximumPageSize });
             if (response.Unavailable) return [];
             var cards = RecommendedCards(response.Apps);
+            if (OffsiteBackupCard(response.Apps) is { } offsite) cards.Insert(0, offsite);
             var installedAt = await db.Settings.AsNoTracking().Where(setting => setting.Key == EssentialCatalogBootstrapService.CompletionKey)
                 .Select(setting => (DateTime?)setting.UpdatedAt).FirstOrDefaultAsync(token);
             if (InstalledForYouCard(response.Apps, installedAt) is { } note) cards.Insert(0, note);

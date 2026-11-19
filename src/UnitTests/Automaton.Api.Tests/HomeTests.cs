@@ -148,6 +148,29 @@ public sealed class HomeTests
     }
 
     [Test]
+    public void InstalledForYouNoteNamesEveryDefaultAppStillInstalled()
+    {
+        var apps = new[] { Entry("server-console", installed: Guid.NewGuid()), Entry("victorialogs", installed: Guid.NewGuid()), Entry("gate-keeper") };
+        var note = HomeNeedsYouService.InstalledForYouCard(apps, DateTime.UtcNow)!;
+        Assert.That(note.Title, Is.EqualTo("Installed for you: server-console, victorialogs"));
+        var removed = HomeNeedsYouService.InstalledForYouCard([apps[0], Entry("victorialogs")], DateTime.UtcNow)!;
+        Assert.That(removed.Title, Is.EqualTo("Installed for you: server-console"), "a removed app is not listed");
+    }
+
+    [Test]
+    public void OffsiteBackupCardShowsUntilOffsiteBackupIsInstalled()
+    {
+        var card = HomeNeedsYouService.OffsiteBackupCard([Entry("offsite-backup", recommended: false)])!;
+        Assert.That(card.Key, Is.EqualTo("offsite-backup"));
+        Assert.That(card.CatalogAppId, Is.EqualTo("offsite-backup"));
+        Assert.That(HomeCardKeys.CanDismiss(card.Key), Is.True);
+        Assert.That(HomeNeedsYouService.OffsiteBackupCard([Entry("offsite-backup", installed: Guid.NewGuid())]), Is.Null, "installed");
+        Assert.That(HomeNeedsYouService.OffsiteBackupCard([Entry("offsite-backup", newer: true)]), Is.Null, "needs a newer server");
+        Assert.That(HomeNeedsYouService.OffsiteBackupCard([Entry("offsite-backup", source: "custom")]), Is.Null, "official only");
+        Assert.That(HomeNeedsYouService.OffsiteBackupCard([Entry("heartbeat")]), Is.Null, "not in the catalog");
+    }
+
+    [Test]
     public void RecommendedCardsFollowTheCatalogOrder()
     {
         var cards = HomeNeedsYouService.RecommendedCards([Entry("last"), Entry("second", order: 2), Entry("server-console", order: 1)]);

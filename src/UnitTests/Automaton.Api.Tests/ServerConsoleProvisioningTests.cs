@@ -22,7 +22,7 @@ public sealed class ServerConsoleProvisioningTests
         var (service, audit, appId) = await CreateAsync(
             AppPermissionApproval.ServerRead, AppPermissionApproval.NotifyEmail, AppPermissionApproval.ServerCleanup);
 
-        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, default);
+        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, ServerConsoleProvisioningService.ApprovedPermissions, default);
 
         var statuses = await service.GetStatusAsync(appId, default);
         Assert.That(statuses.Select(s => (s.Permission, s.Status)), Is.EquivalentTo(new[]
@@ -33,7 +33,7 @@ public sealed class ServerConsoleProvisioningTests
         }));
         Assert.That(audit.Requests, Has.Count.EqualTo(3));
         Assert.That(audit.Requests.Select(r => r.EventType), Is.All.EqualTo(AuditEventTypes.AppPermissionApproved));
-        Assert.That(audit.Requests.Select(r => r.Metadata?.ToString()), Is.All.Contain("Server Console provisioning"));
+        Assert.That(audit.Requests.Select(r => r.Metadata?.ToString()), Is.All.Contain("provisioning"));
     }
 
     [Test]
@@ -43,7 +43,7 @@ public sealed class ServerConsoleProvisioningTests
         await service.SetApprovalAsync(appId, AppPermissionApproval.ServerCleanup, false, default);
         audit.Requests.Clear();
 
-        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, default);
+        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, ServerConsoleProvisioningService.ApprovedPermissions, default);
 
         var statuses = (await service.GetStatusAsync(appId, default)).ToDictionary(s => s.Permission, s => s.Status);
         Assert.That(statuses[AppPermissionApproval.ServerRead], Is.EqualTo(AppPermissionStatuses.Approved));
@@ -56,7 +56,7 @@ public sealed class ServerConsoleProvisioningTests
     {
         var (service, _, appId) = await CreateAsync(AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRead);
 
-        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, default);
+        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, ServerConsoleProvisioningService.ApprovedPermissions, default);
 
         var statuses = (await service.GetStatusAsync(appId, default)).ToDictionary(s => s.Permission, s => s.Status);
         Assert.That(statuses[AppPermissionApproval.BackupsRead], Is.EqualTo(AppPermissionStatuses.Pending), "a permission outside the list needs a person");
