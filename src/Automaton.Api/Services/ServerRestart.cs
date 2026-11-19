@@ -79,6 +79,13 @@ public static class ServerRestart
         var update = await InstallationUpdate.ReadAsync(configuration, now, token);
         if (update.RequestPending || (update.Run?.State is "starting" or "running" && !update.Stale))
             return "A server update is running. Try again when it has finished.";
+        if (await ServerOsUpdate.IsActiveAsync(configuration, now, token))
+            return "An OS update is running. Try again when it has finished.";
+        return await DeployOrRunnerBusyReasonAsync(db, now, token);
+    }
+
+    private static async Task<string?> DeployOrRunnerBusyReasonAsync(ApplicationDbContext db, DateTimeOffset now, CancellationToken token)
+    {
         var since = now.UtcDateTime - StuckAfter;
         if (await db.DeploymentOperations.AsNoTracking().AnyAsync(operation =>
                 (operation.Status == DeploymentOperationStatuses.Pending || operation.Status == DeploymentOperationStatuses.Running)

@@ -17,6 +17,7 @@ umask 077
 install_dir=/opt/automaton-server
 restart_dir=${AUTOMATON_RESTART_DIR:-/var/lib/automaton/restart}
 update_dir=${AUTOMATON_UPDATE_DIR:-/var/lib/automaton/update}
+os_update_dir=${AUTOMATON_OS_UPDATE_DIR:-/var/lib/automaton/os-update}
 systemd_dir=${AUTOMATON_SYSTEMD_DIR:-/etc/systemd/system}
 mode=run
 while (($#)); do
@@ -119,6 +120,11 @@ busy_reason() {
         echo 'A server update is running.'; return
     fi
     exec 6<&- 2>/dev/null || true
+    # Rebooting while apt or dpkg runs can leave packages half-installed.
+    if [[ -e "$os_update_dir/.lock" ]] && ! { exec 5<"$os_update_dir/.lock" && flock -n 5; }; then
+        echo 'An OS update is running.'; return
+    fi
+    exec 5<&- 2>/dev/null || true
     case "$(python3 - "$update_dir/status/status.json" <<'PY' 2>/dev/null
 import json, sys
 try:
