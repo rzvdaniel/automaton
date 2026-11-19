@@ -73,7 +73,7 @@ public sealed class EssentialCatalogBootstrapTests
     public async Task AnAppRemovedDuringARetryIsNotInstalledOrApprovedAgain()
     {
         var steps = new List<string>();
-        Assert.That(await Installer(find: null, installedByInstaller: true, steps), Is.Null);
+        Assert.That(await Installer(find: null, marked: Guid.NewGuid(), steps), Is.Null);
         Assert.That(steps, Is.Empty);
     }
 
@@ -81,7 +81,7 @@ public sealed class EssentialCatalogBootstrapTests
     public async Task AnAppTheAdministratorInstalledIsNeverApproved()
     {
         var steps = new List<string>();
-        Assert.That(await Installer(find: Guid.NewGuid(), installedByInstaller: false, steps), Is.Null, "VictoriaLogs installed by the administrator keeps logs:receive pending");
+        Assert.That(await Installer(find: Guid.NewGuid(), marked: null, steps), Is.Null, "VictoriaLogs installed by the administrator keeps logs:receive pending");
         Assert.That(steps, Is.Empty);
     }
 
@@ -89,18 +89,23 @@ public sealed class EssentialCatalogBootstrapTests
     public async Task ANewInstallIsMarkedBeforeItIsApprovedAndARetryOnlyFinishesIt()
     {
         var steps = new List<string>();
-        Assert.That(await Installer(find: null, installedByInstaller: false, steps), Is.Not.Null);
+        Assert.That(await Installer(find: null, marked: null, steps), Is.Not.Null);
         Assert.That(steps, Is.EqualTo(new[] { "install", "mark", "approve", "deploy" }));
 
         steps.Clear();
-        await Installer(find: Guid.NewGuid(), installedByInstaller: true, steps);
+        var ours = Guid.NewGuid();
+        await Installer(find: ours, marked: ours, steps);
         Assert.That(steps, Is.EqualTo(new[] { "approve", "deploy" }));
+
+        steps.Clear();
+        Assert.That(await Installer(find: Guid.NewGuid(), marked: ours, steps), Is.Null, "removed, then installed again by the administrator");
+        Assert.That(steps, Is.Empty);
     }
 
-    private static Task<Guid?> Installer(Guid? find, bool installedByInstaller, List<string> steps) =>
+    private static Task<Guid?> Installer(Guid? find, Guid? marked, List<string> steps) =>
         ServerConsoleProvisioningService.RunInstallerAsync(
             find: () => Task.FromResult(find), install: () => { steps.Add("install"); return Task.FromResult(Guid.NewGuid()); },
-            markInstalled: () => { steps.Add("mark"); return Task.CompletedTask; }, installedByInstaller,
+            markInstalled: _ => { steps.Add("mark"); return Task.CompletedTask; }, marked,
             approve: _ => { steps.Add("approve"); return Task.CompletedTask; }, needsDeploy: _ => Task.FromResult(true),
             deploy: _ => { steps.Add("deploy"); return Task.CompletedTask; },
             Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, default, "VictoriaLogs");

@@ -136,10 +136,11 @@ public sealed class EssentialCatalogBootstrapService(
             foreach (var entry in available)
             {
                 var key = InstalledKeyPrefix + entry.Id;
-                var installed = await db.Settings.AnyAsync(s => s.Key == key, cancellationToken);
-                var appId = await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionByInstallerAsync(adminId, entry, installed, async () =>
+                var marker = await db.Settings.Where(s => s.Key == key).Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
+                Guid? installedAppId = marker is null ? null : Guid.TryParse(marker, out var parsed) ? parsed : Guid.Empty;
+                var appId = await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionByInstallerAsync(adminId, entry, installedAppId, async newAppId =>
                 {
-                    db.Settings.Add(new Setting { Key = key, Value = "true" });
+                    db.Settings.Add(new Setting { Key = key, Value = newAppId.ToString() });
                     await db.SaveChangesAsync(cancellationToken);
                 }, cancellationToken);
                 if (appId is not null) logger.LogInformation("Installed or completed default catalog app {AppName} for the first administrator.", entry.Name);
