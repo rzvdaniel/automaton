@@ -193,7 +193,8 @@ security_packages() {
 
 # Runs apt and keeps the existing configuration files. Output goes to the log file, never to the status values.
 run_apt() {
-    local -a conf=(-y -o Dpkg::Options::=--force-confold)
+    # DPkg::Lock::Timeout waits for another apt or dpkg (for example unattended-upgrades after boot) instead of failing.
+    local -a conf=(-y -o Dpkg::Options::=--force-confold -o DPkg::Lock::Timeout=300)
     if [[ "$SCOPE" == all ]]; then
         apt_env "$apt" "${conf[@]}" upgrade >>"$log_file" 2>&1
         return
