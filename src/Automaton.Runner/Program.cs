@@ -36,10 +36,7 @@ public class Program
     {
         var configuration = GetConfiguration(args);
 
-        Log.Logger = new LoggerConfiguration()
-            .ReadFrom.Configuration(configuration)
-            .AddOtlpIfConfigured(configuration, "automaton-runner")
-            .CreateLogger();
+        Log.Logger = CreateLogger(configuration);
 
         try
         {
@@ -252,6 +249,12 @@ public class Program
             .AddCommandLine(args)
             .Build();
     }
+
+    internal static Serilog.Core.Logger CreateLogger(IConfiguration configuration)
+        => new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration)
+            .AddOtlpIfConfigured(configuration, "automaton-runner")
+            .CreateLogger();
 
     internal static IHostBuilder CreateHostBuilder(string[] args)
         => RunnerHostBuilder.Create(args);
