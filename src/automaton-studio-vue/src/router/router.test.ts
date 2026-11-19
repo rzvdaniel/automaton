@@ -67,6 +67,14 @@ describe('studio router', () => {
     expect(router.resolve(path).name).toBe(name)
   })
 
+  it.each([
+    ['/catalog', 'apps-catalog'],
+    ['/backups', 'admin-backups'],
+  ])('sends the menu name %s to its page', (path, name) => {
+    const matched = router.resolve(path).matched
+    expect(matched[matched.length - 1]?.redirect).toEqual({ name })
+  })
+
   it.each(['organizations', 'admin-users'])('sends the %s list to the People page', (name) => {
     expect(router.getRoutes().find((route) => route.name === name)?.redirect).toEqual({ name: 'people' })
   })
