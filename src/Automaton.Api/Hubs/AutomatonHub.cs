@@ -200,6 +200,22 @@ public class AutomatonHub : Hub
         return await services.GetRequiredService<LogSinkService>().SyncAsync(runner.Id, host, runtimes, Context.ConnectionAborted);
     }
 
+    /// <summary>Runner → API: runtimes it could not start (and ones that came back), so Studio shows them down instead of live.</summary>
+    public async Task ReportRuntimeStates(RuntimeStateReport[]? reports)
+    {
+        var runner = GetRunner();
+        var services = Context.GetHttpContext()!.RequestServices;
+        try { await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Rejected runtime state report for runner {RunnerId}", runner.Id);
+            Context.Abort();
+            return;
+        }
+        await services.GetRequiredService<AppDeploymentTargetStateService>()
+            .ApplyRuntimeReportsAsync(runner.Id, reports, Context.ConnectionAborted);
+    }
+
     public async Task Heartbeat()
     {
         var runner = GetRunner();

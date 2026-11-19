@@ -149,6 +149,7 @@ public sealed partial class HostContainerExecutionService
             or HostContainerOperationKinds.RemoveComposeProject
             or HostContainerOperationKinds.StartContainer
             or HostContainerOperationKinds.StopContainer
+            or HostContainerOperationKinds.EnableAutoRestart
             or HostContainerOperationKinds.InspectContainer
             or HostContainerOperationKinds.GetContainerLogs
             or HostContainerOperationKinds.RemoveContainer

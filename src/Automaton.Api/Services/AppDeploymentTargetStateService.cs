@@ -1,11 +1,45 @@
 using Automaton.Api.Data;
 using Automaton.Api.Enums;
+using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
 public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataContext)
 {
+    private const int MaxRuntimeReports = 200;
+
+    /// <summary>
+    /// A Runner could not start a runtime it hosts, or got one back: a running target of this Runner becomes Failed (Studio
+    /// shows it down with Retry), and a Failed one running again becomes Running. Other states, such as a deployment in
+    /// progress, and targets of other Runners are left alone.
+    /// </summary>
+    public async Task ApplyRuntimeReportsAsync(
+        Guid runnerId, IReadOnlyList<RuntimeStateReport>? reports, CancellationToken cancellationToken = default)
+    {
+        if (reports is not { Count: > 0 }) return;
+        var byTarget = reports.Take(MaxRuntimeReports).GroupBy(item => item.DeploymentTargetId).ToDictionary(group => group.Key, group => group.Last());
+        var targets = await dataContext.AppDeploymentTargets
+            .Where(target => byTarget.Keys.Contains(target.Id) && target.ExecutionRunnerId == runnerId)
+            .ToListAsync(cancellationToken);
+        foreach (var target in targets)
+        {
+            var report = byTarget[target.Id];
+            if (report.AppId != target.WebAppId) continue;
+            if (report.Failed && target.Status == DeploymentTargetStatus.Running)
+            {
+                target.Status = DeploymentTargetStatus.Failed;
+                target.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+            else if (!report.Failed && target.Status == DeploymentTargetStatus.Failed && target.ActiveDeploymentOperationId is null)
+            {
+                target.Status = DeploymentTargetStatus.Running;
+                target.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+        await dataContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<DeploymentTargetStatus> ClaimMutationAsync(
         Guid appId,
         Guid deploymentTargetId,
