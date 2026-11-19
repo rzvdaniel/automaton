@@ -233,6 +233,41 @@ public sealed class AppCatalogTests
         });
     }
 
+    private static string PublisherJson(string publisher) => """
+        {"schemaVersion":1,"repo":"owner/apps","apps":[
+          {"id":"backup","name":"Backup","summary":"Copies backups.","category":"Maintenance","folder":"maintenance/backup",
+           "commit":"0123456789abcdef0123456789abcdef01234567","minServerVersion":"0.2.31","permissions":[],"publisher":PUBLISHER}]}
+        """.Replace("PUBLISHER", publisher);
+
+    [Test]
+    public async Task Get_ShowsThePublisher_AndTicksOnlyAutomatonInTheOfficialCatalog()
+    {
+        await using var db = CreateDb();
+        var official = await CreateService(db, new FakeHandler(_ => Respond(PublisherJson("""{"name":"Automaton","logo":"https://example.com/a.svg"}"""), null)), version: "0.2.31")
+            .GetAsync(Guid.NewGuid(), refresh: true, default);
+        await using var db2 = CreateDb();
+        var other = await CreateService(db2, new FakeHandler(_ => Respond(PublisherJson("""{"name":"Acme","logo":"javascript:alert(1)"}"""), null)), version: "0.2.31")
+            .GetAsync(Guid.NewGuid(), refresh: true, default);
+        await using var db3 = CreateDb();
+        var none = await CreateService(db3, new FakeHandler(_ => Respond(CatalogJson, null)), version: "0.2.31")
+            .GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(official.Apps.Single().Publisher, Is.EqualTo(new CatalogPublisherDto("Automaton", "https://example.com/a.svg", true)));
+            Assert.That(other.Apps.Single().Publisher, Is.EqualTo(new CatalogPublisherDto("Acme", null, false)));
+            Assert.That(none.Apps.Single().Publisher, Is.Null);
+        });
+    }
+
+    [Test]
+    public void PublisherOf_NeverTicksACustomSourceNamedAutomaton()
+    {
+        var app = new AppCatalogService.CatalogApp { Publisher = new AppCatalogService.CatalogPublisher { Name = "Automaton" } };
+        var custom = new CatalogSourceStore.SourceRef("x", "Mine", "me/apps", "main", false, null);
+        Assert.That(AppCatalogService.PublisherOf(app, custom)!.Verified, Is.False);
+    }
+
     private static string MovedJson(string from = "rzvdaniel/automaton-apps") => """
         {"schemaVersion":1,"repo":"owner/store","apps":[
           {"id":"goat","name":"GoatCounter","summary":"Stats.","category":"Analytics","folder":"analytics/goatcounter",

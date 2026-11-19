@@ -20,6 +20,8 @@ import type { AppDiskUsage } from '../types/apps.types'
 import AppRestartButton from './AppRestartButton.vue'
 import AppRunsOn from './AppRunsOn.vue'
 import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
+import PublisherBadge from './PublisherBadge.vue'
+import { usePublishers } from '../composables/usePublishers'
 import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { DeploymentTargetStatus } from '../types/apps.types'
@@ -40,6 +42,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-changed': []; 'targets-changed': [] }>()
 const toast = useToast()
+const { publisherOf } = usePublishers()
+const publisher = computed(() => publisherOf(props.app.id))
 
 const secretNames = ref<string[] | null>(null)
 const update = ref<CatalogUpdate | null>(null)
@@ -166,6 +170,7 @@ const source = computed(() => {
           <template v-else>{{ part.text }}</template>
         </template>
       </p>
+      <p v-if="publisher" class="status__publisher"><PublisherBadge :publisher="publisher" /></p>
     </section>
 
     <section v-if="update" class="card" aria-label="Update available" data-testid="update-card">

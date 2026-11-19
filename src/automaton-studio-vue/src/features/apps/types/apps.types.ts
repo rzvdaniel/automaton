@@ -549,6 +549,13 @@ export interface GitAppSource {
   commit: string
 }
 
+/** Who made a catalog app. `verified` is set by the server: Automaton's own apps in the official catalog. */
+export interface CatalogPublisher {
+  name: string
+  logo?: string | null
+  verified: boolean
+}
+
 export interface CatalogEntry extends GitAppSource {
   id: string
   name: string
@@ -563,6 +570,7 @@ export interface CatalogEntry extends GitAppSource {
   customSource: boolean
   tags?: string[]
   icon?: string | null
+  publisher?: CatalogPublisher | null
 }
 
 /** The filters and page the Catalog tab sends; the server filters and pages. */

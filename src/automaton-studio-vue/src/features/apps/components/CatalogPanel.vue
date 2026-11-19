@@ -12,6 +12,7 @@ import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import AppFilterBar, { type FilterPill } from './AppFilterBar.vue'
 import AppRow from './AppRow.vue'
+import PublisherBadge from './PublisherBadge.vue'
 import CatalogSources from './CatalogSources.vue'
 import { appsService } from '../services/apps.service'
 import { getStudioApplicationUrl } from '../utils/public-app-url'
@@ -234,6 +235,7 @@ async function installFromUrl() {
               <span class="catalog-update__pill">{{ isRetryOnly(updateOf(app)!) ? 'Last deploy failed' : 'Update available' }}</span>
               <template v-if="updateOf(app)!.deployFailed"> {{ shortReason(updateOf(app)!.deployError) }}</template>
             </span>
+            <PublisherBadge v-if="app.publisher" :publisher="app.publisher" />
             <span v-if="access(app)" class="catalog-access">{{ access(app) }}</span>
           </template>
           <template #tag>

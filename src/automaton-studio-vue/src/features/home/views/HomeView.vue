@@ -11,6 +11,8 @@ import { appState } from '@/features/apps/utils/app-list-display'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { serverConsoleService } from '@/features/server/services/server-console.service'
 import type { HomeCard } from '../types/home.types'
+import PublisherBadge from '@/features/apps/components/PublisherBadge.vue'
+import { usePublishers } from '@/features/apps/composables/usePublishers'
 import HomeAppCard from '../components/HomeAppCard.vue'
 import { useHomeStore } from '../stores/home.store'
 import { appFacts, moved, mosaic, type MosaicPlace } from '../utils'
@@ -19,6 +21,7 @@ import { usePermissionRequests } from '@/features/admin/composables/usePermissio
 
 const router = useRouter()
 const store = useHomeStore()
+const { publisherOf } = usePublishers()
 const auth = useAuthStore()
 const toast = useToast()
 
@@ -301,6 +304,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
             <RouterLink :to="`/apps/${item.app.id}`" class="pin-row" :aria-label="`Open ${item.app.name}`" data-testid="pinned-row">
               <AppMark :id="item.app.id" :name="item.app.name" :image-url="item.app.thumbnailUrl" />
               <span class="pin__name">{{ item.app.name }}</span>
+              <PublisherBadge v-if="publisherOf(item.app.id)" :publisher="publisherOf(item.app.id)!" />
               <span class="pin__state" :class="`pin__state--${appState(item.app).tone}`">{{ appState(item.app).label }}</span>
               <span class="pin-row__summary">{{ item.card?.card.status ?? '' }}</span>
             </RouterLink>
@@ -325,6 +329,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
               <span class="pin__name">{{ item.app.name }}</span>
               <span class="pin__state" :class="`pin__state--${appState(item.app).tone}`">{{ appState(item.app).label }}</span>
             </RouterLink>
+            <PublisherBadge v-if="publisherOf(item.app.id)" :publisher="publisherOf(item.app.id)!" />
             <HomeAppCard v-if="item.card" :app-id="item.app.id" :item="item.card" />
             <dl class="pin__facts">
               <div v-for="fact in appFacts(item.app)" :key="fact.label">

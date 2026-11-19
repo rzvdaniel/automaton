@@ -370,7 +370,18 @@ public sealed class AppCatalogService(
         Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id
             : app.MovedFrom is { } from && installed.TryGetValue(InstalledKey(from.Repo, from.Folder), out var previous) ? previous : null;
         return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended, app.RecommendedOrder);
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended, app.RecommendedOrder, PublisherOf(app, source));
+    }
+
+    internal const string AutomatonPublisher = "Automaton";
+
+    internal static CatalogPublisherDto? PublisherOf(CatalogApp app, CatalogSourceStore.SourceRef source)
+    {
+        var name = app.Publisher?.Name?.Trim();
+        if (string.IsNullOrEmpty(name)) return null;
+        var logo = app.Publisher?.Logo?.Trim();
+        var safeLogo = !string.IsNullOrEmpty(logo) && (logo.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || logo.StartsWith("/", StringComparison.Ordinal) && !logo.StartsWith("//", StringComparison.Ordinal)) ? logo : null;
+        return new CatalogPublisherDto(name.Length > 80 ? name[..80] : name, safeLogo, source.Official && string.Equals(name, AutomatonPublisher, StringComparison.Ordinal));
     }
 
     internal static Version? ParseVersion(string? text)
@@ -385,6 +396,12 @@ public sealed class AppCatalogService(
 
     /// <summary>The repository and folder an app was installed from before it moved, and where it is pinned now.</summary>
     public sealed record PinnedApp(string Repo, string Folder, string Commit);
+
+    internal sealed class CatalogPublisher
+    {
+        public string? Name { get; set; }
+        public string? Logo { get; set; }
+    }
 
     internal sealed class MovedFromRef
     {
@@ -411,6 +428,7 @@ public sealed class AppCatalogService(
         public List<string> Permissions { get; set; } = [];
         public List<string> Tags { get; set; } = [];
         public string? Icon { get; set; }
+        public CatalogPublisher? Publisher { get; set; }
         /// <summary>Set when the app used to live in the official catalog: servers that installed it there update it from here.</summary>
         public MovedFromRef? MovedFrom { get; set; }
         /// <summary>Suggested to administrators on Studio Home until installed. Set in the catalog file, not in code.</summary>
