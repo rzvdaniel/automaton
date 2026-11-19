@@ -198,7 +198,8 @@ do_reboot() {
     if [[ -n "$reason" ]]; then
         MESSAGE="The restart was cancelled: $reason Request it again when that has finished."
         write_status refused
-        return 1
+        # Succeed so the transient unit does not stay "failed" and block the next scheduled restart.
+        return 0
     fi
     reboot_now
 }
@@ -244,6 +245,7 @@ run_request() {
     if ((delay > 0)); then
         write_status scheduled
         if [[ -n "${AUTOMATON_RESTART_TEST:-}" ]]; then echo "delay=$delay" > "$restart_dir/scheduled"; return 0; fi
+        systemctl reset-failed automaton-restart-scheduled.service automaton-restart-scheduled.timer >/dev/null 2>&1 || true
         systemd-run --quiet --unit=automaton-restart-scheduled --on-active="${delay}s" --timer-property=AccuracySec=1s \
             /usr/bin/env bash "$install_dir/restart-from-request.sh" --reboot --install-dir "$install_dir" \
             || { MESSAGE='The restart could not be scheduled.'; write_status refused; return 1; }

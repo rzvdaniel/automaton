@@ -106,6 +106,13 @@ public sealed class ServerRestartTests
         Assert.That(backup.Item2, Does.Contain("backup"));
         File.Delete(Path.Combine(host.Backups, "request.json"));
 
+        Directory.CreateDirectory(Path.Combine(host.Root, "none"));
+        File.WriteAllText(Path.Combine(host.Root, "none", "backup.running"), "");
+        var running = await Ask();
+        Assert.That(running.Item1, Is.EqualTo(ServerRestartResult.Busy), "a backup that already started");
+        Assert.That(running.Item2, Does.Contain("backup"));
+        File.Delete(Path.Combine(host.Root, "none", "backup.running"));
+
         File.WriteAllText(Path.Combine(host.UpdateStatus, "status.json"), "{\"state\":\"running\",\"startedAtUtc\":\"" + Now.AddMinutes(-5).ToString("o") + "\"}");
         var update = await Ask();
         Assert.That(update.Item1, Is.EqualTo(ServerRestartResult.Busy));

@@ -98,7 +98,7 @@ class RestartFromRequestTests(unittest.TestCase):
         self.backup_lock.write_text('')
         with open(self.backup_lock) as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            self.assertNotEqual(self.run_script('--reboot').returncode, 0)
+            self.assertEqual(self.run_script('--reboot').returncode, 0, 'a refusal must not leave the transient unit failed')
         self.assertFalse((self.restart / 'reboot-called').exists())
         self.assertEqual(self.status()['state'], 'refused')
         self.assertEqual(self.run_script('--reboot').returncode, 0)

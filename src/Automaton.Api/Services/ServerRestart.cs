@@ -74,8 +74,8 @@ public static class ServerRestart
     public static async Task<string?> BusyReasonAsync(
         ApplicationDbContext db, IConfiguration configuration, DateTimeOffset now, CancellationToken token)
     {
-        if ((await InstallationBackups.ReadAsync(configuration, token)).RequestPending)
-            return "A backup is waiting to start. Try again when it has finished.";
+        if ((await InstallationBackups.ReadAsync(configuration, token)).RequestPending || BackupIsRunning(configuration, now))
+            return "A backup is running. Try again when it has finished.";
         var update = await InstallationUpdate.ReadAsync(configuration, now, token);
         if (update.RequestPending || (update.Run?.State is "starting" or "running" && !update.Stale))
             return "A server update is running. Try again when it has finished.";
@@ -132,6 +132,13 @@ public static class ServerRestart
         {
             try { File.Delete(temporary); } catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
         }
+    }
+
+    // backup.sh keeps this marker while it runs; one older than a backup can last is a leftover of a crash or reboot.
+    private static bool BackupIsRunning(IConfiguration configuration, DateTimeOffset now)
+    {
+        var marker = Path.Combine(configuration["Installation:StatusDirectory"] ?? InstallationBackups.DefaultStatusDirectory, "backup.running");
+        return File.Exists(marker) && now - File.GetLastWriteTimeUtc(marker) < StuckAfter;
     }
 
     /// <summary>When the host last booted: the btime line of /proc/stat, which a container shares with its host.</summary>
