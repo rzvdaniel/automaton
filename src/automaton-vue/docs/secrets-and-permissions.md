@@ -31,7 +31,7 @@ An app folder linked to an app on your server ([Your first app](./getting-starte
 
 ## Request a platform permission
 
-Declare `application.permissions` (`backups:read`, `server:read`, `security:read` (fail2ban bans, read-only), `server:cleanup`, `backups:run`, `server:restart` and `notify:email`), deploy, then show the state:
+Declare `application.permissions` (`backups:read`, `server:read`, `security:read` (fail2ban bans, read-only), `security:manage` (unban or allowlist an address), `server:cleanup`, `backups:run`, `server:restart` and `notify:email`), deploy, then show the state:
 
 ```bash
 automaton permissions status

@@ -43,7 +43,9 @@ Create a to-do item for each step and tick them off.
 4. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes, including the "Check after
    release" list. Start step 5 while CI runs. An empty check list means the run has not started; it is not a pass.
 5. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
-   applies, at most two rounds.
+   applies, at most two rounds. For a high tier, spawn a separate `automaton-reviewer` subagent for the security pass; it
+   posts only with `~/bin/gh-warden pr review ...` (the main review uses the default `gh` login; never post both with
+   one login). Without `gh-warden` (other machines), stop and say the security pass needs a different login.
 6. **Merge.** Run `python3 .agents/tools/merge-gate.py <N> --merge`; it squash-merges and deletes the branch only on
    PASS. Never run `gh pr merge` yourself. Then watch the `main` run for your commit. Also hold anything the owner said to hold.
 7. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).

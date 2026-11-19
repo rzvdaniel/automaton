@@ -70,10 +70,30 @@ public sealed class RunnerRuntimeRegistry
             reports[new DeploymentRuntimeKey(appId, deploymentTargetId)] = new(appId, deploymentTargetId, true, error);
     }
 
+    /// <summary>A probed runtime that is running normally again: a failure recorded by the probe is cleared and sent once.</summary>
+    public void MarkRecovered(Guid appId, Guid deploymentTargetId)
+    {
+        var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
+        lock (gate)
+            if (reports.TryGetValue(key, out var report) && report.Failed)
+                reports[key] = report with { Failed = false, Error = null };
+    }
+
     public IReadOnlyList<RunnerRuntimeStateReport> PendingReports()
     {
         lock (gate)
             return reports.Values.ToArray();
+    }
+
+    /// <summary>
+    /// Pending reports plus a "running" report for every other registered runtime, so a target the server marked
+    /// failed (a failed deploy while the previous version kept running) follows the runtime. Memory only, no inspection.
+    /// </summary>
+    public IReadOnlyList<RunnerRuntimeStateReport> StateReports()
+    {
+        lock (gate)
+            return reports.Values.Concat(registrations.Keys.Where(key => !reports.ContainsKey(key))
+                .Select(key => new RunnerRuntimeStateReport(key.AppId, key.DeploymentTargetId, false, null))).ToArray();
     }
 
     /// <summary>Drops the recovered entries the server has received; a failed one is sent again until the runtime is back.</summary>

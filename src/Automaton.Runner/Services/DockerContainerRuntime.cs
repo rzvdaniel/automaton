@@ -54,7 +54,9 @@ public sealed record DockerContainerIdentity(
     IReadOnlyDictionary<string, string> Labels,
     string? HostAddress = null,
     int? HostPort = null,
-    int? ContainerPort = null);
+    int? ContainerPort = null,
+    bool Restarting = false,
+    int RestartCount = 0);
 
 /// <summary>
 /// Translates only the explicitly configured Runner workspace mount from the
@@ -315,7 +317,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
     public async Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
     {
         var result = await ExecuteAsync(
-            ["inspect", "--format", "{{.Id}}|{{.State.Running}}|{{json .Config.Labels}}", containerIdOrName],
+            ["inspect", "--format", "{{.Id}}|{{.State.Running}}|{{.State.Restarting}}|{{.RestartCount}}|{{json .Config.Labels}}", containerIdOrName],
             TimeSpan.FromSeconds(15), cancellationToken, allowFailure: true);
         if (result.ExitCode != 0)
         {
@@ -323,14 +325,16 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
                 return new DockerContainerIdentity(containerIdOrName, false, false, new Dictionary<string, string>());
             throw new InvalidOperationException($"Docker inspect failed for managed container '{containerIdOrName}': {result.CombinedOutput.Trim()}");
         }
-        var parts = result.StandardOutput.Trim().Split('|', 3);
-        if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[0]))
+        var parts = result.StandardOutput.Trim().Split('|', 5);
+        if (parts.Length != 5 || string.IsNullOrWhiteSpace(parts[0]))
             throw MalformedInspection(containerIdOrName, result.StandardOutput);
         var running = ParseRunningState(parts[1], containerIdOrName);
+        var restarting = ParseRunningState(parts[2], containerIdOrName);
+        _ = int.TryParse(parts[3], out var restartCount);
         Dictionary<string, string> labels;
         try
         {
-            labels = JsonSerializer.Deserialize<Dictionary<string, string>>(parts[2])
+            labels = JsonSerializer.Deserialize<Dictionary<string, string>>(parts[4])
                 ?? throw new JsonException("Docker returned null labels.");
         }
         catch (JsonException)
@@ -345,7 +349,8 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
             parts[0].Trim(),
             true,
             running,
-            labels);
+            labels,
+            Restarting: restarting, RestartCount: restartCount);
     }
 
     public async Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)

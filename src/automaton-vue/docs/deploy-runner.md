@@ -95,7 +95,7 @@ automaton runners delete main --abandon-offline --yes     # deletes the Runner a
 automaton apps delete my-app --abandon-offline-runtime --yes  # deletes one app whose Runner is offline
 ```
 
-In Studio: **Runners**, the red cross on an offline Runner ("Delete offline Runner and its apps"), or **Delete** on an app whose Runner is offline and confirm "Delete without cleanup".
+In Studio: **Runners**, the red cross on an offline Runner ("Delete offline Runner and its apps"), or **Delete** on an app whose Runner is offline and confirm "Delete anyway" (offered in the app's Settings and the apps list after the delete fails because the Runner is offline). Each such deletion is recorded in the audit log with the reason "Runner offline". When the Runner is already deleted, deleting its app needs no Runner at all.
 
 The apps, their public addresses, secrets and server-side data are removed and the Runner registration is revoked, with an audit entry. Nothing is removed on the machine: the result lists each skipped environment, and containers and data may remain there until you clean it by hand. A Runner that is online is refused; use the normal removal above. The API is `DELETE /api/runners/{id}?abandonOffline=true` and `DELETE /api/apps/{id}?abandonOfflineRuntimes=true`.
 

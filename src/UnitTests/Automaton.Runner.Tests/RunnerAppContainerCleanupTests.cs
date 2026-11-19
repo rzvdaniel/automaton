@@ -37,7 +37,7 @@ public sealed class RunnerAppContainerCleanupTests
             calls.Add(args.ToArray());
             if (args[0] == "ps") return Task.FromResult(new DockerContainerRuntime.CommandResult(0, removed ? "" : id, ""));
             if (args[0] == "rm") { removed = true; return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "", "")); }
-            return Task.FromResult(new DockerContainerRuntime.CommandResult(0, id + "|true|" + JsonSerializer.Serialize(labels), ""));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(0, id + "|true|false|0|" + JsonSerializer.Serialize(labels), ""));
         });
         var manager = new RunnerRuntimeContainerManager(new RunnerWorkspaceService(), new RunnerRuntimeRegistry(),
             runtime, NullLogger<RunnerRuntimeContainerManager>.Instance);

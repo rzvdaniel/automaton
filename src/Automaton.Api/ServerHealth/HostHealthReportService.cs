@@ -37,6 +37,16 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
         return Parse(json);
     }
 
+    /// <summary>The Machine Management Runner whose fail2ban report is the newest and shows fail2ban running, or null.</summary>
+    public async Task<Guid?> LatestFail2BanRunnerAsync(CancellationToken token)
+    {
+        var rows = await db.Runners.AsNoTracking()
+            .Where(item => item.ApplicationProfile == RunnerApplicationProfiles.MachineManagement && item.MachineHostHealthJson != null && item.DeletionRequestedAtUtc == null)
+            .OrderByDescending(item => item.MachineHostHealthMeasuredAtUtc)
+            .Select(item => new { item.Id, item.MachineHostHealthJson }).Take(20).ToListAsync(token);
+        return rows.FirstOrDefault(row => Parse(row.MachineHostHealthJson)?.Fail2Ban is { Running: true })?.Id;
+    }
+
     public static MachineHostHealth? Parse(string? json)
     {
         if (json is null) return null;

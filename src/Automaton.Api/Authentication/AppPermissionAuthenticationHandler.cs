@@ -13,6 +13,7 @@ public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOpt
     public const string ServerRestartPolicy = "AppPermission:server:restart";
     public const string ServerReadPolicy = "AppPermission:server:read";
     public const string SecurityReadPolicy = "AppPermission:security:read";
+    public const string SecurityManagePolicy = "AppPermission:security:manage";
     public const string AppsReadStatusPolicy = "AppPermission:apps:read-status";
     public const string ServerCleanupPolicy = "AppPermission:server:cleanup";
     public const string RunnerMaintainPolicy = "AppPermission:runner:maintain";

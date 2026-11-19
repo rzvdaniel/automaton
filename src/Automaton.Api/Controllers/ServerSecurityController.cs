@@ -8,7 +8,7 @@ namespace Automaton.Api.Controllers;
 /// <summary>
 /// Read-only fail2ban state for apps with an approved <c>security:read</c> permission (and system administrators).
 /// The Machine Management Runner reads fail2ban's database on the host; apps get no socket, firewall or shell access.
-/// Unban and allowlist (<c>security:manage</c>) are not offered yet.
+/// Unban and allowlist (<c>security:manage</c>) are in <see cref="ServerSecurityManageController"/>.
 /// </summary>
 [ApiController]
 [Route("api/server/security")]

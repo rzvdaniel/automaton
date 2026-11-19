@@ -119,4 +119,51 @@ public sealed class HostCleanupServiceTests
         Assert.ThrowsAsync<InvalidOperationException>(() => Create(_ => (1, "no")).RebootAsync(default));
         Assert.That(Create(a => a[0] == "inspect" ? (0, "i") : (1, "boom")).OsUpdateAsync(default).Result.Succeeded, Is.False);
     }
+
+    private static (int, string) Fail2Ban(IReadOnlyList<string> a) => a[0] == "inspect" ? (0, "sha256:own\n")
+        : a.Contains("status") ? (0, "Status\n|- Number of jail:\t2\n`- Jail list:\tsshd, automaton-scanner\n") : (0, "ok");
+
+    [Test]
+    public async Task Unban_RunsFixedFail2BanCommandsPerJail_WithoutAShell()
+    {
+        var result = await Create(Fail2Ban).Fail2BanUnbanAsync(new("203.0.113.9"), default);
+        var unbans = calls.Where(call => call.Contains("unbanip")).ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Jails, Is.EqualTo(new[] { "sshd", "automaton-scanner" }));
+            Assert.That(unbans, Has.Count.EqualTo(2));
+            Assert.That(unbans[0].TakeLast(5), Is.EqualTo(new[] { "fail2ban-client", "set", "sshd", "unbanip", "203.0.113.9" }));
+            Assert.That(calls.SelectMany(call => call), Does.Not.Contain("sh").And.Not.Contain("-c"));
+        });
+    }
+
+    [Test]
+    public async Task Allowlist_AddsTheAddressToEveryJailAndLiftsItsBan()
+    {
+        var result = await Create(Fail2Ban).Fail2BanAllowlistAsync(new("2001:db8::1"), default);
+        Assert.That(result.Jails, Has.Count.EqualTo(2));
+        Assert.That(calls.Count(call => call.Contains("addignoreip")), Is.EqualTo(2));
+        Assert.That(calls.Count(call => call.Contains("unbanip")), Is.EqualTo(2));
+    }
+
+    [TestCase("")]
+    [TestCase("-1")]
+    [TestCase("203.0.113.0/24")]
+    [TestCase("example.com")]
+    [TestCase("1.2.3.4 ; reboot")]
+    [TestCase("fe80::1%eth0")]
+    public void AnythingButOneAddress_IsRefusedBeforeDockerRuns(string value)
+    {
+        Assert.Throws<InvalidDataException>(() => HostCleanupService.ValidAddress(value));
+        Assert.ThrowsAsync<InvalidDataException>(() => Create(Fail2Ban).Fail2BanUnbanAsync(new(value), default));
+        Assert.That(calls, Is.Empty);
+    }
+
+    [Test]
+    public void FailingFail2Ban_IsAnError_AndJailNamesAreRead()
+    {
+        Assert.ThrowsAsync<InvalidOperationException>(() => Create(a => a[0] == "inspect" ? (0, "i") : (1, "down")).Fail2BanUnbanAsync(new("203.0.113.9"), default));
+        Assert.ThrowsAsync<InvalidOperationException>(() => Create(a => a[0] == "inspect" ? (0, "i") : a.Contains("status") ? (0, "`- Jail list:\tsshd") : (1, "not banned")).Fail2BanUnbanAsync(new("203.0.113.9"), default));
+        Assert.That(HostCleanupService.ParseJails("x\n`- Jail list:\ta, b;rm, c-d\n"), Is.EqualTo(new[] { "a", "c-d" }));
+    }
 }

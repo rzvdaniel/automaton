@@ -286,6 +286,105 @@ public sealed class ServerHealthTests
         Assert.That(ApplicationContractValidator.SupportedPermissions, Does.Contain("security:read"));
     }
 
+    private sealed class FakeCommands : Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands
+    {
+        public List<(Guid Runner, string Kind, string Payload)> Sent { get; } = [];
+        public Task<System.Text.Json.JsonElement> SendAsync(Guid runnerId, Guid actor, AppActionCommand command, TimeSpan timeout, CancellationToken token)
+        {
+            Sent.Add((runnerId, command.Kind, command.Payload.ToString()));
+            return Task.FromResult(System.Text.Json.JsonSerializer.SerializeToElement(new Fail2BanActionResult("203.0.113.9", ["sshd"])));
+        }
+    }
+
+    private sealed class FakeAudit : Automaton.Api.Services.Interfaces.IAuditEventService
+    {
+        public List<(string Action, string Message, string Metadata)> Events { get; } = [];
+        public Task WriteAsync(Automaton.Api.Models.AuditEventWriteRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task WriteAsync(string action, string entityType, Guid? entityId, string message, object? metadata = null, string outcome = "Success", bool failOnError = false, CancellationToken cancellationToken = default)
+        {
+            Events.Add((action, message, System.Text.Json.JsonSerializer.Serialize(metadata)));
+            return Task.CompletedTask;
+        }
+    }
+
+    [Test]
+    public async Task UnbanAndAllowlist_GoToTheRunnerThatReportsFail2Ban_AndAreAudited()
+    {
+        await using var db = CreateDb();
+        var (runner, key) = SeedMachineRunner(db);
+        await db.SaveChangesAsync();
+        var reports = new HostHealthReportService(db);
+        var commands = new FakeCommands();
+        var audit = new FakeAudit();
+        var manage = new Fail2BanManageService(reports, commands, audit);
+        Assert.ThrowsAsync<InvalidOperationException>(() => manage.UnbanAsync(Guid.NewGuid(), Guid.NewGuid(), "203.0.113.9", default), "nothing reported yet");
+
+        await reports.ReportAsync(key, Sample() with { Fail2Ban = new(true, []) }, default);
+        var app = Guid.NewGuid();
+        await manage.UnbanAsync(app, Guid.NewGuid(), "203.0.113.9", default);
+        await manage.AllowlistAsync(app, Guid.NewGuid(), "2001:0db8:0:0:0:0:0:1", default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(commands.Sent.Select(item => item.Kind), Is.EqualTo(new[] { "fail2ban-unban", "fail2ban-allowlist" }));
+            Assert.That(commands.Sent.All(item => item.Runner == runner.Id), Is.True);
+            Assert.That(commands.Sent[1].Payload, Does.Contain("2001:db8::1"), "the canonical address is sent");
+            Assert.That(audit.Events, Has.Count.EqualTo(2));
+            Assert.That(audit.Events[0].Message, Does.Contain("unban of 203.0.113.9"));
+            Assert.That(audit.Events[1].Metadata, Does.Contain("fail2ban-allowlist"));
+        });
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("not-an-ip")]
+    [TestCase("203.0.113.0/24")]
+    [TestCase("1.2.3.4 5.6.7.8")]
+    public async Task AnInvalidAddress_IsRefusedWithoutAuditOrCommand(string? ip)
+    {
+        await using var db = CreateDb();
+        var commands = new FakeCommands();
+        var audit = new FakeAudit();
+        var manage = new Fail2BanManageService(new HostHealthReportService(db), commands, audit);
+        Assert.ThrowsAsync<ArgumentException>(() => manage.UnbanAsync(Guid.NewGuid(), Guid.NewGuid(), ip, default));
+        Assert.That(commands.Sent, Is.Empty);
+        Assert.That(audit.Events, Is.Empty);
+    }
+
+    [Test]
+    public async Task OnlyASecurityManageCredentialOrASystemAdministratorPassesTheManagePolicy()
+    {
+        var services = new ServiceCollection().AddLogging()
+            .AddAuthorization(options => AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.SecurityManagePolicy, AppPermissionApproval.SecurityManage)).BuildServiceProvider();
+        var authorization = services.GetRequiredService<IAuthorizationService>();
+        static ClaimsPrincipal App(params string[] permissions) => new(new ClaimsIdentity(
+            permissions.Select(permission => new Claim("app_permission", permission)), "AppPermission"));
+        async Task<bool> Allowed(ClaimsPrincipal user) =>
+            (await authorization.AuthorizeAsync(user, AppPermissionAuthenticationOptions.SecurityManagePolicy)).Succeeded;
+
+        Assert.That(await Allowed(App(AppPermissionApproval.SecurityManage)), Is.True);
+        Assert.That(await Allowed(App(AppPermissionApproval.SecurityRead)), Is.False, "security:read cannot unban");
+        Assert.That(await Allowed(App()), Is.False);
+        var policy = typeof(ServerSecurityManageController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single();
+        Assert.That(policy.Policy, Is.EqualTo(AppPermissionAuthenticationOptions.SecurityManagePolicy));
+        Assert.That(ApplicationContractValidator.SupportedPermissions, Does.Contain("security:manage"));
+    }
+
+    [Test]
+    public void AnAppWithoutAnAdministratorViewerToken_GetsForbidden()
+    {
+        var appId = Guid.NewGuid();
+        var http = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", appId.ToString()), new Claim("app_permission", AppPermissionApproval.SecurityManage)], "AppPermission"))
+        };
+        var tokens = new ViewerTokenService(Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("security-manage-test"));
+        var controller = new ServerSecurityManageController(null!, tokens, null!) { ControllerContext = new() { HttpContext = http } };
+        var result = controller.Unban(new("203.0.113.9"), default).Result;
+        Assert.That(((StatusCodeResult)result).StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
+    }
+
     private static ServerHealthService Service(ApplicationDbContext db, IMemoryCache memory, string? version)
     {
         var values = new Dictionary<string, string?>

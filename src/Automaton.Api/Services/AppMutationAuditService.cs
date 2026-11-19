@@ -113,13 +113,16 @@ public sealed class AppMutationAuditService(
             EntityType = AuditEntityTypes.App,
             EntityId = app.Id,
             EventType = AuditEventTypes.AppDeleted,
-            Message = $"App '{app.Name}' was deleted",
+            Message = abandonedOfflineRuntimes
+                ? $"App '{app.Name}' was deleted without runtime cleanup (Runner offline)"
+                : $"App '{app.Name}' was deleted",
             Outcome = AuditOutcomes.Success,
             ActorUserId = UserId,
             Metadata = new
             {
                 AppId = app.Id,
                 Name = app.Name,
+                Reason = abandonedOfflineRuntimes ? "Runner offline" : null,
                 app.PublicUrl,
                 ExecutionRunnerId = GetDefaultRunnerId(app),
                 OwnerUserId = ownerId,

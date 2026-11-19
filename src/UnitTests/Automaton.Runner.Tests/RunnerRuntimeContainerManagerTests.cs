@@ -657,6 +657,69 @@ public sealed class RunnerRuntimeContainerManagerTests
         await manager.StopAsync(CancellationToken.None);
     }
 
+    private static bool IsFailed(RunnerRuntimeRegistry registry, Guid appId, Guid targetId)
+        => registry.StateReports().Single(r => r.AppId == appId && r.DeploymentTargetId == targetId).Failed;
+
+    [Test]
+    public async Task ProbeMarksRisingRestartCountFailedAndUnchangedCountRecovered()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        manager.ProbeInterval = TimeSpan.Zero;
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19061));
+
+        fake.RestartCount = 3;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.False, "First sample has nothing to compare with.");
+
+        fake.RestartCount = 4;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.True, "A rising count while running is a slow crash loop.");
+
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.False, "Same count and running again: recovered.");
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task ProbeMarksRestartingStateFailedEvenOnFirstSample()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        manager.ProbeInterval = TimeSpan.Zero;
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19062));
+
+        fake.Restarting = true;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.True);
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task ProbeForgetsRestartCountsOfRemovedRuntimes()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        manager.ProbeInterval = TimeSpan.Zero;
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19063));
+        fake.RestartCount = 5;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+
+        Assert.That(manager.ProbedRestartCountEntries, Is.EqualTo(1));
+        await manager.StopAsync(appId, targetId);
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(manager.ProbedRestartCountEntries, Is.Zero);
+    }
+
     private (RunnerRuntimeContainerManager Manager, RunnerWorkspaceService Workspace, Guid AppId, Guid TargetId) CreateManager(FakeContainerRuntime fake)
     {
         var workspace = new RunnerWorkspaceService();
@@ -842,6 +905,8 @@ public sealed class RunnerRuntimeContainerManagerTests
         public DockerApplicationContainerRequest? LastRequest { get; private set; }
         public List<string> StoppedContainers { get; } = [];
         public Exception? InspectFailure { get; set; }
+        public int RestartCount { get; set; }
+        public bool Restarting { get; set; }
         public Exception? GetLogsFailure { get; set; }
         public string Logs { get; set; } = string.Empty;
         public Exception? StopFailure { get; set; }
@@ -925,7 +990,7 @@ public sealed class RunnerRuntimeContainerManagerTests
                 labels["com.automaton.deployment-target-id"] = identity.TargetId.ToString();
                 labels["com.automaton.runtime-kind"] = "generic";
             }
-            return new DockerContainerIdentity(containerIdOrName, exists, exists && Running[containerIdOrName], labels);
+            return new DockerContainerIdentity(containerIdOrName, exists, exists && Running[containerIdOrName], labels, Restarting: Restarting, RestartCount: RestartCount);
         }
 
         public Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)

@@ -82,6 +82,60 @@ internal sealed partial class HostCleanupService(HostCleanupService.DockerRunner
         return new(true);
     }
 
+    /// <summary>Lifts the ban on one address in every jail. The address is validated; the fixed argument list runs without a shell.</summary>
+    public async Task<Fail2BanActionResult> Fail2BanUnbanAsync(Fail2BanAddressRequest request, CancellationToken token)
+    {
+        var ip = ValidAddress(request.Ip);
+        var image = await OwnImageAsync(token);
+        var changed = new List<string>();
+        foreach (var jail in await Fail2BanJailsAsync(image, token))
+            if ((await run(HostCommand(image, "fail2ban-client", "set", jail, "unbanip", ip), token)).ExitCode == 0) changed.Add(jail);
+        if (changed.Count == 0) throw new InvalidOperationException("fail2ban did not unban the address; it may not be banned.");
+        return new(ip, changed);
+    }
+
+    /// <summary>
+    /// Adds one address to every running jail's allowlist (<c>addignoreip</c>) and lifts its ban. This is fail2ban's live allowlist:
+    /// it lasts until fail2ban reloads or restarts (an installer update reloads it); a permanent one goes into <c>jail.local</c>.
+    /// </summary>
+    public async Task<Fail2BanActionResult> Fail2BanAllowlistAsync(Fail2BanAddressRequest request, CancellationToken token)
+    {
+        var ip = ValidAddress(request.Ip);
+        var image = await OwnImageAsync(token);
+        var changed = new List<string>();
+        foreach (var jail in await Fail2BanJailsAsync(image, token))
+            if ((await run(HostCommand(image, "fail2ban-client", "set", jail, "addignoreip", ip), token)).ExitCode == 0)
+            {
+                changed.Add(jail);
+                await run(HostCommand(image, "fail2ban-client", "set", jail, "unbanip", ip), token);
+            }
+        if (changed.Count == 0) throw new InvalidOperationException("fail2ban did not allowlist the address.");
+        return new(ip, changed);
+    }
+
+    /// <summary>One IPv4 or IPv6 address in its own canonical form; anything else (a name, a range, an option) is refused.</summary>
+    internal static string ValidAddress(string? value)
+    {
+        if (!System.Net.IPAddress.TryParse(value, out var address) || value!.Contains('%') || value.Length > 45 || value.Any(char.IsWhiteSpace))
+            throw new InvalidDataException("Give one IPv4 or IPv6 address.");
+        return address.ToString();
+    }
+
+    private async Task<IReadOnlyList<string>> Fail2BanJailsAsync(string image, CancellationToken token)
+    {
+        var status = await run(HostCommand(image, "fail2ban-client", "status"), token);
+        if (status.ExitCode != 0) throw new InvalidOperationException("fail2ban is not running on this machine.");
+        return ParseJails(status.Output);
+    }
+
+    /// <summary>Reads the jail names from the "Jail list:" line of <c>fail2ban-client status</c>.</summary>
+    internal static IReadOnlyList<string> ParseJails(string output)
+    {
+        var line = output.Split('\n').FirstOrDefault(item => item.Contains("Jail list:", StringComparison.Ordinal));
+        return line is null ? [] : line[(line.IndexOf(':') + 1)..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(name => name.Length is > 0 and <= 100 && name.All(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.')).ToArray();
+    }
+
     private async Task<string> OwnImageAsync(CancellationToken token)
     {
         var own = await run(["inspect", "--format", "{{.Image}}", Environment.MachineName], token);

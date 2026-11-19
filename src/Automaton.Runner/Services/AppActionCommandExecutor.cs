@@ -38,6 +38,10 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "app-logs" => await ReadAppLogsAsync(command.Read<ReadAppLogsRequest>(), token),
             "os-update" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable.")).OsUpdateAsync(token),
             "reboot" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable.")).RebootAsync(token),
+            "fail2ban-unban" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable."))
+                .Fail2BanUnbanAsync(command.Read<Fail2BanAddressRequest>(), token),
+            "fail2ban-allowlist" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable."))
+                .Fail2BanAllowlistAsync(command.Read<Fail2BanAddressRequest>(), token),
             "disk-report" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
                 .DiskReportAsync(token),
             _ => throw new InvalidDataException("Unknown App Action command.")

@@ -271,7 +271,7 @@ public sealed class DockerContainerRuntimeBoundaryTests
         var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
             new DockerContainerRuntime.CommandResult(
                 0,
-                $"container-1|true|{{\"com.automaton.managed\":\"true\",\"com.automaton.app-id\":\"{appId}\",\"com.automaton.deployment-target-id\":\"{targetId}\",\"com.automaton.runtime-kind\":\"generic\",\"image.label\":\"a;b|c=d\"}}",
+                $"container-1|true|false|0|{{\"com.automaton.managed\":\"true\",\"com.automaton.app-id\":\"{appId}\",\"com.automaton.deployment-target-id\":\"{targetId}\",\"com.automaton.runtime-kind\":\"generic\",\"image.label\":\"a;b|c=d\"}}",
                 string.Empty)));
 
         var identity = await runtime.InspectAsync("container-1");
@@ -282,6 +282,17 @@ public sealed class DockerContainerRuntimeBoundaryTests
             Assert.That(identity.Labels["com.automaton.app-id"], Is.EqualTo(appId.ToString()));
             Assert.That(identity.Labels["image.label"], Is.EqualTo("a;b|c=d"));
         });
+    }
+
+    [Test]
+    public async Task InspectFallsBackToZeroWhenTheRestartCountIsNotANumber()
+    {
+        var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
+            new DockerContainerRuntime.CommandResult(0, "container-1|true|false|<no value>|{}", string.Empty)));
+
+        var identity = await runtime.InspectAsync("container-1");
+
+        Assert.That(identity.RestartCount, Is.Zero);
     }
 
     [Test]
