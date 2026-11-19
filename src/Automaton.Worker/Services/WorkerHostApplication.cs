@@ -25,7 +25,7 @@ internal static class WorkerHostApplication
         await builder.Build().RunAsync();
     }
 
-    private static void ConfigureLogging(HostApplicationBuilder builder)
+    internal static void ConfigureLogging(HostApplicationBuilder builder)
     {
         builder.Services.AddSerilog((_, config) =>
         {

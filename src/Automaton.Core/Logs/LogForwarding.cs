@@ -27,7 +27,9 @@ internal sealed class LogForwardingSink(Func<string, ILogEventSink> create) : IL
     private string? endpoint;
     private ILogEventSink? inner;
 
-    public void SetEndpoint(string? value)
+    public void SetEndpoint(string? value) => SetEndpoint(value, disposeInBackground: true);
+
+    private void SetEndpoint(string? value, bool disposeInBackground)
     {
         ILogEventSink? old;
         lock (gate)
@@ -37,10 +39,21 @@ internal sealed class LogForwardingSink(Func<string, ILogEventSink> create) : IL
             inner = value is null ? null : create(value);
             endpoint = value;
         }
-        (old as IDisposable)?.Dispose();
+        if (old is not IDisposable disposable) return;
+        // Disposing flushes what is queued for the old address. When that address no longer answers (its app was
+        // restarted or removed) the flush waits for a timeout of over a minute; switching must not wait for it, or the
+        // caller (the 30 s poll, the Runner's heartbeat) is stuck and never reaches the new address.
+        if (disposeInBackground) _ = Task.Run(() => DisposeQuietly(disposable));
+        else DisposeQuietly(disposable);
+    }
+
+    private static void DisposeQuietly(IDisposable sink)
+    {
+        try { sink.Dispose(); }
+        catch (Exception) { /* the old address is gone; nothing to report to it */ }
     }
 
     public void Emit(LogEvent logEvent) => Volatile.Read(ref inner)?.Emit(logEvent);
 
-    public void Dispose() => SetEndpoint(null);
+    public void Dispose() => SetEndpoint(null, disposeInBackground: false);
 }
