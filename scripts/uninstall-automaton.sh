@@ -35,12 +35,31 @@ while (($#)); do
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
-for dir in "$install_dir" "$config_dir"; do
-    [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / && ! -L "$dir" ]] || { echo 'Use an absolute directory path without shell metacharacters; symlinks are refused.' >&2; exit 1; }
+for dir in "$install_dir" "$config_dir" "$runners_dir" "$systemd_dir" "$f2b_dir" "$state_dir" "$logrotate_dir"; do
+    [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / && ! -L "$dir" && ! "$dir" =~ (^|/)\.\.(/|$) ]] \
+        || { echo "Refusing directory '$dir': use an absolute path without shell metacharacters or '..'; symlinks are refused." >&2; exit 1; }
 done
+# Only delete a directory that is the default or is recognisably an Automaton install. A custom directory that an earlier
+# (keep-mode) run already emptied, leaving only the kept items, still counts, so a second run stays safe and idempotent.
+only_kept() { # dir keptname...: true when the directory holds nothing but the named entries
+    local dir=$1 entry; shift
+    for entry in "$dir"/* "$dir"/.[!.]*; do
+        [[ -e "$entry" ]] || continue
+        [[ " $* " == *" ${entry##*/} "* ]] || return 1
+    done
+}
+if [[ "$install_dir" != /opt/automaton-server && -d "$install_dir" && ! -e "$install_dir/docker-compose.yml" && ! -e "$install_dir/compose.yaml" && ! -e "$install_dir/update.sh" ]] \
+    && ! only_kept "$install_dir" backups; then
+    echo "Refusing $install_dir: it is not /opt/automaton-server and holds no compose file or update.sh, so it does not look like an Automaton install." >&2; exit 1
+fi
+if [[ "$config_dir" != /etc/automaton && -d "$config_dir" && ! -e "$config_dir/installation.json" ]] \
+    && ! only_kept "$config_dir" backup-recipient secrets; then
+    echo "Refusing $config_dir: it is not /etc/automaton and holds no installation.json, so it does not look like Automaton configuration." >&2; exit 1
+fi
 [[ $EUID == 0 || -n $test_mode ]] || $dry_run || { echo 'Run the uninstaller with sudo.' >&2; exit 1; }
-command -v docker >/dev/null && docker info >/dev/null 2>&1 && have_docker=true || have_docker=false
-removed=(); kept=()
+# Test mode never talks to Docker.
+[[ -z $test_mode ]] && command -v docker >/dev/null && docker info >/dev/null 2>&1 && have_docker=true || have_docker=false
+removed=(); kept=(); warnings=()
 act() { # run a command, or only print it with --dry-run
     if $dry_run; then printf '  [dry-run] %s\n' "$*"; else "$@" >/dev/null 2>&1 || true; fi
 }
@@ -74,8 +93,11 @@ remove_ids() { # kind(container|network) ids...
     local id
     for id in "$@"; do
         [[ -n "$id" ]] || continue
-        removed+=("$kind $(docker "$kind" inspect --format '{{.Name}}' "$id" 2>/dev/null | tr -d / || echo "$id")")
-        if [[ $kind == container ]]; then act docker rm --force --volumes=false "$id" 2>/dev/null || true; else act docker network rm "$id"; fi
+        local name
+        name=$(docker "$kind" inspect --format '{{.Name}}' "$id" 2>/dev/null | tr -d / || true)
+        name=${name:-$id}
+        if [[ $kind == container ]]; then act docker rm --force --volumes=false "$id"; else act docker network rm "$id"; fi
+        if ! $dry_run && docker "$kind" inspect "$id" >/dev/null 2>&1; then warnings+=("$kind $name could not be removed"); else removed+=("$kind $name"); fi
     done
 }
 volumes_to_delete=()
@@ -114,7 +136,10 @@ fi
 kept_volumes=()
 for volume in "${volumes_to_delete[@]}"; do
     [[ -n "$volume" ]] && docker volume inspect "$volume" >/dev/null 2>&1 || continue
-    if $delete_data; then act docker volume rm "$volume"; removed+=("volume $volume"); else kept_volumes+=("$volume"); fi
+    if $delete_data; then
+        act docker volume rm "$volume"
+        if ! $dry_run && docker volume inspect "$volume" >/dev/null 2>&1; then warnings+=("volume $volume could not be removed"); else removed+=("volume $volume"); fi
+    else kept_volumes+=("$volume"); fi
 done
 
 # 3. systemd units, the fail2ban jails and filters the installer added.
@@ -135,7 +160,18 @@ if ! $dry_run && [[ -z $test_mode ]]; then
         fail2ban-client reload >/dev/null 2>&1 || echo 'Warning: fail2ban did not reload; run: sudo fail2ban-client reload' >&2
     fi
 fi
-[[ -d "$state_dir" ]] && { act rm -rf -- "$state_dir"; removed+=("directory $state_dir"); }
+# update/ and backup/ only hold request and status files. The Runner's workflows and apps may hold app data: keep them unless --delete-data.
+if [[ -d "$state_dir" ]]; then
+    if $delete_data; then
+        act rm -rf -- "$state_dir"; removed+=("directory $state_dir")
+    else
+        for entry in "$state_dir"/* "$state_dir"/.[!.]*; do
+            [[ -e "$entry" && "$entry" != "$state_dir/infrastructure-runner" && "$entry" != "$state_dir/apps" ]] || continue
+            act rm -rf -- "$entry"; removed+=("$entry")
+        done
+        for keep in infrastructure-runner apps; do [[ -e "$state_dir/$keep" ]] && kept+=("app data in $state_dir/$keep"); done
+    fi
+fi
 
 # 4. Installation and configuration directories. Without --delete-data the encrypted backups and the key that decrypts them stay.
 backup_dir="$install_dir/backups"
@@ -143,11 +179,12 @@ if [[ -d "$install_dir" ]]; then
     if $delete_data; then
         act rm -rf -- "$install_dir"; removed+=("directory $install_dir")
     else
+        n=0
         for entry in "$install_dir"/* "$install_dir"/.[!.]*; do
             [[ -e "$entry" && "$entry" != "$backup_dir" ]] || continue
-            act rm -rf -- "$entry"
+            act rm -rf -- "$entry"; n=1
         done
-        removed+=("directory $install_dir (except backups)")
+        ((n)) && removed+=("directory $install_dir (except backups)")
         [[ -d "$backup_dir" ]] && kept+=("backups in $backup_dir")
     fi
 fi
@@ -155,15 +192,16 @@ if [[ -d "$config_dir" ]]; then
     if $delete_data; then
         act rm -rf -- "$config_dir"; removed+=("directory $config_dir")
     else
+        n=0
         for entry in "$config_dir"/* "$config_dir"/.[!.]*; do
             [[ -e "$entry" && "$entry" != "$config_dir/backup-recipient" && "$entry" != "$config_dir/secrets" ]] || continue
-            act rm -rf -- "$entry"
+            act rm -rf -- "$entry"; n=1
         done
         for entry in "$config_dir/secrets"/* "$config_dir/secrets"/.[!.]*; do
             [[ -e "$entry" && "$entry" != "$config_dir/secrets/backup-key" ]] || continue
-            act rm -rf -- "$entry"
+            act rm -rf -- "$entry"; n=1
         done
-        removed+=("directory $config_dir (except the backup key)")
+        ((n)) && removed+=("directory $config_dir (except the backup key)")
         [[ -e "$config_dir/secrets/backup-key" ]] && kept+=("backup key $config_dir/secrets/backup-key (decrypts the backups; keep it private)")
     fi
 fi
@@ -171,6 +209,8 @@ fi
 echo
 if $dry_run; then echo 'Would remove:'; else echo 'Removed:'; fi
 ((${#removed[@]})) && printf '  %s\n' "${removed[@]}" || echo '  nothing (already uninstalled)'
+if ((${#warnings[@]})); then echo 'Warnings:'; printf '  %s\n' "${warnings[@]}"; fi
+if $delete_data && ! $have_docker; then echo 'Warning: Docker is not running, so no volumes were removed (database and app data volumes remain). Start Docker and run this script again with --delete-data.'; fi
 if ! $delete_data; then
     echo 'Kept:'
     ((${#kept_volumes[@]})) && printf '  volume %s\n' "${kept_volumes[@]}"
