@@ -222,12 +222,86 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             if (identity.HostPort is > 0) metadata.EffectivePort = identity.HostPort;
             await metadataStore.WriteAsync(metadata, cancellationToken);
             Register(appId, targetId, identity.Id, metadata.ContainerName, metadata.EffectivePort, metadata.ComposeCandidateId);
+            // Containers made before the restart policy existed get it here, so an upgraded server is covered without a redeploy.
+            if (metadata.ComposeCandidateId is null) await EnableAutoRestartAsync(appId, targetId, identity.Id);
             return;
         }
-        logger.LogWarning("Refusing to adopt container {ContainerId}: it is missing, stopped, or does not have the expected Automaton identity.", metadata.ContainerId);
-        if (!workspace.RuntimeArtifactExists(metadata.ArtifactRoot)) return;
-        await ApplyAsync(appId, targetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata), cancellationToken,
-            metadata.ArtifactRoot, metadata.CandidateId);
+        if (identity.Exists && metadata.ComposeCandidateId is null)
+        {
+            if (!RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId))
+            {
+                // Never remove or replace a container that is not ours to manage.
+                var message = "The container does not have the expected Automaton ownership labels, so it was left alone.";
+                logger.LogWarning("Preserving container {ContainerId} for {AppId}/{TargetId}: {Message}", metadata.ContainerId, appId, targetId, message);
+                registry.MarkFailed(appId, targetId, message);
+                return;
+            }
+            await StartStoppedContainerAsync(metadata, identity, appId, targetId, cancellationToken);
+            return;
+        }
+        logger.LogWarning("Container {ContainerId} is missing; starting the runtime again from its deployed files.", metadata.ContainerId);
+        if (!workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+        {
+            registry.MarkFailed(appId, targetId, "The container and the deployed files are missing.");
+            return;
+        }
+        try
+        {
+            await ApplyAsync(appId, targetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata), cancellationToken,
+                metadata.ArtifactRoot, metadata.CandidateId);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            registry.MarkFailed(appId, targetId, ex.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// An owned container that Docker stopped (a host reboot, `restart: no`) is started again, not recreated:
+    /// recreating needs the stopped container removed, which loses it when the new one cannot start.
+    /// </summary>
+    private async Task StartStoppedContainerAsync(
+        RunnerRuntimeDeploymentMetadata metadata,
+        DockerContainerIdentity identity,
+        Guid appId,
+        Guid targetId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.LogInformation("Starting stopped container {ContainerId} of {AppId}/{TargetId}.", identity.Id, appId, targetId);
+            int? port;
+            if (containers is IScopedApplicationContainerRuntime scoped)
+                port = (await scoped.StartApplicationAsync(new(appId, targetId), identity.Id, cancellationToken)).HostPort;
+            else
+            {
+                await ((IStagedApplicationContainerRuntime)containers).StartApplicationAsync(identity.Id, cancellationToken);
+                port = (await InspectAsync(appId, targetId, identity.Id, cancellationToken)).HostPort ?? metadata.EffectivePort;
+            }
+            if (port is not > 0) throw new InvalidOperationException("The started container has no published port.");
+            // Docker assigns a new host port when a container starts again; the log sink and routes follow it.
+            metadata.EffectivePort = port;
+            await metadataStore.WriteAsync(metadata, cancellationToken);
+            Register(appId, targetId, identity.Id, metadata.ContainerName, port);
+            await EnableAutoRestartAsync(appId, targetId, identity.Id);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            registry.MarkFailed(appId, targetId, $"The runtime could not be started: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>The live container only; best effort, because the Runner start-up reconcile is the backup.</summary>
+    private async Task EnableAutoRestartAsync(Guid appId, Guid targetId, string containerId)
+    {
+        if (containers is not IScopedApplicationContainerRuntime scoped) return;
+        try { await scoped.EnableAutoRestartAsync(new(appId, targetId), containerId, CancellationToken.None); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not set the restart policy of container {ContainerId} of {AppId}/{TargetId}.", containerId, appId, targetId);
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -520,6 +594,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             if (!await IsRunningAsync(attempt.AppId, attempt.TargetId, started.Id, cancellationToken))
                 throw new InvalidOperationException("The runtime container exited after readiness and before promotion.");
             var warning = await PromoteAsync(attempt.AppId, attempt.TargetId, previous, attempt.Candidate, cancellationToken);
+            if (!RunnerRuntimeMetadataPolicy.HasComposeContract(attempt.Contract))
+                await EnableAutoRestartAsync(attempt.AppId, attempt.TargetId, started.Id);
             return new RuntimeApplyResult { PromotionIrreversible = true, Warning = warning };
         }
         catch (Exception deploymentError)
@@ -976,6 +1052,10 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 return;
+            }
+            catch (InvalidOperationException ex) when (ex.Message == BrokeredApplicationContainerRuntime.IdentityRequiredMessage)
+            {
+                logger.LogInformation("Waiting for the Runner to connect to the server before recovering {MetadataPath}.", path);
             }
             catch (Exception ex)
             {

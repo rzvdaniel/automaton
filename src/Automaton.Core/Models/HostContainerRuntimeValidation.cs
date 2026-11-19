@@ -9,6 +9,7 @@ public static class HostContainerRuntimeValidation
         or HostContainerOperationKinds.ApplyComposeProject or HostContainerOperationKinds.InspectComposeProject
         or HostContainerOperationKinds.RemoveComposeProject
         or HostContainerOperationKinds.StartContainer or HostContainerOperationKinds.StopContainer
+        or HostContainerOperationKinds.EnableAutoRestart
         or HostContainerOperationKinds.InspectContainer or HostContainerOperationKinds.GetContainerLogs
         or HostContainerOperationKinds.RemoveContainer or HostContainerOperationKinds.RemoveTargetContainers;
 

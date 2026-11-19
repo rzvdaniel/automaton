@@ -218,7 +218,7 @@ public sealed class HostContainerRuntimeTests
     {
         foreach (var operation in new[] { HostContainerOperationKinds.StartContainer, HostContainerOperationKinds.InspectContainer,
             HostContainerOperationKinds.GetContainerLogs, HostContainerOperationKinds.RemoveContainer,
-            HostContainerOperationKinds.StopContainer })
+            HostContainerOperationKinds.StopContainer, HostContainerOperationKinds.EnableAutoRestart })
         {
             calls.Clear();
             var state = Inspection();
@@ -231,6 +231,7 @@ public sealed class HostContainerRuntimeTests
 
     [TestCase(HostContainerOperationKinds.StartContainer, "start")]
     [TestCase(HostContainerOperationKinds.StopContainer, "stop")]
+    [TestCase(HostContainerOperationKinds.EnableAutoRestart, "update")]
     [TestCase(HostContainerOperationKinds.GetContainerLogs, "logs")]
     [TestCase(HostContainerOperationKinds.RemoveContainer, "rm")]
     public async Task OperationsInspectThenUseFullIdInsteadOfCallerName(string operation, string command)

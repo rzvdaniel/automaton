@@ -156,6 +156,8 @@ public sealed partial class HostContainerExecutionService
         {
             HostContainerOperationKinds.StartContainer => new[] { "docker", "start", inspection.ContainerId },
             HostContainerOperationKinds.StopContainer => new[] { "docker", "stop", "--time", "20", inspection.ContainerId },
+            // Only the live container gets this: Docker brings it back after a host reboot, but a manual stop stays stopped.
+            HostContainerOperationKinds.EnableAutoRestart => new[] { "docker", "update", "--restart", "unless-stopped", inspection.ContainerId },
             HostContainerOperationKinds.GetContainerLogs => new[] { "docker", "logs", "--tail", "200", inspection.ContainerId },
             HostContainerOperationKinds.RemoveContainer => new[] { "docker", "rm", "-f", inspection.ContainerId },
             _ => throw new InvalidOperationException("Unsupported container operation.")
@@ -191,7 +193,7 @@ public sealed partial class HostContainerExecutionService
             await ReleaseImageAsync(inspection.Labels, cancellationToken);
             return new HostContainerExecutionResponse { Success = true, ContainerId = inspection.ContainerId };
         }
-        if (request.Operation == HostContainerOperationKinds.StopContainer)
+        if (request.Operation is HostContainerOperationKinds.StopContainer or HostContainerOperationKinds.EnableAutoRestart)
             return new HostContainerExecutionResponse { Success = true, Exists = true, ContainerId = inspection.ContainerId };
         var postStart = await InspectOwnedContainerAsync(inspection.ContainerId, request.Scope, cancellationToken, discoverEndpoint: true);
         if (!postStart.Success || !postStart.Exists || !postStart.Running || !postStart.HostPort.HasValue)

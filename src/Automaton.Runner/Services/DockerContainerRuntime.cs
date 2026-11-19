@@ -135,6 +135,9 @@ public interface IScopedApplicationContainerRuntime
     Task StopAndRemoveAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
     /// <summary>Stops the container and keeps it, so <see cref="StartApplicationAsync(ApplicationContainerScope, string, CancellationToken)"/> can start it again.</summary>
     Task StopAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
+    /// <summary>Lets Docker start the container again after a host reboot (a manual stop stays stopped). For the live container only.</summary>
+    Task EnableAutoRestartAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
 }
 
 public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IApplicationContainerCleanupRuntime
