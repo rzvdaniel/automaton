@@ -403,7 +403,7 @@ public static class ApplicationContractValidator
     public const string LogsReceivePermission = "logs:receive";
 
     /// <summary>Every app permission an app can request.</summary>
-    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read", "notify:email", "server:cleanup", "runner:maintain", "backups:run", "apps:read-status", "security:read", LogsReceivePermission];
+    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read", "notify:email", "server:cleanup", "runner:maintain", "backups:run", "server:restart", "apps:read-status", "security:read", LogsReceivePermission];
 
     public const int MaxOpenPaths = 20;
     public const int MaxDescriptionLength = 200;

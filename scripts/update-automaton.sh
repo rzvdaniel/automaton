@@ -137,7 +137,11 @@ ensure_update_trigger() {
     if [[ -f "$bundle/update-from-request.sh" ]]; then install -m 0700 "$bundle/update-from-request.sh" "$install_dir/update-from-request.sh"; fi
     [[ -f "$install_dir/update-from-request.sh" ]] || return 0
     bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
-        || { echo "Updates from Studio could not be enabled; nothing was changed. Fix it, then rerun: sudo bash $install_dir/update-from-request.sh --install-units" >&2; exit 1; }
+        || { echo "Updates from Studio could not be enabled; nothing was changed. Fix it, then rerun: sudo bash $install_dir/update-from-request.sh --install-units" >&2; exit 1; }    # Restarting the server from Studio uses the same pattern. Failures only warn: updates do not depend on it.
+    if [[ -f "$bundle/restart-from-request.sh" ]]; then install -m 0700 "$bundle/restart-from-request.sh" "$install_dir/restart-from-request.sh"; fi
+    [[ -f "$install_dir/restart-from-request.sh" ]] || return 0
+    bash "$install_dir/restart-from-request.sh" --install-units --install-dir "$install_dir" \
+        || echo "Warning: restarting the server from Studio could not be enabled. Run: sudo bash $install_dir/restart-from-request.sh --install-units" >&2
 }
 # automaton.monster only: the "Deploy production" website step needs a root-owned script, compose file and sudoers line,
 # and the deploy key's forced command must allow it. They come from this checksum-verified bundle, never from a download.

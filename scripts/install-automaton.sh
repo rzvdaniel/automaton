@@ -261,7 +261,7 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh cleanup.sh restore.sh update-from-request.sh fail2ban.sh configure.py explain_certificate_failure.py; do
+for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh fail2ban.sh configure.py explain_certificate_failure.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
 if ! $configure_only && [[ -d "$bundle_dir/fail2ban" ]]; then
@@ -272,6 +272,10 @@ fi
 if [[ -f "$install_dir/update-from-request.sh" ]] && ! $configure_only; then
     bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
         || { echo "Updates from Studio could not be enabled; nothing was changed. Fix it, then rerun: sudo bash $install_dir/update-from-request.sh --install-units" >&2; exit 1; }
+fi
+if [[ -f "$install_dir/restart-from-request.sh" ]] && ! $configure_only; then
+    bash "$install_dir/restart-from-request.sh" --install-units --install-dir "$install_dir" \
+        || echo "Warning: restarting the server from Studio could not be enabled. Run: sudo bash $install_dir/restart-from-request.sh --install-units" >&2
 fi
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.
