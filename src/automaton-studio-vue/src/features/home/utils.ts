@@ -20,3 +20,26 @@ export function moved<T>(items: T[], from: number, to: number): T[] {
   next.splice(to, 0, item as T)
   return next
 }
+
+export interface MosaicPlace { column: number; span: number; top: number }
+
+/**
+ * Masonry placement: each card goes into the shortest column; a wide card takes the two neighbouring columns
+ * whose taller one is lowest. Order is kept, so the first card is always top left. One column ignores wide.
+ */
+export function mosaic(heights: number[], wide: boolean[], columns: number, gap: number): { places: MosaicPlace[]; height: number } {
+  const count = Math.max(1, columns)
+  const tops = new Array<number>(count).fill(0)
+  const places = heights.map((height, index) => {
+    const span = wide[index] && count > 1 ? 2 : 1
+    let best = 0
+    let bestTop = Infinity
+    for (let column = 0; column + span <= count; column++) {
+      const top = Math.max(...tops.slice(column, column + span))
+      if (top < bestTop) { best = column; bestTop = top }
+    }
+    for (let column = best; column < best + span; column++) tops[column] = bestTop + height + gap
+    return { column: best, span, top: bestTop }
+  })
+  return { places, height: Math.max(0, Math.max(...tops) - gap) }
+}

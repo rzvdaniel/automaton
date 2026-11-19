@@ -8,9 +8,13 @@ public sealed record HomeCard(
     string Key, string Kind, string Severity, string Title, string Detail,
     string ActionLabel, string ActionPath, bool Dismissible, Guid? AppId = null, string? CatalogAppId = null);
 
-public sealed record HomePinnedApp(AppListItemDto App, DateTime PinnedAtUtc, AppHomeCardDto? Card = null);
+public sealed record HomePinnedApp(AppListItemDto App, DateTime PinnedAtUtc, AppHomeCardDto? Card = null, bool Wide = false);
 
-public sealed record HomeResponse(IReadOnlyList<HomeCard> NeedsYou, IReadOnlyList<HomePinnedApp> Pinned);
+public sealed record HomeResponse(IReadOnlyList<HomeCard> NeedsYou, IReadOnlyList<HomePinnedApp> Pinned, bool ListView = false);
+
+public sealed record HomePinSizeRequest(bool Wide);
+
+public sealed record HomeViewRequest(bool ListView);
 
 public sealed record HomePinOrderRequest(IReadOnlyList<Guid> AppIds);
 

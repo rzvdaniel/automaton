@@ -3805,6 +3805,9 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("Wide")
+                        .HasColumnType("boolean");
+
                     b.HasKey("UserId", "AppId");
 
                     b.HasIndex("AppId");
@@ -3812,6 +3815,19 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasIndex("UserId", "SortOrder");
 
                     b.ToTable("UserHomePins");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.UserHomeSetting", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ListView")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserHomeSettings");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.UserNotificationAck", b =>
@@ -4995,6 +5011,15 @@ namespace Automaton.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.UserHomeSetting", b =>
+                {
                     b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")

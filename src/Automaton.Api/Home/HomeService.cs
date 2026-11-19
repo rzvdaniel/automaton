@@ -40,14 +40,15 @@ public sealed class HomeService(
         var visiblePins = pins.Where(pin => byId.ContainsKey(pin.AppId)).ToList();
         var cards = await LoadAppCardsAsync(visiblePins.Select(pin => pin.AppId).ToList(), token);
         var pinned = visiblePins
-            .Select(pin => new HomePinnedApp(byId[pin.AppId], pin.PinnedAtUtc, cards.GetValueOrDefault(pin.AppId))).ToList();
+            .Select(pin => new HomePinnedApp(byId[pin.AppId], pin.PinnedAtUtc, cards.GetValueOrDefault(pin.AppId), pin.Wide)).ToList();
 
         var needsYouCards = new List<HomeCard>();
         if (await authorization.IsSystemAdministratorAsync(userId, token)) needsYouCards.AddRange(await needsYou.ServerCardsAsync(userId, token));
         needsYouCards.AddRange(HomeNeedsYouService.AppCards(listed));
         var dismissed = await db.UserHomeDismissals.AsNoTracking().Where(item => item.UserId == userId)
             .Select(item => item.CardKey).ToListAsync(token);
-        return new(needsYouCards.Where(card => !dismissed.Contains(card.Key) && !Notifications.NotificationKinds.InFeed.Contains(card.Kind)).ToList(), pinned);
+        var listView = await db.UserHomeSettings.AsNoTracking().Where(item => item.UserId == userId).Select(item => item.ListView).SingleOrDefaultAsync(token);
+        return new(needsYouCards.Where(card => !dismissed.Contains(card.Key) && !Notifications.NotificationKinds.InFeed.Contains(card.Kind)).ToList(), pinned, listView);
     }
 
     /// <summary>A card is late when its last card run failed, or it was not refreshed within three of its intervals.</summary>
@@ -92,6 +93,32 @@ public sealed class HomeService(
             return await db.UserHomePins.AsNoTracking().AnyAsync(pin => pin.UserId == userId && pin.AppId == appId, token);
         }
         return true;
+    }
+
+    /// <summary>Sets whether a pinned card spans two columns. Returns false when the app is not pinned by this person.</summary>
+    public async Task<bool> SetWideAsync(Guid userId, Guid appId, bool wide, CancellationToken token)
+    {
+        var pin = await db.UserHomePins.SingleOrDefaultAsync(item => item.UserId == userId && item.AppId == appId, token);
+        if (pin is null) return false;
+        pin.Wide = wide;
+        await db.SaveChangesAsync(token);
+        return true;
+    }
+
+    /// <summary>Saves whether Home shows cards or a list for this person.</summary>
+    public async Task SetListViewAsync(Guid userId, bool listView, CancellationToken token)
+    {
+        var setting = await db.UserHomeSettings.SingleOrDefaultAsync(item => item.UserId == userId, token);
+        if (setting is null) db.UserHomeSettings.Add(new UserHomeSetting { UserId = userId, ListView = listView });
+        else setting.ListView = listView;
+        try { await db.SaveChangesAsync(token); }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            var existing = await db.UserHomeSettings.SingleAsync(item => item.UserId == userId, token);
+            existing.ListView = listView;
+            await db.SaveChangesAsync(token);
+        }
     }
 
     public async Task UnpinAsync(Guid userId, Guid appId, CancellationToken token)

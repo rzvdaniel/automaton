@@ -101,6 +101,11 @@ internal static class ApplicationModelConfiguration
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
         });
+        modelBuilder.Entity<UserHomeSetting>(entity =>
+        {
+            entity.HasKey(e => e.UserId);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<UserHomeDismissal>(entity =>
         {
             entity.HasKey(e => new { e.UserId, e.CardKey });

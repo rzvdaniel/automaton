@@ -39,3 +39,19 @@ describe('moved', () => {
     expect(moved(['a', 'b'], 0, 5)).toEqual(['a', 'b'])
   })
 })
+
+describe('mosaic', () => {
+  it('puts a short card under another short one instead of leaving a gap', async () => {
+    const { mosaic } = await import('./utils')
+    const { places, height } = mosaic([300, 100, 100, 100], [false, false, false, false], 2, 10)
+    expect(places.map((p) => [p.column, p.top])).toEqual([[0, 0], [1, 0], [1, 110], [1, 220]])
+    expect(height).toBe(320)
+  })
+  it('lets a wide card span two columns and ignores wide on one column', async () => {
+    const { mosaic } = await import('./utils')
+    const wide = mosaic([100, 50, 80], [false, true, false], 3, 10)
+    expect(wide.places[1]).toEqual({ column: 1, span: 2, top: 0 })
+    expect(wide.places[2]).toEqual({ column: 1, span: 1, top: 60 })
+    expect(mosaic([100, 50], [true, true], 1, 10).places.map((p) => p.span)).toEqual([1, 1])
+  })
+})

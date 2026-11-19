@@ -257,6 +257,31 @@ public sealed class HomeTests
     }
 
     [Test]
+    public async Task WideAndListViewAreSavedPerPerson()
+    {
+        Guid owner = Guid.NewGuid(), stranger = Guid.NewGuid();
+        var (db, home) = Create(owner);
+        var app = Guid.NewGuid();
+        AppAuthorizationTestData.SeedApp(db, app, owner, "wide" + app.ToString("N")[..6]);
+        Assert.That(await home.Pin(app, default), Is.TypeOf<NoContentResult>());
+
+        Assert.That(await home.SetSize(app, new HomePinSizeRequest(true), default), Is.TypeOf<NoContentResult>());
+        var response = (HomeResponse)((OkObjectResult)(await home.Get(default)).Result!).Value!;
+        Assert.That(response.Pinned.Single().Wide, Is.True);
+        Assert.That(response.ListView, Is.False);
+
+        Assert.That(await home.SetView(new HomeViewRequest(true), default), Is.TypeOf<NoContentResult>());
+        Assert.That(await home.SetView(new HomeViewRequest(true), default), Is.TypeOf<NoContentResult>(), "saving twice is fine");
+        Assert.That(((HomeResponse)((OkObjectResult)(await home.Get(default)).Result!).Value!).ListView, Is.True);
+
+        var (_, other) = Create(stranger, db);
+        Assert.That(await other.SetSize(app, new HomePinSizeRequest(true), default), Is.TypeOf<NotFoundResult>(), "not pinned by them");
+        Assert.That(((HomeResponse)((OkObjectResult)(await other.Get(default)).Result!).Value!).ListView, Is.False, "view is private");
+        var (_, anonymous) = Create(Guid.Empty, db);
+        Assert.That(await anonymous.SetView(new HomeViewRequest(true), default), Is.TypeOf<UnauthorizedResult>());
+    }
+
+    [Test]
     public void FailedAppsBecomeCardsForPeopleWhoCanChangeThem()
     {
         var failing = new AppListItemDto { Id = Guid.NewGuid(), Name = "Shop", CanUpdate = true, LiveEnvironment = new AppListEnvironmentDto { Status = "Failed" } };

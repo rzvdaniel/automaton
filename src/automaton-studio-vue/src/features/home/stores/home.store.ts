@@ -8,6 +8,7 @@ import type { HomeCard, HomePinnedApp, NotificationItem } from '../types/home.ty
 export const useHomeStore = defineStore('home', () => {
   const needsYou = ref<HomeCard[]>([])
   const pinned = ref<HomePinnedApp[]>([])
+  const listView = ref(false)
   const notifications = ref<NotificationItem[]>([])
   const isLoading = ref(false)
   const loaded = ref(false)
@@ -24,6 +25,7 @@ export const useHomeStore = defineStore('home', () => {
       notifications.value = feed
       needsYou.value = data.needsYou
       pinned.value = data.pinned
+      listView.value = data.listView === true
       loaded.value = true
     } catch {
       error.value = 'Home could not be loaded.'
@@ -54,6 +56,30 @@ export const useHomeStore = defineStore('home', () => {
       await homeService.reorder(appIds)
     } catch (caught) {
       pinned.value = previous
+      throw caught
+    }
+  }
+
+  async function setWide(appId: string, wide: boolean) {
+    const item = pinned.value.find((entry) => entry.app.id === appId)
+    if (!item) return
+    const previous = item.wide
+    item.wide = wide
+    try {
+      await homeService.setSize(appId, wide)
+    } catch (caught) {
+      item.wide = previous
+      throw caught
+    }
+  }
+
+  async function setListView(value: boolean) {
+    const previous = listView.value
+    listView.value = value
+    try {
+      await homeService.setView(value)
+    } catch (caught) {
+      listView.value = previous
       throw caught
     }
   }
@@ -89,5 +115,5 @@ export const useHomeStore = defineStore('home', () => {
     notifications.value = notifications.value.filter((item) => item.key !== key)
   }
 
-  return { notifications, acknowledge, needsYou, pinned, pinnedIds, isLoading, loaded, error, refreshing, refreshCard, load, ensureLoaded, pin, unpin, reorder, dismiss }
+  return { listView, setWide, setListView, notifications, acknowledge, needsYou, pinned, pinnedIds, isLoading, loaded, error, refreshing, refreshCard, load, ensureLoaded, pin, unpin, reorder, dismiss }
 })
