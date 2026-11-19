@@ -12,9 +12,10 @@ Usage:
 
 Credentials come from the agent credentials file (default ~/.automaton-test/accounts.env, or
 ~/.config/automaton-test/accounts.env on the test server). It signs in as each test account (ADMIN, USER, USER2)
-and removes only that account's own items. It prints names and ids, never emails, passwords or tokens.
+and removes only that account's own items. The base URL (AUTOMATON_TEST_API_URL) must contain "test" or its host must
+equal AUTOMATON_TEST_API_HOST in the same file; otherwise it refuses. It prints names and ids, never emails, passwords or tokens.
 """
-import argparse, datetime, json, os, sys, time, urllib.error, urllib.request
+import argparse, datetime, json, os, sys, time, urllib.error, urllib.parse, urllib.request
 
 PREFIX = "e2e-"
 ACCOUNTS = ("ADMIN", "USER", "USER2")
@@ -178,8 +179,10 @@ def main():
         sys.exit("No credentials file found.")
     values = load(path)
     base = values.get("AUTOMATON_TEST_API_URL", "")
-    if not base or "test" not in base and "runner-01" not in base:
-        sys.exit("AUTOMATON_TEST_API_URL does not look like the test server; refusing to run.")
+    host = urllib.parse.urlparse(base).hostname or "."
+    if not base or "test" not in base and host != (values.get("AUTOMATON_TEST_API_HOST") or "-"):
+        sys.exit("AUTOMATON_TEST_API_URL does not look like the test server (no \"test\" in it and its host is not "
+                 "AUTOMATON_TEST_API_HOST); refusing to run.")
     cutoff = None
     if args.older_than_hours is not None:
         cutoff = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(hours=args.older_than_hours)

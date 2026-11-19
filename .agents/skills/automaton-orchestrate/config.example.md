@@ -41,8 +41,8 @@ A dated list of the owner's rules (process, quality bar, what is never done). Ad
 that should last.
 
 ## Accounts
-Who posts what, one line each. Example: bot = main review; warden (`~/bin/gh-warden`) = security pass; gauntlet = Gauntlet
-test issues on runner-02; Desktop/owner = releases and production deploys.
+Who posts what, one line each. Example: `<main login>` (default `gh`) = main review; `<second login>` (the `security_gh` command in
+`.agents/environment.md`) = security pass by a separate reviewer; `<test login>` = test issues; `<owner>` = releases and production deploys.
 
 ## Local quirks and traps
 Things specific to this project, machine or tooling that cost time (shell wrappers, API limits, setup that must not be
