@@ -72,6 +72,34 @@ public sealed class RunnerRuntimeStopFirstUpdateTests
     }
 
     [Test]
+    public async Task StopFirstStartsTheNewContainerWhenTheOldOneIsGone()
+    {
+        var runtime = new LockingRuntime();
+        var (manager, appId, targetId, _) = await DeployedAsync(runtime, RuntimeUpdateModes.StopFirst);
+        runtime.Lose("c1");
+
+        await manager.ApplyAsync(appId, targetId, Contract(RuntimeUpdateModes.StopFirst));
+
+        Assert.That(runtime.Events, Is.EqualTo(new[] { "create c1", "start c1", "create c2", "start c2" }));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task StopFirstReportsTheNewContainerFailureWhenTheOldOneIsGone()
+    {
+        var runtime = new LockingRuntime();
+        var (manager, appId, targetId, _) = await DeployedAsync(runtime, RuntimeUpdateModes.StopFirst);
+        runtime.Lose("c1");
+        runtime.FailNextStart = true;
+
+        var error = Assert.ThrowsAsync<InvalidOperationException>(() => manager.ApplyAsync(appId, targetId, Contract(RuntimeUpdateModes.StopFirst)));
+
+        Assert.That(error!.Message, Does.Contain("flock.lock").And.Not.Contain("could not be started again"));
+        Assert.That(runtime.Events, Is.EqualTo(new[] { "create c1", "start c1", "create c2", "start c2 (fails)", "remove c2" }));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task WithoutTheFieldTheOldContainerKeepsRunningUntilTheNewOneIsReady()
     {
         var runtime = new LockingRuntime();
@@ -126,6 +154,12 @@ public sealed class RunnerRuntimeStopFirstUpdateTests
         public int LockViolations { get; private set; }
         public bool FailNextStart { get; set; }
 
+        public void Lose(string id)
+        {
+            containers[id].Listener?.Stop();
+            containers.Remove(id);
+        }
+
         public bool IsRunning(string id) => containers[id].Running;
         public int PortOf(string id) => containers[id].Port;
 
@@ -159,6 +193,7 @@ public sealed class RunnerRuntimeStopFirstUpdateTests
         public Task StopAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
         {
             Events.Add("stop " + id);
+            if (!containers.ContainsKey(id)) throw new InvalidOperationException("container_missing: The application container does not exist.");
             containers[id].Listener?.Stop();
             containers[id] = (false, containers[id].Port, null);
             return Task.CompletedTask;

@@ -581,12 +581,14 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         try
         {
             started = await CreateCandidateContainerAsync(attempt, cancellationToken);
-            if (StopsPreviousFirst(attempt, previous))
+            // A previous container that is already gone (lost in a reboot) counts as stopped: nothing to stop or restart.
+            if (StopsPreviousFirst(attempt, previous)
+                && (await attempt.ScopedRuntime!.InspectAsync(new(attempt.AppId, attempt.TargetId), previous!.ContainerId!, cancellationToken)).Exists)
             {
                 // The old container holds a lock on the data folder, so it stops before the new one starts.
                 // Flag it first: a stop that fails halfway must still be undone.
                 previousStopped = true;
-                await attempt.ScopedRuntime!.StopAsync(new(attempt.AppId, attempt.TargetId), previous!.ContainerId!, cancellationToken);
+                await attempt.ScopedRuntime!.StopAsync(new(attempt.AppId, attempt.TargetId), previous.ContainerId!, cancellationToken);
             }
             await StartCandidateRuntimeAsync(attempt, started, cancellationToken);
             await networkPolicy.WaitForReadinessAsync(attempt.EffectivePort, attempt.Contract.Health, cancellationToken,
