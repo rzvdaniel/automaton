@@ -22,7 +22,7 @@
     "primevue": "^4.5.4",
     "vite-ssg": "^28.3.0",
     "vue": "^3.5.45",
-    "vue-router": "^4.6.4"
+    "vue-router": "^5.5.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -37,7 +37,7 @@
     "playwright": "^1.60.0",
     "prettier": "^3.7.4",
     "typescript": "~5.9.3",
-    "vite": "^6.4.4",
+    "vite": "^7.3.0",
     "vitepress": "^1.6.3",
     "vue-tsc": "^2.2.10"
   },
