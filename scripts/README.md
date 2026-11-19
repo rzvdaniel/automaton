@@ -68,6 +68,8 @@ sudo bash /opt/automaton-server/update.sh
 sudo bash /opt/automaton-server/install.sh --status
 ```
 
+`uninstall-automaton.sh` removes a server installed this way (Docker stays installed): `sudo bash uninstall-automaton.sh [--delete-data] [--yes] [--dry-run]`. See [Uninstall](../src/automaton-vue/docs/install-server.md#uninstall). Tests can redirect its system paths with the `AUTOMATON_UNINSTALL_TEST`, `AUTOMATON_SYSTEMD_DIR`, `AUTOMATON_FAIL2BAN_ETC`, `AUTOMATON_LOGROTATE_DIR`, `AUTOMATON_STATE_DIR` and `AUTOMATON_RUNNERS_DIR` variables.
+
 The Runner's nightly cleanup removes unused images; Server Console warns about low disk. The retired source blue/green deployment helpers have been removed. The separately hosted marketing website is outside the server updater.
 
 CLI releases remain independent: run [Pack CLI and Runner](../.github/workflows/nuget.yml) with an explicit version and publish enabled. See [CLI NuGet publishing](../docs/maintainers/cli-nuget-publishing.md).

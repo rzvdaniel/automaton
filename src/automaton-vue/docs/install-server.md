@@ -74,6 +74,16 @@ API=https://api.$DOMAIN
 
 Then, in the same shell: [create the administrator](./first-admin#when-an-ai-agent-sets-up-the-server-for-you), install the CLI with the install script, no .NET needed (`curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh`, then `export PATH="$HOME/.local/bin:$PATH"` in this shell; on Windows `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`) and [sign it in without a browser](./automaton-cli#log-in-without-a-browser), [add a Runner](./deploy-runner#for-ai-agents), build and deploy any requested app ([Build an Automaton app](./build-an-automaton-app)), and last run `server password-link` and show the one-time link in your final message ([first-admin](./first-admin#when-an-ai-agent-sets-up-the-server-for-you)). Do not finish before the link is shown. The whole path takes a few minutes.
 
+## Uninstall
+
+```bash
+curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/uninstall-automaton.sh -o uninstall-automaton.sh
+sudo bash uninstall-automaton.sh --dry-run      # list what would go
+sudo bash uninstall-automaton.sh                # remove, keep data
+```
+
+It removes the server containers, the Runner from `runners install --local` with its app containers and networks, the systemd units, the fail2ban jails, `/opt/automaton-server` and `/etc/automaton`. Docker stays, and so do other containers. By default your Docker volumes, the nightly backups (`/opt/automaton-server/backups`) and the backup key (`/etc/automaton/secrets/backup-key`) are kept and listed at the end. A fresh install refuses to run over kept volumes: add `--delete-data` (asks you to type the domain; `--yes` skips the question) to delete volumes, backups and key too. Running it again is safe. Agents: run `--delete-data --yes` before retrying a failed install.
+
 ## Verify it worked
 
 ```bash
