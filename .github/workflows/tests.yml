@@ -74,6 +74,8 @@ jobs:
       - run: bash -n docker/install/update-from-request.sh
       - run: python3 scripts/tests/server-update-request-test.py
       - run: bash scripts/tests/deploy-website-test.sh
+      - run: bash -n scripts/uninstall-automaton.sh
+      - run: bash scripts/tests/uninstall-automaton-test.sh
       - run: |
           sudo apt-get install -y python3-cryptography
           sudo python3 scripts/tests/server-updater-test.py
