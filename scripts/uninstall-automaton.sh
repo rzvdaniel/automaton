@@ -5,13 +5,26 @@ set -euo pipefail
 umask 077
 install_dir=/opt/automaton-server
 config_dir=/etc/automaton
-# The AUTOMATON_* overrides exist for tests only.
-runners_dir=${AUTOMATON_RUNNERS_DIR:-/opt/automaton/self-hosted-runners}
-systemd_dir=${AUTOMATON_SYSTEMD_DIR:-/etc/systemd/system}
-f2b_dir=${AUTOMATON_FAIL2BAN_ETC:-/etc/fail2ban}
-state_dir=${AUTOMATON_STATE_DIR:-/var/lib/automaton}
-logrotate_dir=${AUTOMATON_LOGROTATE_DIR:-/etc/logrotate.d}
+runners_dir=/opt/automaton/self-hosted-runners
+systemd_dir=/etc/systemd/system
+f2b_dir=/etc/fail2ban
+state_dir=/var/lib/automaton
+logrotate_dir=/etc/logrotate.d
 test_mode=${AUTOMATON_UNINSTALL_TEST:-}
+overrides=(AUTOMATON_RUNNERS_DIR AUTOMATON_SYSTEMD_DIR AUTOMATON_FAIL2BAN_ETC AUTOMATON_STATE_DIR AUTOMATON_LOGROTATE_DIR)
+if [[ -z $test_mode ]]; then
+    # Outside test mode the fixed default paths apply; the overrides are ignored.
+    for v in "${overrides[@]}"; do [[ -z ${!v:-} ]] || echo "Ignoring $v: directory overrides only work in test mode." >&2; done
+else
+    # Test mode must never reach real paths: every override is required and must lie under the temp directory.
+    tmp_root=${TMPDIR:-/tmp}; tmp_root=${tmp_root%/}
+    for v in "${overrides[@]}"; do
+        [[ -n ${!v:-} && ${!v} == "$tmp_root"/?* && ${!v} != *..* ]] \
+            || { echo "Test mode refused: $v must be set to a path under $tmp_root." >&2; exit 1; }
+    done
+    runners_dir=$AUTOMATON_RUNNERS_DIR; systemd_dir=$AUTOMATON_SYSTEMD_DIR; f2b_dir=$AUTOMATON_FAIL2BAN_ETC
+    state_dir=$AUTOMATON_STATE_DIR; logrotate_dir=$AUTOMATON_LOGROTATE_DIR
+fi
 delete_data=false
 assume_yes=false
 dry_run=false
@@ -35,6 +48,11 @@ while (($#)); do
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
+if [[ -n $test_mode ]]; then
+    for dir in "$install_dir" "$config_dir"; do
+        [[ "$dir" == "$tmp_root"/?* ]] || { echo "Test mode refused: $dir is not under $tmp_root." >&2; exit 1; }
+    done
+fi
 for dir in "$install_dir" "$config_dir" "$runners_dir" "$systemd_dir" "$f2b_dir" "$state_dir" "$logrotate_dir"; do
     [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / && ! -L "$dir" && ! "$dir" =~ (^|/)\.\.(/|$) ]] \
         || { echo "Refusing directory '$dir': use an absolute path without shell metacharacters or '..'; symlinks are refused." >&2; exit 1; }
@@ -48,13 +66,20 @@ only_kept() { # dir keptname...: true when the directory holds nothing but the n
         [[ " $* " == *" ${entry##*/} "* ]] || return 1
     done
 }
-if [[ "$install_dir" != /opt/automaton-server && -d "$install_dir" && ! -e "$install_dir/docker-compose.yml" && ! -e "$install_dir/compose.yaml" && ! -e "$install_dir/update.sh" ]] \
-    && ! only_kept "$install_dir" backups; then
-    echo "Refusing $install_dir: it is not /opt/automaton-server and holds no compose file or update.sh, so it does not look like an Automaton install." >&2; exit 1
+# A custom directory must carry Automaton's own markers (a generic compose.yaml or update.sh is not enough); an empty one is refused.
+# A directory an earlier keep-mode run emptied, leaving only the kept items, still counts, so a second run stays safe and idempotent.
+has_compose_name() { grep -Eqs '^name:[[:space:]]*"?automaton-server"?[[:space:]]*$' "$1/compose.yaml" "$1/docker-compose.yml"; }
+if [[ "$install_dir" != /opt/automaton-server ]]; then
+    if [[ ! -d "$install_dir" ]] || { ! { has_compose_name "$install_dir" && [[ -e "$install_dir/update.sh" || -e "$install_dir/release.env" ]]; } \
+        && ! { only_kept "$install_dir" backups && [[ -d "$install_dir/backups" ]]; }; }; then
+        echo "Refusing $install_dir: it is not /opt/automaton-server and has no compose file named automaton-server with update.sh or release.env." >&2; exit 1
+    fi
 fi
-if [[ "$config_dir" != /etc/automaton && -d "$config_dir" && ! -e "$config_dir/installation.json" ]] \
-    && ! only_kept "$config_dir" backup-recipient secrets; then
-    echo "Refusing $config_dir: it is not /etc/automaton and holds no installation.json, so it does not look like Automaton configuration." >&2; exit 1
+if [[ "$config_dir" != /etc/automaton ]]; then
+    if [[ ! -d "$config_dir" ]] || { [[ ! -e "$config_dir/installation.json" && ! -e "$config_dir/secrets/setup-token" ]] \
+        && ! { only_kept "$config_dir" backup-recipient secrets && [[ -e "$config_dir/secrets/backup-key" || -e "$config_dir/backup-recipient" ]]; }; }; then
+        echo "Refusing $config_dir: it is not /etc/automaton and has no installation.json or secrets/setup-token." >&2; exit 1
+    fi
 fi
 [[ $EUID == 0 || -n $test_mode ]] || $dry_run || { echo 'Run the uninstaller with sudo.' >&2; exit 1; }
 # Test mode never talks to Docker.
@@ -211,6 +236,7 @@ if $dry_run; then echo 'Would remove:'; else echo 'Removed:'; fi
 ((${#removed[@]})) && printf '  %s\n' "${removed[@]}" || echo '  nothing (already uninstalled)'
 if ((${#warnings[@]})); then echo 'Warnings:'; printf '  %s\n' "${warnings[@]}"; fi
 if $delete_data && ! $have_docker; then echo 'Warning: Docker is not running, so no volumes were removed (database and app data volumes remain). Start Docker and run this script again with --delete-data.'; fi
+if ! $delete_data && ! $have_docker; then echo 'Warning: Docker is not running, so volumes could not be checked: database and app data volumes may remain. Start Docker and run this script again to list them.'; fi
 if ! $delete_data; then
     echo 'Kept:'
     ((${#kept_volumes[@]})) && printf '  volume %s\n' "${kept_volumes[@]}"
