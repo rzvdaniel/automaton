@@ -294,7 +294,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     }
 
     private const int ProbeBatchSize = 10;
-    private static readonly TimeSpan ProbeInterval = TimeSpan.FromMinutes(2);
+    internal int ProbedRestartCountEntries { get { lock (gate) return probedRestartCounts.Count; } }
+    internal TimeSpan ProbeInterval { get; set; } = TimeSpan.FromMinutes(2);
     private DateTimeOffset nextProbe = DateTimeOffset.MinValue;
     private int probeOffset;
     private readonly Dictionary<DeploymentRuntimeKey, int> probedRestartCounts = [];
@@ -313,6 +314,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             if (now < nextProbe) return;
             nextProbe = now + ProbeInterval;
             var all = active.Values.Where(item => item.ComposeCandidateId is null).OrderBy(item => item.AppId).ThenBy(item => item.TargetId).ToArray();
+            var live = all.Select(item => new DeploymentRuntimeKey(item.AppId, item.TargetId)).ToHashSet();
+            foreach (var stale in probedRestartCounts.Keys.Where(k => !live.Contains(k)).ToArray()) probedRestartCounts.Remove(stale);
             if (all.Length == 0) return;
             probeOffset %= all.Length;
             batch = all.Skip(probeOffset).Take(ProbeBatchSize).ToArray();

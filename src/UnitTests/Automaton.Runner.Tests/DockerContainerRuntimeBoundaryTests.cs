@@ -285,6 +285,17 @@ public sealed class DockerContainerRuntimeBoundaryTests
     }
 
     [Test]
+    public async Task InspectFallsBackToZeroWhenTheRestartCountIsNotANumber()
+    {
+        var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
+            new DockerContainerRuntime.CommandResult(0, "container-1|true|false|<no value>|{}", string.Empty)));
+
+        var identity = await runtime.InspectAsync("container-1");
+
+        Assert.That(identity.RestartCount, Is.Zero);
+    }
+
+    [Test]
     public void ApplicationStartCleanupFailurePreservesStartFailure()
     {
         var runtime = new DockerContainerRuntime((arguments, _, _, _) =>
