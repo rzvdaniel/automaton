@@ -60,7 +60,8 @@ if $have_docker; then
     while read -r name; do
         [[ "$name" =~ ^automaton-self-hosted-[0-9a-f]{12}$ ]] || continue
         env=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$name" 2>/dev/null || true)
-        [[ -n "$domain" ]] && grep -Eq "^AUTOMATON_SERVER_URL=https?://(api\.)?${domain//./\\.}/?$" <<<"$env" || continue
+        if [[ -z "$domain" ]]; then echo "Warning: $name was left running: the domain is unknown (no $config_dir/installation.json). Remove it by hand if it belongs to this server." >&2; continue; fi
+        grep -Eq "^AUTOMATON_SERVER_URL=https?://(api\.)?${domain//./\\.}/?$" <<<"$env" || continue
         id=$(sed -n 's/^AUTOMATON_RUNNER_INSTALLATION_ID=//p' <<<"$env" | head -n1)
         [[ "$id" =~ ^sh_[0-9a-f]{32}$ ]] || continue
         runner_ids+=("$id")
