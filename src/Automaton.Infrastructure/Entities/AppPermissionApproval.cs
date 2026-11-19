@@ -10,6 +10,7 @@ public sealed class AppPermissionApproval
     public const string ServerRead = "server:read";
     public const string AppsReadStatus = "apps:read-status";
     public const string SecurityRead = "security:read";
+    public const string SecurityManage = "security:manage";
     public const string LogsReceive = "logs:receive";
     public const string NotifyEmail = "notify:email";
     public const string ServerCleanup = "server:cleanup";

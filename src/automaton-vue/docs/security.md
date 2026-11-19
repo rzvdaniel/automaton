@@ -40,7 +40,7 @@ A Machine Management Runner has access to the host's Docker socket to manage bou
 
 ## App permissions
 
-An app that needs platform access declares permissions in `automaton.json` (for example `backups:read` the read-only `server:read` and `security:read` (fail2ban bans, no firewall access), `server:cleanup` (read the nightly cleanup and change or run it; approve only for an app that administrators alone can open), or `notify:email`, which only emails the server's own users and an administrator-managed allowed list). Nothing is granted until a system administrator approves the request in Studio; the platform then issues a scoped key and stores it as an app secret. The API rejects calls outside the approved permissions, and revoking the approval stops the next call.
+An app that needs platform access declares permissions in `automaton.json` (for example `backups:read` the read-only `server:read` and `security:read` (fail2ban bans, no firewall access), `security:manage` (unban or allowlist an address for a system administrator; approve only for an app that administrators alone can open), `server:cleanup` (read the nightly cleanup and change or run it; approve only for an app that administrators alone can open), or `notify:email`, which only emails the server's own users and an administrator-managed allowed list). Nothing is granted until a system administrator approves the request in Studio; the platform then issues a scoped key and stores it as an app secret. The API rejects calls outside the approved permissions, and revoking the approval stops the next call.
 
 ## Audit log
 

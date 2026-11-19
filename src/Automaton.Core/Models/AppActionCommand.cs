@@ -39,3 +39,9 @@ public sealed record HostOsUpdateResult(bool Succeeded, string Summary, bool Res
 
 /// <summary>The Runner accepted a restart of the machine; it happens a minute later, so the answer can still be delivered.</summary>
 public sealed record HostRebootResult(bool Scheduled);
+
+/// <summary>One address for a fail2ban unban or allowlist; the Runner accepts only a single IPv4 or IPv6 address.</summary>
+public sealed record Fail2BanAddressRequest(string Ip);
+
+/// <summary>What the Runner did about an address; <c>Jails</c> are the jails it was changed in.</summary>
+public sealed record Fail2BanActionResult(string Ip, IReadOnlyList<string> Jails);
