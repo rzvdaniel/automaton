@@ -8,4 +8,6 @@ public class UserHomePin
     public DateTime PinnedAtUtc { get; set; }
     /// <summary>Lower comes first; new pins go last.</summary>
     public int SortOrder { get; set; }
+    /// <summary>True when the card spans two columns on Home.</summary>
+    public bool Wide { get; set; }
 }

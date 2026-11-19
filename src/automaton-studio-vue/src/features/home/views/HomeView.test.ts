@@ -14,7 +14,7 @@ vi.mock('vue-router', () => ({
 }))
 const consoleService = vi.hoisted(() => ({ install: vi.fn(), get: vi.fn() }))
 vi.mock('@/features/server/services/server-console.service', () => ({ serverConsoleService: consoleService }))
-const service = vi.hoisted(() => ({ get: vi.fn(), pin: vi.fn(), unpin: vi.fn(), reorder: vi.fn(), dismiss: vi.fn() }))
+const service = vi.hoisted(() => ({ get: vi.fn(), pin: vi.fn(), unpin: vi.fn(), reorder: vi.fn(), dismiss: vi.fn(), setSize: vi.fn(), setView: vi.fn() }))
 vi.mock('../services/home.service', () => ({ homeService: service }))
 
 const adminApps = vi.hoisted(() => ({ listApps: vi.fn(), setPermission: vi.fn() }))
@@ -209,5 +209,31 @@ describe('HomeView', () => {
     expect(cards[0]!.classes()).not.toContain('hc--stale')
     expect(cards[1]!.classes()).toContain('hc--stale')
     expect(cards[1]!.find('[data-testid="app-card-time"]').text()).toContain('Not up to date')
+  })
+
+  it('makes a card wide, switches to the list view and announces a move', async () => {
+    service.get.mockResolvedValue({
+      needsYou: [], listView: false,
+      pinned: [{ app: app('1', 'Shop'), pinnedAtUtc: '' }, { app: app('2', 'Blog'), pinnedAtUtc: '' }],
+    })
+    service.setSize.mockResolvedValue(undefined)
+    service.setView.mockResolvedValue(undefined)
+    service.reorder.mockResolvedValue(undefined)
+    const wrapper = mountHome()
+    await flushPromises()
+    await wrapper.findAll('[data-testid="toggle-wide"]')[0]!.trigger('click')
+    expect(service.setSize).toHaveBeenCalledWith('1', true)
+    expect(wrapper.findAll('[data-testid="pinned-app"]')[0]!.classes()).toContain('pin--wide')
+
+    await wrapper.find('[aria-label="Move Shop later"]').trigger('click')
+    await flushPromises()
+    expect(service.reorder).toHaveBeenCalledWith(['2', '1'])
+    expect(wrapper.find('[data-testid="move-announcement"]').text()).toBe('Shop moved to position 2 of 2')
+
+    await wrapper.find('[data-testid="view-list"]').trigger('click')
+    await flushPromises()
+    expect(service.setView).toHaveBeenCalledWith(true)
+    expect(wrapper.findAll('[data-testid="pinned-row"]')).toHaveLength(2)
+    expect(wrapper.find('[data-testid="pinned-app"]').exists()).toBe(false)
   })
 })

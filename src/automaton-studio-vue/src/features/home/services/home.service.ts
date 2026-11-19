@@ -15,6 +15,12 @@ export const homeService = {
   async reorder(appIds: string[]): Promise<void> {
     await apiClient.put('/api/home/pins/order', { appIds })
   },
+  async setSize(appId: string, wide: boolean): Promise<void> {
+    await apiClient.put(`/api/home/pins/${appId}/size`, { wide })
+  },
+  async setView(listView: boolean): Promise<void> {
+    await apiClient.put('/api/home/view', { listView })
+  },
   async refreshCard(appId: string): Promise<void> {
     await apiClient.post(`/api/home/cards/${appId}/refresh`)
   },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -13,7 +13,7 @@ import { serverConsoleService } from '@/features/server/services/server-console.
 import type { HomeCard } from '../types/home.types'
 import HomeAppCard from '../components/HomeAppCard.vue'
 import { useHomeStore } from '../stores/home.store'
-import { appFacts, moved } from '../utils'
+import { appFacts, moved, mosaic, type MosaicPlace } from '../utils'
 import PermissionRequestRow from '@/features/admin/components/PermissionRequestRow.vue'
 import { usePermissionRequests } from '@/features/admin/composables/usePermissionRequests'
 
@@ -122,10 +122,74 @@ async function drop(target: number) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'The order could not be saved.', life: 5000 })
   }
 }
-function shift(index: number, by: number) {
+const announcement = ref('')
+async function shift(index: number, by: number) {
   dragged.value = index
-  return drop(index + by)
+  await drop(index + by)
+  const target = index + by
+  if (store.pinned[target]) announcement.value = `${store.pinned[target].app.name} moved to position ${target + 1} of ${store.pinned.length}`
 }
+
+async function toggleWide(appId: string, wide: boolean) {
+  try {
+    await store.setWide(appId, wide)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'The size could not be saved.', life: 5000 })
+  }
+}
+async function setView(list: boolean) {
+  try {
+    await store.setListView(list)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'The view could not be saved.', life: 5000 })
+  }
+}
+
+// Mosaic: measure the cards and put each one in the shortest column. Falls back to a plain grid until measured.
+const gap = 12
+const minCard = 280
+const board = ref<HTMLElement | null>(null)
+const cardEls = ref<HTMLElement[]>([])
+const places = ref<MosaicPlace[]>([])
+const columns = ref(1)
+const boardHeight = ref(0)
+const measured = ref(false)
+function relayout() {
+  const el = board.value
+  if (!el || store.listView) return
+  columns.value = Math.max(1, Math.floor((el.clientWidth + gap) / (minCard + gap)))
+  const heights = store.pinned.map((_, index) => cardEls.value[index]?.offsetHeight ?? 0)
+  if (heights.some((height) => height === 0)) return
+  const result = mosaic(heights, store.pinned.map((item) => item.wide === true), columns.value, gap)
+  places.value = result.places
+  boardHeight.value = result.height
+  measured.value = true
+}
+let resizeObserver: ResizeObserver | null = null
+function observe() {
+  resizeObserver?.disconnect()
+  if (typeof ResizeObserver === 'undefined') return
+  resizeObserver = new ResizeObserver(relayout)
+  if (board.value) resizeObserver.observe(board.value)
+  cardEls.value.forEach((el) => el && resizeObserver?.observe(el))
+}
+function cardStyle(index: number) {
+  const place = places.value[index]
+  if (!measured.value || !place) return undefined
+  const width = `calc((100% - ${(columns.value - 1) * gap}px) / ${columns.value})`
+  return {
+    position: 'absolute' as const, top: `${place.top}px`, width: place.span === 2 ? `calc(${width} * 2 + ${gap}px)` : width,
+    left: `calc((${width} + ${gap}px) * ${place.column})`,
+  }
+}
+watch(() => [store.pinned.map((item) => `${item.app.id}${item.wide}`).join(), store.listView], async () => {
+  measured.value = false
+  await nextTick()
+  observe()
+  relayout()
+})
+onMounted(async () => { await nextTick(); observe(); relayout() })
+onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <template>
@@ -224,12 +288,32 @@ function shift(index: number, by: number) {
       </section>
 
       <section v-if="store.pinned.length > 0" aria-labelledby="pinned-title" data-testid="pinned-apps">
-        <h2 id="pinned-title" class="home-section">Pinned apps</h2>
-        <div class="home-cards home-cards--apps">
+        <div class="home-section-row">
+          <h2 id="pinned-title" class="home-section">Pinned apps</h2>
+          <div class="view-switch" role="group" aria-label="Home view">
+            <Button label="Cards" size="small" text :severity="store.listView ? 'secondary' : undefined" :aria-pressed="!store.listView" data-testid="view-cards" @click="setView(false)" />
+            <Button label="List" size="small" text :severity="store.listView ? undefined : 'secondary'" :aria-pressed="store.listView" data-testid="view-list" @click="setView(true)" />
+          </div>
+        </div>
+        <p class="sr-only" role="status" aria-live="polite" data-testid="move-announcement">{{ announcement }}</p>
+        <ul v-if="store.listView" class="pin-list" data-testid="pinned-list">
+          <li v-for="item in store.pinned" :key="item.app.id">
+            <RouterLink :to="`/apps/${item.app.id}`" class="pin-row" :aria-label="`Open ${item.app.name}`" data-testid="pinned-row">
+              <AppMark :id="item.app.id" :name="item.app.name" :image-url="item.app.thumbnailUrl" />
+              <span class="pin__name">{{ item.app.name }}</span>
+              <span class="pin__state" :class="`pin__state--${appState(item.app).tone}`">{{ appState(item.app).label }}</span>
+              <span class="pin-row__summary">{{ item.card?.card.status ?? '' }}</span>
+            </RouterLink>
+          </li>
+        </ul>
+        <div v-else ref="board" class="home-cards home-cards--apps" :class="{ 'home-cards--mosaic': measured }" :style="measured ? { height: `${boardHeight}px` } : undefined">
           <article
             v-for="(item, index) in store.pinned"
             :key="item.app.id"
+            :ref="(el) => { if (el) cardEls[index] = el as HTMLElement }"
             class="pin"
+            :class="{ 'pin--wide': item.wide }"
+            :style="cardStyle(index)"
             draggable="true"
             data-testid="pinned-app"
             @dragstart="dragged = index"
@@ -259,6 +343,11 @@ function shift(index: number, by: number) {
               />
               <Button icon="pi pi-arrow-left" size="small" text severity="secondary" :disabled="index === 0" :aria-label="`Move ${item.app.name} earlier`" @click="shift(index, -1)" />
               <Button icon="pi pi-arrow-right" size="small" text severity="secondary" :disabled="index === store.pinned.length - 1" :aria-label="`Move ${item.app.name} later`" @click="shift(index, 1)" />
+              <Button
+                :icon="item.wide ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" size="small" text severity="secondary"
+                :label="item.wide ? 'Normal' : 'Wide'" :aria-label="item.wide ? `Make ${item.app.name} normal width` : `Make ${item.app.name} wide`"
+                data-testid="toggle-wide" @click="toggleWide(item.app.id, !item.wide)"
+              />
               <Button icon="pi pi-bookmark-fill" size="small" text severity="secondary" :aria-label="`Unpin ${item.app.name}`" data-testid="unpin" @click="store.unpin(item.app.id)" />
             </div>
           </article>
@@ -288,6 +377,16 @@ function shift(index: number, by: number) {
 .home-head__title { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); }
 .home-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; }
 .home-section { margin: 0 0 10px; font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--ink); }
+.home-section-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.home-section-row .home-section { margin: 0; }
+.view-switch { display: flex; gap: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pin-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pin-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; color: inherit; text-decoration: none; }
+.pin-row:hover { border-color: var(--signal); }
+.pin-row__summary { flex: 1; min-width: 0; text-align: right; color: var(--ink-soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-cards--mosaic { display: block; position: relative; }
+.pin--wide { grid-column: span 2; }
 .home-skeleton, .home-cards { display: flex; flex-direction: column; gap: 8px; }
 .home-cards--apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
 .need {

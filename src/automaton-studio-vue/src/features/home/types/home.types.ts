@@ -35,11 +35,15 @@ export interface HomePinnedApp {
   app: AppListItem
   pinnedAtUtc: string
   card?: AppHomeCard | null
+  /** The card spans two columns. */
+  wide?: boolean
 }
 
 export interface HomeData {
   needsYou: HomeCard[]
   pinned: HomePinnedApp[]
+  /** Home shows one row per app instead of cards. */
+  listView?: boolean
 }
 
 /** One entry of the notification feed Studio, the CLI and the MCP tool share. */

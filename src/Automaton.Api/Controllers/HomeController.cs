@@ -50,6 +50,23 @@ public sealed class HomeController(HomeService home) : BaseController
         return NoContent();
     }
 
+    [HttpPut("pins/{appId:guid}/size")]
+    public async Task<IActionResult> SetSize(Guid appId, [FromBody] HomePinSizeRequest request, CancellationToken token)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty) return Unauthorized();
+        return await home.SetWideAsync(userId, appId, request.Wide, token) ? NoContent() : NotFound();
+    }
+
+    [HttpPut("view")]
+    public async Task<IActionResult> SetView([FromBody] HomeViewRequest request, CancellationToken token)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty) return Unauthorized();
+        await home.SetListViewAsync(userId, request.ListView, token);
+        return NoContent();
+    }
+
     [HttpPut("pins/order")]
     public async Task<IActionResult> Reorder([FromBody] HomePinOrderRequest request, CancellationToken token)
     {
