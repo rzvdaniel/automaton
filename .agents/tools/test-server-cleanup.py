@@ -179,8 +179,8 @@ def main():
         sys.exit("No credentials file found.")
     values = load(path)
     base = values.get("AUTOMATON_TEST_API_URL", "")
-    host = urllib.parse.urlparse(base).hostname or ""
-    if not base or "test" not in base and host != values.get("AUTOMATON_TEST_API_HOST", "-"):
+    host = urllib.parse.urlparse(base).hostname or "."
+    if not base or "test" not in base and host != (values.get("AUTOMATON_TEST_API_HOST") or "-"):
         sys.exit("AUTOMATON_TEST_API_URL does not look like the test server (no \"test\" in it and its host is not "
                  "AUTOMATON_TEST_API_HOST); refusing to run.")
     cutoff = None
