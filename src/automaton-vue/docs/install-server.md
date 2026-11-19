@@ -90,7 +90,7 @@ It removes the server containers, the Runner from `runners install --local` with
 curl -fsS https://api.example.com/health
 ```
 
-Expected: HTTP 200 with JSON such as `{"status":"ok","version":"server-vX.Y.Z"}` where the version is the release you installed (versions before 0.2.22 return plain `ok`). Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
+Expected: HTTP 200 with `{"status":"ok"}`. The anonymous `/health` does not show the version; `automaton installation-status` does. Then open `https://studio.example.com` and continue with [Create the first administrator](./first-admin).
 
 ## Set up email
 

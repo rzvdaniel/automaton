@@ -58,7 +58,7 @@ curl -fsS https://api.example.com/health
 automaton installation-status
 ```
 
-Expected: `{"status":"ok","version":"server-vX.Y.Z"}`, and `Version:` shows the new release.
+Expected: `{"status":"ok"}` (the anonymous `/health` does not show the version), and `Version:` shows the new release.
 
 ## Common errors
 

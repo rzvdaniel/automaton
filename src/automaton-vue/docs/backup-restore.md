@@ -73,7 +73,7 @@ curl -fsS https://api.example.com/health
 automaton installation-status
 ```
 
-Expected: `{"status":"ok","version":"server-v0.2.164"}` (your version), and your users and apps are counted.
+Expected: `{"status":"ok"}` from `/health`, and `automaton installation-status` shows your version and counts your users and apps.
 
 ## Common errors
 
