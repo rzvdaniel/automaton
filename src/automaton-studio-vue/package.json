@@ -25,7 +25,7 @@
     "@codemirror/lang-yaml": "^6.1.2",
     "@microsoft/signalr": "^9.0.6",
     "@primevue/themes": "^4.5.4",
-    "axios": "^1.13.2",
+    "axios": "^1.21.1",
     "chart.js": "^4.5.1",
     "codemirror": "^6.0.2",
     "marked": "^15.0.12",
