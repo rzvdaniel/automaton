@@ -15,6 +15,8 @@ import AdminPermissionRequestsView from './views/AdminPermissionRequestsView.vue
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
+  // The rail's Backups entry typed or bookmarked on its own.
+  { path: '/backups', redirect: { name: 'admin-backups' } },
   {
     path: '/admin',
     component: AdminLayout,
