@@ -97,7 +97,7 @@ internal static class ApiRequestLoggingMiddleware
             }));
     }
 
-    private static LogEventLevel GetLevel(
+    internal static LogEventLevel GetLevel(
         HttpContext context,
         double elapsed,
         Exception? exception,
@@ -109,7 +109,16 @@ internal static class ApiRequestLoggingMiddleware
             return LogEventLevel.Error;
         }
 
-        if (context.Response.StatusCode >= 400 || elapsed > 1000)
+        var isUpgrade = context.Response.StatusCode == StatusCodes.Status101SwitchingProtocols;
+        var isForwardAuthDenial = context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden
+            && context.Request.Path.StartsWithSegments("/internal/runtime/auth", StringComparison.OrdinalIgnoreCase);
+
+        if (isForwardAuthDenial)
+        {
+            return LogEventLevel.Information;
+        }
+
+        if (context.Response.StatusCode >= 400 || (elapsed > 1000 && !isUpgrade))
         {
             return LogEventLevel.Warning;
         }
