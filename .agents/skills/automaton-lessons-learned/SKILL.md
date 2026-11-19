@@ -6,7 +6,7 @@ license: Apache-2.0
 
 # Automaton lessons learned
 
-Turns what went wrong into fixes. Works on Desktop and on runner-01; `gh` is the only hard requirement.
+Turns what went wrong into fixes. Works on Desktop and on a headless agent host; `gh` is the only hard requirement.
 
 ## 1. Collect (since the last run)
 
@@ -40,4 +40,4 @@ One comment on the inbox, starting `Lessons run YYYY-MM-DD`: each change with it
 
 ## Schedule
 
-Nightly on runner-01: the `agent` crontab pipes a one-line prompt that says to follow this skill into `~/bin/agent-queue add lessons-$(date +\%Y\%m\%d)` (cron needs `\%`).
+Nightly on the agent host (see `.agents/environment.md`): the agent user's crontab pipes a one-line prompt that says to follow this skill into `~/bin/agent-queue add lessons-$(date +\%Y\%m\%d)` (cron needs `\%`).
