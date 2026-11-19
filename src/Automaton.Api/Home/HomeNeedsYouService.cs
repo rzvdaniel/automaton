@@ -69,7 +69,7 @@ public class HomeNeedsYouService(
         var app = apps.FirstOrDefault(item => item.Id == OffsiteBackupAppId && item.SourceId == CatalogSourceStore.OfficialId);
         return app is null || app.InstalledAppId is not null || app.RequiresNewerServer ? null
             : new(HomeCardKeys.OffsiteBackup, HomeCardKeys.OffsiteBackup, "warn", "Your backups only live on this server",
-                "If the server is lost, so are its backups. Offsite Backup copies them to another place.", "Install Offsite Backup", "/apps/catalog", true, null, app.Id);
+                $"If the server is lost, so are its backups. {app.Name} copies them to another place.", $"Install {app.Name}", "/apps/catalog", true, null, app.Id);
     }
 
     internal const string OffsiteBackupAppId = "offsite-backup";
