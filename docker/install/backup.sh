@@ -248,6 +248,9 @@ case "$mode" in
     backup)
         exec 9>"${AUTOMATON_BACKUP_LOCK_FILE:-/run/lock/automaton-backup.lock}"
         flock -n 9 || { echo 'Another backup is running.' >&2; exit 1; }
+        # Lets the API refuse a server restart while this backup runs (the status directory is mounted read-only into it).
+        install -d -m 0755 "$status_dir" && : > "$status_dir/backup.running"
+        trap 'rm -f -- "$status_dir/backup.running"' EXIT
         if take_backup; then
             write_status true ''
         else

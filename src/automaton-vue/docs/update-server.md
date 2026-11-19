@@ -44,6 +44,10 @@ The `automaton` commands run from your own machine, signed in to the server; onl
 
 A release older than the installed one is refused unless you pass `--allow-downgrade` (Studio does not offer it).
 
+## Restart the server
+
+Updates that need a restart (a new kernel) can be applied without SSH. A system administrator, or an app that holds the administrator-approved `server:restart` permission, asks the API to restart the server now or at a time within the next 7 days (`POST /api/install/restart` with an optional `{"restartAtUtc": "..."}`). The API never reboots the host: it writes a request file that the root unit `automaton-restart.path` turns into `systemctl reboot`. The request is refused while a backup, an app deploy, a server update or a Runner upgrade is running, and the host checks for a backup or update again when a scheduled restart is due (a deploy or Runner upgrade is checked only when the restart is requested) (a restart cancelled that way shows as refused in `GET /api/install/restart`). Every request is recorded in the audit log with who asked and for when, and `GET /api/install/restart` returns `lastRestartedAtUtc`. Apps come back by themselves after boot. The installer and the updater install the unit; `sudo bash /opt/automaton-server/restart-from-request.sh --install-units` enables it by hand, and `uninstall-automaton.sh` removes it.
+
 ## Fallback over SSH
 
 ```bash

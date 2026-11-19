@@ -10,6 +10,7 @@ export interface PermissionRequest {
 const words: Record<string, { wants: string; allows: string }> = {
   'notify:email': { wants: 'send email', allows: 'Lets the app email people through this server\'s email settings. It never sees the SMTP password.' },
   'backups:read': { wants: 'read backups', allows: 'Lets the app list this server\'s backups.' },
+  'server:restart': { wants: 'restart the server', allows: 'Lets the app restart this server, now or at a time you choose. Apps stop for a moment and come back by themselves.' },
   'backups:run': { wants: 'start backups', allows: 'Lets the app start a backup of this server.' },
   'server:read': { wants: 'read server status', allows: 'Lets the app read this server\'s health and settings status.' },
   'security:read': { wants: 'read fail2ban bans', allows: 'Lets the app see which addresses fail2ban banned on this server. It gets no firewall access.' },

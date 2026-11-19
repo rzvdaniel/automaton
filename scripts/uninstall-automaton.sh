@@ -176,7 +176,8 @@ done
 
 # 3. systemd units, the fail2ban jails and filters the installer added.
 for unit in automaton-update.path automaton-update.service automaton-backup.timer automaton-backup.service \
-    automaton-backup-request.path automaton-backup-request.service automaton-cleanup.timer automaton-cleanup.service; do
+    automaton-backup-request.path automaton-backup-request.service automaton-cleanup.timer automaton-cleanup.service \
+    automaton-restart.path automaton-restart.service; do
     if [[ -e "$systemd_dir/$unit" ]]; then
         [[ -n $test_mode ]] || act systemctl disable --now "$unit"; act rm -f -- "$systemd_dir/$unit"; removed+=("unit $unit")
     fi
@@ -185,6 +186,10 @@ for file in "$systemd_dir/fail2ban.service.d/automaton.conf" "$f2b_dir/jail.d/au
     "$f2b_dir/filter.d/automaton-scanner.conf" "$f2b_dir/filter.d/automaton-signin.conf" "$logrotate_dir/automaton-traefik"; do
     if [[ -e "$file" ]]; then act rm -f -- "$file"; removed+=("file $file"); fi
 done
+# A restart scheduled from Studio is a transient timer; stop it so the host does not reboot after the uninstall.
+if ! $dry_run && [[ -z $test_mode ]] && command -v systemctl >/dev/null; then
+    systemctl stop automaton-restart-scheduled.timer >/dev/null 2>&1 || true
+fi
 if ! $dry_run && [[ -z $test_mode ]]; then
     rmdir "$systemd_dir/fail2ban.service.d" 2>/dev/null || true
     command -v systemctl >/dev/null && systemctl daemon-reload >/dev/null 2>&1 || true
