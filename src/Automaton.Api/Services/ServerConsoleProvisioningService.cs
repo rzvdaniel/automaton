@@ -8,7 +8,7 @@ namespace Automaton.Api.Services;
 
 /// <summary>
 /// Installs a default app (Server Console, VictoriaLogs) from the official catalog for one system administrator (private to them), approves the
-/// permissions it asks for (the installer approves all on the first install, a person's one-button install only those listed here; each is recorded in the audit log) and deploys it. Used for a new
+/// permissions it asks for at that install (the installer and a person's one-button install both approve everything pending right after installing; later updates never are; each approval is recorded in the audit log) and deploys it. Used for a new
 /// server and for the one-button install on an existing server; it never runs without one of those two triggers.
 /// </summary>
 public sealed class ServerConsoleProvisioningService(
@@ -21,12 +21,12 @@ public sealed class ServerConsoleProvisioningService(
 {
     public const string AppId = "server-console";
 
-    /// <summary>The only permissions approved at install of Server Keeper. The app reads server state, sends email and reads the cleanup.</summary>
+    /// <summary>What Server Keeper asks for: it reads server state, sends email and reads the cleanup. Informational; installs approve what the app asks.</summary>
     internal static readonly string[] ApprovedPermissions = ["server:read", "notify:email", "server:cleanup"];
 
     /// <summary>
-    /// The apps a new server gets on its first Runner: only apps that work with no setup, each with the only permissions
-    /// approved for it. Add an app here when it ships and needs no setup; existing servers are never changed by this list.
+    /// The apps a new server gets on its first Runner: only apps that work with no setup, each with the permissions
+    /// it is expected to ask for. Add an app here when it ships and needs no setup; existing servers are never changed by this list.
     /// </summary>
     internal static readonly IReadOnlyDictionary<string, string[]> DefaultApps = new Dictionary<string, string[]>
     {
@@ -46,14 +46,23 @@ public sealed class ServerConsoleProvisioningService(
         return await FindInstalledAsync(userId, entry, token);
     }
 
-    /// <summary>Installs when missing, approves still-pending permissions and deploys a newly installed app. Impersonate or run as <paramref name="userId"/>.</summary>
+    /// <summary>
+    /// Installs when missing, approves the permissions the new app asks for and deploys it. An app that is already installed keeps its
+    /// pending requests: only the install approves, as for the first-Runner installer. Impersonate or run as <paramref name="userId"/>.
+    /// </summary>
     public async Task<Guid> ProvisionAsync(Guid userId, CatalogEntryDto? entry, CancellationToken token)
     {
         entry ??= await EntryAsync(userId, AppId, token) ?? throw new InvalidOperationException("Server Console is not available in the official catalog.");
+        var installedNow = false;
         return await RunAsync(
             find: () => FindInstalledAsync(userId, entry, token),
-            install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
-            approve: appId => ApprovePendingAsync(permissions, appId, DefaultApps.GetValueOrDefault(entry.Id, []), token),
+            install: async () =>
+            {
+                var id = (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id;
+                installedNow = true;
+                return id;
+            },
+            approve: appId => installedNow ? ApprovePendingAsync(permissions, appId, null, token, InstallerReason) : Task.CompletedTask,
             needsDeploy: appId => NeedsDeployAsync(db, appId, token),
             deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
             logger, token, entry.Name);
@@ -84,20 +93,31 @@ public sealed class ServerConsoleProvisioningService(
 
     /// <summary>
     /// Provisioning by the first-Runner installer. An app is installed only while <paramref name="installedAppId"/> is null and nothing
-    /// of it exists; the marker (the new app's id) is written right after the install, before anything can fail. Once marked, a missing app was
+    /// of it exists; the marker (the new app's id) is written right after the install, before anything can fail, together with the
+    /// permissions the app asked for then (<paramref name="markInstalled"/> gets them; a retry passes them back as <paramref name="approvedAtInstall"/>
+    /// and approves only those, so what an update asks for in the retry window stays pending). Once marked, a missing app was
     /// removed by the administrator and is left alone; an app other than the marked one was installed by the administrator and is never approved here.
     /// Returns null when the app was left alone.
     /// </summary>
     public async Task<Guid?> ProvisionByInstallerAsync(
-        Guid userId, CatalogEntryDto entry, Guid? installedAppId, Func<Guid, Task> markInstalled, CancellationToken token)
-        => await RunInstallerAsync(
+        Guid userId, CatalogEntryDto entry, Guid? installedAppId, IReadOnlyCollection<string> approvedAtInstall,
+        Func<Guid, IReadOnlyCollection<string>, Task> markInstalled, CancellationToken token)
+    {
+        var allowed = approvedAtInstall;
+        return await RunInstallerAsync(
             find: () => FindInstalledAsync(userId, entry, token),
             install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
-            markInstalled, installedAppId,
-            approve: appId => ApprovePendingAsync(permissions, appId, null, token, InstallerReason),
+            markInstalled: async appId =>
+            {
+                allowed = (await permissions.GetStatusAsync(appId, token)).Where(s => s.Status == AppPermissionStatuses.Pending).Select(s => s.Permission).ToArray();
+                await markInstalled(appId, allowed);
+            },
+            installedAppId,
+            approve: appId => ApprovePendingAsync(permissions, appId, allowed, token, InstallerReason),
             needsDeploy: appId => NeedsDeployAsync(db, appId, token),
             deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
             logger, token, entry.Name);
+    }
 
     internal static async Task<Guid?> RunInstallerAsync(
         Func<Task<Guid?>> find, Func<Task<Guid>> install, Func<Guid, Task> markInstalled, Guid? installedAppId,

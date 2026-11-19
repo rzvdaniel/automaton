@@ -16,6 +16,8 @@ public sealed class EssentialCatalogBootstrapService(
     internal static readonly string[] AppIds = [.. ServerConsoleProvisioningService.DefaultApps.Keys];
     internal const string StartedKey = "Apps.Catalog.EssentialsStartedAt";
     internal const string InstalledKeyPrefix = "Apps.Catalog.EssentialInstalled.";
+    /// <summary>The permissions an app asked for at install (comma-separated); a retry approves only these.</summary>
+    internal const string ApprovedKeyPrefix = "Apps.Catalog.EssentialApproved.";
     internal static readonly TimeSpan RetryWindow = TimeSpan.FromHours(24);
     private const long LockId = 827;
 
@@ -90,6 +92,9 @@ public sealed class EssentialCatalogBootstrapService(
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    internal static string[] ParseApproved(string? value)
+        => string.IsNullOrEmpty(value) ? [] : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     internal static bool WindowElapsed(DateTime startedUtc, DateTime nowUtc) => nowUtc - startedUtc >= RetryWindow;
 
     private static async Task<DateTime> StartedAtAsync(ApplicationDbContext db, CancellationToken cancellationToken)
@@ -138,9 +143,12 @@ public sealed class EssentialCatalogBootstrapService(
                 var key = InstalledKeyPrefix + entry.Id;
                 var marker = await db.Settings.Where(s => s.Key == key).Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
                 Guid? installedAppId = marker is null ? null : Guid.TryParse(marker, out var parsed) ? parsed : Guid.Empty;
-                var appId = await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionByInstallerAsync(adminId, entry, installedAppId, async newAppId =>
+                var approved = await db.Settings.Where(s => s.Key == ApprovedKeyPrefix + entry.Id).Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
+                // No record (an install from before it was kept) approves nothing on a retry.
+                var appId = await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionByInstallerAsync(adminId, entry, installedAppId, ParseApproved(approved), async (newAppId, asked) =>
                 {
                     db.Settings.Add(new Setting { Key = key, Value = newAppId.ToString() });
+                    db.Settings.Add(new Setting { Key = ApprovedKeyPrefix + entry.Id, Value = string.Join(',', asked) });
                     await db.SaveChangesAsync(cancellationToken);
                 }, cancellationToken);
                 if (appId is not null) logger.LogInformation("Installed or completed default catalog app {AppName} for the first administrator.", entry.Name);

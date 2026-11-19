@@ -77,6 +77,30 @@ public sealed class ServerConsoleProvisioningTests
     }
 
     [Test]
+    public async Task ARetryApprovesOnlyWhatTheAppAskedAtInstallNotWhatAnUpdateAdded()
+    {
+        // Permissions pending at install were recorded; an update in the retry window added backups:run.
+        var (service, _, appId) = await CreateAsync(AppPermissionApproval.ServerRead, AppPermissionApproval.BackupsRun);
+        var recorded = EssentialCatalogBootstrapService.ParseApproved("server:read");
+
+        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, recorded, default);
+
+        var statuses = (await service.GetStatusAsync(appId, default)).ToDictionary(s => s.Permission, s => s.Status);
+        Assert.That(statuses[AppPermissionApproval.ServerRead], Is.EqualTo(AppPermissionStatuses.Approved));
+        Assert.That(statuses[AppPermissionApproval.BackupsRun], Is.EqualTo(AppPermissionStatuses.Pending));
+    }
+
+    [Test]
+    public async Task ARetryWithNoRecordApprovesNothing()
+    {
+        var (service, _, appId) = await CreateAsync(AppPermissionApproval.ServerRead);
+
+        await ServerConsoleProvisioningService.ApprovePendingAsync(service, appId, EssentialCatalogBootstrapService.ParseApproved(null), default);
+
+        Assert.That((await service.GetStatusAsync(appId, default)).Single().Status, Is.EqualTo(AppPermissionStatuses.Pending));
+    }
+
+    [Test]
     public async Task OnlyTheFirstInstallApprovesAndALaterUpdateLeavesNewPermissionsPending()
     {
         var steps = new List<string>();
