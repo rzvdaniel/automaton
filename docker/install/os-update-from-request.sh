@@ -36,6 +36,7 @@ if [[ -z "$test_mode" && $EUID != 0 ]]; then echo 'Run with sudo.' >&2; exit 1; 
 apt=apt-get
 [[ -n "$test_mode" && -n "${AUTOMATON_OS_UPDATE_APT:-}" ]] && apt=$AUTOMATON_OS_UPDATE_APT
 reboot_required=${AUTOMATON_REBOOT_REQUIRED_FILE:-/var/run/reboot-required}
+updates_available=${AUTOMATON_UPDATES_AVAILABLE_FILE:-/var/lib/update-notifier/updates-available}
 
 requests="$os_dir/requests"
 status_dir="$os_dir/status"
@@ -205,6 +206,13 @@ run_apt() {
     apt_env "$apt" "${conf[@]}" --only-upgrade install "${packages[@]}" >>"$log_file" 2>&1
 }
 
+# apt's update-notifier hook rewrites the update summary as root-only (0600). The Runner reads it to show the update counts, so
+# make it readable again after every apt run (a symlink or missing file is left alone).
+restore_updates_summary_mode() {
+    [[ -f "$updates_available" && ! -L "$updates_available" ]] && chmod 0644 -- "$updates_available" 2>/dev/null
+    return 0
+}
+
 run_request() {
     install -d -m 0750 "$status_dir"
     install -d -m 0700 "$requests"
@@ -247,7 +255,10 @@ run_request() {
     write_status running
     local before after
     before=$(apt_env "$apt" -s upgrade 2>/dev/null | grep -c '^Inst ')
-    if run_apt; then
+    local apt_ok=0
+    run_apt && apt_ok=1
+    restore_updates_summary_mode
+    if ((apt_ok)); then
         after=$(apt_env "$apt" -s upgrade 2>/dev/null | grep -c '^Inst ')
         UPGRADED=$((before > after ? before - after : 0))
         FINISHED_AT=$(now)
