@@ -18,6 +18,9 @@ if [[ -z $test_mode ]]; then
 else
     # Test mode must never reach real paths: every override is required and must lie under the temp directory.
     tmp_root=${TMPDIR:-/tmp}; tmp_root=${tmp_root%/}
+    # TMPDIR="/" (stripped to empty) or a symlinked or missing directory is not a real temp dir: refuse.
+    [[ -n $tmp_root && $tmp_root =~ ^/[a-zA-Z0-9_./-]+$ && -d $tmp_root && $(realpath -- "$tmp_root") == "$tmp_root" ]] \
+        || { echo "Test mode refused: TMPDIR '${TMPDIR:-/tmp}' is not a real temporary directory." >&2; exit 1; }
     for v in "${overrides[@]}"; do
         [[ -n ${!v:-} && ${!v} == "$tmp_root"/?* && ${!v} != *..* ]] \
             || { echo "Test mode refused: $v must be set to a path under $tmp_root." >&2; exit 1; }
@@ -54,11 +57,9 @@ if [[ -n $test_mode ]]; then
     done
 fi
 for dir in "$install_dir" "$config_dir" "$runners_dir" "$systemd_dir" "$f2b_dir" "$state_dir" "$logrotate_dir"; do
-    [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / && ! -L "$dir" && ! "$dir" =~ (^|/)\.\.(/|$) ]] \
-        || { echo "Refusing directory '$dir': use an absolute path without shell metacharacters or '..'; symlinks are refused." >&2; exit 1; }
+    [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / && ! "$dir" =~ (^|/)\.\.(/|$) && $(realpath -m -- "$dir") == "$dir" ]] \
+        || { echo "Refusing directory '$dir': use an absolute path without shell metacharacters or '..'; it and its parents must not be symlinks." >&2; exit 1; }
 done
-# Only delete a directory that is the default or is recognisably an Automaton install. A custom directory that an earlier
-# (keep-mode) run already emptied, leaving only the kept items, still counts, so a second run stays safe and idempotent.
 only_kept() { # dir keptname...: true when the directory holds nothing but the named entries
     local dir=$1 entry; shift
     for entry in "$dir"/* "$dir"/.[!.]*; do
@@ -66,18 +67,24 @@ only_kept() { # dir keptname...: true when the directory holds nothing but the n
         [[ " $* " == *" ${entry##*/} "* ]] || return 1
     done
 }
+marker_name=.automaton-uninstalled
+# Keep mode writes this root-owned marker into each kept directory; only a directory that carries it (and nothing but kept items) may be removed on a later run.
+has_marker() { [[ -f "$1/$marker_name" && ! -L "$1/$marker_name" && ( -n $test_mode || $(stat -c %u -- "$1/$marker_name") == 0 ) ]]; }
+write_marker() { # dir: record that an earlier keep-mode run left this directory
+    $dry_run || [[ ! -d "$1" ]] || printf 'Kept by uninstall-automaton.sh for %s on %s\n' "${domain:-unknown domain}" "$(date -u +%F)" > "$1/$marker_name" 2>/dev/null || true
+}
 # A custom directory must carry Automaton's own markers (a generic compose.yaml or update.sh is not enough); an empty one is refused.
-# A directory an earlier keep-mode run emptied, leaving only the kept items, still counts, so a second run stays safe and idempotent.
+# A directory an earlier keep-mode run emptied still counts only with its marker, so a second run stays safe and idempotent.
 has_compose_name() { grep -Eqs '^name:[[:space:]]*"?automaton-server"?[[:space:]]*$' "$1/compose.yaml" "$1/docker-compose.yml"; }
 if [[ "$install_dir" != /opt/automaton-server ]]; then
     if [[ ! -d "$install_dir" ]] || { ! { has_compose_name "$install_dir" && [[ -e "$install_dir/update.sh" || -e "$install_dir/release.env" ]]; } \
-        && ! { only_kept "$install_dir" backups && [[ -d "$install_dir/backups" ]]; }; }; then
+        && ! { only_kept "$install_dir" backups "$marker_name" && has_marker "$install_dir"; }; }; then
         echo "Refusing $install_dir: it is not /opt/automaton-server and has no compose file named automaton-server with update.sh or release.env." >&2; exit 1
     fi
 fi
 if [[ "$config_dir" != /etc/automaton ]]; then
     if [[ ! -d "$config_dir" ]] || { [[ ! -e "$config_dir/installation.json" && ! -e "$config_dir/secrets/setup-token" ]] \
-        && ! { only_kept "$config_dir" backup-recipient secrets && [[ -e "$config_dir/secrets/backup-key" || -e "$config_dir/backup-recipient" ]]; }; }; then
+        && ! { only_kept "$config_dir" backup-recipient secrets "$marker_name" && has_marker "$config_dir"; }; }; then
         echo "Refusing $config_dir: it is not /etc/automaton and has no installation.json or secrets/setup-token." >&2; exit 1
     fi
 fi
@@ -206,11 +213,11 @@ if [[ -d "$install_dir" ]]; then
     else
         n=0
         for entry in "$install_dir"/* "$install_dir"/.[!.]*; do
-            [[ -e "$entry" && "$entry" != "$backup_dir" ]] || continue
+            [[ -e "$entry" && "$entry" != "$backup_dir" && "$entry" != "$install_dir/$marker_name" ]] || continue
             act rm -rf -- "$entry"; n=1
         done
         ((n)) && removed+=("directory $install_dir (except backups)")
-        [[ -d "$backup_dir" ]] && kept+=("backups in $backup_dir")
+        [[ -d "$backup_dir" ]] && kept+=("backups in $backup_dir") && write_marker "$install_dir"
     fi
 fi
 if [[ -d "$config_dir" ]]; then
@@ -219,7 +226,7 @@ if [[ -d "$config_dir" ]]; then
     else
         n=0
         for entry in "$config_dir"/* "$config_dir"/.[!.]*; do
-            [[ -e "$entry" && "$entry" != "$config_dir/backup-recipient" && "$entry" != "$config_dir/secrets" ]] || continue
+            [[ -e "$entry" && "$entry" != "$config_dir/backup-recipient" && "$entry" != "$config_dir/secrets" && "$entry" != "$config_dir/$marker_name" ]] || continue
             act rm -rf -- "$entry"; n=1
         done
         for entry in "$config_dir/secrets"/* "$config_dir/secrets"/.[!.]*; do
@@ -227,7 +234,7 @@ if [[ -d "$config_dir" ]]; then
             act rm -rf -- "$entry"; n=1
         done
         ((n)) && removed+=("directory $config_dir (except the backup key)")
-        [[ -e "$config_dir/secrets/backup-key" ]] && kept+=("backup key $config_dir/secrets/backup-key (decrypts the backups; keep it private)")
+        [[ -e "$config_dir/secrets/backup-key" ]] && kept+=("backup key $config_dir/secrets/backup-key (decrypts the backups; keep it private)") && write_marker "$config_dir"
     fi
 fi
 

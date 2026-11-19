@@ -36,6 +36,7 @@ AUTOMATON_RUNNERS_DIR=/ expect_fail --install-dir "$t/inst" --config-dir "$t/cfg
 AUTOMATON_STATE_DIR=/var/lib expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
 expect_fail --install-dir /opt/automaton-server --config-dir "$t/cfg"
 [[ -e $t/docker-called ]] && { echo "FAIL: docker called in test mode"; fail=1; }
+# Deliberately NOT run through run(): without AUTOMATON_UNINSTALL_TEST the script must ignore the overrides and use its fixed paths (dry-run, so nothing changes).
 if PATH="$t/bin:/usr/bin:/bin" bash "$s" --dry-run --install-dir "$t/inst" --config-dir "$t/cfg" >"$t/out" 2>&1; then :; fi
 grep -q 'Ignoring AUTOMATON_STATE_DIR' "$t/out" || { echo "FAIL: override not ignored outside test mode"; fail=1; }
 grep -q 'Refusing\|Dry run' "$t/out" || { echo "FAIL: unexpected non-test output"; fail=1; }
@@ -48,6 +49,20 @@ expect_ok --install-dir "$t/inst" --config-dir "$t/cfg"
 expect_ok --install-dir "$t/inst" --config-dir "$t/cfg"   # second run: nothing left to remove
 grep -q 'except backups' "$t/out" && { echo "FAIL: '(except backups)' printed with nothing removed"; fail=1; }
 grep -q 'volumes could not be checked' "$t/out" || { echo "FAIL: keep mode silent about unchecked volumes"; fail=1; }
+[[ -f $t/inst/.automaton-uninstalled && -f $t/cfg/.automaton-uninstalled ]] || { echo "FAIL: keep mode wrote no marker"; fail=1; }
+# A kept-only directory WITHOUT the marker is never accepted (it could be anything with a backups folder).
+mkdir -p "$t/lookalike/backups" "$t/cfglook/secrets"; touch "$t/lookalike/backups/b" "$t/cfglook/secrets/backup-key"
+expect_fail --install-dir "$t/lookalike" --config-dir "$t/cfg"
+expect_fail --delete-data --install-dir "$t/inst" --config-dir "$t/cfglook"
+[[ -e $t/lookalike/backups/b && -e $t/cfglook/secrets/backup-key ]] || { echo "FAIL: marker-less directory was deleted"; fail=1; }
+# Parent symlinks are refused, not only a symlinked last component.
+ln -s "$t/inst" "$t/link"; mkdir -p "$t/real/sub"; ln -s "$t/real" "$t/rlink"
+expect_fail --install-dir "$t/link" --config-dir "$t/cfg"
+expect_fail --install-dir "$t/rlink/sub" --config-dir "$t/cfg"
+# Test mode refuses TMPDIR=/ and a symlinked or missing TMPDIR.
+TMPDIR=/ expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
+TMPDIR=$t/rlink expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
+TMPDIR=$t/missing expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
 expect_ok --delete-data --install-dir "$t/inst" --config-dir "$t/cfg"
 grep -q 'no volumes were removed' "$t/out" || { echo "FAIL: no warning about volumes"; fail=1; }
 [[ -e $t/state/apps ]] && { echo "FAIL: --delete-data kept state"; fail=1; }
