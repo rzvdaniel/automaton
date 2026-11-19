@@ -24,11 +24,12 @@ public static class HomeCardKeys
     public const string RunnerUpdate = "runner-update";
     public const string AppFailed = "app-failed";
     public const string InstalledForYou = "installed-for-you";
+    public const string OffsiteBackup = "offsite-backup";
     public const string RecommendedApp = "recommended-app";
     public const string RecommendedPrefix = "recommended:";
 
     /// <summary>Only optional cards can be dismissed; the others go away when their task is done.</summary>
-    public static readonly IReadOnlySet<string> Dismissible = new HashSet<string>(StringComparer.Ordinal) { NoSmtp, NoBackup, InstalledForYou };
+    public static readonly IReadOnlySet<string> Dismissible = new HashSet<string>(StringComparer.Ordinal) { NoSmtp, NoBackup, InstalledForYou, OffsiteBackup };
 
     public static bool CanDismiss(string key) => Dismissible.Contains(key) || key.StartsWith(RecommendedPrefix, StringComparison.Ordinal) && key.Length is > 12 and <= 100;
 }

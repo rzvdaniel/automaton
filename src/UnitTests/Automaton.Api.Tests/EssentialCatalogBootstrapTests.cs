@@ -29,18 +29,20 @@ public sealed class EssentialCatalogBootstrapTests
     }
 
     [Test]
-    public void BootstrapInstallsOnlyServerConsoleAtItsCatalogCommit()
+    public void BootstrapInstallsOnlyTheDefaultAppsAtTheirCatalogCommit()
     {
         const string commit = "0123456789abcdef0123456789abcdef01234567";
-        var entries = new[] { "server-console", "website-monitor", "heartbeat" }.Select(id => Entry(id, commit)).ToList();
+        var entries = new[] { "server-console", "victorialogs", "website-monitor", "heartbeat" }.Select(id => Entry(id, commit)).ToList();
         entries.Add(Entry("server-console", "ffffffffffffffffffffffffffffffffffffffff", source: "custom"));
         var response = new CatalogResponse(entries, DateTime.UtcNow, false, false, null);
 
-        Assert.That(EssentialCatalogBootstrapService.AppIds, Is.EqualTo(new[] { "server-console" }));
+        Assert.That(EssentialCatalogBootstrapService.AppIds, Is.EquivalentTo(new[] { "server-console", "victorialogs" }));
         var missing = EssentialCatalogBootstrapService.MissingEssentials(response, new HashSet<(string Repo, string Folder)>());
-        Assert.That(missing!.Select(app => (app.Id, app.Commit)), Is.EqualTo(new[] { ("server-console", commit) }));
+        Assert.That(missing!.Select(app => (app.Id, app.Commit)), Is.EquivalentTo(new[] { ("server-console", commit), ("victorialogs", commit) }));
         Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response, new HashSet<(string Repo, string Folder)>
-            { ("rzvdaniel/automaton-apps", "maintenance/server-console") }), Is.Empty, "an existing install is kept");
+            { ("rzvdaniel/automaton-apps", "maintenance/server-console"), ("rzvdaniel/automaton-apps", "maintenance/victorialogs") }), Is.Empty, "an existing install is kept");
+        Assert.That(ServerConsoleProvisioningService.DefaultApps["victorialogs"], Is.EqualTo(new[] { "logs:receive" }), "log forwarding needs only this");
+        Assert.That(ServerConsoleProvisioningService.DefaultApps.ContainsKey("gate-keeper"), Is.False, "not until it ships");
         Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Unavailable = true }, new HashSet<(string Repo, string Folder)>()), Is.Null);
         Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Stale = true }, new HashSet<(string Repo, string Folder)>()), Is.Null);
     }
