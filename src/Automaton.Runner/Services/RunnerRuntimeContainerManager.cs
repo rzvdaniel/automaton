@@ -293,6 +293,58 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
     }
 
+    private const int ProbeBatchSize = 10;
+    internal int ProbedRestartCountEntries { get { lock (gate) return probedRestartCounts.Count; } }
+    internal TimeSpan ProbeInterval { get; set; } = TimeSpan.FromMinutes(2);
+    private DateTimeOffset nextProbe = DateTimeOffset.MinValue;
+    private int probeOffset;
+    private readonly Dictionary<DeploymentRuntimeKey, int> probedRestartCounts = [];
+
+    /// <summary>
+    /// A container Docker keeps restarting (a crash loop) is reported failed, and live again once it stays up.
+    /// Bounded: at most <see cref="ProbeBatchSize"/> containers every <see cref="ProbeInterval"/>, taken in turn, called
+    /// from the heartbeat. Compose runtimes are not probed.
+    /// </summary>
+    public async Task ProbeRestartingAsync(CancellationToken cancellationToken)
+    {
+        ActiveContainer[] batch;
+        lock (gate)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (now < nextProbe) return;
+            nextProbe = now + ProbeInterval;
+            var all = active.Values.Where(item => item.ComposeCandidateId is null).OrderBy(item => item.AppId).ThenBy(item => item.TargetId).ToArray();
+            var live = all.Select(item => new DeploymentRuntimeKey(item.AppId, item.TargetId)).ToHashSet();
+            foreach (var stale in probedRestartCounts.Keys.Where(k => !live.Contains(k)).ToArray()) probedRestartCounts.Remove(stale);
+            if (all.Length == 0) return;
+            probeOffset %= all.Length;
+            batch = all.Skip(probeOffset).Take(ProbeBatchSize).ToArray();
+            probeOffset += batch.Length;
+        }
+        foreach (var item in batch)
+        {
+            try
+            {
+                var identity = await InspectAsync(item.AppId, item.TargetId, item.ContainerId, cancellationToken);
+                if (!identity.Exists) continue;
+                // Docker resets its restart delay once a container ran 10 s, so a slow crash is seen as running: the count catches it.
+                var key = new DeploymentRuntimeKey(item.AppId, item.TargetId);
+                bool countedRestart;
+                lock (gate)
+                {
+                    countedRestart = probedRestartCounts.TryGetValue(key, out var last) && identity.RestartCount > last;
+                    probedRestartCounts[key] = identity.RestartCount;
+                }
+                if (identity.Restarting || countedRestart) registry.MarkFailed(item.AppId, item.TargetId, "The app keeps crashing and Docker keeps restarting it.");
+                else if (identity.Running) registry.MarkRecovered(item.AppId, item.TargetId);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogDebug(ex, "Could not probe container {ContainerId} of {AppId}/{TargetId}.", item.ContainerId, item.AppId, item.TargetId);
+            }
+        }
+    }
+
     /// <summary>The live container only; best effort, because the Runner start-up reconcile is the backup.</summary>
     private async Task EnableAutoRestartAsync(Guid appId, Guid targetId, string containerId)
     {

@@ -137,6 +137,23 @@ public sealed class RunnerRuntimeRebootRecoveryTests
     }
 
     [Test]
+    public void StateReportsIncludeEveryRegisteredRuntimeAsRunningUnlessItFailed()
+    {
+        var registry = new RunnerRuntimeRegistry();
+        var (okApp, okTarget, badApp, badTarget) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        registry.Register(okApp, okTarget, 19000);
+        registry.Register(badApp, badTarget, 19001);
+        registry.MarkFailed(badApp, badTarget, "crash loop");
+
+        var reports = registry.StateReports();
+        Assert.That(reports.Single(item => item.AppId == okApp).Failed, Is.False, "A running runtime is reported so a stale failed status clears.");
+        Assert.That(reports.Single(item => item.AppId == badApp).Failed, Is.True);
+
+        registry.MarkRecovered(badApp, badTarget);
+        Assert.That(registry.StateReports().All(item => !item.Failed), Is.True);
+    }
+
+    [Test]
     public void StoppingARuntimeDropsItsFailureReport()
     {
         var registry = new RunnerRuntimeRegistry();

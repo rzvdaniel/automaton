@@ -13,7 +13,7 @@ internal sealed class RunnerRuntimeStateSync(RunnerRuntimeRegistry? registry, IL
     public async Task SyncAsync(HubConnection hub, CancellationToken cancellationToken)
     {
         if (registry is null) return;
-        var pending = registry.PendingReports();
+        var pending = registry.StateReports();
         if (pending.Count == 0) return;
         try
         {
