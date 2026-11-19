@@ -81,6 +81,36 @@ public sealed class ServerConsoleProvisioningService(
     }
 
     /// <summary>
+    /// Provisioning by the first-Runner installer. An app is installed only while <paramref name="installedAppId"/> is null and nothing
+    /// of it exists; the marker (the new app's id) is written right after the install, before anything can fail. Once marked, a missing app was
+    /// removed by the administrator and is left alone; an app other than the marked one was installed by the administrator and is never approved here.
+    /// Returns null when the app was left alone.
+    /// </summary>
+    public async Task<Guid?> ProvisionByInstallerAsync(
+        Guid userId, CatalogEntryDto entry, Guid? installedAppId, Func<Guid, Task> markInstalled, CancellationToken token)
+        => await RunInstallerAsync(
+            find: () => FindInstalledAsync(userId, entry, token),
+            install: async () => (await installer.InstallAsync(new CatalogInstallRequest { Repo = entry.Repo, Folder = entry.Folder, Commit = entry.Commit }, token)).Id,
+            markInstalled, installedAppId,
+            approve: appId => ApprovePendingAsync(permissions, appId, DefaultApps.GetValueOrDefault(entry.Id, []), token),
+            needsDeploy: appId => NeedsDeployAsync(db, appId, token),
+            deploy: appId => deployer.AcceptAsync(appId, userId, userId, null, false, token),
+            logger, token, entry.Name);
+
+    internal static async Task<Guid?> RunInstallerAsync(
+        Func<Task<Guid?>> find, Func<Task<Guid>> install, Func<Guid, Task> markInstalled, Guid? installedAppId,
+        Func<Guid, Task> approve, Func<Guid, Task<bool>> needsDeploy, Func<Guid, Task> deploy,
+        ILogger logger, CancellationToken token, string appName)
+    {
+        var existing = await find();
+        // Marked: only that very app is ours (a removed one, or one the administrator installed again, is left alone).
+        if (installedAppId is { } marked ? existing != marked : existing is not null) return null;
+        var appId = existing ?? await install();
+        if (installedAppId is null) await markInstalled(appId);
+        return await RunAsync(() => Task.FromResult<Guid?>(appId), install, approve, needsDeploy, deploy, logger, token, appName);
+    }
+
+    /// <summary>
     /// True until a first deploy was ever requested. Installing already creates the default deployment target (the Runner
     /// assignment), so "has no target" is never true; a deploy operation or a deployed runtime is what shows one was started.
     /// </summary>
