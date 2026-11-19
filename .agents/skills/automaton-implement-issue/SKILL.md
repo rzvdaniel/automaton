@@ -11,7 +11,7 @@ the area skills that `AGENTS.md` lists for the code you touch; this skill is onl
 
 ## Ground rules
 
-- **Decide, do not wait.** Ask the owner only for product decisions. High-tier changes merge through the gate like any other (on runner-01/runner-02 you finish them yourself, per the owner, 2026-11-19)
+- **Decide, do not wait.** Ask the owner only for product decisions. High-tier changes merge through the gate like any other
   ([PR review](../pr-review/SKILL.md)); the production deploy needs the owner. If running something would answer the question (behaviour, output, timing,
   layout), run it and decide from the result.
 - **When you do need the owner, do not stop.** Post the question on the issue with the options and the one you would
