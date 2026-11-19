@@ -20,7 +20,9 @@ internal static partial class CatalogBuildService
     [GeneratedRegex(@"^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$")] private static partial Regex Folder();
     [GeneratedRegex(@"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")] private static partial Regex Repo();
 
-    internal sealed record Entry(string Id, string Name, string Summary, string Category, string Folder, string Commit, string MinServerVersion, IReadOnlyList<string> Permissions);
+    internal sealed record Entry(string Id, string Name, string Summary, string Category, string Folder, string Commit, string MinServerVersion, IReadOnlyList<string> Permissions, Publisher? Publisher = null);
+
+    internal sealed record Publisher(string Name, string? Logo);
 
     /// <summary>The catalog text, or the problems that stop it from being valid.</summary>
     internal static (string? Json, IReadOnlyList<string> Problems) Build(string directory, string? repoOverride, Func<string, string>? pinnedCommit = null)
@@ -53,9 +55,9 @@ internal static partial class CatalogBuildService
         {
             schemaVersion = SchemaVersion,
             repo,
-            apps = entries.Select(e => new { id = e.Id, name = e.Name, summary = e.Summary, category = e.Category, folder = e.Folder, commit = e.Commit, minServerVersion = e.MinServerVersion, permissions = e.Permissions })
+            apps = entries.Select(e => new { id = e.Id, name = e.Name, summary = e.Summary, category = e.Category, folder = e.Folder, commit = e.Commit, minServerVersion = e.MinServerVersion, permissions = e.Permissions, publisher = e.Publisher is null ? null : new { name = e.Publisher.Name, logo = e.Publisher.Logo } })
         };
-        return (JsonSerializer.Serialize(catalog, new JsonSerializerOptions { WriteIndented = true }) + "\n", []);
+        return (JsonSerializer.Serialize(catalog, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull }) + "\n", []);
     }
 
     private static void AddEntry(string directory, JsonElement item, Func<string, string> pin, List<Entry> entries, List<string> problems)
@@ -68,10 +70,21 @@ internal static partial class CatalogBuildService
         {
             var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath)).RootElement;
             if (manifest.ValueKind != JsonValueKind.Object) { problems.Add($"{folder}: automaton.json must be a JSON object."); return; }
+            var publisher = ReadPublisher(item, folder, problems);
+            if (publisher.Invalid) return;
             entries.Add(new Entry(folder.Split('/').Last(), Text(manifest, "name") ?? "", Text(manifest, "summary") ?? "",
-                Text(item, "category") ?? "", folder, pin(folder), Text(item, "minServerVersion") ?? "", Permissions(manifest)));
+                Text(item, "category") ?? "", folder, pin(folder), Text(item, "minServerVersion") ?? "", Permissions(manifest), publisher.Value));
         }
         catch (JsonException exception) { problems.Add($"{folder}: automaton.json is not valid JSON: {exception.Message}"); }
+    }
+
+    private static (Publisher? Value, bool Invalid) ReadPublisher(JsonElement item, string folder, List<string> problems)
+    {
+        if (!item.TryGetProperty("publisher", out var element) || element.ValueKind == JsonValueKind.Null) return (null, false);
+        var name = element.ValueKind == JsonValueKind.Object ? Text(element, "name")?.Trim() : null;
+        if (string.IsNullOrEmpty(name)) { problems.Add($"{folder}: publisher must be an object with a non-empty \"name\" (and an optional \"logo\")."); return (null, true); }
+        var logo = Text(element, "logo")?.Trim();
+        return (new Publisher(name, string.IsNullOrEmpty(logo) ? null : logo), false);
     }
 
     internal static IEnumerable<string> Problems(IReadOnlyList<Entry> entries)

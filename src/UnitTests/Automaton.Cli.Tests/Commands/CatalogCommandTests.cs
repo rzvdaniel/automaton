@@ -98,6 +98,41 @@ public class CatalogCommandTests
         Assert.That(JsonDocument.Parse(json!).RootElement.GetProperty("apps")[0].GetProperty("permissions")[0].GetString(), Is.EqualTo("backups:read"));
     }
 
+    [Test]
+    public void Build_CopiesThePublisher_AndOmitsItWhenNotSet()
+    {
+        Directory.CreateDirectory(Path.Combine(directory, "a/tool"));
+        Directory.CreateDirectory(Path.Combine(directory, "b/plain"));
+        File.WriteAllText(Path.Combine(directory, "catalog-apps.json"), """{"apps":[{"folder":"a/tool","category":"Ops","minServerVersion":"1.2.3","publisher":{"name":"Acme","logo":"https://example.com/a.svg"}},{"folder":"b/plain","category":"Ops","minServerVersion":"1.2.3"}]}""");
+        File.WriteAllText(Path.Combine(directory, "a/tool/automaton.json"), """{"name":"Tool","summary":"s"}""");
+        File.WriteAllText(Path.Combine(directory, "b/plain/automaton.json"), """{"name":"Plain","summary":"s"}""");
+
+        var (json, problems) = CatalogBuildService.Build(directory, "acme/apps", _ => Sha);
+
+        Assert.That(problems, Is.Empty);
+        var apps = JsonDocument.Parse(json!).RootElement.GetProperty("apps");
+        Assert.Multiple(() =>
+        {
+            Assert.That(apps[0].GetProperty("publisher").GetProperty("name").GetString(), Is.EqualTo("Acme"));
+            Assert.That(apps[0].GetProperty("publisher").GetProperty("logo").GetString(), Is.EqualTo("https://example.com/a.svg"));
+            Assert.That(apps[1].TryGetProperty("publisher", out _), Is.False);
+        });
+    }
+
+    [TestCase("""{"apps":[{"folder":"a/tool","category":"Ops","minServerVersion":"1.2.3","publisher":"Acme"}]}""", "publisher must be an object")]
+    [TestCase("""{"apps":[{"folder":"a/tool","category":"Ops","minServerVersion":"1.2.3","publisher":{"logo":"x"}}]}""", "publisher must be an object")]
+    public void Build_ReportsAnInvalidPublisher(string list, string expected)
+    {
+        Directory.CreateDirectory(Path.Combine(directory, "a/tool"));
+        File.WriteAllText(Path.Combine(directory, "catalog-apps.json"), list);
+        File.WriteAllText(Path.Combine(directory, "a/tool/automaton.json"), """{"name":"Tool","summary":"s"}""");
+
+        var (json, problems) = CatalogBuildService.Build(directory, "acme/apps", _ => Sha);
+
+        Assert.That(json, Is.Null);
+        Assert.That(problems, Has.Some.Contain(expected));
+    }
+
     [TestCase("""{"apps":[{"folder":"a/tool","category":"Ops","minServerVersion":"1.2"}]}""", "minServerVersion")]
     [TestCase("""{"apps":[{"folder":"a/tool","category":"","minServerVersion":"1.2.3"}]}""", "category is empty")]
     [TestCase("""{"apps":[{"folder":"a/../tool","category":"Ops","minServerVersion":"1.2.3"}]}""", "folder name is not allowed")]

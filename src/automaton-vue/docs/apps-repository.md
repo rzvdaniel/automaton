@@ -73,6 +73,7 @@ You edit this file. Each entry names an app folder:
 - `category` (required): a short label shown on the entry.
 - `minServerVersion` (required): the oldest Automaton Server that can run the app, as `1.2.3`. Servers older than that show the entry but do not offer Install.
 - `repo` (optional): `owner/name`. When it is missing the build uses `--repo` or the `GITHUB_REPOSITORY` variable that GitHub Actions sets.
+- `publisher` (optional, `{ "name": "Acme", "logo": "https://…/logo.svg" }`): who publishes the app; the build copies it into `catalog.json` and the Catalog tab shows it on the app. `name` is required when `publisher` is present, `logo` is an optional `https` image address. The build leaves the field out when you do not set it. Only apps from the official catalog can show the verified tick, whatever name you give.
 - `movedFrom` (optional, `{ "repo": "rzvdaniel/automaton-apps", "folder": "…" }`): the app used to be in the official catalog at that folder. A server that installed it there finds it again here, shows it as installed, and updates it from this catalog (it then records this repository and folder). It works only when the source that lists it is turned on, only for apps that left the official catalog, and an exact match in another source always wins.
 
 ## Large catalogs
