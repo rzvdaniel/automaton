@@ -14,6 +14,9 @@ public sealed class EssentialCatalogBootstrapService(
 {
     internal const string CompletionKey = "Apps.Catalog.EssentialsInstalled";
     internal static readonly string[] AppIds = [.. ServerConsoleProvisioningService.DefaultApps.Keys];
+    internal const string StartedKey = "Apps.Catalog.EssentialsStartedAt";
+    internal const string InstalledKeyPrefix = "Apps.Catalog.EssentialInstalled.";
+    internal static readonly TimeSpan RetryWindow = TimeSpan.FromHours(24);
     private const long LockId = 827;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -56,7 +59,12 @@ public sealed class EssentialCatalogBootstrapService(
             if (!locked) return false;
             if (await db.Settings.AnyAsync(s => s.Key == CompletionKey, cancellationToken)) return true;
 
-            if (!await InstallMissingAsync(scope.ServiceProvider, db, adminId, cancellationToken)) return false;
+            var started = await StartedAtAsync(db, cancellationToken);
+            if (!await InstallMissingAsync(scope.ServiceProvider, db, adminId, cancellationToken))
+            {
+                if (!WindowElapsed(started, DateTime.UtcNow)) return false;
+                logger.LogWarning("Essential catalog installation gave up after {Hours} hours; default apps not installed by now stay uninstalled.", RetryWindow.TotalHours);
+            }
             db.Settings.Add(new Setting { Key = CompletionKey, Value = "true" });
             await db.SaveChangesAsync(cancellationToken);
             return true;
@@ -82,18 +90,34 @@ public sealed class EssentialCatalogBootstrapService(
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    internal static IReadOnlyList<CatalogEntryDto>? MissingEssentials(
-        CatalogResponse response, IReadOnlySet<(string Repo, string Folder)> installed)
+    internal static bool WindowElapsed(DateTime startedUtc, DateTime nowUtc) => nowUtc - startedUtc >= RetryWindow;
+
+    private static async Task<DateTime> StartedAtAsync(ApplicationDbContext db, CancellationToken cancellationToken)
+    {
+        var setting = await db.Settings.FirstOrDefaultAsync(s => s.Key == StartedKey, cancellationToken);
+        if (setting is not null && DateTime.TryParse(setting.Value, null, System.Globalization.DateTimeStyles.RoundtripKind, out var started)) return started;
+        var now = DateTime.UtcNow;
+        db.Settings.Add(new Setting { Key = StartedKey, Value = now.ToString("O") });
+        await db.SaveChangesAsync(cancellationToken);
+        return now;
+    }
+
+    /// <summary>
+    /// The default apps this catalog can install: an app the official catalog lacks, or that needs a newer server, is skipped
+    /// and does not hold back the others. Null when the catalog itself is unavailable or stale.
+    /// </summary>
+    internal static (IReadOnlyList<CatalogEntryDto> Available, IReadOnlyList<string> Skipped)? SelectEssentials(CatalogResponse response)
     {
         if (response.Unavailable || response.Stale) return null;
-        var missing = new List<CatalogEntryDto>();
+        var available = new List<CatalogEntryDto>();
+        var skipped = new List<string>();
         foreach (var id in AppIds)
         {
             var entry = response.Apps.SingleOrDefault(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId);
-            if (entry is null || entry.RequiresNewerServer) return null;
-            if (!installed.Contains((entry.Repo, entry.Folder))) missing.Add(entry);
+            if (entry is null || entry.RequiresNewerServer) skipped.Add(id);
+            else available.Add(entry);
         }
-        return missing;
+        return (available, skipped);
     }
 
     private async Task<bool> InstallMissingAsync(IServiceProvider services, ApplicationDbContext db, Guid adminId, CancellationToken cancellationToken)
@@ -101,19 +125,26 @@ public sealed class EssentialCatalogBootstrapService(
         var catalog = services.GetRequiredService<AppCatalogService>();
         var response = await catalog.GetAsync(adminId, false, cancellationToken,
             new CatalogQuery { Source = CatalogSourceStore.OfficialId, PageSize = CatalogQuery.MaximumPageSize });
-        if (MissingEssentials(response, new HashSet<(string Repo, string Folder)>()) is null) return false;
-        // Every step is safe to repeat: a pass that stopped after an install still deploys what was never deployed.
-        var missing = AppIds.Select(id => response.Apps.Single(app => app.Id == id && app.SourceId == CatalogSourceStore.OfficialId)).ToList();
+        if (SelectEssentials(response) is not var (available, skipped)) return false;
+        foreach (var id in skipped)
+            logger.LogInformation("Default app {AppId} is missing from the official catalog or needs a newer server; skipped for now.", id);
         var userContext = services.GetRequiredService<UserContextService>();
         userContext.ImpersonateUser(adminId);
         try
         {
-            foreach (var entry in missing)
+            // Each app is marked as installed by the installer right after its install; only a marked app is resumed, never reinstalled.
+            foreach (var entry in available)
             {
-                await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionAsync(adminId, entry, cancellationToken);
-                logger.LogInformation("Installed or completed essential catalog app {AppName} for the first administrator.", entry.Name);
+                var key = InstalledKeyPrefix + entry.Id;
+                var installed = await db.Settings.AnyAsync(s => s.Key == key, cancellationToken);
+                var appId = await services.GetRequiredService<ServerConsoleProvisioningService>().ProvisionByInstallerAsync(adminId, entry, installed, async () =>
+                {
+                    db.Settings.Add(new Setting { Key = key, Value = "true" });
+                    await db.SaveChangesAsync(cancellationToken);
+                }, cancellationToken);
+                if (appId is not null) logger.LogInformation("Installed or completed default catalog app {AppName} for the first administrator.", entry.Name);
             }
-            return true;
+            return skipped.Count == 0;
         }
         finally { userContext.ClearImpersonation(); }
     }
