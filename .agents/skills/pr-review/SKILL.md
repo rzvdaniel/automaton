@@ -31,7 +31,7 @@ fits the system and breaks anything.
 Pinned action shas (`uses: owner/repo@<sha>`) are checked by CI (`.agents/tools/check-action-pins.py`). When pinning, use the commit: `git ls-remote` shows it on the `^{}` (peeled) line, not the tag object line.
 
 **Security pass.** Looks only for security problems (in Claude Code: `/security-review`). For the high tier it is a
-second fresh agent. For a medium change it is part of the same review (one agent, one more section), required on
+second fresh agent posting as a different login (`~/bin/gh-warden pr review ...`, where it exists). For a medium change it is part of the same review (one agent, one more section), required on
 the security-pass paths and whenever the change adds or changes an endpoint, a permission check, secret handling, a
 file path or shell command built from input, or anything an app or anonymous visitor can reach.
 
