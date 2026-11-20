@@ -1,19 +1,44 @@
+# The section names are the source for the write-issue skill and .agents/tools/issue-check.py.
 name: Feature request
 description: Suggest something Automaton should do.
 labels: [enhancement]
 body:
   - type: textarea
-    id: problem
+    id: goal
     attributes:
-      label: Problem
-      description: What you are trying to do and what gets in the way today.
+      label: Goal
+      description: "As a <role>, I want <capability>, so that <benefit>."
     validations:
       required: true
   - type: textarea
-    id: idea
+    id: example
     attributes:
-      label: Suggested solution
+      label: Example
+      description: A concrete case, who does what and what they see.
+    validations:
+      required: true
   - type: textarea
-    id: alternatives
+    id: suggestion
     attributes:
-      label: Alternatives you considered
+      label: Suggestion
+      description: |
+        The simplest approach you see, one idea per bullet, and what is out of scope. Use a table for options:
+
+        | Mode | What happens |
+        |---|---|
+        | Off | nothing |
+        | **Notify** (default) | "0.2.174 available" |
+    validations:
+      required: true
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: What will be checked on the test server, as a real user would do it. Not "tests pass".
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: Related
+      description: "Optional: issues, PRs and files by path (#123, src/Automaton.Api/Program.cs)."

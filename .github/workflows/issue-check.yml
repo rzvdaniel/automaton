@@ -1,0 +1,27 @@
+name: Issue check
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+concurrency:
+  group: issue-check-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  issue-check:
+    name: issue-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # The script comes from the default branch; the issue body is read from the event payload by the script only.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .agents/tools
+      - name: Run issue-check.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .agents/tools/issue-check.py

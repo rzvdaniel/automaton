@@ -30,7 +30,10 @@ the area skills that `AGENTS.md` lists for the code you touch; this skill is onl
 Create a to-do item for each step and tick them off.
 
 1. **Claim.** Find the issue, or create it first ([write-issue skill](../automaton-write-issue/SKILL.md)). With no
-   task given, take the highest-priority open issue labelled `agent:ready` that is not `agent:in-progress`. Add
+   task given, take the highest-priority open issue labelled `agent:ready` that is not `agent:in-progress`. If it has
+   the `needs-shape` label, stop before claiming: do not build or add `agent:in-progress`; comment what is missing (the
+   issue-check comment names it), report it in the handoff, and build only once the issue is fixed and the label is
+   gone. Otherwise add
    `agent:in-progress`, set the board Status to In Progress, and comment your branch name; skip an issue another
    agent already claimed. Read its parent and blockers and restate its "Done when".
 2. **Build.** Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio)
