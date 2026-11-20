@@ -33,7 +33,7 @@ public sealed class AppCatalogService(
         var version = ParseVersion(configuration["Installation:Version"]);
         var runnerVersions = await dbContext.Runners
             .Where(r => r.RunnerUsers.Any(u => u.UserId == userId))
-            .Select(r => r.ApiCompatibilityVersion).ToListAsync(cancellationToken);
+            .Select(r => r.Version).ToListAsync(cancellationToken);
         var apps = new List<CatalogEntryDto>();
         var problems = new List<string>();
         DateTime? fetchedAt = null;

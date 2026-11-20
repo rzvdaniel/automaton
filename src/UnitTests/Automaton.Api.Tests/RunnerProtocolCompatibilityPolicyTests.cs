@@ -70,22 +70,26 @@ public sealed class RunnerProtocolCompatibilityPolicyTests
         ApiCompatibilityVersion = version
     };
 
-    [Test]
-    public void OldRunnerIsToldToUpgradeForANewPermission()
+    [TestCase("0.2.166", "security:read", true)]
+    [TestCase("0.2.172", "security:manage", true)]
+    [TestCase("0.2.167", "logs:receive", true)]
+    [TestCase("0.2.173", "security:manage", false)]
+    [TestCase("0.2.173", "logs:receive", false)]
+    [TestCase("0.2.1", "backups:read", false)]
+    [TestCase(null, "security:manage", false)]
+    [TestCase("not-a-version", "security:manage", false)]
+    public void RunnerReleaseDecidesIfAPermissionIsKnown(string? release, string permission, bool tooOld)
     {
-        var runner = CreateRunner(RunnerApiCompatibilityVersions.AppTunnelOverHttp2);
+        var runner = CreateRunner(RunnerApiCompatibilityVersions.Current);
+        runner.Version = release;
+        if (!tooOld)
+        {
+            Assert.DoesNotThrow(() => RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(runner, ["backups:read", permission]));
+            return;
+        }
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(runner, ["backups:read", "security:read"]));
-        Assert.That(exception!.Message, Does.Contain("Runner too old").And.Contain("security:read").And.Contain("Upgrade"));
+            RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(runner, ["backups:read", permission]));
+        Assert.That(exception!.Message, Does.Contain("Runner too old").And.Contain(permission).And.Contain("Upgrade").And.Contain(release));
         Assert.That(exception.Message, Does.Not.Contain("backups:read"));
-    }
-
-    [Test]
-    public void CurrentRunnerAcceptsEveryPermissionAndOldRunnerAcceptsOldOnes()
-    {
-        Assert.DoesNotThrow(() => RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(
-            CreateRunner(RunnerApiCompatibilityVersions.Current), Automaton.Core.Models.ApplicationContractValidator.SupportedPermissions));
-        Assert.DoesNotThrow(() => RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(
-            CreateRunner(RunnerApiCompatibilityVersions.AppTunnelOverHttp2), ["backups:read", "server:read"]));
     }
 }
