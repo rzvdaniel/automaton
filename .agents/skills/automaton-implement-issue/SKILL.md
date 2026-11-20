@@ -33,7 +33,8 @@ Create a to-do item for each step and tick them off.
    task given, take the highest-priority open issue labelled `agent:ready` that is not `agent:in-progress`. Add
    `agent:in-progress`, set the board Status to In Progress, and comment your branch name; skip an issue another
    agent already claimed. Read its parent and blockers and restate its "Done when".
-2. **Build.** Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio)
+2. **Build.** If the issue has the `needs-shape` label, stop: do not build. Comment what is missing (the issue-check
+   comment names it) and report it in the handoff; build only once the issue is fixed and the label is gone. Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio)
    and commit a failing test before the fix. Add tests for new behaviour, including who gets 200, 403 and 404.
 3. **Show it works.** Run the affected test projects and, for Studio, `npx vue-tsc --noEmit -p tsconfig.app.json` in
    `src/automaton-studio-vue`. `main` is green, so every failure is yours; never skip or delete a failing test unless
