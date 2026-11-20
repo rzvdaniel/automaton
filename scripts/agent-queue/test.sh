@@ -36,4 +36,27 @@ r=$(limit_deadline "hit your limit resets soonish"); (( r >= now + 3890 && r <= 
 n='Note from agent-queue: the previous run stopped at the usage limit.'
 echo task > "$t/lt"; for i in 1 2; do grep -qF "$n" "$t/lt" || printf '\n\n%s more\n' "$n" >> "$t/lt"; done
 [[ $(grep -cF "$n" "$t/lt") == 1 ]] || fail "note duplicated"
+# agent-cleanup: removes merged clean worktrees, keeps unpushed/dirty/open ones
+export AGENT_CLEAN_REPOS=$t/repo GH=$t/gh
+git init -q --bare "$t/origin.git"; git init -q -b main "$t/repo"; cd "$t/repo"
+git config user.email t@t; git config user.name t; git remote add origin "$t/origin.git"
+git commit -q --allow-empty -m init; git push -q origin main
+for b in merged dirty unpushed open; do git worktree add -q -b $b "$t/wt-$b"; git -C "$t/wt-$b" commit -q --allow-empty -m $b; git -C "$t/wt-$b" push -q origin $b; done
+echo x > "$t/wt-dirty/new.txt"
+git -C "$t/wt-unpushed" commit -q --allow-empty -m local
+cat > "$t/gh" <<G
+#!/usr/bin/env bash
+b=\$4; sha=\$(git --git-dir=$t/origin.git rev-parse "refs/heads/\$b")
+[[ \$b == open ]] && echo "OPEN \$sha" || echo "MERGED \$sha"
+G
+chmod +x "$t/gh"
+git -C "$t/repo" worktree add -q -b busy "$t/wt-busy"; git -C "$t/wt-busy" commit -q --allow-empty -m busy; git -C "$t/wt-busy" push -q origin busy
+(cd "$t/wt-busy" && exec sleep 30) & busy=$!
+sleep 1; out=$("$d/agent-cleanup" worktrees); cd "$d"; kill $busy
+[[ -d $t/wt-busy ]] || fail "worktree in use was removed"
+[[ ! -d $t/wt-merged ]] || fail "merged worktree kept: $out"
+for b in dirty unpushed open; do [[ -d $t/wt-$b ]] || fail "$b worktree removed"; done
+[[ $out == *"kept $t/wt-unpushed: HEAD is not"* ]] || fail "unpushed reason: $out"
+AGENT_CLEAN_DISK_PATH=$t AGENT_CLEAN_MIN_GIB=0 "$d/agent-cleanup" caches | grep -q "left alone" || fail "caches cleared with enough space"
+[[ $("$d/agent-cleanup" disk) == "free disk: "*" GiB"* ]] || fail "disk line"
 echo "ALL PASS"

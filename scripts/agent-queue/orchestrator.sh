@@ -22,7 +22,7 @@ mkdir -p "$Q/orchestrator"; log() { echo "$(date -Is) $*" | tee -a "$Q/orchestra
   fi
 done
 if [[ ${ORCH_REPORT:-} == 1 ]]; then
-  "$AQ" status > "$Q/orchestrator/status.txt"
-  printf 'Read %s and the GitHub state of the issues named there. Write a short morning report to %s: merged PRs, blocked tasks, latest test-server release. Do not merge, release or touch production.\n' \
+  { "$AQ" status; "$(dirname "$AQ")/agent-cleanup" disk; } > "$Q/orchestrator/status.txt"
+  printf 'Read %s and the GitHub state of the issues named there. Write a short morning report to %s: merged PRs, blocked tasks, latest test-server release, and the "free disk" line from the file (say so if it is under 15 GiB). Do not merge, release or touch production.\n' \
     "$Q/orchestrator/status.txt" "$Q/orchestrator/morning-report.md" | "$AQ" add "report-$(date +%Y%m%d%H%M)" || true
 fi
