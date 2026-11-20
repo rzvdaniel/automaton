@@ -24,10 +24,12 @@ removable() {
   local prs; prs=$(cd "$repo" && $GH pr list --head "$br" --state all --json state,headRefOid -q '.[] | "\(.state) \(.headRefOid)"' 2>/dev/null) || { echo "gh failed"; return 1; }
   grep -q '^OPEN ' <<< "$prs" && { echo "PR still open"; return 1; }
   [[ -n $prs ]] || { echo "no PR for the branch"; return 1; }
-  # nothing unpushed: every commit is on a remote branch, or was exactly the head of a merged/closed PR
-  if [[ -n $(git -C "$wt" rev-list HEAD --not --remotes 2>/dev/null | head -n1) ]]; then
-    grep -q "^[A-Z]* $head\$" <<< "$prs" || { echo "unpushed commits"; return 1; }
-  fi
+  # nothing unpushed and nothing newer than the PR: HEAD must be exactly the head of a merged/closed PR
+  grep -q "^[A-Z]* $head\$" <<< "$prs" || { echo "HEAD is not the head of the merged PR (unpushed or newer commits)"; return 1; }
+  # a running process (an agent task, a shell) works inside it
+  local c; for c in /proc/[0-9]*/cwd; do
+    case $(readlink "$c" 2>/dev/null) in "$wt"|"$wt"/*) echo "in use by a running process"; return 1;; esac
+  done
   return 0
 }
 

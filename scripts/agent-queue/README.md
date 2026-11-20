@@ -25,7 +25,7 @@ Install does not restart the worker; a running task keeps its old script until t
 ## Disk cleanup
 
 `agent-cleanup worktrees` (daily 04:30) removes a git worktree and its branch only when its PR is merged or closed, the
-tree is clean (no uncommitted or untracked files) and nothing is unpushed (every commit is on a remote branch or was the
-exact head of the merged PR). Everything else is kept and the reason is printed. `agent-cleanup caches` (Sundays 05:00)
+tree is clean (no uncommitted or untracked files) and HEAD is exactly the head of the merged/closed PR (so nothing is unpushed or newer), and no running process has it as
+its working directory. Ignored files (such as a local `.env`) go with the worktree. Everything else is kept and the reason is printed. `agent-cleanup caches` (Sundays 05:00)
 clears NuGet and npm caches when free space is under 15 GiB. `agent-cleanup disk` prints the free space; the morning
 report includes it. Repos: `AGENT_CLEAN_REPOS`; `AGENT_CLEAN_DRY=1` only prints. Not the server's own cleanup (Server Keeper).
