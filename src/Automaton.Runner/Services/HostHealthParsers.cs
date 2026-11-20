@@ -168,20 +168,22 @@ internal static partial class HostHealthParsers
         return (pretty ?? name, version);
     }
 
-    /// <summary>Ubuntu's update-notifier summary; null counts when the file is missing or unreadable.</summary>
-    public static (int? Pending, int? Security) ParseUpdatesAvailable(string? text)
+    /// <summary>
+    /// Update counts from <c>apt-check</c> ("all;security") or, as a fallback, <c>apt list --upgradable</c>; null counts when
+    /// neither produced a usable answer.
+    /// </summary>
+    public static (int? Pending, int? Security) ParseUpdateCounts(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return (null, null);
-        var pending = PendingPattern().Match(text);
-        if (!pending.Success) return (null, null);
-        var security = SecurityPattern().Match(text);
-        return (int.Parse(pending.Groups[1].Value, CultureInfo.InvariantCulture),
-            security.Success ? int.Parse(security.Groups[1].Value, CultureInfo.InvariantCulture) : 0);
+        var check = AptCheckPattern().Match(text);
+        if (check.Success)
+            return (int.Parse(check.Groups[1].Value, CultureInfo.InvariantCulture),
+                int.Parse(check.Groups[2].Value, CultureInfo.InvariantCulture));
+        var lines = text.Split('\n', StringSplitOptions.TrimEntries).Where(line => line.Contains("[upgradable from", StringComparison.Ordinal)).ToArray();
+        if (lines.Length == 0 && !text.Contains("Listing", StringComparison.Ordinal)) return (null, null);
+        return (lines.Length, lines.Count(line => line.Split(' ', 2)[0].Split('/', 2)[^1].Contains("-security", StringComparison.Ordinal)));
     }
 
-    [GeneratedRegex(@"(\d+) updates? can be applied", RegexOptions.IgnoreCase)]
-    private static partial Regex PendingPattern();
-
-    [GeneratedRegex(@"(\d+) of these updates? (?:is|are) (?:a )?standard security updates?", RegexOptions.IgnoreCase)]
-    private static partial Regex SecurityPattern();
+    [GeneratedRegex(@"^\s*(\d+);(\d+)\s*$", RegexOptions.Multiline)]
+    private static partial Regex AptCheckPattern();
 }

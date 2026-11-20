@@ -50,7 +50,6 @@ class OsUpdateFromRequestTests(unittest.TestCase):
             'AUTOMATON_RESTART_DIR': str(self.restart), 'AUTOMATON_SYSTEMD_DIR': str(self.systemd),
             'AUTOMATON_BACKUP_LOCK_FILE': str(self.backup_lock), 'AUTOMATON_OS_UPDATE_APT': str(apt),
             'AUTOMATON_REBOOT_REQUIRED_FILE': str(self.reboot_required),
-            'AUTOMATON_UPDATES_AVAILABLE_FILE': str(root / 'updates-available'),
             'AUTOMATON_FAKE_DIR': str(self.fake), 'AUTOMATON_FAKE_FAIL': str(self.fail_marker),
         }
         self.run_script('--install-units')
@@ -100,14 +99,6 @@ class OsUpdateFromRequestTests(unittest.TestCase):
         self.assertEqual(len(upgrade), 1)
         self.assertIn('-o Dpkg::Options::=--force-confold', upgrade[0])
         self.assertTrue(self.status()['restartRequired'])
-
-    def test_the_update_summary_stays_readable_after_apt_rewrites_it_root_only(self):
-        summary = Path(self.temporary.name) / 'updates-available'
-        summary.write_text('2 updates')
-        summary.chmod(0o600)
-        self.request({'requestedBy': 'x', 'scope': 'security'})
-        self.assertEqual(self.run_script().returncode, 0)
-        self.assertEqual(stat.S_IMODE(summary.stat().st_mode), 0o644)
 
     def test_a_failed_apt_run_is_reported_with_its_log(self):
         self.fail_marker.write_text('')
