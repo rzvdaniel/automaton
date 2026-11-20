@@ -42,7 +42,7 @@ that should last.
 
 ## Accounts
 Who posts what, one line each. Example: `<main login>` (default `gh`) = main review; `<second login>` (the `security_gh` command in
-`.agents/environment.md`) = security pass by a separate reviewer; `<test login>` = test issues; `<owner>` = releases and production deploys.
+`.agents/environment.md`) = security pass by a separate reviewer (may be plain `gh` if that machine's login differs from the main reviewer's); `<test login>` = test issues; `<owner>` = releases and production deploys.
 
 ## Reviewer accounts
 `merge-gate.py` needs the main review and the security pass from different GitHub logins.

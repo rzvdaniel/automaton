@@ -31,14 +31,14 @@ fits the system and breaks anything.
 Pinned action shas (`uses: owner/repo@<sha>`) are checked by CI (`.agents/tools/check-action-pins.py`). When pinning, use the commit: `git ls-remote` shows it on the `^{}` (peeled) line, not the tag object line.
 
 **Security pass.** Looks only for security problems (in Claude Code: `/security-review`). For the high tier it is a
-second fresh agent posting with the second login named in `.agents/environment.md` (`security_gh` command; the main review uses the default `gh` login; without a second login, stop and say a different login must post it). For a medium change it is part of the same review (one agent, one more section), required on
+second fresh agent: use the `security_gh` command named in `.agents/environment.md`; if none is named, use plain `gh` only when `gh api user --jq .login` differs from every login that posted a main review of the PR; otherwise stop and say a different login must post it. The main review uses the default `gh` login. A login that posted the security pass cannot re-review the same PR. For a medium change it is part of the same review (one agent, one more section), required on
 the security-pass paths and whenever the change adds or changes an endpoint, a permission check, secret handling, a
 file path or shell command built from input, or anything an app or anonymous visitor can reach.
 
 **Different logins.** Reviewers and security passes start as the `automaton-reviewer` agent
 ([`.claude/agents/automaton-reviewer.md`](../../../.claude/agents/automaton-reviewer.md)), never a generic agent.
 `merge-gate.py` requires the main review and the separate security pass to come from different GitHub logins. Before
-posting, check which login you post as (`gh api user -q .login`) and which logins already reviewed the PR. Post the main
+posting, check which login you post as (`gh api user --jq .login`) and which logins already reviewed the PR. Post the main
 review only if your login has not posted the security pass on this PR, and the security pass only if it has not posted
 the main review. If you would collide, stop and report which other login must post instead. A re-review after a rebase
 or fixes counts as a main review.

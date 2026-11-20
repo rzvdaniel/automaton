@@ -28,8 +28,9 @@ that the end-to-end check runs after release on a maintainer's test server.
   without board access skip this: file the issue and the maintainers place it.
 
 ## Second login for the security pass
-- `security_gh`: the command that runs `gh` as the second login (for example `~/bin/<wrapper>`). The security-pass reviewer
-  posts only with it. Without one, a high-tier PR stops and says a different login must post the security pass.
+- `security_gh`: the command that posts the security pass (for example `~/bin/<wrapper>`, or plain `gh` when this machine's
+  login differs from the main reviewer's). Without one, plain `gh` is used only if `gh api user --jq .login` differs from every main
+  reviewer of the PR; otherwise stop and say a different login must post the security pass.
 
 ## Agents
 - Which agents run where (for example a headless agent on the test server), how to start them and where their logs are.
