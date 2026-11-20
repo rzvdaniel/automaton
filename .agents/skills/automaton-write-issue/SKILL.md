@@ -33,6 +33,9 @@ What should happen instead.
 
 **Done when**
 What will be checked on the test server (and, if it shows there, on production).
+
+**Related**
+Optional: issues, PRs and files by path.
 ```
 
 For a feature:
@@ -45,16 +48,39 @@ As a <role>, I want <capability>, so that <benefit>.
 A concrete case: who does what, and what they see.
 
 **Suggestion**
-The simplest approach you see, and what is out of scope.
+- The simplest approach you see, one idea per bullet.
+- A table when there are options (see Formatting):
+
+  | Mode | What happens |
+  |---|---|
+  | Off | nothing |
+  | **Notify** (default) | "0.2.174 available", with the release notes |
+
+- Out of scope: what this issue will not do.
 
 **Done when**
 What will be checked on the test server, as a real user would do it.
+
+**Related**
+Optional: issues, PRs and files by path.
 ```
 
 "Done when" names an end-to-end check, not "tests pass". If only a unit test can cover it (for example it needs a
 fresh server), say so; the issue then gets `verified-partial` until someone runs the real check.
 
 Keep it short. Link related issues and PRs by number. No credentials, hostnames from secrets, or customer data.
+
+## Formatting
+
+So issues read well for people and agents alike:
+
+- A **table** for options, modes, settings, permissions or a before/after: one row per item, a short "What happens" column.
+- A **Mermaid** diagram (`flowchart` or `sequenceDiagram` in a `mermaid` code block) only when a flow has 3+ steps or 3+
+  parts talking to each other, under about 10 nodes. GitHub renders it; agents read the text.
+- Numbered lists for steps, bullets for everything else; one idea per bullet.
+- Code blocks for commands, errors, config and file paths. Quote error text exactly.
+- Bold only the key term at the start of a bullet, or the default choice.
+- No ASCII-art boxes, images of text or emoji. Plain words; name things the way the UI names them.
 
 ## Board
 
