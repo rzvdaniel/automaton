@@ -1,15 +1,22 @@
 import type { AppListItem } from '@/features/apps/types/apps.types'
 import { formatShortTime } from '@/features/apps/utils/app-list-display'
 
-/** The platform facts shown on a pinned app's card, from the data every app list item already has. */
-export function appFacts(app: AppListItem, now = new Date()): { label: string; value: string }[] {
-  const facts: { label: string; value: string }[] = []
+/** The one muted footer line of a pinned card: when it was deployed (or last ran) and when its card was updated. */
+export function footerLine(app: AppListItem, card: { updatedAtUtc: string; stale: boolean } | null | undefined, now = new Date()): string {
+  const parts: string[] = []
   const deployed = app.liveEnvironment?.lastSuccessfulDeploymentAtUtc
-  facts.push({ label: 'Last deploy', value: deployed ? formatShortTime(deployed, now) : 'never' })
-  const run = app.lastActionRun
-  if (run) facts.push({ label: 'Last Action run', value: `${run.moduleKey} ${run.status.toLowerCase()} ${formatShortTime(run.createdAtUtc, now)}` })
-  facts.push({ label: 'Runner', value: app.runner?.name ?? 'none' })
-  return facts
+  if (deployed) parts.push(`Deployed ${formatShortTime(deployed, now)}`)
+  else if (app.lastActionRun) parts.push(`Last run ${formatShortTime(app.lastActionRun.createdAtUtc, now)}`)
+  else parts.push('Not deployed yet')
+  if (card) parts.push(card.stale ? `Not up to date, updated ${formatShortTime(card.updatedAtUtc, now)}` : `updated ${formatShortTime(card.updatedAtUtc, now)}`)
+  return parts.join(' \u00b7 ')
+}
+
+export interface SlotRect { left: number; top: number; width: number; height: number }
+
+/** The index of the rectangle the point is inside, ignoring `skip`; -1 when it is over none (or only over the gaps). */
+export function slotAt(rects: SlotRect[], x: number, y: number, skip: number): number {
+  return rects.findIndex((r, i) => i !== skip && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height)
 }
 
 /** Moves one item to a new index, for drag and drop. */

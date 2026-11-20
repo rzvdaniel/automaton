@@ -1,30 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import type { AppListItem } from '@/features/apps/types/apps.types'
-import { appFacts, moved } from './utils'
+import { footerLine, moved, slotAt } from './utils'
 
 const app = (extra: Partial<AppListItem>): AppListItem => ({
   id: 'a', name: 'Shop', summary: '', description: '', tags: [], isPublished: false, updatedAtUtc: '', canDelete: false,
   runtime: { genericRuntimeDeployed: true }, ...extra,
 })
 
-describe('appFacts', () => {
+describe('footerLine', () => {
   const now = new Date('2026-11-17T12:00:00Z')
+  const live = (at: string | null) => ({ name: 'Live', status: 'Running', isHostedRunner: false, runnerOnline: true, genericRuntimeDeployed: true, routePath: '', lastSuccessfulDeploymentAtUtc: at })
 
-  it('shows last deploy and Runner for a web app', () => {
-    const facts = appFacts(app({
-      runner: { id: 'r', name: 'home-box', purpose: 'x', connectivityStatus: 'Online' },
-      liveEnvironment: { name: 'Live', status: 'Running', isHostedRunner: false, runnerOnline: true, genericRuntimeDeployed: true, routePath: '', lastSuccessfulDeploymentAtUtc: '2026-11-17T09:00:00Z' },
-    }), now)
-    expect(facts).toEqual([{ label: 'Last deploy', value: '3h ago' }, { label: 'Runner', value: 'home-box' }])
+  it('says when it was deployed and when the card was updated', () => {
+    const line = footerLine(app({ liveEnvironment: live('2026-11-17T09:00:00Z') }), { updatedAtUtc: '2026-11-17T11:59:00Z', stale: false }, now)
+    expect(line).toBe('Deployed 3h ago \u00b7 updated 1m ago')
   })
+  it('falls back to the last Action run, then to not deployed, and flags a stale card', () => {
+    const run = { moduleKey: 'nightly', status: 'Succeeded', createdAtUtc: '2026-11-17T11:30:00Z' }
+    expect(footerLine(app({ lastActionRun: run }), null, now)).toBe('Last run 30m ago')
+    expect(footerLine(app({}), { updatedAtUtc: '2026-11-17T11:00:00Z', stale: true }, now)).toBe('Not deployed yet \u00b7 Not up to date, updated 1h ago')
+  })
+})
 
-  it('adds the last Action run and says never when nothing was deployed', () => {
-    const facts = appFacts(app({ lastActionRun: { moduleKey: 'nightly', status: 'Succeeded', createdAtUtc: '2026-11-17T11:30:00Z' } }), now)
-    expect(facts).toEqual([
-      { label: 'Last deploy', value: 'never' },
-      { label: 'Last Action run', value: 'nightly succeeded 30m ago' },
-      { label: 'Runner', value: 'none' },
-    ])
+describe('slotAt', () => {
+  const rects = [{ left: 0, top: 0, width: 100, height: 50 }, { left: 110, top: 0, width: 100, height: 50 }]
+  it('finds the slot under the point, skips the dragged one and ignores the gap', () => {
+    expect(slotAt(rects, 150, 20, 0)).toBe(1)
+    expect(slotAt(rects, 50, 20, 0)).toBe(-1)
+    expect(slotAt(rects, 105, 20, -1)).toBe(-1)
   })
 })
 
