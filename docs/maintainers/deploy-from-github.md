@@ -13,7 +13,7 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
 3. **Deployment branches and tags:** choose "Selected branches and tags" and add `main`.
 4. **Environment secrets** (not repository secrets):
    - `PROD_SSH_HOST`: the server's host name or IP.
-   - `PROD_SSH_USER`: the SSH user, which may run `sudo /usr/bin/bash /opt/automaton-server/update.sh` without a password.
+   - `PROD_SSH_USER`: the SSH user, which may run `sudo /usr/bin/bash /opt/automaton-server/update.sh` without a password. `update.sh` refuses `--bundle`, `--checksum`, `--install-dir`, `--config-dir`, `--backup-dir` and `--keep-backups` and `--allow-downgrade` when it runs through sudo from such an account (`SUDO_USER` set, not root, and `sudo -l` for it does not list `ALL`), so a broad rule like `update.sh *` still allows only no options and `--version`. An administrator with full sudo rights can still use them. Never add `SETENV:` or `env_keep` to this rule: the check trusts the environment sudo hands the script. Prefer the narrow rule `/usr/bin/bash /opt/automaton-server/update.sh --version server-v<X.Y.Z>` anyway (sudo-rs rejects wildcards).
    - `PROD_SSH_KEY`: a private key dedicated to this workflow, with its public key in that user's `authorized_keys`. Lock that line to the update command, so a leaked key can do nothing else:
 
      ```
