@@ -101,7 +101,7 @@ if $have_docker; then
 fi
 # Units, fail2ban jails, the state directory and the Runner folder are host-wide: only the install they point at may remove them.
 own_host=true
-if [[ -e "$systemd_dir/automaton-backup.service" ]] && ! grep -qF -- "$install_dir/" "$systemd_dir/automaton-backup.service"; then
+if [[ -e "$systemd_dir/automaton-backup.service" ]] && ! grep -qE -- "(^|[[:space:]=])${install_dir//./\\.}/" "$systemd_dir/automaton-backup.service"; then
     own_host=false
     host_note="The systemd units, fail2ban jails, $state_dir and $runners_dir belong to another install on this host and were left alone."
 fi
@@ -117,7 +117,9 @@ if $delete_data && $final_backup; then
             || { echo 'The final backup failed. Nothing was changed; pass --no-final-backup to delete without one.' >&2; exit 1; }
         newest=$(find "$install_dir/backups/nightly" -maxdepth 1 -name 'automaton-*.tar.age' -printf '%f\n' | sort | tail -n1)
         [[ -n $newest && -s "$install_dir/backups/nightly/$newest" ]] || { echo 'The final backup left no archive. Nothing was changed.' >&2; exit 1; }
-        install -d -m 0700 "$final_backup_dir"
+        install -d -m 0755 /var/backups && final_backup_dir=$(mktemp -d "$final_backup_dir.XXXX") || { echo 'Cannot create the final backup folder. Nothing was changed.' >&2; exit 1; }
+        env_config=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" 2>/dev/null | cut -d= -f2- || true)
+        [[ -z $env_config || $env_config == "$config_dir" ]] || { rmdir "$final_backup_dir"; echo "The install's .env says CONFIG_DIR=$env_config, not $config_dir: the backup key would not match. Nothing was changed." >&2; exit 1; }
         cp -- "$install_dir/backups/nightly/$newest" "$config_dir/secrets/backup-key" "$final_backup_dir/"
         (cd "$final_backup_dir" && [[ $(sha256sum < "$newest") == $(sha256sum < "$install_dir/backups/nightly/$newest") ]]) \
             || { echo 'The copy of the final backup does not match. Nothing was changed.' >&2; exit 1; }
