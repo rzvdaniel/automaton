@@ -69,27 +69,28 @@ public class HostHealthParsersTests
     }
 
     [Test]
-    public void HelperOutput_ParsesOsUpdatesAndRebootSections()
+    public void HelperOutput_ParsesOsAndRebootSections()
     {
-        var sections = HostHealthParsers.SplitSections("[os]\nPRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\n[updates]\n12 updates can be applied immediately.\n5 of these updates are standard security updates.\n[reboot]\n1700000000\n");
+        var sections = HostHealthParsers.SplitSections("[os]\nPRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\n[reboot]\n1700000000\n");
 
         Assert.Multiple(() =>
         {
             Assert.That(HostHealthParsers.ParseOsRelease(sections["os"]), Is.EqualTo(("Ubuntu 24.04.1 LTS", "24.04")));
-            Assert.That(HostHealthParsers.ParseUpdatesAvailable(sections["updates"]), Is.EqualTo(((int?)12, (int?)5)));
             Assert.That(sections["reboot"].Trim(), Is.EqualTo("1700000000"));
         });
     }
 
-    [TestCase("1 update can be applied immediately.\n1 of these updates is a standard security update.\n", 1, 1)]
-    [TestCase("3 updates can be applied immediately.\n", 3, 0)]
-    [TestCase("0 updates can be applied immediately.\n", 0, 0)]
-    public void UpdateNotifierText_ReadsCounts(string text, int pending, int security)
-        => Assert.That(HostHealthParsers.ParseUpdatesAvailable(text), Is.EqualTo(((int?)pending, (int?)security)));
+    [TestCase("71;12\n", 71, 12)]
+    [TestCase("0;0", 0, 0)]
+    [TestCase("Listing... Done\nopenssl/noble-security 3.0.13 amd64 [upgradable from: 3.0.12]\nvim/noble-updates 9.1 amd64 [upgradable from: 9.0]\n", 2, 1)]
+    [TestCase("Listing... Done\n", 0, 0)]
+    public void UpdateCounts_ReadAptCheckAndTheAptListFallback(string text, int pending, int security)
+        => Assert.That(HostHealthParsers.ParseUpdateCounts(text), Is.EqualTo(((int?)pending, (int?)security)));
 
-    [Test]
-    public void MissingUpdateNotifierFile_MeansUnknownNotZero()
-        => Assert.That(HostHealthParsers.ParseUpdatesAvailable(""), Is.EqualTo(((int?)null, (int?)null)));
+    [TestCase("")]
+    [TestCase("E: Could not open lock file\n")]
+    public void UnusableUpdateOutput_MeansUnknownNotZero(string text)
+        => Assert.That(HostHealthParsers.ParseUpdateCounts(text), Is.EqualTo(((int?)null, (int?)null)));
 
     [Test]
     public void DirectorySize_CountsFilesBelowThePath_AndIsZeroForAMissingOne()

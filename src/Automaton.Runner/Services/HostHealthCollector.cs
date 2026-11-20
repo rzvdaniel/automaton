@@ -14,7 +14,6 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
 
     private const string HelperScript =
         "echo '[os]'; cat /host/os-release 2>/dev/null; " +
-        "echo '[updates]'; cat /host/updates/updates-available 2>/dev/null; " +
         "if [ -e /host/reboot-required ]; then echo '[reboot]'; stat -c %Y /host/reboot-required; fi";
 
     public async Task<MachineHostHealth> CollectAsync(CancellationToken token)
@@ -24,7 +23,7 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
         var memory = HostHealthParsers.ParseMemory(Read("/proc/meminfo"));
         var disk = ReadDisk();
         var (docker, dockerApps, apps) = await ReadDockerAsync(token);
-        var files = HostFiles.From(await ReadHostFilesAsync(token));
+        var files = HostFiles.From(await ReadHostFilesAsync(token), await ReadUpdateCountsAsync(token));
         var fail2Ban = await Fail2BanReader.ReadAsync(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE"), token);
 
         return new MachineHostHealth(
@@ -57,14 +56,13 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
     private sealed record HostFiles(
         string? OsName, string? OsVersion, int? Pending, int? Security, bool? RebootRequired, DateTime? RebootSince)
     {
-        public static HostFiles From(Dictionary<string, string> sections)
+        public static HostFiles From(Dictionary<string, string> sections, (int? Pending, int? Security) updates)
         {
             var (name, version) = HostHealthParsers.ParseOsRelease(sections.GetValueOrDefault("os"));
-            var (pending, security) = HostHealthParsers.ParseUpdatesAvailable(sections.GetValueOrDefault("updates"));
             DateTime? since = long.TryParse(sections.GetValueOrDefault("reboot")?.Trim(), out var seconds)
                 ? DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime : null;
             // The helper container only ran when the os section exists; otherwise "restart required" is unknown.
-            return new(name, version, pending, security, sections.ContainsKey("os") ? sections.ContainsKey("reboot") : null, since);
+            return new(name, version, updates.Pending, updates.Security, sections.ContainsKey("os") ? sections.ContainsKey("reboot") : null, since);
         }
     }
 
@@ -96,15 +94,14 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
     }
 
     // Each attempt mounts fewer host paths: docker refuses a bind mount whose source is missing (no reboot-required file
-    // when no restart is pending, no update-notifier on Debian).
+    // when no restart is pending).
     private static async Task<Dictionary<string, string>> ReadHostFilesAsync(CancellationToken token)
     {
         var image = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE");
         if (string.IsNullOrWhiteSpace(image)) return [];
         var os = ("/etc/os-release", "/host/os-release");
         var reboot = ("/run/reboot-required", "/host/reboot-required");
-        var updates = ("/var/lib/update-notifier", "/host/updates");
-        (string Source, string Target)[][] attempts = [[os, reboot, updates], [os, reboot], [os, updates], [os]];
+        (string Source, string Target)[][] attempts = [[os, reboot], [os]];
         foreach (var mounts in attempts)
         {
             var args = new List<string>
@@ -119,6 +116,18 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
             if (result?.ExitCode == 0) return HostHealthParsers.SplitSections(result.Output);
         }
         return [];
+    }
+
+    // Asks apt on the host (apt-check works as a normal user and reads the lists apt-daily.timer refreshes) instead of the
+    // update-notifier summary file Ubuntu rewrites root-only. apt-check prints "all;security" on stderr.
+    private const string UpdateCountScript = "/usr/lib/update-notifier/apt-check 2>&1 || apt list --upgradable 2>/dev/null";
+
+    private static async Task<(int? Pending, int? Security)> ReadUpdateCountsAsync(CancellationToken token)
+    {
+        var image = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE");
+        if (string.IsNullOrWhiteSpace(image)) return (null, null);
+        var result = await RunAsync("docker", HostCleanupService.HostCommand(image, "sh", "-c", UpdateCountScript), token);
+        return result?.ExitCode == 0 ? HostHealthParsers.ParseUpdateCounts(result.Output) : (null, null);
     }
 
     internal sealed record CommandResult(int ExitCode, string Output);
