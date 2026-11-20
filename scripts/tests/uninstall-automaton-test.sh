@@ -1,71 +1,77 @@
 #!/usr/bin/env bash
-# Path checks of uninstall-automaton.sh. Runs in test mode against temp dirs (no root, no Docker needed).
+# Checks uninstall-automaton.sh against two installs inside a throwaway Docker-in-Docker container (privileged, its own daemon, removed at the end).
+# The script is never run on this machine. Stand-in containers carry the labels Compose gives the real stack.
 set -u
-s="$(dirname "$0")/../uninstall-automaton.sh"
-t=$(mktemp -d); export TMPDIR=${TMPDIR:-/tmp}; trap 'rm -rf "$t"' EXIT
+here=$(cd "$(dirname "$0")" && pwd)
+command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo 'SKIP: needs Docker to start the throwaway container'; exit 0; }
+ctr=automaton-uninstall-test-$$
+trap 'docker rm -f "$ctr" >/dev/null 2>&1' EXIT
+docker run -d --privileged --name "$ctr" docker:dind >/dev/null || exit 1
+for _ in $(seq 1 60); do docker exec "$ctr" docker info >/dev/null 2>&1 && break; sleep 1; done
+docker exec "$ctr" docker info >/dev/null 2>&1 || { echo 'FAIL: inner Docker did not start'; exit 1; }
+docker exec "$ctr" apk add --no-cache bash python3 util-linux findutils coreutils grep sed >/dev/null || { echo 'FAIL: apk add'; exit 1; }
+(docker image inspect busybox:1.37 >/dev/null 2>&1 || docker pull -q busybox:1.37 >/dev/null) && docker save busybox:1.37 | docker exec -i "$ctr" docker load >/dev/null || { echo 'FAIL: busybox'; exit 1; }
+docker cp "$here/../uninstall-automaton.sh" "$ctr:/uninstall-automaton.sh"
+docker exec -i "$ctr" bash -s <<'INNER'
+set -u
 fail=0
-run() { AUTOMATON_UNINSTALL_TEST=1 PATH="$t/bin:/usr/bin:/bin" bash "$s" --yes "$@" >"$t/out" 2>&1; }
-expect_fail() { if run "$@"; then echo "FAIL: accepted: $*"; fail=1; fi; }
-expect_ok() { run "$@" || { echo "FAIL: refused: $*"; cat "$t/out"; fail=1; }; }
-export AUTOMATON_RUNNERS_DIR=$t/runners AUTOMATON_SYSTEMD_DIR=$t/systemd AUTOMATON_FAIL2BAN_ETC=$t/f2b AUTOMATON_STATE_DIR=$t/state AUTOMATON_LOGROTATE_DIR=$t/lr
-mkdir -p "$t/other" "$t/inst/backups" "$t/cfg/secrets" "$t/state/update" "$t/state/apps"
-mkdir -p "$t/bin" "$t/empty"
-printf '#!/bin/sh\necho "docker called" >> "%s/docker-called"\nexit 1\n' "$t" > "$t/bin/docker"; chmod +x "$t/bin/docker"
-printf 'name: automaton-server\n' > "$t/inst/compose.yaml"; touch "$t/inst/update.sh"
-mkdir -p "$t/generic" "$t/cfg2"; printf 'name: other\n' > "$t/generic/compose.yaml"; touch "$t/generic/update.sh" "$t/cfg2/x"
-printf 'name: automaton-server\n' > "$t/nomark.yaml"
-mkdir -p "$t/systemd"; touch "$t/systemd/automaton-restart.path" "$t/systemd/automaton-restart.service" "$t/systemd/automaton-os-update.path" "$t/systemd/automaton-os-update.service"
-touch "$t/other/precious" "$t/inst/x" "$t/inst/backups/b" "$t/cfg/installation.json" "$t/cfg/secrets/backup-key" "$t/cfg/secrets/s" "$t/state/update/u" "$t/state/apps/data"
-expect_fail --install-dir /opt/../etc --config-dir "$t/cfg"
-expect_fail --install-dir "$t/inst/../other" --config-dir "$t/cfg"
-expect_fail --install-dir "$t/inst" --config-dir "$t/cfg/.."
-expect_fail --install-dir / --config-dir "$t/cfg"
-expect_fail --install-dir "$t/other" --config-dir "$t/cfg"          # exists, not an Automaton install
-expect_fail --install-dir "$t/inst" --config-dir "$t/other"
-expect_fail --install-dir "$t/generic" --config-dir "$t/cfg"        # generic compose.yaml + update.sh
-expect_fail --install-dir "$t/empty" --config-dir "$t/cfg"          # empty directory
-expect_fail --install-dir "$t/inst" --config-dir "$t/empty"
-expect_fail --install-dir "$t/inst" --config-dir "$t/cfg2"          # no Automaton marker
-mkdir "$t/inst2"; printf 'name: automaton-server\n' > "$t/inst2/compose.yaml"
-expect_fail --install-dir "$t/inst2" --config-dir "$t/cfg"          # compose name but no update.sh/release.env
-[[ -e $t/other/precious ]] || { echo "FAIL: unrelated directory was touched"; fail=1; }
-AUTOMATON_STATE_DIR=/ expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
-AUTOMATON_STATE_DIR=$t/../x expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
-AUTOMATON_RUNNERS_DIR=/ expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
-# Test mode needs every override, under the temp dir; outside test mode they are ignored.
-( unset AUTOMATON_STATE_DIR; expect_fail --install-dir "$t/inst" --config-dir "$t/cfg" )
-AUTOMATON_STATE_DIR=/var/lib expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
-expect_fail --install-dir /opt/automaton-server --config-dir "$t/cfg"
-[[ -e $t/docker-called ]] && { echo "FAIL: docker called in test mode"; fail=1; }
-# Deliberately NOT run through run(): without AUTOMATON_UNINSTALL_TEST the script must ignore the overrides and use its fixed paths (dry-run, so nothing changes).
-if PATH="$t/bin:/usr/bin:/bin" bash "$s" --dry-run --install-dir "$t/inst" --config-dir "$t/cfg" >"$t/out" 2>&1; then :; fi
-grep -q 'Ignoring AUTOMATON_STATE_DIR' "$t/out" || { echo "FAIL: override not ignored outside test mode"; fail=1; }
-grep -q 'Refusing\|Dry run' "$t/out" || { echo "FAIL: unexpected non-test output"; fail=1; }
-[[ -e $t/state/update/u ]] || { echo "FAIL: non-test run used the override"; fail=1; }
-# A recognised install is cleaned; backups, key and the Runner's app data stay.
-expect_ok --install-dir "$t/inst" --config-dir "$t/cfg"
-[[ -e $t/inst/x ]] && { echo "FAIL: install file kept"; fail=1; }
-[[ -e $t/inst/backups/b && -e $t/cfg/secrets/backup-key && -e $t/state/apps/data ]] || { echo "FAIL: data not kept"; fail=1; }
-[[ -e $t/state/update/u || -e $t/cfg/secrets/s ]] && { echo "FAIL: state/secret kept"; fail=1; }
-[[ -e $t/systemd/automaton-restart.path || -e $t/systemd/automaton-restart.service || -e $t/systemd/automaton-os-update.path || -e $t/systemd/automaton-os-update.service ]] && { echo "FAIL: restart units kept"; fail=1; }
-expect_ok --install-dir "$t/inst" --config-dir "$t/cfg"   # second run: nothing left to remove
-grep -q 'except backups' "$t/out" && { echo "FAIL: '(except backups)' printed with nothing removed"; fail=1; }
-grep -q 'volumes could not be checked' "$t/out" || { echo "FAIL: keep mode silent about unchecked volumes"; fail=1; }
-[[ -f $t/inst/.automaton-uninstalled && -f $t/cfg/.automaton-uninstalled ]] || { echo "FAIL: keep mode wrote no marker"; fail=1; }
-# A kept-only directory WITHOUT the marker is never accepted (it could be anything with a backups folder).
-mkdir -p "$t/lookalike/backups" "$t/cfglook/secrets"; touch "$t/lookalike/backups/b" "$t/cfglook/secrets/backup-key"
-expect_fail --install-dir "$t/lookalike" --config-dir "$t/cfg"
-expect_fail --delete-data --install-dir "$t/inst" --config-dir "$t/cfglook"
-[[ -e $t/lookalike/backups/b && -e $t/cfglook/secrets/backup-key ]] || { echo "FAIL: marker-less directory was deleted"; fail=1; }
-# Parent symlinks are refused, not only a symlinked last component.
-ln -s "$t/inst" "$t/link"; mkdir -p "$t/real/sub"; ln -s "$t/real" "$t/rlink"
-expect_fail --install-dir "$t/link" --config-dir "$t/cfg"
-expect_fail --install-dir "$t/rlink/sub" --config-dir "$t/cfg"
-# Test mode refuses TMPDIR=/ and a symlinked or missing TMPDIR.
-TMPDIR=/ expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
-TMPDIR=$t/rlink expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
-TMPDIR=$t/missing expect_fail --install-dir "$t/inst" --config-dir "$t/cfg"
-expect_ok --delete-data --install-dir "$t/inst" --config-dir "$t/cfg"
-grep -q 'no volumes were removed' "$t/out" || { echo "FAIL: no warning about volumes"; fail=1; }
-[[ -e $t/state/apps ]] && { echo "FAIL: --delete-data kept state"; fail=1; }
+t() { "$@" >/dev/null || { echo "FAIL: $*"; cat /out 2>/dev/null; fail=1; }; }
+no() { if "$@" >/dev/null 2>&1; then echo "FAIL (should not hold): $*"; fail=1; fi; }
+un() { bash /uninstall-automaton.sh "$@" >/out 2>&1; }
+mk() { # dir cfg domain: an install with a recognisable compose file and configuration
+    mkdir -p "$1/backups/nightly" "$2/secrets"
+    printf 'name: automaton-server\n' > "$1/compose.yaml"; touch "$1/update.sh" "$1/marker-file" "$1/backups/old"
+    printf '{"domain":"%s"}' "$3" > "$2/installation.json"; echo key-of-$3 > "$2/secrets/backup-key"
+    printf '#!/bin/bash\necho archive > "%s/backups/nightly/automaton-20260101T000000Z.tar.age"\n' "$1" > "$1/backup.sh"
+}
+stack() { # name dir: a stand-in server container labelled like Compose, from that directory
+    docker run -d --name "$1" --label com.docker.compose.project=automaton-server --label "com.docker.compose.project.working_dir=$2" busybox:1.37 sleep 3600 >/dev/null
+}
+running() { [[ $(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null) == true ]]; }
+docker volume create --label com.docker.compose.project=automaton-server automaton-server_postgres-data >/dev/null
+mk /opt/automaton-server /etc/automaton a.test; mk /srv/b /srv/bcfg b.test
+mkdir -p /var/lib/automaton/apps; touch /var/lib/automaton/apps/data
+mkdir -p /etc/systemd/system; printf 'ExecStart=/usr/bin/env bash /opt/automaton-server/backup.sh\n' > /etc/systemd/system/automaton-backup.service
+stack a1 /opt/automaton-server; stack b1 /srv/b
+# Deleting data needs --confirm; --yes does not confirm it.
+no un --delete-data --yes --install-dir /srv/b --config-dir /srv/bcfg
+grep -q -- '--confirm b.test' /out || { echo 'FAIL: no hint about --confirm'; fail=1; }
+no un --delete-data --confirm wrong.test --install-dir /srv/b --config-dir /srv/bcfg
+t test -e /srv/b/marker-file; t running b1
+# A failing final backup stops everything.
+printf '#!/bin/bash\nexit 1\n' > /srv/b/backup.sh
+no un --delete-data --confirm b.test --install-dir /srv/b --config-dir /srv/bcfg
+t test -e /srv/b/marker-file; t running b1
+# Paths that are not an install are refused.
+no un --install-dir /srv/b/../etc --config-dir /srv/bcfg
+mkdir -p /srv/other; touch /srv/other/precious
+no un --install-dir /srv/other --config-dir /srv/bcfg
+no un --install-dir /srv/b --config-dir /srv/other
+t test -e /srv/other/precious
+# Keep mode on the second install: only its own containers go; the first install keeps running with its data and host units.
+t un --install-dir /srv/b --config-dir /srv/bcfg
+no running b1; t running a1
+no test -e /srv/b/marker-file; t test -e /srv/b/backups/old; t test -e /opt/automaton-server/marker-file
+t docker volume inspect automaton-server_postgres-data
+t test -e /etc/systemd/system/automaton-backup.service; t test -e /var/lib/automaton/apps/data
+# Deleting the second install with a confirmation and a final backup leaves the first untouched.
+mk /srv/b /srv/bcfg b.test   # the install comes back (a retry)
+stack b2 /srv/b
+t un --delete-data --confirm b.test --install-dir /srv/b --config-dir /srv/bcfg
+no running b2; t running a1
+no test -e /srv/b; no test -e /srv/bcfg
+t test -e /opt/automaton-server/marker-file; t test -e /etc/automaton/secrets/backup-key
+t docker volume inspect automaton-server_postgres-data
+fb=$(ls -d /var/backups/automaton-final-* 2>/dev/null | head -n1)
+t test -s "$fb/automaton-20260101T000000Z.tar.age"; t grep -q key-of-b.test "$fb/backup-key"
+# Pointing it at the one install it can see removes that install, with its volumes and a final backup.
+t un --delete-data --confirm a.test --install-dir /opt/automaton-server --config-dir /etc/automaton
+no running a1; no docker volume inspect automaton-server_postgres-data
+no test -e /opt/automaton-server; no test -e /etc/automaton; no test -e /var/lib/automaton
+[[ $(ls -d /var/backups/automaton-final-* | wc -l) -eq 2 ]] || { echo 'FAIL: no second final backup'; fail=1; }
+# Retry flow: --no-final-backup deletes without one; nothing left to remove is not an error.
+mk /srv/c /srv/ccfg c.test
+t un --delete-data --confirm c.test --no-final-backup --install-dir /srv/c --config-dir /srv/ccfg
+no test -e /srv/c
 [[ $fail -eq 0 ]] && echo ok; exit $fail
+INNER
