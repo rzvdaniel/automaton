@@ -21,10 +21,11 @@ const datasets = computed(() => props.block.series.map((series) => ({
   label: series.name,
   data: series.values,
   borderColor: tone(series.tone),
-  backgroundColor: props.block.kind === 'line' || filled.value ? shade(tone(series.tone), filled.value ? 18 : 0) : tone(series.tone),
+  backgroundColor: props.block.kind === 'line' || filled.value ? shade(tone(series.tone), filled.value ? 14 : 0) : tone(series.tone),
   fill: filled.value,
   tension: 0.3,
-  pointRadius: 0,
+  pointRadius: props.block.kind === 'line' || filled.value ? series.values.map((_, i) => (i === series.values.length - 1 ? 3.5 : 0)) : 0,
+  pointBackgroundColor: tone(series.tone),
   borderWidth: 2,
   borderRadius: 3,
 })))

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { formatShortTime } from '@/features/apps/utils/app-list-display'
 import { getLaunchTargetUrl } from '@/features/apps/utils/public-app-url'
 import type { AppHomeCard } from '../types/home.types'
 import type { CardBlock, CardTone } from '../types/home-card.types'
@@ -9,7 +8,7 @@ import HomeCardChart from './HomeCardChart.vue'
 const props = defineProps<{ appId: string; item: AppHomeCard }>()
 
 const root = ref<HTMLElement | null>(null)
-const colors = ref({ ok: '#1f6b4f', warning: '#f26a1b', critical: '#c0392b', info: '#55565e', ink: '#17181c', line: '#e2e0da', soft: '#55565e' })
+const colors = ref({ ok: '#55565e', warning: '#f26a1b', critical: '#c0392b', info: '#55565e', ink: '#17181c', line: '#e2e0da', soft: '#55565e' })
 /** Chart.js needs real colour values, so read the themed tokens again whenever light/dark changes. */
 let observer: MutationObserver | null = null
 function readColors() {
@@ -120,25 +119,19 @@ const link = (path: string) => getLaunchTargetUrl(props.appId, path)
         <span class="hc-alert__level">{{ alert.severity }}</span> {{ alert.text }}
       </li>
     </ul>
-    <p class="hc__time" data-testid="app-card-time">
-      {{ item.stale ? 'Not up to date. Last update ' : 'Updated ' }}{{ formatShortTime(item.updatedAtUtc) }}
-    </p>
   </div>
 </template>
 
 <style scoped>
 .hc {
-  --hc-ok: var(--ok); --hc-warning: var(--signal); --hc-critical: #c0392b; --hc-info: var(--ink-soft);
+  --hc-ok: var(--ink-soft); --hc-warning: var(--signal); --hc-critical: #c0392b; --hc-info: var(--ink-soft);
   position: relative; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 10px; border-radius: 10px;
   background: var(--row-line); overflow: hidden; container-type: inline-size;
 }
 :global(.app-dark) .hc { --hc-critical: #ff6b5b; }
-.hc::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--hc-edge, transparent); }
-.hc--ok { --hc-edge: var(--hc-ok); }
-.hc--warning { --hc-edge: var(--hc-warning); }
-.hc--critical { --hc-edge: var(--hc-critical); }
-.hc--info { --hc-edge: var(--hc-info); }
 .hc--stale { opacity: 0.55; filter: grayscale(1); }
+.hc--warning .hc__status { color: var(--signal-ink); }
+.hc--critical .hc__status { color: var(--hc-critical); }
 .hc__status { margin: 0; font-family: var(--display); font-weight: 700; font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; color: var(--ink); }
 .hc__detail { margin: -6px 0 0; font-size: 13px; color: var(--ink-soft); overflow-wrap: anywhere; }
 .hc__nodata { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; color: var(--ink-soft); }
@@ -146,7 +139,6 @@ const link = (path: string) => getLaunchTargetUrl(props.appId, path)
 .hc__nodata-text strong { color: var(--ink); }
 .hc__nodata-link { font-weight: 600; color: var(--ink); }
 .hc__nodata-link:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-.hc__time { margin: 0; font-size: 12px; color: var(--ink-soft); }
 .hc-tone--ok { --hc-tone: var(--hc-ok); }
 .hc-tone--warning { --hc-tone: var(--hc-warning); }
 .hc-tone--critical { --hc-tone: var(--hc-critical); }
@@ -166,7 +158,8 @@ const link = (path: string) => getLaunchTargetUrl(props.appId, path)
 .hc-meter__mark--crit { background: var(--hc-critical); opacity: 1; }
 .hc-counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 8px; }
 .hc-counter { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.hc-counter__value { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; color: var(--hc-tone, var(--ink)); }
+.hc-counter__value { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; color: var(--ink); }
+.hc-counter.hc-tone--warning .hc-counter__value, .hc-counter.hc-tone--critical .hc-counter__value { color: var(--hc-tone); }
 .hc-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; }
 .hc-list li { display: flex; align-items: baseline; gap: 8px; }
 .hc-list__text { flex: 1; min-width: 0; overflow-wrap: anywhere; }

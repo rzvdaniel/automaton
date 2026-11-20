@@ -10,12 +10,12 @@ import { getStudioApplicationUrl } from '@/features/apps/utils/public-app-url'
 import { appState } from '@/features/apps/utils/app-list-display'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { serverConsoleService } from '@/features/server/services/server-console.service'
-import type { HomeCard } from '../types/home.types'
+import type { HomeCard, HomePinnedApp } from '../types/home.types'
 import PublisherBadge from '@/features/apps/components/PublisherBadge.vue'
 import { usePublishers } from '@/features/apps/composables/usePublishers'
 import HomeAppCard from '../components/HomeAppCard.vue'
 import { useHomeStore } from '../stores/home.store'
-import { appFacts, moved, mosaic, type MosaicPlace } from '../utils'
+import { footerLine, moved, mosaic, slotAt, type MosaicPlace, type SlotRect } from '../utils'
 import PermissionRequestRow from '@/features/admin/components/PermissionRequestRow.vue'
 import { usePermissionRequests } from '@/features/admin/composables/usePermissionRequests'
 
@@ -112,26 +112,143 @@ async function act(card: HomeCard) {
   }
 }
 
-// Drag a card onto another to move it there.
-const dragged = ref<number | null>(null)
-async function drop(target: number) {
-  const from = dragged.value
-  dragged.value = null
-  if (from === null || from === target) return
-  const ids = moved(store.pinned.map((item) => item.app.id), from, target)
+/** Calm by default; orange when the card or app needs attention; red only when failing. */
+function attention(item: HomePinnedApp): 'calm' | 'attention' | 'failing' {
+  const tone = item.card?.card.tone
+  if (appState(item.app).tone === 'failing' || tone === 'critical') return 'failing'
+  return tone === 'warning' ? 'attention' : 'calm'
+}
+const stateText = (item: HomePinnedApp) => {
+  const label = appState(item.app).label
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+// Reordering: pointer drag from the card's head row (5 px threshold), arrow buttons, or Alt+Arrow.
+const announcement = ref('')
+async function save(ids: string[]) {
   try {
     await store.reorder(ids)
+    return true
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'The order could not be saved.', life: 5000 })
+    return false
   }
 }
-const announcement = ref('')
 async function shift(index: number, by: number) {
-  dragged.value = index
-  await drop(index + by)
   const target = index + by
-  if (store.pinned[target]) announcement.value = `${store.pinned[target].app.name} moved to position ${target + 1} of ${store.pinned.length}`
+  const item = store.pinned[index]
+  if (!item || target < 0 || target >= store.pinned.length) return
+  // Moving the card re-inserts it in the DOM, which drops focus; put it back afterwards.
+  const focused = document.activeElement as HTMLElement | null
+  const saved = await save(moved(store.pinned.map((entry) => entry.app.id), index, target))
+  await nextTick()
+  focused?.focus?.()
+  if (saved) announcement.value = `${item.app.name} moved to position ${target + 1} of ${store.pinned.length}`
 }
+function onCardKey(event: KeyboardEvent, index: number) {
+  if (!event.altKey || event.ctrlKey || event.metaKey) return
+  const by = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : 0
+  if (by === 0) return
+  event.preventDefault()
+  void shift(index, by)
+}
+
+const dragThreshold = 5
+interface DragState { index: number; x: number; y: number; offsetX: number; offsetY: number }
+const dragging = ref<DragState | null>(null)
+/** While dragging: the order the cards would have, as indexes into store.pinned. */
+const order = ref<number[] | null>(null)
+const settling = ref<string | null>(null)
+let pending: { index: number; startX: number; startY: number } | null = null
+let swallowNextClick = false
+
+function pointOnBoard(event: PointerEvent) {
+  const rect = board.value!.getBoundingClientRect()
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+}
+function slotRects(sequence: number[]): SlotRect[] {
+  const width = (board.value!.clientWidth - (columns.value - 1) * gap) / columns.value
+  const rects: SlotRect[] = []
+  sequence.forEach((index) => {
+    const place = places.value[index]
+    if (!place) return
+    rects[index] = { left: place.column * (width + gap), top: place.top, width: place.span * width + (place.span - 1) * gap, height: cardEls.value[index]?.offsetHeight ?? 0 }
+  })
+  return rects
+}
+function onPointerDown(event: PointerEvent, index: number) {
+  if (phone.value || event.button !== 0 || !measured.value || store.pinned.length < 2) return
+  pending = { index, startX: event.clientX, startY: event.clientY }
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('pointercancel', onPointerCancel)
+}
+function onPointerMove(event: PointerEvent) {
+  if (!pending || !board.value) return
+  if (!dragging.value) {
+    if (Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY) < dragThreshold) return
+    const card = cardEls.value[pending.index]!.getBoundingClientRect()
+    dragging.value = { index: pending.index, x: 0, y: 0, offsetX: pending.startX - card.left, offsetY: pending.startY - card.top }
+    order.value = store.pinned.map((_, index) => index)
+    swallowNextClick = true
+  }
+  const drag = dragging.value
+  const point = pointOnBoard(event)
+  drag.x = point.x - drag.offsetX
+  drag.y = point.y - drag.offsetY
+  const sequence = order.value!
+  const target = slotAt(slotRects(sequence), point.x, point.y, drag.index)
+  if (target >= 0) {
+    const from = sequence.indexOf(drag.index)
+    const to = sequence.indexOf(target)
+    if (from !== to) {
+      order.value = moved(sequence, from, to)
+      relayout()
+    }
+  }
+}
+function stopListening() {
+  pending = null
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('pointerup', onPointerUp)
+  window.removeEventListener('pointercancel', onPointerCancel)
+  setTimeout(() => { swallowNextClick = false }, 0)
+}
+async function endDrag(commit: boolean) {
+  const drag = dragging.value
+  const sequence = order.value
+  stopListening()
+  if (!drag || !sequence) return
+  const id = store.pinned[drag.index]!.app.id
+  const ids = sequence.map((index) => store.pinned[index]!.app.id)
+  const changed = sequence.some((index, position) => index !== position)
+  settling.value = id
+  setTimeout(() => { if (settling.value === id) settling.value = null }, 260)
+  dragging.value = null
+  if (!commit || !changed) {
+    order.value = null
+    relayout()
+    return
+  }
+  // The store reorders synchronously (and rolls back on failure), so clear the preview in the same tick.
+  const saved = save(ids)
+  order.value = null
+  if (await saved) announcement.value = `${store.pinned.find((item) => item.app.id === id)?.app.name ?? 'Card'} moved to position ${ids.indexOf(id) + 1} of ${ids.length}`
+}
+const onPointerUp = () => { void endDrag(true) }
+const onPointerCancel = () => { void endDrag(false) }
+/** A drag ends over the card's link; the click that follows must not open the app. */
+function swallowClick(event: MouseEvent) {
+  if (!swallowNextClick) return
+  event.preventDefault()
+  event.stopPropagation()
+}
+const slotStyle = computed(() => {
+  const drag = dragging.value
+  const place = drag ? places.value[drag.index] : undefined
+  if (!drag || !place) return undefined
+  return { ...placeStyle(place), height: `${cardEls.value[drag.index]?.offsetHeight ?? 0}px` }
+})
 
 async function toggleWide(appId: string, wide: boolean) {
   try {
@@ -149,8 +266,11 @@ async function setView(list: boolean) {
 }
 
 // Mosaic: measure the cards and put each one in the shortest column. Falls back to a plain grid until measured.
+// Cards are absolutely placed, and CSS transitions on top/left/width give the slide when the order changes.
 const gap = 12
 const minCard = 280
+const phoneQuery = '(max-width: 559px)'
+const phone = ref(false)
 const board = ref<HTMLElement | null>(null)
 const cardEls = ref<HTMLElement[]>([])
 const places = ref<MosaicPlace[]>([])
@@ -160,11 +280,14 @@ const measured = ref(false)
 function relayout() {
   const el = board.value
   if (!el || store.listView) return
-  columns.value = Math.max(1, Math.floor((el.clientWidth + gap) / (minCard + gap)))
-  const heights = store.pinned.map((_, index) => cardEls.value[index]?.offsetHeight ?? 0)
+  columns.value = phone.value ? 1 : Math.max(1, Math.floor((el.clientWidth + gap) / (minCard + gap)))
+  const sequence = order.value ?? store.pinned.map((_, index) => index)
+  const heights = sequence.map((index) => cardEls.value[index]?.offsetHeight ?? 0)
   if (heights.some((height) => height === 0)) return
-  const result = mosaic(heights, store.pinned.map((item) => item.wide === true), columns.value, gap)
-  places.value = result.places
+  const result = mosaic(heights, sequence.map((index) => store.pinned[index]?.wide === true), columns.value, gap)
+  const byIndex: MosaicPlace[] = []
+  sequence.forEach((index, position) => { byIndex[index] = result.places[position]! })
+  places.value = byIndex
   boardHeight.value = result.height
   measured.value = true
 }
@@ -176,23 +299,44 @@ function observe() {
   if (board.value) resizeObserver.observe(board.value)
   cardEls.value.forEach((el) => el && resizeObserver?.observe(el))
 }
-function cardStyle(index: number) {
-  const place = places.value[index]
-  if (!measured.value || !place) return undefined
+function placeStyle(place: MosaicPlace) {
   const width = `calc((100% - ${(columns.value - 1) * gap}px) / ${columns.value})`
   return {
     position: 'absolute' as const, top: `${place.top}px`, width: place.span === 2 ? `calc(${width} * 2 + ${gap}px)` : width,
     left: `calc((${width} + ${gap}px) * ${place.column})`,
   }
 }
+function cardStyle(index: number) {
+  const place = places.value[index]
+  if (!measured.value || !place) return undefined
+  const drag = dragging.value
+  if (drag && drag.index === index) return { ...placeStyle(place), left: `${drag.x}px`, top: `${drag.y}px` }
+  return placeStyle(place)
+}
+let phoneList: MediaQueryList | null = null
+function onPhoneChange() {
+  phone.value = phoneList?.matches ?? false
+  relayout()
+}
+watch(() => store.listView, () => { measured.value = false })
 watch(() => [store.pinned.map((item) => `${item.app.id}${item.wide}`).join(), store.listView], async () => {
-  measured.value = false
   await nextTick()
   observe()
   relayout()
 })
-onMounted(async () => { await nextTick(); observe(); relayout() })
-onBeforeUnmount(() => resizeObserver?.disconnect())
+onMounted(async () => {
+  if (typeof window.matchMedia === 'function') {
+    phoneList = window.matchMedia(phoneQuery)
+    phone.value = phoneList.matches
+    phoneList.addEventListener('change', onPhoneChange)
+  }
+  await nextTick(); observe(); relayout()
+})
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  phoneList?.removeEventListener('change', onPhoneChange)
+  stopListening()
+})
 </script>
 
 <template>
@@ -311,49 +455,47 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
           </li>
         </ul>
         <div v-else ref="board" class="home-cards home-cards--apps" :class="{ 'home-cards--mosaic': measured }" :style="measured ? { height: `${boardHeight}px` } : undefined">
+          <div v-if="dragging && slotStyle" class="pin-slot" :style="slotStyle" data-testid="drop-slot" aria-hidden="true" />
           <article
             v-for="(item, index) in store.pinned"
             :key="item.app.id"
             :ref="(el) => { if (el) cardEls[index] = el as HTMLElement }"
             class="pin"
-            :class="{ 'pin--wide': item.wide }"
+            :class="[{ 'pin--wide': item.wide, 'pin--dragging': dragging?.index === index, 'pin--settling': settling === item.app.id }, `pin--${attention(item)}`]"
             :style="cardStyle(index)"
-            draggable="true"
             data-testid="pinned-app"
-            @dragstart="dragged = index"
-            @dragover.prevent
-            @drop.prevent="drop(index)"
+            @keydown="onCardKey($event, index)"
           >
-            <RouterLink :to="`/apps/${item.app.id}`" class="pin__link" :aria-label="`Open ${item.app.name}`">
+            <RouterLink
+              :to="`/apps/${item.app.id}`" class="pin__link" :aria-label="`Open ${item.app.name}`"
+              @pointerdown="onPointerDown($event, index)" @dragstart.prevent @click.capture="swallowClick"
+            >
               <AppMark :id="item.app.id" :name="item.app.name" :image-url="item.app.thumbnailUrl" />
               <span class="pin__name">{{ item.app.name }}</span>
-              <span class="pin__state" :class="`pin__state--${appState(item.app).tone}`">{{ appState(item.app).label }}</span>
+              <span class="pin__state" :class="`pin__state--${attention(item)}`" data-testid="pin-state">
+                <span class="pin__dot" />{{ stateText(item) }}
+              </span>
             </RouterLink>
             <PublisherBadge v-if="publisherOf(item.app.id)" :publisher="publisherOf(item.app.id)!" />
             <HomeAppCard v-if="item.card" :app-id="item.app.id" :item="item.card" />
-            <dl class="pin__facts">
-              <div v-for="fact in appFacts(item.app)" :key="fact.label">
-                <dt>{{ fact.label }}</dt>
-                <dd>{{ fact.value }}</dd>
-              </div>
-            </dl>
+            <p class="pin__footer" data-testid="app-card-time">{{ footerLine(item.app, item.card) }}</p>
             <div class="pin__actions">
               <Button
                 v-if="item.card && item.app.canUpdate"
-                :label="store.refreshing.has(item.app.id) ? 'Refreshing…' : 'Refresh card'"
-                icon="pi pi-refresh" size="small" text severity="secondary"
+                icon="pi pi-refresh" size="small" text severity="secondary" class="pin__icon"
+                :class="{ 'pin__icon--busy': store.refreshing.has(item.app.id) }"
                 :disabled="store.refreshing.has(item.app.id)"
-                :aria-label="`Refresh the card of ${item.app.name}`" data-testid="refresh-card"
+                :aria-label="`Refresh the card of ${item.app.name}`" :title="store.refreshing.has(item.app.id) ? 'Refreshing…' : 'Refresh card'" data-testid="refresh-card"
                 @click="refreshCard(item.app.id)"
               />
-              <Button icon="pi pi-arrow-left" size="small" text severity="secondary" :disabled="index === 0" :aria-label="`Move ${item.app.name} earlier`" @click="shift(index, -1)" />
-              <Button icon="pi pi-arrow-right" size="small" text severity="secondary" :disabled="index === store.pinned.length - 1" :aria-label="`Move ${item.app.name} later`" @click="shift(index, 1)" />
+              <Button icon="pi pi-arrow-left" size="small" text severity="secondary" class="pin__icon" :disabled="index === 0" :aria-label="`Move ${item.app.name} earlier`" @click="shift(index, -1)" />
+              <Button icon="pi pi-arrow-right" size="small" text severity="secondary" class="pin__icon" :disabled="index === store.pinned.length - 1" :aria-label="`Move ${item.app.name} later`" @click="shift(index, 1)" />
               <Button
-                :icon="item.wide ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" size="small" text severity="secondary"
-                :label="item.wide ? 'Normal' : 'Wide'" :aria-label="item.wide ? `Make ${item.app.name} normal width` : `Make ${item.app.name} wide`"
+                :icon="item.wide ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" size="small" text severity="secondary" class="pin__icon pin__wide"
+                :aria-label="item.wide ? `Make ${item.app.name} normal width` : `Make ${item.app.name} wide`" :title="item.wide ? 'Normal width' : 'Wide'"
                 data-testid="toggle-wide" @click="toggleWide(item.app.id, !item.wide)"
               />
-              <Button icon="pi pi-bookmark-fill" size="small" text severity="secondary" :aria-label="`Unpin ${item.app.name}`" data-testid="unpin" @click="store.unpin(item.app.id)" />
+              <Button icon="pi pi-bookmark-fill" size="small" text severity="secondary" class="pin__icon" :aria-label="`Unpin ${item.app.name}`" title="Unpin" data-testid="unpin" @click="store.unpin(item.app.id)" />
             </div>
           </article>
         </div>
@@ -406,21 +548,38 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 .need__requests { list-style: none; margin: 6px 0 0; padding: 0; }
 .need__requests li + li { border-top: 1px solid var(--row-line); }
 .need__actions { display: flex; align-items: center; gap: 4px; }
-.pin { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
-.pin:hover { border-color: var(--signal); }
-.pin__link { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.pin { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-sizing: border-box; }
+.pin:hover { border-color: var(--ink-soft); }
+.pin--attention, .pin--attention:hover { border-color: var(--signal); }
+.pin--failing, .pin--failing:hover { border-color: var(--hc-critical, #c0392b); }
+.pin__link { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; cursor: grab; user-select: none; touch-action: none; }
 .pin__link:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 8px; }
 .pin__name { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pin__state { flex: none; padding: 3px 9px; border-radius: 999px; font-family: var(--mono); font-size: 11.5px; }
-.pin__state--live { background: var(--signal); color: var(--on-signal); font-weight: 600; }
-.pin__state--ok { border: 1px solid var(--ok); color: var(--ok); }
-.pin__state--failing { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
-.pin__state--stopped { background: var(--row-line); color: var(--ink-soft); }
-.pin__facts { margin: 0; display: grid; gap: 4px; font-size: 13px; }
-.pin__facts div { display: flex; justify-content: space-between; gap: 8px; }
-.pin__facts dt { color: var(--ink-soft); }
-.pin__facts dd { margin: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin__state { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+.pin__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); opacity: 0.7; }
+.pin__state--attention { color: var(--signal-ink); }
+.pin__state--attention .pin__dot { background: var(--signal); opacity: 1; }
+.pin__state--failing { color: var(--hc-critical, #c0392b); }
+.pin__state--failing .pin__dot { background: var(--hc-critical, #c0392b); opacity: 1; }
+.pin__footer { margin: 0; font-size: 12px; color: var(--ink-soft); }
 .pin__actions { display: flex; justify-content: flex-end; gap: 2px; }
+.pin__icon--busy { opacity: 0.5; }
+.pin--dragging { z-index: 20; transform: rotate(1.5deg) scale(1.02); box-shadow: 0 18px 40px rgb(0 0 0 / 0.22); cursor: grabbing; pointer-events: none; transition: transform 160ms ease-out, box-shadow 160ms ease-out; }
+.pin-slot { box-sizing: border-box; border: 2px dashed var(--signal); border-radius: 12px; background: color-mix(in srgb, var(--signal) 8%, transparent); }
+.pin, .pin-slot { transition: top 260ms ease-out, left 260ms ease-out, width 260ms ease-out, transform 220ms ease-out, box-shadow 220ms ease-out; }
+.pin--dragging { transition: transform 160ms ease-out, box-shadow 160ms ease-out; }
+.pin--settling { z-index: 10; transition: top 220ms ease-out, left 220ms ease-out, width 220ms ease-out, transform 220ms ease-out, box-shadow 220ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .pin, .pin-slot, .pin--dragging, .pin--settling { transition: none; }
+  .pin--dragging { transform: none; }
+}
+@media (max-width: 559px) {
+  .pin__wide { display: none; }
+  .pin--wide { grid-column: auto; }
+  .pin__link { cursor: auto; touch-action: auto; }
+  .pin__actions .p-button { min-width: 44px; min-height: 44px; }
+  .home-cards--apps { grid-template-columns: minmax(0, 1fr); }
+}
 .home-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 40px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; }
 .home-empty__title { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 600; }
 .home-empty__line { margin: 0 0 8px; color: var(--ink-soft); max-width: 52ch; }

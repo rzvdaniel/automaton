@@ -208,7 +208,9 @@ describe('HomeView', () => {
     expect(cards[0]!.find('[data-testid="app-card-alert"]').text()).toContain('Backup is late')
     expect(cards[0]!.classes()).not.toContain('hc--stale')
     expect(cards[1]!.classes()).toContain('hc--stale')
-    expect(cards[1]!.find('[data-testid="app-card-time"]').text()).toContain('Not up to date')
+    const footers = wrapper.findAll('[data-testid="app-card-time"]')
+    expect(footers[0]!.text()).not.toContain('Not up to date')
+    expect(footers[1]!.text()).toContain('Not up to date')
   })
 
   it('makes a card wide, switches to the list view and announces a move', async () => {
@@ -235,5 +237,35 @@ describe('HomeView', () => {
     expect(service.setView).toHaveBeenCalledWith(true)
     expect(wrapper.findAll('[data-testid="pinned-row"]')).toHaveLength(2)
     expect(wrapper.find('[data-testid="pinned-app"]').exists()).toBe(false)
+  })
+
+  it('moves a card with Alt+Arrow, announces it, and ignores a plain arrow key', async () => {
+    service.get.mockResolvedValue({
+      needsYou: [], listView: false,
+      pinned: [{ app: app('1', 'Shop'), pinnedAtUtc: '' }, { app: app('2', 'Blog'), pinnedAtUtc: '' }],
+    })
+    service.reorder.mockResolvedValue(undefined)
+    const wrapper = mountHome()
+    await flushPromises()
+    await wrapper.findAll('[data-testid="pinned-app"]')[0]!.trigger('keydown', { key: 'ArrowRight' })
+    expect(service.reorder).not.toHaveBeenCalled()
+    await wrapper.findAll('[data-testid="pinned-app"]')[0]!.trigger('keydown', { key: 'ArrowRight', altKey: true })
+    await flushPromises()
+    expect(service.reorder).toHaveBeenCalledWith(['2', '1'])
+    expect(wrapper.find('[data-testid="move-announcement"]').text()).toBe('Shop moved to position 2 of 2')
+  })
+
+  it('shows a calm state dot and orange only for a card that needs attention', async () => {
+    const card = (tone: string) => ({ card: { status: 's', tone, facts: [], alerts: [] }, updatedAtUtc: new Date().toISOString(), stale: false })
+    service.get.mockResolvedValue({
+      needsYou: [],
+      pinned: [{ app: app('1', 'Shop'), pinnedAtUtc: '', card: card('ok') }, { app: app('2', 'Blog'), pinnedAtUtc: '', card: card('warning') }],
+    })
+    const wrapper = mountHome()
+    await flushPromises()
+    const pins = wrapper.findAll('[data-testid="pinned-app"]')
+    expect(pins[0]!.classes()).toContain('pin--calm')
+    expect(pins[1]!.classes()).toContain('pin--attention')
+    expect(pins[0]!.find('[data-testid="pin-state"]').text()).toBe('Live')
   })
 })
