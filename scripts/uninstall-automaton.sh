@@ -10,52 +10,35 @@ systemd_dir=/etc/systemd/system
 f2b_dir=/etc/fail2ban
 state_dir=/var/lib/automaton
 logrotate_dir=/etc/logrotate.d
-test_mode=${AUTOMATON_UNINSTALL_TEST:-}
-overrides=(AUTOMATON_RUNNERS_DIR AUTOMATON_SYSTEMD_DIR AUTOMATON_FAIL2BAN_ETC AUTOMATON_STATE_DIR AUTOMATON_LOGROTATE_DIR)
-if [[ -z $test_mode ]]; then
-    # Outside test mode the fixed default paths apply; the overrides are ignored.
-    for v in "${overrides[@]}"; do [[ -z ${!v:-} ]] || echo "Ignoring $v: directory overrides only work in test mode." >&2; done
-else
-    # Test mode must never reach real paths: every override is required and must lie under the temp directory.
-    tmp_root=${TMPDIR:-/tmp}; tmp_root=${tmp_root%/}
-    # TMPDIR="/" (stripped to empty) or a symlinked or missing directory is not a real temp dir: refuse.
-    [[ -n $tmp_root && $tmp_root =~ ^/[a-zA-Z0-9_./-]+$ && -d $tmp_root && $(realpath -- "$tmp_root") == "$tmp_root" ]] \
-        || { echo "Test mode refused: TMPDIR '${TMPDIR:-/tmp}' is not a real temporary directory." >&2; exit 1; }
-    for v in "${overrides[@]}"; do
-        [[ -n ${!v:-} && ${!v} == "$tmp_root"/?* && ${!v} != *..* ]] \
-            || { echo "Test mode refused: $v must be set to a path under $tmp_root." >&2; exit 1; }
-    done
-    runners_dir=$AUTOMATON_RUNNERS_DIR; systemd_dir=$AUTOMATON_SYSTEMD_DIR; f2b_dir=$AUTOMATON_FAIL2BAN_ETC
-    state_dir=$AUTOMATON_STATE_DIR; logrotate_dir=$AUTOMATON_LOGROTATE_DIR
-fi
 delete_data=false
 assume_yes=false
+confirm=''
+final_backup=true
 dry_run=false
 while (($#)); do
     case "$1" in
         --delete-data) delete_data=true; shift ;;
         --yes) assume_yes=true; shift ;;
+        --confirm) confirm="${2:?Missing domain}"; shift 2 ;;
+        --no-final-backup) final_backup=false; shift ;;
         --dry-run) dry_run=true; shift ;;
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
         --help)
-            printf '%s\n' 'Usage: sudo bash uninstall-automaton.sh [--delete-data] [--yes] [--dry-run]' \
-                'Removes the Automaton server stack, the Runner installed with "runners install --local" and its app containers and networks,' \
-                'the systemd units, the fail2ban jails and filters, and /opt/automaton-server and /etc/automaton. Docker stays installed.' \
+            printf '%s\n' 'Usage: sudo bash uninstall-automaton.sh [--delete-data --confirm DOMAIN [--no-final-backup]] [--dry-run]' \
+                'Removes the Automaton server stack of the install it is pointed at (its own containers, network and, with --delete-data, volumes),' \
+                'the Runner installed with "runners install --local" and its app containers and networks, the systemd units, the fail2ban jails and filters,' \
+                'and /opt/automaton-server and /etc/automaton. Docker stays installed. Other installs on the host are left alone.' \
                 'Data is kept by default: Docker volumes (database, app data), nightly backups in <install dir>/backups and the backup key.' \
-                '--delete-data  also delete all volumes, backups and the backup key; you must type the domain to confirm' \
-                '--yes          do not ask (scripts and agents)' \
-                '--dry-run      print what would be removed and change nothing' \
+                '--delete-data       also delete all volumes, backups and the backup key; needs --confirm DOMAIN (or typing the domain in a terminal)' \
+                '--confirm DOMAIN    the server domain (see /etc/automaton/installation.json); --yes alone never confirms deleting data' \
+                '--no-final-backup   skip the final backup that --delete-data takes into /var/backups first' \
+                '--dry-run           print what would be removed and change nothing' \
                 'Optional: --install-dir PATH --config-dir PATH'
             exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
-if [[ -n $test_mode ]]; then
-    for dir in "$install_dir" "$config_dir"; do
-        [[ "$dir" == "$tmp_root"/?* ]] || { echo "Test mode refused: $dir is not under $tmp_root." >&2; exit 1; }
-    done
-fi
 for dir in "$install_dir" "$config_dir" "$runners_dir" "$systemd_dir" "$f2b_dir" "$state_dir" "$logrotate_dir"; do
     [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / && ! "$dir" =~ (^|/)\.\.(/|$) && $(realpath -m -- "$dir") == "$dir" ]] \
         || { echo "Refusing directory '$dir': use an absolute path without shell metacharacters or '..'; it and its parents must not be symlinks." >&2; exit 1; }
@@ -69,7 +52,7 @@ only_kept() { # dir keptname...: true when the directory holds nothing but the n
 }
 marker_name=.automaton-uninstalled
 # Keep mode writes this root-owned marker into each kept directory; only a directory that carries it (and nothing but kept items) may be removed on a later run.
-has_marker() { [[ -f "$1/$marker_name" && ! -L "$1/$marker_name" && ( -n $test_mode || $(stat -c %u -- "$1/$marker_name") == 0 ) ]]; }
+has_marker() { [[ -f "$1/$marker_name" && ! -L "$1/$marker_name" && $(stat -c %u -- "$1/$marker_name") == 0 ]]; }
 write_marker() { # dir: record that an earlier keep-mode run left this directory
     $dry_run || [[ ! -d "$1" ]] || printf 'Kept by uninstall-automaton.sh for %s on %s\n' "${domain:-unknown domain}" "$(date -u +%F)" > "$1/$marker_name" 2>/dev/null || true
 }
@@ -88,20 +71,58 @@ if [[ "$config_dir" != /etc/automaton ]]; then
         echo "Refusing $config_dir: it is not /etc/automaton and has no installation.json or secrets/setup-token." >&2; exit 1
     fi
 fi
-[[ $EUID == 0 || -n $test_mode ]] || $dry_run || { echo 'Run the uninstaller with sudo.' >&2; exit 1; }
-# Test mode never talks to Docker.
-[[ -z $test_mode ]] && command -v docker >/dev/null && docker info >/dev/null 2>&1 && have_docker=true || have_docker=false
-removed=(); kept=(); warnings=()
+[[ $EUID == 0 ]] || $dry_run || { echo 'Run the uninstaller with sudo.' >&2; exit 1; }
+command -v docker >/dev/null && docker info >/dev/null 2>&1 && have_docker=true || have_docker=false
 act() { # run a command, or only print it with --dry-run
     if $dry_run; then printf '  [dry-run] %s\n' "$*"; else "$@" >/dev/null 2>&1 || true; fi
 }
+removed=(); kept=(); warnings=()
 domain=''
 [[ -r "$config_dir/installation.json" ]] && domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "$config_dir/installation.json" 2>/dev/null || true)
-if $delete_data && ! $dry_run && ! $assume_yes; then
+if $delete_data && ! $dry_run; then
     word=${domain:-delete}
-    [[ -t 0 ]] || { echo 'Deleting data needs a terminal to confirm, or pass --yes.' >&2; exit 1; }
-    read -r -p "This permanently deletes all Automaton data, volumes and backups. Type '$word' to continue: " answer
-    [[ "$answer" == "$word" ]] || { echo 'Cancelled; nothing was changed.' >&2; exit 1; }
+    if [[ -z $confirm ]]; then
+        [[ -t 0 ]] || { echo "Deleting data needs --confirm $word (--yes does not confirm it)." >&2; exit 1; }
+        read -r -p "This permanently deletes all Automaton data, volumes and backups. Type '$word' to continue: " confirm
+    fi
+    [[ "$confirm" == "$word" ]] || { echo 'Confirmation did not match; nothing was changed.' >&2; exit 1; }
+fi
+# The stack is this install's Compose project, matched by the project name and the directory it runs from; a project of the same name
+# that runs from another directory is another install, and neither its containers nor its network and volumes are touched.
+project=$(sed -n 's/^name:[[:space:]]*"\{0,1\}\([A-Za-z0-9_-]*\)"\{0,1\}[[:space:]]*$/\1/p' "$install_dir/compose.yaml" "$install_dir/docker-compose.yml" 2>/dev/null | head -n1 || true)
+project=${project:-automaton-server}
+own_stack=true; stack_note=''
+if $have_docker; then
+    other=$(docker ps -a --filter "label=com.docker.compose.project=$project" --format '{{.Label "com.docker.compose.project.working_dir"}}' | grep -vxF -- "$install_dir" | head -n1 || true)
+    if [[ -n $other ]]; then
+        own_stack=false
+        stack_note="Compose project $project also runs from $other: its network and volumes were left alone."
+    fi
+fi
+# Units, fail2ban jails, the state directory and the Runner folder are host-wide: only the install they point at may remove them.
+own_host=true
+if [[ -e "$systemd_dir/automaton-backup.service" ]] && ! grep -qF -- "$install_dir/" "$systemd_dir/automaton-backup.service"; then
+    own_host=false
+    host_note="The systemd units, fail2ban jails, $state_dir and $runners_dir belong to another install on this host and were left alone."
+fi
+final_backup_dir=''
+if $delete_data && $final_backup; then
+    stamp=$(date -u +%Y%m%dT%H%M%SZ)
+    final_backup_dir=/var/backups/automaton-final-$stamp
+    if $dry_run; then echo "  [dry-run] final backup into $final_backup_dir"
+    else
+        $have_docker && [[ -f "$install_dir/backup.sh" && -r "$config_dir/secrets/backup-key" ]] \
+            || { echo "No final backup possible (Docker, $install_dir/backup.sh or the backup key is missing). Nothing was changed; pass --no-final-backup to delete without one." >&2; exit 1; }
+        bash "$install_dir/backup.sh" --install-dir "$install_dir" --keep 1000 >&2 \
+            || { echo 'The final backup failed. Nothing was changed; pass --no-final-backup to delete without one.' >&2; exit 1; }
+        newest=$(find "$install_dir/backups/nightly" -maxdepth 1 -name 'automaton-*.tar.age' -printf '%f\n' | sort | tail -n1)
+        [[ -n $newest && -s "$install_dir/backups/nightly/$newest" ]] || { echo 'The final backup left no archive. Nothing was changed.' >&2; exit 1; }
+        install -d -m 0700 "$final_backup_dir"
+        cp -- "$install_dir/backups/nightly/$newest" "$config_dir/secrets/backup-key" "$final_backup_dir/"
+        (cd "$final_backup_dir" && [[ $(sha256sum < "$newest") == $(sha256sum < "$install_dir/backups/nightly/$newest") ]]) \
+            || { echo 'The copy of the final backup does not match. Nothing was changed.' >&2; exit 1; }
+        removed+=("final backup saved in $final_backup_dir ($newest and backup-key; keep it private)")
+    fi
 fi
 $dry_run && echo 'Dry run: nothing is changed.'
 
@@ -156,13 +177,15 @@ for i in "${!runner_ids[@]}"; do
 done
 [[ -d "$runners_dir" ]] && ! $dry_run && rmdir "$runners_dir" "$(dirname "$runners_dir")" 2>/dev/null || true
 
-# 2. The server stack (Compose project automaton-server): containers and network; volumes only with --delete-data.
+# 2. The server stack (this install's Compose project): containers and network; volumes only with --delete-data.
 if $have_docker; then
-    mapfile -t c < <(docker ps -aq --filter label=com.docker.compose.project=automaton-server)
+    mapfile -t c < <(docker ps -aq --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.project.working_dir=$install_dir")
     remove_ids container "${c[@]}"
-    mapfile -t n < <(docker network ls -q --filter label=com.docker.compose.project=automaton-server)
+fi
+if $have_docker && $own_stack; then
+    mapfile -t n < <(docker network ls -q --filter "label=com.docker.compose.project=$project")
     remove_ids network "${n[@]}"
-    mapfile -t v < <(docker volume ls -q --filter label=com.docker.compose.project=automaton-server)
+    mapfile -t v < <(docker volume ls -q --filter "label=com.docker.compose.project=$project")
     volumes_to_delete+=("${v[@]}")
 fi
 kept_volumes=()
@@ -174,12 +197,13 @@ for volume in "${volumes_to_delete[@]}"; do
     else kept_volumes+=("$volume"); fi
 done
 
+if $own_host; then
 # 3. systemd units, the fail2ban jails and filters the installer added.
 for unit in automaton-update.path automaton-update.service automaton-backup.timer automaton-backup.service \
     automaton-backup-request.path automaton-backup-request.service automaton-cleanup.timer automaton-cleanup.service \
     automaton-restart.path automaton-restart.service automaton-os-update.path automaton-os-update.service; do
     if [[ -e "$systemd_dir/$unit" ]]; then
-        [[ -n $test_mode ]] || act systemctl disable --now "$unit"; act rm -f -- "$systemd_dir/$unit"; removed+=("unit $unit")
+        act systemctl disable --now "$unit"; act rm -f -- "$systemd_dir/$unit"; removed+=("unit $unit")
     fi
 done
 for file in "$systemd_dir/fail2ban.service.d/automaton.conf" "$f2b_dir/jail.d/automaton.conf" "$f2b_dir/jail.d/automaton-allowlist.local" \
@@ -187,10 +211,10 @@ for file in "$systemd_dir/fail2ban.service.d/automaton.conf" "$f2b_dir/jail.d/au
     if [[ -e "$file" ]]; then act rm -f -- "$file"; removed+=("file $file"); fi
 done
 # A restart scheduled from Studio is a transient timer; stop it so the host does not reboot after the uninstall.
-if ! $dry_run && [[ -z $test_mode ]] && command -v systemctl >/dev/null; then
+if ! $dry_run && command -v systemctl >/dev/null; then
     systemctl stop automaton-restart-scheduled.timer >/dev/null 2>&1 || true
 fi
-if ! $dry_run && [[ -z $test_mode ]]; then
+if ! $dry_run; then
     rmdir "$systemd_dir/fail2ban.service.d" 2>/dev/null || true
     command -v systemctl >/dev/null && systemctl daemon-reload >/dev/null 2>&1 || true
     if command -v fail2ban-client >/dev/null && systemctl is-active --quiet fail2ban 2>/dev/null; then
@@ -209,6 +233,10 @@ if [[ -d "$state_dir" ]]; then
         for keep in infrastructure-runner apps; do [[ -e "$state_dir/$keep" ]] && kept+=("app data in $state_dir/$keep"); done
     fi
 fi
+
+fi
+[[ -z ${host_note:-} ]] || warnings+=("$host_note")
+[[ -z $stack_note ]] || warnings+=("$stack_note")
 
 # 4. Installation and configuration directories. Without --delete-data the encrypted backups and the key that decrypts them stay.
 backup_dir="$install_dir/backups"
