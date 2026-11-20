@@ -181,7 +181,7 @@ internal static partial class HostHealthParsers
                 int.Parse(check.Groups[2].Value, CultureInfo.InvariantCulture));
         var lines = text.Split('\n', StringSplitOptions.TrimEntries).Where(line => line.Contains("[upgradable from", StringComparison.Ordinal)).ToArray();
         if (lines.Length == 0 && !text.Contains("Listing", StringComparison.Ordinal)) return (null, null);
-        return (lines.Length, lines.Count(line => line.Split(' ', 2)[0].Contains("-security", StringComparison.Ordinal)));
+        return (lines.Length, lines.Count(line => line.Split(' ', 2)[0].Split('/', 2)[^1].Contains("-security", StringComparison.Ordinal)));
     }
 
     [GeneratedRegex(@"^\s*(\d+);(\d+)\s*$", RegexOptions.Multiline)]
