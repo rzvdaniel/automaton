@@ -28,6 +28,22 @@ public static class RunnerProtocolCompatibilityPolicy
         }
     }
 
+    /// <summary>The permissions this Runner is too old to understand (it would reject the app as "unsupported permission").</summary>
+    public static IReadOnlyList<string> PermissionsBeyondRunner(string? apiCompatibilityVersion, IEnumerable<string>? permissions)
+    {
+        var version = int.TryParse(apiCompatibilityVersion, out var parsed) ? parsed : 0;
+        return (permissions ?? []).Where(p => RunnerApiCompatibilityVersions.RequiredVersionForPermission(p) > version).ToList();
+    }
+
+    public static void EnsureSupportsPermissions(Runner runner, IEnumerable<string>? permissions)
+    {
+        var missing = PermissionsBeyondRunner(runner.ApiCompatibilityVersion, permissions);
+        if (missing.Count == 0) return;
+        throw new InvalidOperationException(
+            $"Runner too old: Runner '{runner.Name}' (version {runner.Version ?? "unknown"}) does not know the permission {string.Join(", ", missing)} this app needs. "
+            + "Upgrade the Runner (Studio: Runners > Upgrade Runner, or run `automaton runners upgrade`), then deploy again.");
+    }
+
     public static bool SupportsRuntimeTunnelReconnectCommands(string? apiCompatibilityVersion)
         => int.TryParse(apiCompatibilityVersion, out var version)
             && version >= int.Parse(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands);

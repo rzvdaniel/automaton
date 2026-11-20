@@ -69,4 +69,23 @@ public sealed class RunnerProtocolCompatibilityPolicyTests
         Name = "protocol-test-runner",
         ApiCompatibilityVersion = version
     };
+
+    [Test]
+    public void OldRunnerIsToldToUpgradeForANewPermission()
+    {
+        var runner = CreateRunner(RunnerApiCompatibilityVersions.AppTunnelOverHttp2);
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(runner, ["backups:read", "security:read"]));
+        Assert.That(exception!.Message, Does.Contain("Runner too old").And.Contain("security:read").And.Contain("Upgrade"));
+        Assert.That(exception.Message, Does.Not.Contain("backups:read"));
+    }
+
+    [Test]
+    public void CurrentRunnerAcceptsEveryPermissionAndOldRunnerAcceptsOldOnes()
+    {
+        Assert.DoesNotThrow(() => RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(
+            CreateRunner(RunnerApiCompatibilityVersions.Current), Automaton.Core.Models.ApplicationContractValidator.SupportedPermissions));
+        Assert.DoesNotThrow(() => RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(
+            CreateRunner(RunnerApiCompatibilityVersions.AppTunnelOverHttp2), ["backups:read", "server:read"]));
+    }
 }

@@ -564,6 +564,7 @@ export interface CatalogEntry extends GitAppSource {
   minServerVersion: string
   permissions: string[]
   requiresNewerServer: boolean
+  requiresNewerRunner?: boolean
   installedAppId: string | null
   sourceId: string
   sourceName: string
