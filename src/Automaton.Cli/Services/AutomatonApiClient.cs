@@ -870,6 +870,21 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<List<JsonElement>> ListActionSchedulesAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/action-schedules", ct);
+        await EnsureSuccessAsync(resp);
+        var list = await ReadJsonAsync(resp, ct);
+        return list.ValueKind == JsonValueKind.Array ? list.EnumerateArray().Select(item => item.Clone()).ToList() : [];
+    }
+
+    public async Task<JsonElement> CreateActionScheduleAsync(object schedule, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync("api/action-schedules", JsonSerializer.Serialize(schedule, JsonOptions), ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     // ── Projects ──────────────────────────────────────────────────────────────
 
     public async Task<JsonElement> ListProjectsAsync(CancellationToken ct = default)

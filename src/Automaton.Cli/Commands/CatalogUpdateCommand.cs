@@ -19,22 +19,23 @@ public static class CatalogUpdateCommand
         var secretsStdin = new Option<bool>("--secrets-stdin", "Read the secrets as NAME=VALUE lines from standard input");
         var wait = new Option<bool>("--wait", "Wait until the deployment has finished and report whether it succeeded");
         var json = new Option<bool>("--json", "Print the result as JSON (for agents)");
+        var (noSchedules, schedule) = CatalogInstallCommand.ScheduleOptions();
         var command = new Command("update",
-            "Update an app installed from the catalog to the commit the catalog pins now and redeploy it; data, settings, secrets and schedules stay.\n" +
+            "Update an app installed from the catalog to the commit the catalog pins now and redeploy it; data, settings, secrets and schedules stay; default schedules the new version offers and the app lacks are created (--no-schedules skips them).\n" +
             "Example: automaton catalog update harbour --wait\n" +
             "Without an update it says so and exits 0. Files edited after the install need --confirm-edited; new secrets need --secrets-file or --secrets-stdin.")
-        { app, check, confirmEdited, secretsFile, secretsStdin, wait, json };
+        { app, check, confirmEdited, secretsFile, secretsStdin, wait, noSchedules, schedule, json };
         command.SetHandler(async context =>
         {
             var parsed = context.ParseResult;
             var asJson = parsed.GetValueForOption(json);
             await CatalogInstallCommand.RunAsync(asJson, () => UpdateAsync(config, parsed.GetValueForArgument(app), parsed.GetValueForOption(check),
-                parsed.GetValueForOption(confirmEdited), parsed.GetValueForOption(secretsFile), parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(wait), asJson));
+                parsed.GetValueForOption(confirmEdited), parsed.GetValueForOption(secretsFile), parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(wait), asJson, parsed.GetValueForOption(noSchedules), parsed.GetValueForOption(schedule) ?? []));
         });
         return command;
     }
 
-    private static async Task UpdateAsync(ConfigService config, string appReference, bool check, bool confirmEdited, string? secretsFile, bool secretsStdin, bool wait, bool asJson)
+    private static async Task UpdateAsync(ConfigService config, string appReference, bool check, bool confirmEdited, string? secretsFile, bool secretsStdin, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
     {
         var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin));
         using var client = CatalogInstallCommand.Connect(config);
@@ -77,29 +78,36 @@ public static class CatalogUpdateCommand
         if (edited && !confirmEdited)
             throw new InvalidOperationException($"{name} was edited after it was installed; the update replaces those changes. Add --confirm-edited to go on. Nothing was changed.");
 
-        await ApplyAsync(client, app, name, update, confirmEdited, secrets, secretsStdin, wait, asJson, appReference, retryOnly);
+        await ApplyAsync(client, app, name, update, confirmEdited, secrets, secretsStdin, wait, asJson, appReference, noSchedules, scheduleNames, retryOnly);
     }
 
     private static async Task ApplyAsync(AutomatonApiClient client, JsonElement app, string name, JsonElement update, bool confirmEdited,
-        Dictionary<string, string> secrets, bool secretsStdin, bool wait, bool asJson, string appReference, bool retry = false)
+        Dictionary<string, string> secrets, bool secretsStdin, bool wait, bool asJson, string appReference, bool noSchedules, string[] scheduleNames, bool retry = false)
     {
         var appId = CatalogInstallCommand.Text(app, "id");
         var installed = CatalogInstallCommand.Text(update, "installedCommit");
         var latest = CatalogInstallCommand.Text(update, "latestCommit");
         var newSecrets = CatalogInstallCommand.Strings(update, "newSecrets");
-        var required = await RequiredSecretsAsync(client, app, latest, newSecrets, secrets);
+        var source = await client.GetCatalogInstallSourceAsync(CatalogInstallCommand.Text(app, "installedFromRepo"), CatalogInstallCommand.Text(app, "installedFromFolder"), latest);
+        var application = source.TryGetProperty("application", out var contract) ? contract : default;
+        var schedules = CatalogSchedules.Select(application, noSchedules, scheduleNames);
+        var required = await RequiredSecretsAsync(client, application, newSecrets, secrets);
         var missing = required.Where(secret => !secrets.ContainsKey(secret)).ToList();
         if (missing.Count > 0) AskForSecrets(missing, secrets, secretsStdin, asJson, appReference);
 
         try
         {
             foreach (var (key, value) in secrets) await client.SetSecretAsync(appId, "app", key, value, null);
-            var deployment = await client.UpdateCatalogAppAsync(appId, confirmEdited, wait);
-            var failure = wait ? CatalogInstallCommand.DeploymentFailure(deployment) : null;
+            var waitFor = wait || schedules.Count > 0;
+            var deployment = await client.UpdateCatalogAppAsync(appId, confirmEdited, waitFor);
+            var failure = waitFor ? CatalogInstallCommand.DeploymentFailure(deployment) : null;
             if (failure is not null) throw new InvalidOperationException(failure);
+            var (created, existing) = await CatalogSchedules.CreateAsync(client, appId, name, schedules);
+            wait = waitFor;
             var operationId = CatalogInstallCommand.Text(deployment, "operationId");
-            if (asJson) CliJson.Write(new { success = true, appId, updated = true, installedCommit = installed, latestCommit = latest, deployed = wait, operationId = operationId.Length > 0 ? operationId : null });
+            if (asJson) CliJson.Write(new { success = true, appId, updated = true, installedCommit = installed, latestCommit = latest, deployed = wait, schedulesCreated = created, operationId = operationId.Length > 0 ? operationId : null });
             else Console.WriteLine(retry ? (wait ? $"Redeployed {name} at {Short(latest)}." : $"Retrying the deploy of {name} at {Short(latest)}. Check it with: automaton apps show {appId}") : wait ? $"Updated and deployed {name} to {Short(latest)}." : $"Updating {name} to {Short(latest)}; deployment started. Check it with: automaton apps show {appId}");
+            if (!asJson) CatalogInstallCommand.PrintSchedules(created, existing);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException && secrets.Count > 0)
         {
@@ -108,14 +116,12 @@ public static class CatalogUpdateCommand
     }
 
     /// <summary>The new secrets the person must give: declared by the new version, without a source and not optional. Refuses secrets it does not declare.</summary>
-    private static async Task<List<string>> RequiredSecretsAsync(AutomatonApiClient client, JsonElement app, string latest, List<string> newSecrets, Dictionary<string, string> given)
+    private static Task<List<string>> RequiredSecretsAsync(AutomatonApiClient client, JsonElement application, List<string> newSecrets, Dictionary<string, string> given)
     {
-        if (newSecrets.Count == 0 && given.Count == 0) return [];
-        var source = await client.GetCatalogInstallSourceAsync(CatalogInstallCommand.Text(app, "installedFromRepo"), CatalogInstallCommand.Text(app, "installedFromFolder"), latest);
-        var application = source.TryGetProperty("application", out var contract) ? contract : default;
+        if (newSecrets.Count == 0 && given.Count == 0) return Task.FromResult(new List<string>());
         var (unknown, _, missing) = CatalogInstallValues.Check(application, new Dictionary<string, string>(), given);
         if (unknown.Count > 0) throw new InvalidOperationException($"The new version does not declare: {string.Join(", ", unknown)}. Nothing was changed.");
-        return missing.Where(newSecrets.Contains).ToList();
+        return Task.FromResult(missing.Where(newSecrets.Contains).ToList());
     }
 
     private static void AskForSecrets(List<string> missing, Dictionary<string, string> secrets, bool stdinUsed, bool asJson, string app)

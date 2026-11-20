@@ -30,7 +30,7 @@ public class CatalogInstallCommandTests
     {
         var install = CatalogInstallCommand.BuildInstall(new ConfigService());
         Assert.That(install.Options.Select(o => o.Name), Is.EquivalentTo(
-            new[] { "source", "name", "runner", "setting", "secrets-file", "secrets-stdin", "wait", "json" }));
+            new[] { "source", "name", "runner", "setting", "secrets-file", "secrets-stdin", "wait", "no-schedules", "schedule", "json" }));
         Assert.That(install.Description, Does.Contain("--secrets-file").And.Contain("hidden prompt"));
     }
 
@@ -149,4 +149,34 @@ public class CatalogInstallCommandTests
     [TestCase("""{"id":"a"}""", false)]
     public void NoRunner_FlagsOnlyAnAppAnsweredWithoutARunner(string json, bool flagged) =>
         Assert.That(CatalogInstallCommand.NoRunner(JsonDocument.Parse(json).RootElement) is not null, Is.EqualTo(flagged));
+
+    private static readonly JsonElement WithSchedules = JsonDocument.Parse("""
+        {"schedules":[{"name":"Stall check","action":"stall","cron":"*/5 * * * *"},{"name":"Morning report","action":"report","intervalSeconds":3600}]}
+        """).RootElement;
+
+    [Test]
+    public void Schedules_AreAllKeptByDefault() =>
+        Assert.That(CatalogSchedules.Select(WithSchedules, false, []).Select(CatalogSchedules.Name), Is.EqualTo(new[] { "Stall check", "Morning report" }));
+
+    [Test]
+    public void Schedules_NoSchedulesKeepsNone_AndAnAppWithoutAnyKeepsNone()
+    {
+        Assert.That(CatalogSchedules.Select(WithSchedules, true, []), Is.Empty);
+        Assert.That(CatalogSchedules.Select(Application, false, []), Is.Empty);
+    }
+
+    [Test]
+    public void Schedules_ScheduleKeepsOnlyTheNamedOnes_IgnoringCase()
+        => Assert.That(CatalogSchedules.Select(WithSchedules, false, ["morning REPORT"]).Select(CatalogSchedules.Name), Is.EqualTo(new[] { "Morning report" }));
+
+    [Test]
+    public void Schedules_AnUnknownNameOrBothOptionsAreRefusedBeforeAnythingChanges()
+    {
+        Assert.That(() => CatalogSchedules.Select(WithSchedules, false, ["Lessons"]), Throws.InvalidOperationException.With.Message.Contain("Lessons").And.Message.Contain("Stall check"));
+        Assert.That(() => CatalogSchedules.Select(WithSchedules, true, ["Stall check"]), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void Update_OffersTheSameScheduleOptions() =>
+        Assert.That(CatalogUpdateCommand.Build(new ConfigService()).Options.Select(o => o.Name), Does.Contain("no-schedules").And.Contain("schedule"));
 }
