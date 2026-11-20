@@ -95,6 +95,7 @@ jobs:
       - run: python3 .agents/tools/test_check_action_pins.py
       - run: python3 .agents/tools/test_docs_walk_gate.py
       - run: python3 .agents/tools/test_deploy_notice.py
+      - run: python3 .agents/tools/test_issue_check.py
       - run: python3 .agents/tools/check-action-pins.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,3 +1,4 @@
+# The section names are the source for the write-issue skill and .agents/tools/issue-check.py.
 name: Bug report
 description: Something in Automaton does not work as documented.
 labels: [bug]
@@ -8,32 +9,46 @@ body:
         Security problems: do not open an issue. Report them privately as described in [SECURITY.md](https://github.com/rzvdaniel/automaton/blob/main/SECURITY.md).
         Never paste passwords, tokens, API keys or setup tokens.
   - type: textarea
-    id: what
+    id: problem
     attributes:
-      label: What happened
-      description: What you did, what you expected and what happened instead.
+      label: Problem
+      description: What goes wrong and who it affects, in one or two sentences.
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
+      label: Steps
+      description: |
+        Numbered steps to reproduce:
+
+        1. Open Studio and sign in
+        2. Click Apps
     validations:
       required: true
   - type: textarea
-    id: version
+    id: result
     attributes:
-      label: Versions
-      description: Server release (for example server-v0.1.32), CLI version (`automaton --version`) and Runner, if relevant.
+      label: Result
+      description: What happens, with the exact error or status code. Remove secrets and private hostnames first.
     validations:
       required: true
-  - type: dropdown
-    id: area
-    attributes:
-      label: Area
-      options: [Install or update, Studio, API, CLI, Runner, App store, Website or docs, Other]
   - type: textarea
-    id: logs
+    id: expected
     attributes:
-      label: Logs or screenshots
-      description: Remove secrets and private hostnames first.
+      label: Expected
+      description: What should happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: What will be checked on the test server, as a real user would do it. Not "tests pass".
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: Related
+      description: "Optional: issues, PRs and files by path, and the server release (for example server-v0.1.32)."

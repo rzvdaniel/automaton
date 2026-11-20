@@ -15,6 +15,9 @@ What should be true, in plain words: "An app owner can delete their app after lo
 
 ## Body
 
+The section names are those of the issue forms in `.github/ISSUE_TEMPLATE/` (`feature.yml`, `bug.yml`), the one source;
+`.agents/tools/issue-check.py` labels an issue `needs-shape` when a required one is missing. Related is optional.
+
 For a bug:
 
 ```markdown
