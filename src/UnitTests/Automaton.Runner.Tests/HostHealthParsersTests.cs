@@ -81,6 +81,7 @@ public class HostHealthParsersTests
     }
 
     [TestCase("71;12\n", 71, 12)]
+    [TestCase("/usr/lib/update-notifier/apt-check:387: Warning: W:Unable to read x\n  depcache = apt_pkg.DepCache(cache)\n42;0", 42, 0)]
     [TestCase("0;0", 0, 0)]
     [TestCase("Listing... Done\nopenssl/noble-security 3.0.13 amd64 [upgradable from: 3.0.12]\nvim/noble-updates 9.1 amd64 [upgradable from: 9.0]\n", 2, 1)]
     [TestCase("Listing... Done\n", 0, 0)]
