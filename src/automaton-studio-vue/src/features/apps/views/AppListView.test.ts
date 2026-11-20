@@ -43,7 +43,7 @@ async function mountView(apps: AppListItem[], roles: string[] = []) {
   return wrapper
 }
 
-const rows = (wrapper: Awaited<ReturnType<typeof mountView>>) => wrapper.findAll('.apps-card a').map((row) => row.text())
+const rows = (wrapper: Awaited<ReturnType<typeof mountView>>) => wrapper.findAll('.app-row__main').map((row) => row.text())
 
 describe('AppListView', () => {
   beforeEach(() => {
@@ -61,8 +61,11 @@ describe('AppListView', () => {
   it('lists each app as a link to its page with kind once and only the state', async () => {
     const wrapper = await mountView(apps)
     expect(wrapper.find('h1').text()).toBe('Apps')
-    const links = wrapper.findAll('.apps-card a')
-    expect(links.map((link) => link.attributes('href'))).toEqual(['/apps/a', '/apps/b', '/apps/c'])
+    const links = wrapper.findAll('.app-row__main')
+    // A web app opens the app itself; apps with no screen open their Automaton page.
+    expect(links.map((link) => link.attributes('href'))).toEqual([expect.stringContaining('/apps/a/application'), '/apps/b', '/apps/c'])
+    expect(links[0]!.attributes('target')).toBe('_blank')
+    expect(wrapper.findAll('[data-testid="app-settings"]').map((gear) => gear.attributes('href'))).toEqual(['/apps/a'])
     expect(links[0]!.text()).toContain('Web app · Take notes')
     expect(links[0]!.text()).not.toContain('private')
     expect(links[0]!.text()).toContain('live')

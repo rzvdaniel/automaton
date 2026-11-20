@@ -7,7 +7,7 @@ import Skeleton from 'primevue/skeleton'
 import { useToast } from 'primevue/usetoast'
 import AppMark from '@/features/apps/components/AppMark.vue'
 import { getStudioApplicationUrl } from '@/features/apps/utils/public-app-url'
-import { appState } from '@/features/apps/utils/app-list-display'
+import { appOpenUrl, appState } from '@/features/apps/utils/app-list-display'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { serverConsoleService } from '@/features/server/services/server-console.service'
 import type { HomeCard, HomePinnedApp } from '../types/home.types'
@@ -445,12 +445,18 @@ onBeforeUnmount(() => {
         <p class="sr-only" role="status" aria-live="polite" data-testid="move-announcement">{{ announcement }}</p>
         <ul v-if="store.listView" class="pin-list" data-testid="pinned-list">
           <li v-for="item in store.pinned" :key="item.app.id">
-            <RouterLink :to="`/apps/${item.app.id}`" class="pin-row" :aria-label="`Open ${item.app.name}`" data-testid="pinned-row">
+            <component
+              :is="appOpenUrl(item.app) ? 'a' : RouterLink" class="pin-row" :aria-label="`Open ${item.app.name}`" data-testid="pinned-row"
+              v-bind="appOpenUrl(item.app) ? { href: appOpenUrl(item.app), target: '_blank', rel: 'noopener' } : { to: `/apps/${item.app.id}` }"
+            >
               <AppMark :id="item.app.id" :name="item.app.name" :image-url="item.app.thumbnailUrl" />
               <span class="pin__name">{{ item.app.name }}</span>
               <PublisherBadge v-if="publisherOf(item.app.id)" :publisher="publisherOf(item.app.id)!" />
               <span class="pin__state" :class="`pin__state--${appState(item.app).tone}`">{{ appState(item.app).label }}</span>
               <span class="pin-row__summary">{{ item.card?.card.status ?? '' }}</span>
+            </component>
+            <RouterLink v-if="appOpenUrl(item.app)" :to="`/apps/${item.app.id}`" class="pin-row__gear" :aria-label="`${item.app.name} settings`" title="Automaton page" data-testid="pinned-row-settings">
+              <i class="pi pi-cog" />
             </RouterLink>
           </li>
         </ul>
@@ -466,8 +472,9 @@ onBeforeUnmount(() => {
             data-testid="pinned-app"
             @keydown="onCardKey($event, index)"
           >
-            <RouterLink
-              :to="`/apps/${item.app.id}`" class="pin__link" :aria-label="`Open ${item.app.name}`"
+            <component
+              :is="appOpenUrl(item.app) ? 'a' : RouterLink" class="pin__link" :aria-label="`Open ${item.app.name}`" data-testid="pin-open"
+              v-bind="appOpenUrl(item.app) ? { href: appOpenUrl(item.app), target: '_blank', rel: 'noopener' } : { to: `/apps/${item.app.id}` }"
               @pointerdown="onPointerDown($event, index)" @dragstart.prevent @click.capture="swallowClick"
             >
               <AppMark :id="item.app.id" :name="item.app.name" :image-url="item.app.thumbnailUrl" />
@@ -475,11 +482,14 @@ onBeforeUnmount(() => {
               <span class="pin__state" :class="`pin__state--${attention(item)}`" data-testid="pin-state">
                 <span class="pin__dot" />{{ stateText(item) }}
               </span>
-            </RouterLink>
+            </component>
             <PublisherBadge v-if="publisherOf(item.app.id)" :publisher="publisherOf(item.app.id)!" />
             <HomeAppCard v-if="item.card" :app-id="item.app.id" :item="item.card" />
             <p class="pin__footer" data-testid="app-card-time">{{ footerLine(item.app, item.card) }}</p>
             <div class="pin__actions">
+              <RouterLink v-if="appOpenUrl(item.app)" :to="`/apps/${item.app.id}`" class="p-button p-button-text p-button-secondary p-button-icon-only p-button-sm pin__icon pin__gear" :aria-label="`${item.app.name} settings`" title="Automaton page" data-testid="pin-settings">
+                <i class="pi pi-cog" />
+              </RouterLink>
               <Button
                 v-if="item.card && item.app.canUpdate"
                 icon="pi pi-refresh" size="small" text severity="secondary" class="pin__icon"
@@ -529,7 +539,8 @@ onBeforeUnmount(() => {
 .view-switch { display: flex; gap: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .pin-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.pin-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; color: inherit; text-decoration: none; }
+.pin-list li { display: flex; align-items: center; gap: 4px; }
+.pin-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; color: inherit; text-decoration: none; }
 .pin-row:hover { border-color: var(--signal); }
 .pin-row__summary { flex: 1; min-width: 0; text-align: right; color: var(--ink-soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-cards--mosaic { display: block; position: relative; }
@@ -562,6 +573,9 @@ onBeforeUnmount(() => {
 .pin__state--failing { color: var(--hc-critical, #c0392b); }
 .pin__state--failing .pin__dot { background: var(--hc-critical, #c0392b); opacity: 1; }
 .pin__footer { margin: 0; font-size: 12px; color: var(--ink-soft); }
+.pin__gear { text-decoration: none; }
+.pin-row__gear { color: var(--ink-soft); padding: 8px; text-decoration: none; }
+.pin-row__gear:hover { color: var(--ink); }
 .pin__actions { display: flex; justify-content: flex-end; gap: 2px; }
 .pin__icon--busy { opacity: 0.5; }
 .pin--dragging { z-index: 20; transform: rotate(1.5deg) scale(1.02); box-shadow: 0 18px 40px rgb(0 0 0 / 0.22); cursor: grabbing; pointer-events: none; transition: transform 160ms ease-out, box-shadow 160ms ease-out; }

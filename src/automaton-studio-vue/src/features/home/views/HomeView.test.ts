@@ -239,6 +239,22 @@ describe('HomeView', () => {
     expect(wrapper.find('[data-testid="pinned-app"]').exists()).toBe(false)
   })
 
+  it('opens a web app from its card and its Automaton page from the gear; an app with no screen opens its page', async () => {
+    service.get.mockResolvedValue({
+      needsYou: [],
+      pinned: [{ app: app('1', 'Shop'), pinnedAtUtc: '' }, { app: { ...app('2', 'Nightly'), actionsOnly: true }, pinnedAtUtc: '' }],
+    })
+    const wrapper = mountHome()
+    await flushPromises()
+    const [shop, nightly] = wrapper.findAll('[data-testid="pinned-app"]')
+    const open = shop!.find('[data-testid="pin-open"]')
+    expect(open.attributes('href')).toContain('/apps/1/application')
+    expect(open.attributes('target')).toBe('_blank')
+    expect(shop!.find('[data-testid="pin-settings"]').attributes('href')).toBe('/apps/1')
+    expect(nightly!.find('[data-testid="pin-open"]').attributes('href')).toBe('/apps/2')
+    expect(nightly!.find('[data-testid="pin-settings"]').exists()).toBe(false)
+  })
+
   it('moves a card with Alt+Arrow, announces it, and ignores a plain arrow key', async () => {
     service.get.mockResolvedValue({
       needsYou: [], listView: false,

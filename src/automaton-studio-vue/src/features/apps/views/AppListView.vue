@@ -19,6 +19,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { APP_START_PROGRESS } from '../utils/app-action-error'
 import {
   appDescription, appState, matchesFilter, matchesSearch, type AppFilter,
+  appOpenUrl,
 } from '../utils/app-list-display'
 
 const router = useRouter()
@@ -163,12 +164,19 @@ const handleRetry = async () => {
             :id="app.id"
             :key="app.id"
             :to="`/apps/${app.id}`"
+            :href="appOpenUrl(app)"
             :name="app.name"
             :line="appDescription(app)"
             :image-url="app.thumbnailUrl"
             :state="appState(app)"
           >
             <template #action>
+              <RouterLink
+                v-if="appOpenUrl(app)" :to="`/apps/${app.id}`" class="p-button p-button-text p-button-secondary p-button-icon-only mr-1"
+                :aria-label="`${app.name} settings`" title="Automaton page" data-testid="app-settings"
+              >
+                <i class="pi pi-cog" />
+              </RouterLink>
               <PinToHomeButton :app-id="app.id" :app-name="app.name" compact class="mr-2" />
               <Button
                 v-if="app.canUpdate"
