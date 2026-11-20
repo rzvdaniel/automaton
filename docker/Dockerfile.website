@@ -11,6 +11,7 @@ RUN npm ci
 WORKDIR /app
 COPY src/automaton-vue/ src/automaton-vue/
 COPY shared/ai-guidance/ shared/ai-guidance/
+COPY shared/site-nav/ shared/site-nav/
 
 WORKDIR /app/src/automaton-vue
 RUN npm run build

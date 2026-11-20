@@ -59,7 +59,7 @@ useSiteTheme()
   </div>
   <div class="feat">
     <div><p class="eyebrow">For everyone · App store and catalogs</p><h3>Share apps like products</h3><p class="soft">Publish an app with a cover and a description to your own store. Add catalogs from GitHub so your team can install ready-made tools in one click.</p>
-      <ul><li>Your store at store.your-domain</li><li>Catalogs from any GitHub repository, public or private</li><li>Fork an app to make it your own</li></ul></div>
+      <ul><li>Your store at store.your-domain</li><li>Catalogs from any GitHub repository, public or private</li><li>Fork an app to make it your own</li></ul><p style="margin-top:18px"><RouterLink class="btn" to="/catalog">Apps you can install →</RouterLink></p></div>
     <div class="mock"><div class="store" style="grid-template-columns:1fr 1fr;gap:12px">
       <div class="appc"><div class="cover" style="background:#f26a1b">Aa</div><div class="bd"><h3 style="font-size:1rem">Untranslatable</h3><p style="font-size:.85rem">Bluffing word game</p></div></div>
       <div class="appc"><div class="cover" style="background:#f8c4a0">♥</div><div class="bd"><h3 style="font-size:1rem">Website Monitor</h3><p style="font-size:.85rem">Outage alerts</p></div></div></div></div>

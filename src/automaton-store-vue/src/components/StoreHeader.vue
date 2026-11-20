@@ -1,31 +1,34 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { publicAppConfig } from '@/config/publicAppConfig'
+import { buildSiteNav } from '@site-nav/siteNav'
+import logoUrl from '@site-nav/logo.svg'
 
-// "Automaton App Store" reads as the name "Automaton" with an "App Store" tag, as on the website.
-const brandName = publicAppConfig.storeTitle.replace(/\s*App Store$/i, '').trim() || publicAppConfig.storeTitle
-const installUrl = 'https://automaton.monster/docs/install-server'
+// The same menu as automaton.monster; this store is the "Live apps" page.
+const siteUrl = 'https://automaton.monster'
+const navItems = buildSiteNav({
+  storeUrl: '/',
+  docsUrl: `${siteUrl}/docs/`,
+  githubUrl: 'https://github.com/rzvdaniel/automaton',
+}).map((item) => (item.path ? { ...item, href: `${siteUrl}${item.path}`, path: undefined } : item))
+const getStartedUrl = `${siteUrl}/get-started`
 </script>
 
 <template>
   <header class="site band top">
     <div class="wrap">
-      <RouterLink class="brand" to="/" :aria-label="`${publicAppConfig.storeTitle} home`">
-        <img v-if="publicAppConfig.logoUrl" class="mark" :src="publicAppConfig.logoUrl" alt="" />
-        <svg v-else class="mark" viewBox="0 0 40 40" aria-hidden="true">
-          <rect x="1.5" y="1.5" width="37" height="37" rx="10" class="mark-bg" />
-          <path class="mark-face" d="M10 15l5 4-5 4M30 15l-5 4 5 4M17 27h6" />
-        </svg>
-        <span class="brand-name">{{ brandName }}</span>
-        <span class="tag">App Store</span>
-      </RouterLink>
+      <a class="brand" :href="`${siteUrl}/`" aria-label="Automaton home">
+        <img class="mark" :src="publicAppConfig.logoUrl || logoUrl" alt="" />
+        <span class="brand-name">Automaton</span>
+      </a>
       <nav class="nav" aria-label="Main">
-        <RouterLink class="link" to="/">Apps</RouterLink>
-        <a class="link" href="https://automaton.monster/docs/">Docs</a>
-        <a class="link" href="https://github.com/rzvdaniel/automaton-apps">GitHub</a>
+        <template v-for="item in navItems" :key="item.key">
+          <RouterLink v-if="item.key === 'live-apps'" class="link" to="/" aria-current="page">{{ item.label }}</RouterLink>
+          <a v-else class="link" :href="item.href" :target="item.external ? '_blank' : undefined" :rel="item.external ? 'noopener' : undefined">{{ item.label }}</a>
+        </template>
         <span class="actions">
           <a v-if="publicAppConfig.studioUrl" class="btn small" :href="publicAppConfig.studioUrl">Studio</a>
-          <a class="btn small primary" :href="installUrl">Get Automaton</a>
+          <a class="btn small primary" :href="getStartedUrl">Get started</a>
         </span>
       </nav>
     </div>
@@ -60,24 +63,6 @@ const installUrl = 'https://automaton.monster/docs/install-server'
   flex: none;
   object-fit: contain;
 }
-.mark-bg {
-  fill: var(--ink);
-}
-.mark-face {
-  fill: none;
-  stroke: var(--signal);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.tag {
-  font: 500 0.75rem var(--body);
-  color: var(--ink-soft);
-  padding: 3px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  white-space: nowrap;
-}
 .nav {
   flex: 1;
   display: flex;
@@ -90,10 +75,10 @@ const installUrl = 'https://automaton.monster/docs/install-server'
   color: var(--ink-soft);
 }
 .site .nav a.link:hover,
-.site .nav a.router-link-exact-active {
+.site .nav a[aria-current='page'] {
   color: var(--ink);
 }
-.site .nav a.router-link-exact-active {
+.site .nav a[aria-current='page'] {
   font-weight: 600;
 }
 .actions {
@@ -102,9 +87,6 @@ const installUrl = 'https://automaton.monster/docs/install-server'
   gap: 10px;
 }
 @media (max-width: 620px) {
-  .nav .link:not(.router-link-exact-active) {
-    display: none;
-  }
   .top .wrap {
     padding-block: 12px;
   }
@@ -112,10 +94,13 @@ const installUrl = 'https://automaton.monster/docs/install-server'
     width: 100%;
   }
 }
-@media (max-width: 400px) {
-  .nav .link {
-    display: none;
+@media (max-width: 620px) {
+  .nav {
+    flex-wrap: wrap;
+    gap: 10px 16px;
   }
+}
+@media (max-width: 400px) {
   .actions {
     margin-left: 0;
     width: 100%;
