@@ -6,7 +6,7 @@ order: 100
 
 # Back up and restore
 
-This page covers the server's database and keys. It does not cover files that apps keep in their own data directories.
+This page covers the server's database and keys and the data of the apps this server's host runs. It does not cover data an app keeps outside the server, or apps on other Runner hosts.
 
 ## What to ask the user
 
@@ -20,11 +20,22 @@ SSH access with sudo on the server for the `sudo` commands below; they run on th
 
 The installer turns on a nightly backup between 03:00 and 04:00 server time and keeps the newest 7 in `/opt/automaton-server/backups/nightly`. Each holds a PostgreSQL dump and the keys that decrypt it. The **Backups** page in Studio shows the last, next and offsite backup, lists them, gives the restore command and has a **Back up now** button for administrators (CLI: `automaton server backup`, and `automaton server backup-status` for the next scheduled run; right after a backup it can show the old time for about 25 s).
 
-Each backup folder holds `database.dump` (custom-format `pg_dump`), the API and Worker Data Protection keys, the server version and checksums, plus an encrypted `.tar.age` archive. The X25519 private key is `/etc/automaton/secrets/backup-key` (root-only): save it separately in a password manager, an archive cannot be restored without it. Administrators can also start a backup from Studio or the CLI; the API never runs it as root (a systemd path unit `automaton-backup-request.path` runs it).
+Each backup folder holds `database.dump` (custom-format `pg_dump`), the API and Worker Data Protection keys, an `app-data` folder with one archive per app (see below), the server version and checksums, plus an encrypted `.tar.age` archive. The X25519 private key is `/etc/automaton/secrets/backup-key` (root-only): save it separately in a password manager, an archive cannot be restored without it. Administrators can also start a backup from Studio or the CLI; the API never runs it as root (a systemd path unit `automaton-backup-request.path` runs it).
 
 **Nightly cleanup** runs in the Runner at 05:00 UTC by default: it removes unused Docker images and build cache older than 7 days and trims journal files above 200 MB, never volumes, images of existing containers or backups. Administrators see and change it on Studio's **Server** page.
 
-Besides the database, protect `/etc/automaton`, the Docker volumes and, on each Runner host, `/opt/automaton/self-hosted-runners/<installation-id>` with its labeled volumes (workspace and app data). Quiesce app writes for writable volumes, keep copies off the machine they protect, and test a restore on an isolated replacement. There is no restore tool for Runner data.
+## App data in the backup
+
+The backup includes the data of every app on the server's own host, in the same encrypted archive (so Backup Warden carries it off-site unchanged):
+
+| Kind of app | What is backed up |
+|---|---|
+| Web apps and Actions | each app's data directory and declared `storage.mounts` (`workspace/data/<app id>` in the Runner's workspace volume) |
+| Compose apps | every named volume of the app's Compose project, such as `pdf-summarizer_uploads` |
+
+Consistency: while an app's data is copied its running containers are paused (frozen, not stopped), so a database file such as SQLite is not copied half-written. The pause lasts as long as the copy takes, and apps resume by themselves; an app sees it as a brief stall. Apps that keep a database in a separate service should still be dumped by that service.
+
+Not included: data an app keeps outside the server, Runners on other machines (protect `/opt/automaton/self-hosted-runners/<installation-id>` and the labeled volumes there yourself), `/etc/automaton`, and the server's own volumes other than the database (the keys are included separately). Keep copies off the machine they protect and test a restore on an isolated replacement. Backups taken before this was added contain no app data.
 
 ## Take or list a backup
 
@@ -40,13 +51,23 @@ The **Backup Warden** app is available in **Apps → Catalog**. Install and conf
 
 ## Restore
 
-Restoring replaces the whole database and keys. Everything written after that backup is lost. Runners keep their registration and apps keep running on them, but app data and deploys made after the backup are not restored, and apps created after it are unknown to the server. List names first with `sudo bash /opt/automaton-server/backup.sh --list`.
+Restoring replaces the whole database and keys. Everything written after that backup is lost. Runners keep their registration and apps keep running on them. App data on this host comes back as it was at backup time; deploys made after the backup are not restored, and apps created after it are unknown to the server. List names first with `sudo bash /opt/automaton-server/backup.sh --list`.
 
 ```bash
 sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z
 ```
 
 It verifies checksums, asks you to type the server's domain (for automation, `--confirm example.com`), saves the current state as a new backup, stops the services, restores, starts and checks Studio. A backup from an older server version restores onto a newer one; the reverse is not supported.
+
+### Restore one app
+
+Deleting an app removes its data, so you can restore just that app's data from a backup without touching the database or other apps:
+
+```bash
+sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z --app <app id or Compose project>
+```
+
+The app id is the one in Studio's URL for the app; for a Compose app use its project name (`pdf-summarizer`). If the id is not in the backup, the command lists what is. The app's containers are stopped, its data replaced with the backed-up files, and the containers started again. The app itself must already exist (redeploy it first if you deleted it); a Compose volume that no longer exists is recreated. A safety backup is taken first.
 
 To move to a new server, install the same release there, copy a backup folder into `/opt/automaton-server/backups/nightly/`, restore it, and copy `/etc/automaton` if existing sessions and Runners must keep working.
 
