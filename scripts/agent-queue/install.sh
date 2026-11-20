@@ -17,7 +17,7 @@ done
 echo "installed to $dest"
 if (( cron )); then
   env_="env PATH=$dest:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin AGENT_QUEUE_RUNNER=$dest/claude-task"
-  orch="$env_ ORCH_STALL_MINUTES=120 ORCH_NIGHT_BUDGET=100000"
+  orch="$env_ ORCH_STALL_MINUTES=120"
   out=">> $HOME/claude-tasks"
   new=$(cat <<C
 @reboot $env_ nohup $dest/agent-queue worker $out/worker.out 2>&1 & # agent-queue

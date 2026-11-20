@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # agent-queue: one task queue and one worker for Claude agent tasks.
 #   add <name> [prompt-file]   queue a task (prompt from file or stdin)
-#   status                     queue, running task, worker, pause and budget
+#   status                     queue, running task, worker and pause
 #   cancel <name>              drop a pending task or stop the running one
 #   worker                     run pending tasks one at a time (held by flock)
 #   stalled [minutes]          list running tasks with no log output for N minutes (default 30)
