@@ -8,7 +8,7 @@ import json, os, re, sys, urllib.error, urllib.request
 
 LABEL = "needs-shape"
 MARKER = "<!-- issue-check -->"
-SKIP_LABELS = {"handover", "lessons", "dependencies", "dependency-advisory"}
+SKIP_LABELS = {"handover", "lessons", "dependencies", "dependency-advisory", "question"}
 BUG = ["Problem", "Steps", "Result", "Expected", "Done when"]
 FEATURE = ["Goal", "Example", "Suggestion", "Done when"]
 OPTIONAL = ["Related"]
@@ -71,7 +71,7 @@ def find_comment(repo, number):
     while True:
         items = api("GET", f"repos/{repo}/issues/{number}/comments?per_page=100&page={page}")
         for c in items:
-            if c["body"].startswith(MARKER):
+            if c["body"].startswith(MARKER) and c.get("user", {}).get("login") == "github-actions[bot]":
                 return c
         if len(items) < 100:
             return None

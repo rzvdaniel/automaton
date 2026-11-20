@@ -63,13 +63,18 @@ class Run(unittest.TestCase):
         self.assertIn(("POST", "repos/o/r/issues/7/comments"), methods)
         self.assertIn(("POST", "repos/o/r/issues/7/labels"), methods)
 
+    def test_question_and_foreign_comment(self):
+        self.assertEqual(ic.run(self.event("x", ["question"]), "o/r"), "skipped")
+        self.comments = [{"id": 6, "body": ic.MARKER, "user": {"login": "someone"}}]
+        self.assertIsNone(ic.find_comment("o/r", 7))
+
     def test_edits_same_comment(self):
-        self.comments = [{"id": 5, "body": ic.MARKER + "\nold"}]
+        self.comments = [{"id": 5, "body": ic.MARKER + "\nold", "user": {"login": "github-actions[bot]"}}]
         ic.run(self.event("**Goal**\nx", [ic.LABEL]), "o/r")
         self.assertEqual([(m, p) for m, p, _ in self.calls if m != "GET"], [("PATCH", "repos/o/r/issues/comments/5")])
 
     def test_fixed_removes_label_and_comment(self):
-        self.comments = [{"id": 5, "body": ic.MARKER + "\nold"}]
+        self.comments = [{"id": 5, "body": ic.MARKER + "\nold", "user": {"login": "github-actions[bot]"}}]
         self.assertEqual(ic.run(self.event(FEATURE, [ic.LABEL]), "o/r"), "ok")
         self.assertEqual([(m, p) for m, p, _ in self.calls if m != "GET"],
                          [("DELETE", "repos/o/r/issues/7/labels/needs-shape"), ("DELETE", "repos/o/r/issues/comments/5")])
