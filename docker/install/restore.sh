@@ -132,7 +132,7 @@ restore_keys() {
     volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/data-protection-keys"}}{{.Name}}{{end}}{{end}}' "$container")
     [[ -n "$volume" ]] || { echo "No Data Protection key volume on $container." >&2; return 1; }
     gzip -dc "$archive" | docker run --rm -i --user 0:0 --entrypoint sh -v "$volume:/keys" "$helper" \
-        -ec 'find /keys -mindepth 1 -delete; tar -xf - -C /keys; chown -R --reference=/keys /keys'
+        -ec 'o=$(stat -c %u:%g /keys); find /keys -mindepth 1 -delete; tar -xf - -C /keys; chown -R "$o" /keys'
 }
 restore_keys "$api" "$backup/api-keys.tar.gz"
 restore_keys "$worker" "$backup/worker-keys.tar.gz"
