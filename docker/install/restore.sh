@@ -98,6 +98,10 @@ restore_app_data() {
     [[ -f "$manifest" ]] || { echo 'This backup has no app data (it was taken before app data was included).'; return 0; }
     while IFS=$'\t' read -r kind key volume sub file; do
         [[ -z "$only" || "$key" == "$only" ]] || continue
+        # The manifest comes from a backup that may have been carried in from elsewhere: accept only the shapes backup.sh writes.
+        [[ "$kind" =~ ^(web|compose)$ && "$volume" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ && "$key" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ \
+            && "$file" =~ ^[0-9]+\.tar\.gz$ && "$sub" =~ ^(\.|workspace/data/[0-9a-f-]{36}|[a-zA-Z0-9][a-zA-Z0-9_.-]*)$ ]] \
+            || { echo 'The backup has an invalid app data entry; nothing was restored for it.' >&2; return 1; }
         found=1
         if ! docker volume inspect "$volume" >/dev/null 2>&1; then
             if [[ "$kind" == compose ]]; then
@@ -116,7 +120,7 @@ restore_app_data() {
             -ec 'd="/v/$1"; mkdir -p "$d"; find "$d" -mindepth 1 -delete; tar -xpf - -C "$d"' _ "$sub"
         if ((${#ids[@]})); then docker start "${ids[@]}" >/dev/null; fi
     done < "$manifest"
-    if ((found == 0)); then
+    if [[ -n "$only" ]] && ((found == 0)); then
         echo "This backup has no data for $only. It has:" >&2
         cut -f2 "$manifest" | sort -u >&2
         return 1

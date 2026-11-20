@@ -70,4 +70,10 @@ restore_app_data "$app" "$helper" "$work/backup" >/dev/null
 check "$web_volume" "workspace/data/$app/data/a.txt" web-one
 check "$web_volume" "workspace/data/$other_app/data/o.txt" changed
 restore_app_data nobody "$helper" "$work/backup" >/dev/null 2>&1 && fail 'an unknown app was accepted'
+# An empty backup (a host with no apps) restores cleanly; a tampered manifest is refused.
+mkdir -p "$work/empty/app-data" "$work/bad/app-data"
+: > "$work/empty/app-data/manifest.tsv"
+restore_app_data '' "$helper" "$work/empty" || fail 'a full restore of a backup without apps failed'
+printf 'web\t%s\t/etc\t.\t1.tar.gz\n' "$app" > "$work/bad/app-data/manifest.tsv"
+restore_app_data '' "$helper" "$work/bad" >/dev/null 2>&1 && fail 'a manifest with a host path was accepted'
 echo PASS

@@ -218,7 +218,7 @@ resume_paused() {
 # archive_volume <label filter of containers to pause> <volume> <subdirectory> <output file> <helper image>
 archive_volume() {
     local filter="$1" volume="$2" subdir="$3" out="$4" helper="$5" status=0
-    mapfile -t paused_containers < <(docker ps -q --filter "label=$filter")
+    mapfile -t paused_containers < <(docker ps -q --filter status=running --filter "label=$filter")
     if ((${#paused_containers[@]})); then docker pause "${paused_containers[@]}" >/dev/null || status=1; fi
     if ((status == 0)); then
         docker run --rm --user 0:0 --entrypoint sh -v "$volume:/v:ro" "$helper" -ec 'tar -C "/v/$1" -cf - .' _ "$subdir" \
