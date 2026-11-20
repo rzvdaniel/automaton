@@ -21,16 +21,19 @@ while (($#)); do
         --config-dir) custom_options=true; config_dir="${2:?Missing configuration directory}"; shift 2 ;;
         --backup-dir) custom_options=true; backup_root="${2:?Missing backup directory}"; shift 2 ;;
         --keep-backups) custom_options=true; keep_backups="${2:?Missing number of backups to keep}"; shift 2 ;;
-        --allow-downgrade) allow_downgrade=true; shift ;;
+        --allow-downgrade) custom_options=true; allow_downgrade=true; shift ;;
         --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH] [--keep-backups N] [--allow-downgrade]'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; echo 'After a successful update, keeps the newest N update backups (default 3) and removes the previous release application images.'; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 # A limited account (for example the production deploy user) may hold a sudo rule for this script. Through sudo it may
-# only use the forms the update flow uses (no options, --version, --allow-downgrade): paths and offline bundles are for
-# a root shell. The updater's own re-run from the verified bundle is exempt.
+# only use the forms the update flow uses (no options, --version): paths, offline bundles and --allow-downgrade are for
+# a root shell or an administrator whose sudo rights are unrestricted (`sudo -l` lists `ALL`). The updater's own re-run
+# from the verified bundle is exempt; sudo strips that variable from a limited account's environment.
 if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root && -z "${AUTOMATON_UPDATER_FROM_BUNDLE:-}" ]] && $custom_options; then
-    echo 'Run the updater with --bundle, --checksum, --install-dir, --config-dir, --backup-dir or --keep-backups from a root shell, not through sudo from a limited account.' >&2; exit 1
+    if ! sudo -n -l -U "$SUDO_USER" 2>/dev/null | grep -Eq '^[[:space:]]*\([^)]*\)[[:space:]]+((NO)?PASSWD:|SETENV:|NOSETENV:)*[[:space:]]*ALL[[:space:]]*$'; then
+        echo 'Run the updater with --bundle, --checksum, --install-dir, --config-dir, --backup-dir, --keep-backups or --allow-downgrade from a root shell or an administrator account, not through sudo from a limited account.' >&2; exit 1
+    fi
 fi
 [[ $EUID == 0 ]] || { echo 'Run the updater with sudo.' >&2; exit 1; }
 [[ -n "$version" || -z "$bundle_archive" ]] || { echo 'Specify --version when using an offline bundle.' >&2; exit 1; }
