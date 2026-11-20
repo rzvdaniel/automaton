@@ -44,6 +44,12 @@ that should last.
 Who posts what, one line each. Example: `<main login>` (default `gh`) = main review; `<second login>` (the `security_gh` command in
 `.agents/environment.md`) = security pass by a separate reviewer; `<test login>` = test issues; `<owner>` = releases and production deploys.
 
+## Reviewer accounts
+`merge-gate.py` needs the main review and the security pass from different GitHub logins.
+- `<main login>`: posts main reviews (and re-reviews after a rebase or fixes), with the default `gh`.
+- `<security login>`: posts security passes only, with the command named in `.agents/environment.md`.
+- A reviewer checks `gh api user -q .login` and who already reviewed before posting, and stops if it would collide.
+
 ## Local quirks and traps
 Things specific to this project, machine or tooling that cost time (shell wrappers, API limits, setup that must not be
 changed, naming of options, known flaky steps).

@@ -35,6 +35,14 @@ second fresh agent posting with the second login named in `.agents/environment.m
 the security-pass paths and whenever the change adds or changes an endpoint, a permission check, secret handling, a
 file path or shell command built from input, or anything an app or anonymous visitor can reach.
 
+**Different logins.** Reviewers and security passes start as the `automaton-reviewer` agent
+([`.claude/agents/automaton-reviewer.md`](../../../.claude/agents/automaton-reviewer.md)), never a generic agent.
+`merge-gate.py` requires the main review and the separate security pass to come from different GitHub logins. Before
+posting, check which login you post as (`gh api user -q .login`) and which logins already reviewed the PR. Post the main
+review only if your login has not posted the security pass on this PR, and the security pass only if it has not posted
+the main review. If you would collide, stop and report which other login must post instead. A re-review after a rebase
+or fixes counts as a main review.
+
 **Confirm before posting.** For each Important finding, reproduce it when that is cheap (a failing test, a command and
 its output); otherwise say what would confirm it and how sure you are. Drop guesses. A wrong finding costs a commit and
 another round.

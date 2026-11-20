@@ -46,6 +46,11 @@ Create a to-do item for each step and tick them off.
    applies, at most two rounds. For a high tier, spawn a separate `automaton-reviewer` subagent for the security pass; it
    posts with the second login named in `.agents/environment.md` (`security_gh` command); the main review posts with the
    default `gh` login, and one login never posts both. Without a second login, stop and say a different login must post it.
+   Start every review and security pass as the `automaton-reviewer` agent
+   ([definition](../../../.claude/agents/automaton-reviewer.md)), never a generic agent. Before posting, check
+   `gh api user -q .login` against the logins that already reviewed the PR: the main review and the security pass must
+   come from different logins, and a re-review after a rebase or fixes counts as a main review. If you would collide,
+   stop and report which other login must post.
 6. **Merge.** Run `python3 .agents/tools/merge-gate.py <N> --merge`; it squash-merges and deletes the branch only on
    PASS. Never run `gh pr merge` yourself. Then watch the `main` run for your commit. Also hold anything the owner said to hold.
 7. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).

@@ -67,7 +67,7 @@ It does **not** write product code (exception: skills, docs and small chores the
 
 ## Delegating to an agent
 
-1. **Pick the agent type.** Where the tool has agent types, delegate implementation to one whose definition carries `AGENTS.md` and `automaton-implement-issue`, and reviews to one that carries `pr-review` (the project defines them, see the configuration); never a generic agent with a hand-written step list. A headless queue gets the same rules as a fixed preamble on every task.
+1. **Pick the agent type.** Where the tool has agent types, delegate implementation to one whose definition carries `AGENTS.md` and `automaton-implement-issue`, and reviews to one that carries `pr-review` (the project defines them, see the configuration); never a generic agent with a hand-written step list. In this repository implementation goes to the `automaton-implementer` agent and every review or security pass to `automaton-reviewer` (`.claude/agents/`), never generic agents. The main review and the security pass must come from different GitHub logins (see "Reviewer accounts" in the configuration). A headless queue gets the same rules as a fixed preamble on every task.
 2. **Write the task.** The goal; the issues in order; the skills to follow; its lane and what it must not touch;
    whether it works in a batch (stop at merge) or alone (deliver too); where it may test; owner-only steps it must
    name and not wait on; that it ends with the handoff from `automaton-implement-issue`.
