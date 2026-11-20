@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install agent-queue into a bin directory (default ~/bin; first argument overrides).
 #   install.sh [dir] [--cron]
-# Copies agent-queue, claude-task and orchestrator.sh (an existing different file is first saved as
+# Copies agent-queue, claude-task, orchestrator.sh and agent-cleanup (an existing different file is first saved as
 # <name>.bak-YYYYMMDD). Files are replaced by a new inode, so a running worker is not disturbed.
 # It does not start or stop the worker. With --cron it also sets the crontab entries below
 # (idempotent: lines marked "# agent-queue" are replaced, other lines are kept).
@@ -10,7 +10,7 @@ dest=$HOME/bin; cron=0
 for a in "$@"; do [[ $a == --cron ]] && cron=1 || dest=$a; done
 src=$(dirname "$(readlink -f "$0")")
 mkdir -p "$dest" "${AGENT_QUEUE_HOME:-$HOME/agent-queue}" "$HOME/claude-tasks"
-for f in agent-queue claude-task orchestrator.sh; do
+for f in agent-queue claude-task orchestrator.sh agent-cleanup; do
   if [[ -e $dest/$f ]] && ! cmp -s "$dest/$f" "$src/$f"; then cp -p "$dest/$f" "$dest/$f.bak-$(date +%Y%m%d)"; fi
   install -m 0755 "$src/$f" "$dest/$f"
 done
@@ -23,6 +23,8 @@ if (( cron )); then
 @reboot $env_ nohup $dest/agent-queue worker $out/worker.out 2>&1 & # agent-queue
 */30 * * * * $orch $dest/orchestrator.sh $out/orchestrator.out 2>&1 # agent-queue
 0 6 * * * $orch ORCH_REPORT=1 $dest/orchestrator.sh $out/orchestrator.out 2>&1 # agent-queue
+30 4 * * * $env_ $dest/agent-cleanup worktrees $out/cleanup.out 2>&1 # agent-queue
+0 5 * * 0 $env_ $dest/agent-cleanup caches $out/cleanup.out 2>&1 # agent-queue
 0 3 * * * $env_ /bin/sh -c 'echo "Follow .agents/skills/automaton-lessons-learned/SKILL.md end to end on the lessons inbox (the open issue labelled lessons). Reply on the inbox." | $dest/agent-queue add lessons-\$(date +\%Y\%m\%d)' $out/lessons-cron.out 2>&1 # agent-queue
 C
 )
