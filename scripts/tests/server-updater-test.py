@@ -179,8 +179,22 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
         stub = self.bin / 'sudo'
         stub.write_text('#!/bin/sh\necho "    (ALL : ALL) ALL"\n')
         stub.chmod(0o755)
-        result = self.update(archive, checksum, extra={'SUDO_USER': 'an-administrator'})
+        # the script calls /usr/bin/sudo, so run a copy that points at the stub
+        script = self.root / 'update-with-stub-sudo.sh'
+        script.write_text((REPO / 'scripts/update-automaton.sh').read_text().replace('/usr/bin/sudo', str(stub)))
+        result = subprocess.run(['bash', str(script), '--version', 'server-v0.1.2', '--install-dir', str(self.install),
+                                 '--config-dir', str(self.config), '--bundle', str(archive), '--checksum', str(checksum)],
+                                env=self.environment | {'SUDO_USER': 'an-administrator'}, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_a_fake_sudo_earlier_on_the_path_is_not_trusted(self):
+        archive, checksum = self.bundle()
+        stub = self.bin / 'sudo'
+        stub.write_text('#!/bin/sh\necho "    (ALL : ALL) ALL"\n')
+        stub.chmod(0o755)
+        result = self.update(archive, checksum, extra={'SUDO_USER': 'no-such-limited-account'})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('root shell', result.stderr)
 
     def test_sudo_from_a_limited_account_refuses_allow_downgrade(self):
         result = subprocess.run(['bash', str(REPO / 'scripts/update-automaton.sh'), '--allow-downgrade'],
