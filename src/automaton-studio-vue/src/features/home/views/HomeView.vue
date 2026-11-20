@@ -592,6 +592,7 @@ onBeforeUnmount(() => {
   .pin--wide { grid-column: auto; }
   .pin__link { cursor: auto; touch-action: auto; }
   .pin__actions .p-button { min-width: 44px; min-height: 44px; }
+  .pin-row__gear { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   .home-cards--apps { grid-template-columns: minmax(0, 1fr); }
 }
 .home-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 40px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; }
