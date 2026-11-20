@@ -23,6 +23,10 @@ the area skills that `AGENTS.md` lists for the code you touch; this skill is onl
   `gh run watch`). A turn that ends while a background job runs leaves the task idle until someone notices.
 - **Others work beside you.** Use your own worktree and branch. Touch only the files your issue needs. Do not upgrade
   the test server or cut a release while an orchestrator is running a batch.
+- **Destructive scripts run only in a throwaway place.** Test anything that deletes, uninstalls, restores or prunes in a
+  throwaway container or on runner-02, never on a host with a live server (check `docker` is not the real one).
+- **Report what you break first.** If a command changed or broke anything outside the task, say so first in the handoff;
+  a fix does not replace the report.
 - The sign-up, server, secrets and production rules in `AGENTS.md` apply at every step.
 
 ## Steps
