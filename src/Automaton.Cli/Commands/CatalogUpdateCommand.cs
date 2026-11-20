@@ -21,7 +21,7 @@ public static class CatalogUpdateCommand
         var json = new Option<bool>("--json", "Print the result as JSON (for agents)");
         var (noSchedules, schedule) = CatalogInstallCommand.ScheduleOptions();
         var command = new Command("update",
-            "Update an app installed from the catalog to the commit the catalog pins now and redeploy it; data, settings, secrets and schedules stay; default schedules the new version offers and the app lacks are created (--no-schedules skips them).\n" +
+            "Update an app installed from the catalog to the commit the catalog pins now and redeploy it; data, settings, secrets and existing schedules stay; default schedules the app lacks (also ones you deleted on purpose) are created again (--no-schedules skips them).\n" +
             "Example: automaton catalog update harbour --wait\n" +
             "Without an update it says so and exits 0. Files edited after the install need --confirm-edited; new secrets need --secrets-file or --secrets-stdin.")
         { app, check, confirmEdited, secretsFile, secretsStdin, wait, noSchedules, schedule, json };

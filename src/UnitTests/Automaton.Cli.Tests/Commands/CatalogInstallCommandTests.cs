@@ -179,4 +179,40 @@ public class CatalogInstallCommandTests
     [Test]
     public void Update_OffersTheSameScheduleOptions() =>
         Assert.That(CatalogUpdateCommand.Build(new ConfigService()).Options.Select(o => o.Name), Does.Contain("no-schedules").And.Contain("schedule"));
+
+    [Test]
+    public async Task CreateSchedules_SkipsOnesTheAppHasAndPostsStudiosBody()
+    {
+        const string appId = "11111111-1111-1111-1111-111111111111";
+        var posted = new List<JsonElement>();
+        using var http = new HttpClient(new Stub(request =>
+        {
+            if (request.Method == HttpMethod.Get)
+                return Json("""[{"applicationId":"11111111-1111-1111-1111-111111111111","name":"My app: Stall check"},{"applicationId":"22222222-2222-2222-2222-222222222222","name":"My app: Morning report"}]""");
+            posted.Add(JsonDocument.Parse(request.Content!.ReadAsStringAsync().Result).RootElement.Clone());
+            return Json("{}");
+        })) { BaseAddress = new Uri("https://api.example.com/") };
+        using var client = new AutomatonApiClient(http, "test-key");
+
+        var (created, existing) = await CatalogSchedules.CreateAsync(client, appId, "My app", CatalogSchedules.Select(WithSchedules, false, []));
+
+        Assert.That(created, Is.EqualTo(new[] { "Morning report" }));
+        Assert.That(existing, Is.EqualTo(new[] { "Stall check" }));
+        Assert.That(posted, Has.Count.EqualTo(1));
+        var body = posted[0];
+        Assert.That(body.GetProperty("name").GetString(), Is.EqualTo("My app: Morning report"));
+        Assert.That(body.GetProperty("applicationId").GetString(), Is.EqualTo(appId));
+        Assert.That(body.GetProperty("actionKey").GetString(), Is.EqualTo("report"));
+        Assert.That(body.GetProperty("scheduleType").GetString(), Is.EqualTo("Interval"));
+        Assert.That(body.GetProperty("intervalSeconds").GetInt32(), Is.EqualTo(3600));
+        Assert.That(body.GetProperty("timeZone").GetString(), Is.EqualTo("Etc/UTC"));
+        Assert.That(body.GetProperty("enabled").GetBoolean(), Is.True);
+    }
+
+    private static HttpResponseMessage Json(string body) => new(System.Net.HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
+
+    private sealed class Stub(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(respond(request));
+    }
 }

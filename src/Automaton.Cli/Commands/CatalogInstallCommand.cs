@@ -133,7 +133,7 @@ public static class CatalogInstallCommand
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             // Includes a timeout while waiting and an unreadable answer: the person must still learn the app id.
-            throw new InvalidOperationException($"{exception.Message}\nThe app was created (app id {appId}); fix the problem in Studio or with automaton pull {appId}, then deploy again.", exception);
+            throw new InvalidOperationException($"{exception.Message}\nThe app was created (app id {appId}); fix the problem in Studio or with automaton pull {appId}, then deploy again. Schedules the app declares may be missing: check its Actions tab, or run automaton catalog update to create them.", exception);
         }
     }
 
