@@ -164,6 +164,16 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
                                '--bundle', str(archive), '--checksum', str(checksum)],
                               env=self.environment | (extra or {}), capture_output=True, text=True)
 
+    def test_sudo_from_a_limited_account_refuses_paths_and_bundles(self):
+        archive, checksum = self.bundle()
+        result = self.update(archive, checksum, extra={'SUDO_USER': 'automaton'})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('root shell', result.stderr)
+        self.assertFalse((self.install / 'backups').exists())
+        # a root shell that came through `sudo -i` as root, and the bundle's own re-run, are not limited
+        result = self.update(archive, checksum, extra={'SUDO_USER': 'root'})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_upgrades_after_verified_backup(self):
         result = self.update(*self.bundle())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

@@ -11,20 +11,27 @@ bundle_archive=''
 bundle_checksum=''
 keep_backups=3
 allow_downgrade=false
+custom_options=false
 while (($#)); do
     case "$1" in
         --version) version="${2:?Missing release version}"; shift 2 ;;
-        --bundle) bundle_archive="${2:?Missing release bundle}"; shift 2 ;;
-        --checksum) bundle_checksum="${2:?Missing checksum}"; shift 2 ;;
-        --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
-        --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
-        --backup-dir) backup_root="${2:?Missing backup directory}"; shift 2 ;;
-        --keep-backups) keep_backups="${2:?Missing number of backups to keep}"; shift 2 ;;
+        --bundle) custom_options=true; bundle_archive="${2:?Missing release bundle}"; shift 2 ;;
+        --checksum) custom_options=true; bundle_checksum="${2:?Missing checksum}"; shift 2 ;;
+        --install-dir) custom_options=true; install_dir="${2:?Missing installation directory}"; shift 2 ;;
+        --config-dir) custom_options=true; config_dir="${2:?Missing configuration directory}"; shift 2 ;;
+        --backup-dir) custom_options=true; backup_root="${2:?Missing backup directory}"; shift 2 ;;
+        --keep-backups) custom_options=true; keep_backups="${2:?Missing number of backups to keep}"; shift 2 ;;
         --allow-downgrade) allow_downgrade=true; shift ;;
         --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH] [--keep-backups N] [--allow-downgrade]'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; echo 'After a successful update, keeps the newest N update backups (default 3) and removes the previous release application images.'; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
+# A limited account (for example the production deploy user) may hold a sudo rule for this script. Through sudo it may
+# only use the forms the update flow uses (no options, --version, --allow-downgrade): paths and offline bundles are for
+# a root shell. The updater's own re-run from the verified bundle is exempt.
+if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root && -z "${AUTOMATON_UPDATER_FROM_BUNDLE:-}" ]] && $custom_options; then
+    echo 'Run the updater with --bundle, --checksum, --install-dir, --config-dir, --backup-dir or --keep-backups from a root shell, not through sudo from a limited account.' >&2; exit 1
+fi
 [[ $EUID == 0 ]] || { echo 'Run the updater with sudo.' >&2; exit 1; }
 [[ -n "$version" || -z "$bundle_archive" ]] || { echo 'Specify --version when using an offline bundle.' >&2; exit 1; }
 [[ -z "$version" || "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify --version server-vX.Y.Z.' >&2; exit 1; }
