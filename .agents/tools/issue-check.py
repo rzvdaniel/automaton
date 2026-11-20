@@ -12,7 +12,7 @@ SKIP_LABELS = {"handover", "lessons", "dependencies", "dependency-advisory"}
 BUG = ["Problem", "Steps", "Result", "Expected", "Done when"]
 FEATURE = ["Goal", "Example", "Suggestion", "Done when"]
 OPTIONAL = ["Related"]
-HEADING = re.compile(r"^[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*|__)?([A-Za-z][A-Za-z ]*?)(?:\*\*|__)?[ \t]*:?[ \t]*$")
+HEADING = re.compile(r"^[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*|__)?([A-Za-z][A-Za-z ]*?)[ \t]*:?(?:\*\*|__)?[ \t]*:?[ \t]*$")
 EMPTY = {"", "_no response_", "no response", "n/a", "none", "tbd", "todo"}
 
 

@@ -14,6 +14,9 @@ class Missing(unittest.TestCase):
         self.assertEqual(ic.missing(BUG, set()), [])
         self.assertEqual(ic.missing(FEATURE.replace("\n", "\r\n"), set()), [])
 
+    def test_colon_inside_bold(self):
+        self.assertEqual(ic.missing(FEATURE.replace("**Goal**", "**Goal:**"), set()), [])
+
     def test_related_is_optional(self):
         self.assertEqual(ic.missing(FEATURE.split("**Related**")[0], set()), [])
 
