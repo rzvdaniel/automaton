@@ -109,6 +109,18 @@ class OsUpdateFromRequestTests(unittest.TestCase):
         self.assertEqual(self.run_script().returncode, 0)
         self.assertEqual(stat.S_IMODE(summary.stat().st_mode), 0o644)
 
+    def test_a_unit_keeps_the_update_summary_readable_when_ubuntu_rewrites_it(self):
+        path_unit = (self.systemd / 'automaton-updates-summary.path').read_text()
+        self.assertIn('PathChanged=' + str(Path(self.temporary.name) / 'updates-available'), path_unit)
+        self.assertIn('--restore-summary-mode', (self.systemd / 'automaton-updates-summary.service').read_text())
+        summary = Path(self.temporary.name) / 'updates-available'
+        summary.write_text('71 updates')
+        summary.chmod(0o600)
+        self.assertEqual(self.run_script('--restore-summary-mode').returncode, 0)
+        self.assertEqual(stat.S_IMODE(summary.stat().st_mode), 0o644)
+        summary.unlink()
+        self.assertEqual(self.run_script('--restore-summary-mode').returncode, 0)
+
     def test_a_failed_apt_run_is_reported_with_its_log(self):
         self.fail_marker.write_text('')
         self.request({'requestedBy': 'x', 'scope': 'all'})

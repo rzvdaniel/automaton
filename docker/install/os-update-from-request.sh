@@ -7,6 +7,7 @@
 # configuration files are kept) and writes status/status.json with the result, whether a restart is needed and a log tail.
 #
 #   os-update-from-request.sh --install-units   create the directories and systemd units (installer/updater)
+#   os-update-from-request.sh --restore-summary-mode  make the Ubuntu update summary 0644 again (automaton-updates-summary.service)
 #   os-update-from-request.sh                   process one pending request (started by automaton-os-update.service)
 #
 # Only requestedBy and scope (security or all) are taken from the request; nothing in the file is ever executed or
@@ -23,8 +24,9 @@ mode=run
 while (($#)); do
     case "$1" in
         --install-units) mode=units; shift ;;
+        --restore-summary-mode) mode=summary; shift ;;
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
-        --help) echo 'Usage: os-update-from-request.sh [--install-units] [--install-dir PATH]'; exit 0 ;;
+        --help) echo 'Usage: os-update-from-request.sh [--install-units | --restore-summary-mode] [--install-dir PATH]'; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -44,6 +46,14 @@ request="$requests/request.json"
 log_file="$status_dir/last.log"
 backup_lock=${AUTOMATON_BACKUP_LOCK_FILE:-/run/lock/automaton-backup.lock}
 export REQUESTED_BY='' REQUESTED_AT='' STARTED_AT='' FINISHED_AT='' SCOPE='' MESSAGE='' UPGRADED=''
+
+# apt's update-notifier hook rewrites the update summary as root-only (0600). The Runner reads it to show the update counts, so
+# make it readable again after every apt run (a symlink or missing file is left alone).
+restore_updates_summary_mode() {
+    [[ -f "$updates_available" && ! -L "$updates_available" ]] || return 0
+    [[ "$(stat -c %a -- "$updates_available" 2>/dev/null)" == 644 ]] || chmod 0644 -- "$updates_available" 2>/dev/null
+    return 0
+}
 
 install_units() {
     # The API container runs as root, so requests/ is root-only on the host as well; status/ is mounted read-only.
@@ -72,12 +82,36 @@ TriggerLimitIntervalSec=0
 [Install]
 WantedBy=multi-user.target
 UNIT
-    chmod 0644 "$systemd_dir/automaton-os-update.service" "$systemd_dir/automaton-os-update.path"
+    # Ubuntu's own apt/MOTD run rewrites the update summary as root-only (0600). Keep it readable for the Runner whenever that
+    # happens: the service only chmods when the mode differs, so its own chmod does not start it again.
+    cat > "$systemd_dir/automaton-updates-summary.service" <<UNIT
+[Unit]
+Description=Keep the Ubuntu update summary readable for Server Keeper
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash $install_dir/os-update-from-request.sh --restore-summary-mode --install-dir $install_dir
+UNIT
+    cat > "$systemd_dir/automaton-updates-summary.path" <<UNIT
+[Unit]
+Description=Watch the Ubuntu update summary
+
+[Path]
+PathChanged=$updates_available
+Unit=automaton-updates-summary.service
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    chmod 0644 "$systemd_dir/automaton-os-update.service" "$systemd_dir/automaton-os-update.path" \
+        "$systemd_dir/automaton-updates-summary.service" "$systemd_dir/automaton-updates-summary.path"
+    restore_updates_summary_mode
     if [[ "$systemd_dir" == /etc/systemd/system ]]; then
         systemctl daemon-reload \
-            && systemctl enable --now automaton-os-update.path >/dev/null \
+            && systemctl enable --now automaton-os-update.path automaton-updates-summary.path >/dev/null \
             && systemctl is-active --quiet automaton-os-update.path \
-            || { echo 'automaton-os-update.path could not be enabled. Check: systemctl status automaton-os-update.path' >&2; return 1; }
+            && systemctl is-active --quiet automaton-updates-summary.path \
+            || { echo 'automaton-os-update.path or automaton-updates-summary.path could not be enabled. Check: systemctl status automaton-os-update.path automaton-updates-summary.path' >&2; return 1; }
     fi
     echo 'OS updates from Studio, the CLI and approved apps enabled (automaton-os-update.path).'
 }
@@ -206,13 +240,6 @@ run_apt() {
     apt_env "$apt" "${conf[@]}" --only-upgrade install "${packages[@]}" >>"$log_file" 2>&1
 }
 
-# apt's update-notifier hook rewrites the update summary as root-only (0600). The Runner reads it to show the update counts, so
-# make it readable again after every apt run (a symlink or missing file is left alone).
-restore_updates_summary_mode() {
-    [[ -f "$updates_available" && ! -L "$updates_available" ]] && chmod 0644 -- "$updates_available" 2>/dev/null
-    return 0
-}
-
 run_request() {
     install -d -m 0750 "$status_dir"
     install -d -m 0700 "$requests"
@@ -275,6 +302,7 @@ run_request() {
 main() {
     case "$mode" in
         units) install_units ;;
+        summary) restore_updates_summary_mode ;;
         run)
             run_request
             local code=$?
