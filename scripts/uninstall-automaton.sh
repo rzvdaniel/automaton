@@ -128,6 +128,10 @@ if $delete_data && $final_backup; then
 fi
 $dry_run && echo 'Dry run: nothing is changed.'
 
+# 0. Stop the watchdog first, or it would start the stack again while it is being removed.
+if $own_host && [[ -e "$systemd_dir/automaton-watchdog.timer" ]]; then
+    act systemctl disable --now automaton-watchdog.timer
+fi
 # 1. Runners this server's installer created on this host (container env points at this server, found via the root directory).
 runner_ids=(); runner_guids=()
 if $have_docker; then

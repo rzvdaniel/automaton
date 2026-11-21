@@ -81,7 +81,7 @@ The same problem is sent once, again every 6 hours while it lasts, and a "recove
 {"webhookUrl": "https://hooks.slack.com/services/...", "emailTo": "you@example.com"}
 ```
 
-The webhook can be Slack, Discord, Telegram (`https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>`) or any URL that accepts a JSON `POST` with `text` and `content`. Email goes straight through the SMTP in `EmailConfig` of `appsettings.Production.json`, to `emailTo` or else `EmailConfig.AdminEmail`. Without a destination, problems only appear in `sudo journalctl -u automaton-watchdog.service`. Send a test message with `sudo python3 /opt/automaton-server/watchdog.py --test`.
+The webhook can be Slack, Discord, Telegram (`https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>`) or any URL that accepts a JSON `POST` with `text` and `content`. Email goes straight through the SMTP in `EmailConfig` of `appsettings.Production.json`, to `emailTo` or else `EmailConfig.AdminEmail`. Without a destination, problems only appear in `sudo journalctl -u automaton-watchdog.service`. To stop the containers for maintenance, first run `sudo systemctl stop automaton-watchdog.timer`, and start it again afterwards. Send a test message with `sudo python3 /opt/automaton-server/watchdog.py --test`.
 
 ## Verify it worked
 
