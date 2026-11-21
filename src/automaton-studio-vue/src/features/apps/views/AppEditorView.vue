@@ -155,10 +155,12 @@ async function copyAddress() {
   }
 }
 
+// Another app's page reuses this view, so reload the waiting requests whenever the app changes.
+watch(appId, () => { waitingPermissions.value = []; void loadWaitingPermissions() }, { immediate: true })
+
 const homeStore = useHomeStore()
 onMounted(async () => {
   void homeStore.ensureLoaded()
-  void loadWaitingPermissions()
   // ?share=1 (and the old ?view=publishing) open the Share dialog.
   const wantsShare = route.query.share === '1' || route.query.view === 'publishing'
   await router.replace({ query: withoutAuthoringQuery(route.query) })
