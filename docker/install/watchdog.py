@@ -219,10 +219,8 @@ def send_email(host, recipient, subject, text):
         smtp = smtplib.SMTP(server, port, timeout=30)
     with smtp:
         if not (config.get('EmailUseSsl') or port == 465):
-            try:
-                smtp.starttls(context=ssl.create_default_context())
-            except smtplib.SMTPNotSupportedError:
-                pass
+            # Never send the password over a plain connection: no STARTTLS means no mail.
+            smtp.starttls(context=ssl.create_default_context())
         if config.get('EmailAccount') and config.get('EmailPassword'):
             try:
                 smtp.login(config['EmailAccount'], config['EmailPassword'])

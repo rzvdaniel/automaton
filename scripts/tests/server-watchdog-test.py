@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """The watchdog alerts (webhook) when containers or volumes are missing or the backup failed or is stale, starts missing
 containers again only while every volume exists, and says nothing while all is well. Docker is a fake on PATH."""
+import importlib.util
 import json
 import os
+import socket
 from pathlib import Path
 import subprocess
 import tempfile
@@ -136,6 +138,45 @@ class WatchdogTests(unittest.TestCase):
         self.run_watchdog()
         self.assertEqual(len(self.texts()), 2)
         self.assertIn('recovered', self.texts()[1])
+
+    def test_email_password_is_never_sent_without_starttls(self):
+        """A server that offers login but no STARTTLS must not receive the password."""
+        spec = importlib.util.spec_from_file_location('watchdog', SCRIPT)
+        watchdog = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(watchdog)
+        listener = socket.socket()
+        listener.bind(('127.0.0.1', 0))
+        listener.listen(1)
+        seen = []
+
+        def serve():
+            conn, _ = listener.accept()
+            with conn, conn.makefile('rwb') as f:
+                f.write(b'220 fake\r\n'); f.flush()
+                while True:
+                    line = f.readline()
+                    if not line:
+                        return
+                    seen.append(line)
+                    cmd = line[:4].upper()
+                    if cmd == b'EHLO':
+                        f.write(b'250-fake\r\n250 AUTH PLAIN LOGIN\r\n')
+                    elif cmd == b'QUIT':
+                        f.write(b'221 bye\r\n'); f.flush(); return
+                    else:
+                        f.write(b'502 no\r\n')
+                    f.flush()
+
+        thread = threading.Thread(target=serve, daemon=True)
+        thread.start()
+        host = type('H', (), {'settings': {'EmailConfig': {
+            'EmailHost': '127.0.0.1', 'EmailPort': listener.getsockname()[1],
+            'EmailAccount': 'user', 'EmailPassword': 'FAKEPW'}}})()
+        with self.assertRaises(Exception):
+            watchdog.send_email(host, 'a@example.com', 'subject', 'text')
+        thread.join(5)
+        listener.close()
+        self.assertFalse([l for l in seen if l[:4].upper() == b'AUTH'])
 
     def test_install_units(self):
         units = self.root / 'units'
