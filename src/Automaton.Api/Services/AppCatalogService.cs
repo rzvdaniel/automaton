@@ -31,6 +31,9 @@ public sealed class AppCatalogService(
         var enabled = await sources.EnabledAsync(cancellationToken);
         var installed = await InstalledAsync(userId, cancellationToken);
         var version = ParseVersion(configuration["Installation:Version"]);
+        var runnerVersions = await dbContext.Runners
+            .Where(r => r.RunnerUsers.Any(u => u.UserId == userId))
+            .Select(r => r.Version).ToListAsync(cancellationToken);
         var apps = new List<CatalogEntryDto>();
         var problems = new List<string>();
         DateTime? fetchedAt = null;
@@ -53,7 +56,7 @@ public sealed class AppCatalogService(
                 stale = true;
                 problems.Add($"{label}{failure} Showing the list from {entry.FetchedAt:u}.");
             }
-            apps.AddRange(entry.Document.Apps.Select(app => ToDto(app, entry.Document.Repo, installed, version, source)));
+            apps.AddRange(entry.Document.Apps.Select(app => ToDto(app, entry.Document.Repo, installed, version, source, runnerVersions)));
         }
 
         if (loaded == 0 && enabled.Count > 0)
@@ -363,14 +366,15 @@ public sealed class AppCatalogService(
     private static (string Repo, string Folder) InstalledKey(string repo, string? folder) =>
         (repo.Trim().ToLowerInvariant(), (folder ?? "").Trim().Trim('/'));
 
-    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source)
+    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source, IReadOnlyList<string?>? runnerVersions = null)
     {
         var minimum = ParseVersion(app.MinServerVersion);
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
         Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id
             : app.MovedFrom is { } from && installed.TryGetValue(InstalledKey(from.Repo, from.Folder), out var previous) ? previous : null;
         return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended, app.RecommendedOrder, PublisherOf(app, source));
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended, app.RecommendedOrder, PublisherOf(app, source),
+            runnerVersions is { Count: > 0 } && runnerVersions.All(v => RunnerProtocolCompatibilityPolicy.PermissionsBeyondRunner(v, app.Permissions).Count > 0));
     }
 
     internal const string AutomatonPublisher = "Automaton";

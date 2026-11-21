@@ -248,6 +248,7 @@ async function installFromUrl() {
               <RouterLink :to="{ name: 'app-editor', params: { id: app.installedAppId } }" class="catalog-installed" :aria-label="`Manage ${catalogName(app.name)}`">Manage</RouterLink>
             </span>
             <span v-else-if="app.requiresNewerServer" class="catalog-access">Needs Automaton Server {{ app.minServerVersion }} or newer</span>
+            <span v-else-if="app.requiresNewerRunner" class="catalog-access">Needs a newer Runner <RouterLink :to="{ name: 'server' }" class="catalog-installed" :aria-label="`Upgrade Runner for ${catalogName(app.name)}`">Upgrade Runner</RouterLink></span>
             <RouterLink v-else :to="installTo(app)" class="p-button p-component p-button-outlined p-button-sm catalog-install" :aria-label="`Install ${catalogName(app.name)}`">Install</RouterLink>
           </template>
         </AppRow>
