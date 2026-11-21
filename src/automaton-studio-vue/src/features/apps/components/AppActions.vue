@@ -28,7 +28,7 @@ const started = ref<Record<string, AppActionExecution>>({})
 let stopped = false
 onUnmounted(() => { stopped = true })
 
-const scheduleFor = (key: string) => props.schedules.find((item) => item.actionKey === key)
+const schedulesFor = (key: string) => props.schedules.filter((item) => item.actionKey === key)
 
 function lastRunFor(key: string): AppActionExecution | null {
   const runs = [...props.executions, ...(started.value[key] ? [started.value[key]!] : [])]
@@ -46,16 +46,21 @@ function resultText(run: AppActionExecution | null): string {
 }
 
 const rows = computed(() => props.actions.map((action) => {
-  const schedule = scheduleFor(action.key)
   const run = lastRunFor(action.key)
-  const on = !!schedule?.enabled && !props.paused
+  const schedules = schedulesFor(action.key).map((schedule) => {
+    const on = schedule.enabled && !props.paused
+    return {
+      schedule,
+      on,
+      label: schedule.name && schedule.name !== action.key && schedule.name !== action.name ? schedule.name : '',
+      text: describeSchedule(schedule),
+      nextText: on && schedule.nextRunAtUtc ? `next run ${formatWhen(schedule.nextRunAtUtc)}` : '',
+    }
+  })
   return {
     action,
-    schedule,
+    schedules,
     run,
-    on,
-    scheduleText: schedule ? describeSchedule(schedule) : 'on demand',
-    nextText: on && schedule?.nextRunAtUtc ? `next run ${formatWhen(schedule.nextRunAtUtc)}` : '',
     result: resultText(run),
     failed: !!run && isFailedRun(run.status),
     busy: !!running.value[action.key] || (!!run && isActiveRun(run.status)),
@@ -84,9 +89,8 @@ async function runNow(key: string) {
   }
 }
 
-async function setEnabled(key: string, enabled: boolean) {
-  const schedule = scheduleFor(key)
-  if (!schedule) return
+async function setEnabled(schedule: ActionSchedule, enabled: boolean) {
+  const key = schedule.id
   switching.value = { ...switching.value, [key]: true }
   try {
     await actionSchedulesService.setEnabled(schedule.id, enabled)
@@ -107,21 +111,27 @@ async function setEnabled(key: string, enabled: boolean) {
         <div class="what">
           <strong>{{ row.action.name || row.action.key }}</strong><span v-if="row.action.description" class="hint"> · {{ row.action.description }}</span>
           <div class="hint">
-            <span class="mono">{{ row.scheduleText }}</span>
-            <span v-if="row.nextText"> · {{ row.nextText }}</span>
-            <span> · last run </span><span :class="{ bad: row.failed }" data-testid="last-result">{{ row.result }}</span>
+            <span v-if="!row.schedules.length" class="mono">on demand · </span>
+            <span>last run </span><span :class="{ bad: row.failed }" data-testid="last-result">{{ row.result }}</span>
             <template v-if="row.run"> · <a href="#" class="logs" @click.prevent="emit('navigate', 'activity')">logs in Activity</a></template>
+          </div>
+          <div v-for="item in row.schedules" :key="item.schedule.id" class="schedule" data-testid="schedule-row">
+            <div class="hint">
+              <strong v-if="item.label" data-testid="schedule-name">{{ item.label }} · </strong>
+              <span class="mono">{{ item.text }}</span>
+              <span v-if="item.nextText"> · {{ item.nextText }}</span>
+            </div>
+            <ToggleSwitch
+              v-if="canUpdate"
+              :model-value="item.on"
+              :disabled="paused || switching[item.schedule.id]"
+              :aria-label="`Schedule ${item.label || item.text} for ${row.action.name || row.action.key}`"
+              data-testid="schedule-switch"
+              @update:model-value="setEnabled(item.schedule, $event)"
+            />
           </div>
         </div>
         <div v-if="canUpdate" class="controls">
-          <ToggleSwitch
-            v-if="row.schedule"
-            :model-value="row.on"
-            :disabled="paused || switching[row.action.key]"
-            :aria-label="`Schedule for ${row.action.name || row.action.key}`"
-            data-testid="schedule-switch"
-            @update:model-value="setEnabled(row.action.key, $event)"
-          />
           <Button
             :label="row.busy ? 'Running…' : 'Run now'"
             size="small"
@@ -141,7 +151,8 @@ async function setEnabled(key: string, enabled: boolean) {
 .card { display: flex; flex-direction: column; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--row-line); }
 .row:last-of-type { border-bottom: 0; }
-.what { min-width: 0; overflow-wrap: anywhere; }
+.what { min-width: 0; flex: 1 1 280px; overflow-wrap: anywhere; }
+.schedule { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
 .controls { display: flex; align-items: center; gap: 14px; }
 .hint { margin: 0; color: var(--ink-soft); font-size: 13px; }
 .mono { font-family: var(--mono); font-size: 12px; }

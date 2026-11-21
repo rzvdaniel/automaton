@@ -66,4 +66,16 @@ describe('AppActions', () => {
     expect(wrapper.find('[data-testid="actions-paused-hint"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('next run')
   })
+
+  it('lists every schedule of one action, each switch changing only its own', async () => {
+    vi.mocked(actionSchedulesService.setEnabled).mockResolvedValue({} as never)
+    const many = ['Stall check', 'Morning report', 'Lessons', 'Pick-up'].map((name, i) => ({ ...schedules[0]!, id: `s${i}`, name }))
+    const wrapper = mountIt({ schedules: many })
+    expect(wrapper.findAll('[data-testid="schedule-row"]')).toHaveLength(4)
+    expect(wrapper.text()).toContain('Morning report')
+    await wrapper.findAll('[data-testid="schedule-switch"] input')[1]!.setValue(false)
+    await flushPromises()
+    expect(actionSchedulesService.setEnabled).toHaveBeenCalledTimes(1)
+    expect(actionSchedulesService.setEnabled).toHaveBeenCalledWith('s1', false)
+  })
 })
