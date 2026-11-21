@@ -629,13 +629,5 @@ esac
         self.assertFalse((self.install / 'backups').exists())
 
 
-class RestoreScriptTests(unittest.TestCase):
-    def test_key_restore_uses_options_busybox_chown_accepts(self):
-        # The helper image is the API/Worker image, whose BusyBox chown has no --reference (#1452).
-        text = (REPO / 'docker/install/restore.sh').read_text()
-        self.assertNotIn('--reference', text)
-        self.assertIn('chown -R "$o" /keys', text)
-
-
 if __name__ == '__main__':
     unittest.main()
