@@ -2,7 +2,7 @@
 
 The **Deploy production** workflow (`.github/workflows/deploy-production.yml`) updates the production server over SSH after the owner approves. The run page shows the version, who started it and who approved it. Agents never hold the production key: it lives only in the `production` environment.
 
-After every run, approved or not, a final **Notify the owner** job opens an issue assigned to the repository owner ("Production deploy X: OK" or "needs attention") with the version, the AI check and docs walk results, the pull requests shipped and the deploy result, so GitHub sends the owner an email or push. It needs no secret. Close these issues when read.
+After every run, approved or not, a final **Notify the owner** job opens an issue assigned to the repository owner ("Production deploy X: OK" or "needs attention") with the version, the AI check, the pull requests shipped and the deploy result, so GitHub sends the owner an email or push. It needs no secret. Close these issues when read.
 
 It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<version>` on the server, then rebuilds and restarts the marketing website (`website-green`) from the released commit, then checks that `https://api.automaton.monster/health`, Studio, the store and the website return 200.
 
@@ -50,10 +50,6 @@ Run the version on the test server first. A failed update keeps the previous rel
 Every server release carries a report as its GitHub Release body: an AI check (Green, Yellow or Red with short reasons), a "Risky" list, and one section per merged pull request (tier, review, security pass, proof, migrations, how to revert). The **Deploy production** run summary shows the verdict and links the report before you approve the `production` environment. Red is a warning, not a block.
 
 The AI check needs the repository secret `CLAUDE_CODE_OAUTH_TOKEN` (a Claude subscription token from `claude setup-token`). Only the release workflow reads it. Without it, or when the usage limit is hit, the body says "AI check unavailable" and the release still publishes. Render a report locally with `python3 .agents/tools/release-report.py --from server-v0.2.104 --to server-v0.2.105`.
-
-## Docs walk gate
-
-**Deploy production** refuses a release unless its notes have a `## Docs walk` section with `Result: Pass` (the `report` job fails, so the environment approval never comes). The verifier writes it after walking the website docs on the test server: `python3 .agents/skills/automaton-verify-release/proof.py --docs-walk Pass <version> "note"`. To deploy anyway, start the run with `skip_docs_walk` set to the reason; the run summary shows it. Check the gate logic with `python3 .agents/tools/test_docs_walk_gate.py`.
 
 ## Publishing a server release
 
