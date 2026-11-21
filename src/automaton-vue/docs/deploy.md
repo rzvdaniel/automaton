@@ -103,7 +103,13 @@ Pausing stops the app on its Runner, switches off its schedules and makes its pu
 
 ### Home, Needs you and pinned apps
 
-Studio opens on **Home**. **Needs you** lists what is waiting for you: an administrator sees a missing Runner, a server or Runner update, apps asking for permissions, and optional tips (set up email, back up the server, install a recommended app such as Server Console with one click); everyone sees apps they can change that are failing. A card goes away when its task is done. Tips have a **Dismiss** button that hides them for you for good. Use **Pin to Home** in the Apps list or on an app's page to add the app to **Pinned apps**; each pinned app shows its state, last deploy, last Action run and Runner. Clicking an app that has a web screen, on Home or in the Apps list, opens the app in a new tab; the ⚙ beside it opens its Automaton page (settings, secrets, schedules, logs). An app with no screen (an Actions-only app) opens its Automaton page. Pins and dismissed cards belong to you alone.
+Studio opens on **Home**, which has up to three parts.
+
+**Notifications** (shown only when there is something) lists alerts. An administrator sees apps asking for permissions, an offline Runner, an expiring certificate, a failed backup and a server update; everyone sees apps they can change that are failing. Each has a button that opens the place to fix it. **Acknowledge** hides a notification for you until its cause changes; a critical one (for example no Runner connected, or a certificate about to expire) cannot be acknowledged and stays until the cause is fixed.
+
+**Needs you** lists what is waiting for you: a missing Runner, a Runner update, and optional tips (set up email, back up the server, install a recommended app such as Server Keeper, VictoriaLogs or Gate Keeper with one click). A card goes away when its task is done. Tips have a **Dismiss** button that hides them for you for good.
+
+**Pinned apps**: use **Pin to Home** in the Apps list or on an app's page to add the app. Each pinned app shows its state, last deploy, last Action run, Runner and, for an app from a catalog, its publisher. The **Cards / List** toggle switches between cards and a compact list. On a card, the controls refresh the card, move it earlier or later, switch it between wide and normal width, and unpin it. Clicking an app that has a web screen opens the app in a new tab; the ⚙ beside it opens its Automaton page (settings, secrets, schedules, logs). An app with no screen (an Actions-only app) opens its Automaton page. Pins, view, order and dismissed cards belong to you alone.
 
 A deploy while the app is paused uploads the new version but keeps the app stopped and says so; use `--resume` (or resume first) to start it. You need the same rights as for deploying the app; others get 403. An API key works too: `POST /api/apps/{id}/pause` and `POST /api/apps/{id}/resume`.
 

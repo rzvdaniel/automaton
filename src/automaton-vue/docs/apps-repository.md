@@ -1,6 +1,7 @@
 ---
 title: Publish your own app catalog
 description: The format of an apps repository (catalog.json, catalog-apps.json, app folders) and how to create one with automaton catalog init and add it as a catalog source.
+order: 135
 ---
 
 # Publish your own app catalog
