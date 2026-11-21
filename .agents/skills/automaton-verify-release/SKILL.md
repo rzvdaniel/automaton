@@ -141,14 +141,21 @@ Run each "Check after release" step by following the user docs page the PR's `Do
 
 ## Docs walk
 
-Required for every server release before it goes to production (#1216). After upgrading the test server, a fresh
-agent that has only the website docs (`llms.txt`, https://automaton.monster/docs) plays the next requests from
-`docs/maintainers/docs-walk-requests.md` (at least Runner install and delete over SSH, deploy and publish an app;
-on Linux, and on Windows PowerShell when a Windows machine is available) and rotates through the rest. It
-records every step where the docs were wrong, missing or unclear, and every guess. Fix the docs, then walk again.
-Then write the result into the release notes:
+Required for every server release before it goes to production (#1216). It starts by itself when the test server is
+upgraded, in parallel with the release check: the release-check task starts a fresh agent right after the upgrade and
+does not wait for it until its own checks are done. The agent has only the website docs (`llms.txt`,
+https://automaton.monster/docs) and plays:
 
-`python3 .agents/skills/automaton-verify-release/proof.py --docs-walk Pass|Fail <version> "short note"`
+- the user pages changed since the previous release: `git diff <previous-tag>..<release-tag> --stat -- src/automaton-vue/docs`
+  plus the `Docs:` lines of the release's PRs, each played as the request a user would make of that page;
+- the next two requests from `docs/maintainers/docs-walk-requests.md`, rotating (on Linux, and on Windows PowerShell
+  when a Windows machine is available).
+
+It records every step where the docs were wrong, missing or unclear, and every guess, and lists the changed pages it
+covered. Fix the docs, then walk again. Per-PR walks are out of scope (each PR's `Docs:` line and review cover them).
+The result must be in the release notes before the release check finishes:
+
+`python3 .agents/skills/automaton-verify-release/proof.py --docs-walk Pass|Fail <version> "short note (pages covered)"`
 
 This adds `## Docs walk` with `Result: Pass|Fail` next to the AI check. **Deploy production** refuses a release
 whose notes do not say Pass (a missing section counts as a fail). Only the owner skips it, by starting the run with

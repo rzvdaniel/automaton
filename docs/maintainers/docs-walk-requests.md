@@ -1,6 +1,6 @@
 # User requests for the docs walk
 
-Each line is something a user asks an AI agent. The docs walk (#1216) rotates through them: a fresh agent reads only `llms.txt` and the website docs, plays the request on the test server (Windows: on a Windows machine with WSL), and records every guess, every input the docs do not tell it to ask for, and anything it would wrongly ask for (passwords, tokens). Fix the docs from that list. Origin: #1228.
+Each line is something a user asks an AI agent. The docs walk (#1216) starts with the release check and plays two of them per release, rotating (plus the pages changed since the last release, #1491): a fresh agent reads only `llms.txt` and the website docs, plays the request on the test server (Windows: on a Windows machine with WSL), and records every guess, every input the docs do not tell it to ask for, and anything it would wrongly ask for (passwords, tokens). Fix the docs from that list. Origin: #1228.
 
 | # | Request | Start page | Played on the test server |
 | --- | --- | --- | --- |
