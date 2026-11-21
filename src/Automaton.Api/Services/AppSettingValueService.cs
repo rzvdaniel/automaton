@@ -74,12 +74,19 @@ public sealed class AppSettingValueService(
         var have = await db.AppSettingValues.Where(setting => setting.AppId == appId && older.Keys.Contains(setting.Name))
             .Select(setting => setting.Name).ToListAsync(token);
         foreach (var (name, value) in older)
+        {
             if (!have.Contains(name))
             {
                 db.AppSettingValues.Add(new() { Id = Guid.NewGuid(), AppId = appId, Name = name, Value = value, UpdatedAtUtc = DateTime.UtcNow, UpdatedByUserId = userId });
-                await db.SaveChangesAsync(token);
-                await secrets.DeleteAsync(appId, userId, name, token);
+                try { await db.SaveChangesAsync(token); }
+                catch (DbUpdateException)
+                {
+                    // A concurrent first read saved it already: keep that row.
+                    db.ChangeTracker.Clear();
+                }
             }
+            await secrets.DeleteAsync(appId, userId, name, token);
+        }
     }
 
     /// <summary>Running copies keep the old value until restarted, so a saved setting restarts them (queued, not awaited).</summary>
