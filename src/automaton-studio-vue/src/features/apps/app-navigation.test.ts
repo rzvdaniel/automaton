@@ -21,6 +21,13 @@ describe('app page navigation', () => {
     expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Source', 'Admin'])
   })
 
+  it('badges the Admin tab with the waiting permission requests, only when there are some', () => {
+    const admin = (waitingPermissions: number) => appTabs({ isAdmin: true, waitingPermissions }).find((tab) => tab.key === 'admin')
+    expect(admin(2)?.badge).toBe(2)
+    expect(admin(0)?.badge).toBeUndefined()
+    expect(appTabs({ canManage: true, waitingPermissions: 1 }).some((tab) => tab.badge)).toBe(false)
+  })
+
   it('keeps every earlier ?view= link working', () => {
     for (const view of ['logs', 'deployments']) expect(resolveAppView(view)).toBe('activity')
     for (const view of ['runtime', 'targets', 'contract']) expect(resolveAppView(view)).toBe('overview')

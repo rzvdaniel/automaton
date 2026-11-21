@@ -33,6 +33,8 @@ import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl, withFirstPage } from '../utils/public-app-url'
 import { accessLabel, appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
 import { useDeleteApp } from '../utils/use-delete-app'
+import { adminAppsService, type AdminAppPermissionStatus } from '@/features/admin/services/adminAppsService'
+import { notifyWaitingChanged } from '@/features/admin/composables/waitingApprovals'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 
@@ -46,6 +48,37 @@ const appId = computed(() => String(route.params.id ?? ''))
 const activeView = ref<AppViewKey>(route.query.tab === 'admin' ? 'admin' : resolveAppViewFromQuery(route.query))
 const roles = useAuthStore().user?.roles ?? []
 const isAdministrator = roles.includes('SysAdmin') || roles.includes('Admin')
+// Only system administrators approve permissions (the endpoint is SysAdmin-only).
+const canApprove = roles.includes('SysAdmin')
+const waitingPermissions = ref<string[]>([])
+const approvingPermission = ref(false)
+async function loadWaitingPermissions() {
+  if (!canApprove || !appId.value) return
+  try {
+    const items: AdminAppPermissionStatus[] = await adminAppsService.getPermissions(appId.value)
+    waitingPermissions.value = items.filter((item) => item.status === 'Pending').map((item) => item.permission)
+  } catch {
+    waitingPermissions.value = []
+  }
+}
+async function decidePermission(permission: string, approved: boolean) {
+  approvingPermission.value = true
+  try {
+    await adminAppsService.setPermission(appId.value, permission, approved)
+    toast.add({ severity: 'success', summary: approved ? 'Permission approved' : 'Permission rejected', life: 2500 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Permission update failed', life: 3000 })
+  } finally {
+    approvingPermission.value = false
+    await permissionsChanged()
+  }
+}
+async function permissionsChanged() {
+  await loadWaitingPermissions()
+  notifyWaitingChanged()
+  permissionsVersion.value++
+}
+const permissionsVersion = ref(0)
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const executions = ref<AppActionExecution[]>([])
 const schedules = ref<ActionSchedule[]>([])
@@ -69,6 +102,7 @@ const tabs = computed(() => appTabs({
   canManage: canManage.value,
   isPublishable: kind.value !== 'tool',
   isAdmin: isAdministrator,
+  waitingPermissions: waitingPermissions.value.length,
 }))
 /** The tab shown: a link to a tab this app or person does not have shows Overview. */
 const shownView = computed<AppViewKey>(() => tabs.value.some((tab) => tab.key === activeView.value) ? activeView.value : 'overview')
@@ -120,6 +154,9 @@ async function copyAddress() {
     toast.add({ severity: 'warn', summary: 'Copy this address', detail: address.value, life: 6000 })
   }
 }
+
+// Another app's page reuses this view, so reload the waiting requests whenever the app changes.
+watch(appId, () => { waitingPermissions.value = []; void loadWaitingPermissions() }, { immediate: true })
 
 const homeStore = useHomeStore()
 onMounted(async () => {
@@ -379,7 +416,7 @@ async function handleSharingChanged() {
             :class="{ on: activeView === tab.key }"
             :aria-selected="activeView === tab.key"
             @click="handleNavigation(tab.key)"
-          >{{ tab.label }}</button>
+          >{{ tab.label }}<span v-if="tab.badge" class="tab-badge" :aria-label="`${tab.badge} waiting for approval`" data-testid="admin-tab-badge">{{ tab.badge }}</span></button>
         </div>
 
         <AppOverview
@@ -393,6 +430,10 @@ async function handleSharingChanged() {
           :public-address="publicAppUrl"
           :private-address="privateAppUrl"
           :sharing="sharing"
+          :waiting-permissions="waitingPermissions"
+          :permissions-version="permissionsVersion"
+          :deciding="approvingPermission"
+          @decide-permission="decidePermission"
           @navigate="handleNavigation"
           @share="showShareDialog = true"
           @paused-changed="editorStore.refreshApp(appId)"
@@ -448,6 +489,7 @@ async function handleSharingChanged() {
           :app-name="app.name"
           :paused="!!app.isPaused"
           @paused-changed="editorStore.refreshApp(appId)"
+          @permissions-changed="permissionsChanged"
         />
       </main>
 
@@ -556,6 +598,7 @@ button.pill--access:hover { background: var(--row-line); }
   cursor: pointer;
 }
 
+.tab-badge { margin-left: 6px; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--signal); color: var(--on-signal); font-size: 11px; font-weight: 600; line-height: 18px; display: inline-block; text-align: center; }
 .tab.on {
   border-bottom-color: var(--signal);
   color: var(--ink);

@@ -12,7 +12,7 @@ import { adminAppsService } from '../services/adminAppsService'
 import type { AdminAppPermissionStatus, RunnerMaintenancePermission } from '../services/adminAppsService'
 
 const props = defineProps<{ appId: string; appName: string; paused: boolean }>()
-const emit = defineEmits<{ 'paused-changed': [] }>()
+const emit = defineEmits<{ 'paused-changed': []; 'permissions-changed': [] }>()
 
 const toast = useToast()
 // Only system administrators approve permissions (the endpoint is SysAdmin-only).
@@ -65,6 +65,7 @@ async function decide(item: AdminAppPermissionStatus, approved: boolean) {
   saving.value = item.permission
   try {
     permissions.value = await adminAppsService.setPermission(props.appId, item.permission, approved)
+    emit('permissions-changed')
     await loadMachines()
     toast.add({ severity: 'success', summary: approved ? 'Permission approved' : item.approved ? 'Permission revoked' : 'Permission rejected', life: 2500 })
   } catch {
