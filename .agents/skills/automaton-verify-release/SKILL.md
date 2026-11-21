@@ -143,8 +143,9 @@ Run each "Check after release" step by following the user docs page the PR's `Do
 
 Required for every server release before it goes to production (#1216). It starts by itself when the test server is
 upgraded, in parallel with the release check: the release-check task starts a fresh agent right after the upgrade and
-does not wait for it until its own checks are done. The agent has only the website docs (`llms.txt`,
-https://automaton.monster/docs) and plays:
+does not wait for it until its own checks are done. The agent has only the docs of the release being walked, never the
+published website (it still serves the previous release's docs, #1500): the docs built from the release tag, or the test server's own copy where it serves them (`<test-server>/llms.txt`
+and `<test-server>/docs/...`); the source is `src/automaton-vue/docs` at that tag. It plays:
 
 - the user pages changed since the previous release: `git diff <previous-tag>..<release-tag> --stat -- src/automaton-vue/docs`
   plus the `Docs:` lines of the release's PRs, each played as the request a user would make of that page;
