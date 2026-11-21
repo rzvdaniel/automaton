@@ -321,7 +321,7 @@ fi
 printf 'After the first administrator and Runner connect, Server Console (called Server Keeper in Studio) is installed from the official catalog and started, with its permissions approved; Home says so. Website Monitor, Heartbeat and the other apps are not installed; install them from the catalog when you need them. To opt out before connecting a Runner, set Catalog.InstallEssentialsOnFirstRunner to false in %s/appsettings.Production.json and restart the API. Remove an unwanted app from its Settings > Danger Zone.\n' "$config_dir"
 # Nightly database and key backups are on by default; take the first one now.
 if [[ -f "$install_dir/backup.sh" ]]; then
-    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && bash "$install_dir/backup.sh" --install-dir "$install_dir" \
+    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && AUTOMATON_SHOW_BACKUP_KEY=1 bash "$install_dir/backup.sh" --install-dir "$install_dir" \
         || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
 fi
 if [[ -f "$install_dir/cleanup.sh" ]]; then

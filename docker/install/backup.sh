@@ -112,7 +112,6 @@ status = {
     'keep': int(keep),
     'directory': root,
     'backupRecipient': open(recipient_file).read().strip() if os.path.isfile(recipient_file) else None,
-    'backupKeyOnServer': os.path.isfile(identity_file),
     'backupKeyCommand': 'sudo cat ' + shlex.quote(identity_file) if os.path.isfile(identity_file) else None,
     'backups': backups,
 }
@@ -181,8 +180,8 @@ UNIT
     echo "Nightly backups enabled (automaton-backup.timer); keeping the newest $keep in $backup_root."
 }
 
-# Only the public key (backup-recipient) lives on the server. The private key is shown once when it is created
-# and removed; restoring needs it from the administrator's password manager (restore.sh --key <file>).
+# Only the public key (backup-recipient) needs to live on the server. The installer shows a new private key once and
+# removes it (AUTOMATON_SHOW_BACKUP_KEY=1); unattended runs keep it 0600 and Studio warns until it is removed; restoring needs it from the administrator's password manager (restore.sh --key <file>).
 initialize_backup_key() {
     if [[ -s "$recipient_file" && ! -L "$recipient_file" ]]; then
         return 0
@@ -198,12 +197,20 @@ initialize_backup_key() {
         generated=$(docker run --rm -v "$config_dir/secrets:/keys" "$age_image" age-keygen -o /keys/.backup-key.partial 2>&1 >/dev/null)
         recipient=$(sed -n 's/^Public key: //p' <<< "$generated")
         [[ "$recipient" =~ ^age1[0-9a-z]+$ ]] || { rm -f -- "$temporary_identity"; echo 'Could not initialize the encrypted backup key.' >&2; return 1; }
+        if [[ "${AUTOMATON_SHOW_BACKUP_KEY:-}" == 1 ]]; then
+            # Only the installer asks for this, with its output on the administrator's screen: a nightly, Studio or update
+            # run would write the key to a journal or a log. Show it first so a failed print leaves nothing half done.
+            echo 'SAVE THIS BACKUP KEY NOW in your password manager. It is shown only once and is not kept on this server;'
+            echo 'without it the encrypted backups cannot be restored:'
+            grep -v '^#' "$temporary_identity" || { rm -f -- "$temporary_identity"; return 1; }
+            rm -f -- "$temporary_identity"
+        else
+            chmod 0600 "$temporary_identity"
+            mv -- "$temporary_identity" "$identity_file"
+            echo 'The backup key is kept in secrets/backup-key. Save it in a password manager and remove it from the server (see the backup docs).' >&2
+        fi
         printf '%s\n' "$recipient" > "$recipient_file"
         chmod 0644 "$recipient_file"
-        echo 'SAVE THIS BACKUP KEY NOW in your password manager. It is shown only once and is not kept on this server;'
-        echo 'without it the encrypted backups cannot be restored:'
-        grep -v '^#' "$temporary_identity"
-        rm -f -- "$temporary_identity"
         return 0
     fi
     printf '%s\n' "$recipient" > "$recipient_file"

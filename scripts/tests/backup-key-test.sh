@@ -35,7 +35,15 @@ for _ in 1 2; do out=$(initialize_backup_key 2>&1) || fail "existing recipient w
 [[ ! -e $identity_file ]] || fail 'a private key appeared on disk'
 ! grep -q age-keygen "$work/docker.log" 2>/dev/null || fail 'a key pair was generated'
 
-# Fresh install: key shown once, nothing private left on disk.
+# Unattended run (nightly, Studio, update) with no key at all: never prints the key, keeps it 0600 on disk.
+config_dir=$work/unattended; mkdir -p "$config_dir"
+recipient_file=$config_dir/backup-recipient identity_file=$config_dir/secrets/backup-key
+out=$(initialize_backup_key 2>&1) || fail "unattended generation failed: $out"
+! grep -q AGE-SECRET-KEY <<< "$out" || fail 'an unattended run printed the private key'
+[[ $(stat -c %a "$identity_file") == 600 ]] || fail 'the unattended key is not 0600 on disk'
+
+# Fresh install (installer sets the flag): key shown once, nothing private left on disk.
+export AUTOMATON_SHOW_BACKUP_KEY=1
 config_dir=$work/fresh; mkdir -p "$config_dir"
 recipient_file=$config_dir/backup-recipient identity_file=$config_dir/secrets/backup-key
 out=$(initialize_backup_key 2>&1) || fail "fresh key generation failed: $out"
