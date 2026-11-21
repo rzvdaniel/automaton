@@ -36,6 +36,12 @@ public static class AuditEventTypes
     public const string ActionScheduleEnabled = "ActionScheduleEnabled";
     public const string ActionScheduleDisabled = "ActionScheduleDisabled";
     public const string ActionScheduleDeleted = "ActionScheduleDeleted";
+    public const string ActionWebhookCreated = "ActionWebhookCreated";
+    public const string ActionWebhookEnabled = "ActionWebhookEnabled";
+    public const string ActionWebhookDisabled = "ActionWebhookDisabled";
+    public const string ActionWebhookSecretRotated = "ActionWebhookSecretRotated";
+    public const string ActionWebhookDeleted = "ActionWebhookDeleted";
+    public const string ActionWebhookCalled = "ActionWebhookCalled";
     public const string RunnerAssignedToApp = "RunnerAssignedToApp";
     public const string RunnerUnassignedFromApp = "RunnerUnassignedFromApp";
     public const string RunnerCreated = "RunnerCreated";

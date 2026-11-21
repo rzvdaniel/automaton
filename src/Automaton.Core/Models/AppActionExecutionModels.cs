@@ -25,6 +25,7 @@ public static class AppModuleTriggerKinds
     public const string Manual = "Manual";
     public const string Internal = "Internal";
     public const string Scheduled = "Scheduled";
+    public const string Webhook = "Webhook";
 }
 
 public static class AppModuleExecutionErrorCodes

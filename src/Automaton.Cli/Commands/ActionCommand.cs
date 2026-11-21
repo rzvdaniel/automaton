@@ -18,6 +18,7 @@ public static class ActionCommand
         command.AddCommand(BuildVersions(config));
         command.AddCommand(BuildRollback(config));
         command.AddCommand(BuildDeleteVersion(config));
+        command.AddCommand(ActionWebhookCommand.Build(config));
         return command;
     }
 
@@ -190,7 +191,7 @@ public static class ActionCommand
         return command;
     }
 
-    private static (string Server, string ApiKey, string AppId) Resolve(ConfigService config)
+    internal static (string Server, string ApiKey, string AppId) Resolve(ConfigService config)
     {
         var directory = Directory.GetCurrentDirectory();
         var resolved = config.ResolveContext(config.TryLoadProjectConfig(directory), directory);

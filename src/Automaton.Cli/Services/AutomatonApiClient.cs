@@ -342,6 +342,34 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> ListActionWebhooksAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/action-webhooks", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> CreateActionWebhookAsync(string appId, string actionKey, string name, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { actionKey, name }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/action-webhooks", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> RotateActionWebhookAsync(string appId, Guid webhookId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/apps/{appId}/action-webhooks/{webhookId}/rotate", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task DeleteActionWebhookAsync(string appId, Guid webhookId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{appId}/action-webhooks/{webhookId}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     public async Task<JsonElement> GetAppActionExecutionAsync(string appId, Guid executionId, CancellationToken ct = default)
     {
         using var resp = await _http.GetAsync($"api/apps/{appId}/action-executions/{executionId}", ct);

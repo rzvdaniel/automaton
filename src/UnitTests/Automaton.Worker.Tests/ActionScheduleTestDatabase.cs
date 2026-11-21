@@ -67,7 +67,7 @@ internal sealed class ActionScheduleTestDatabase : IAsyncDisposable
                 DeploymentHash TEXT NULL, ExitCode INTEGER NULL, ErrorCode TEXT NULL, FailureSummary TEXT NULL,
                 CreatedAtUtc TEXT NOT NULL, StartedAtUtc TEXT NULL, ExecutionDeadlineUtc TEXT NULL,
                 CompletedAtUtc TEXT NULL, LogsAvailableUntilUtc TEXT NULL, ResultAvailableUntilUtc TEXT NULL,
-                CorrelationId TEXT NULL, ResultFingerprint TEXT NULL);
+                CorrelationId TEXT NULL, ResultFingerprint TEXT NULL, TriggerName TEXT NULL);
             CREATE UNIQUE INDEX IX_AppModuleExecutions_ScheduleOccurrenceId ON AppModuleExecutions (ScheduleOccurrenceId);
             """);
 }

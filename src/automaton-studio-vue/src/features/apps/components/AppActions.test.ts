@@ -10,6 +10,8 @@ import { appsService } from '../services/apps.service'
 vi.mock('../services/apps.service', () => ({ appsService: { runAction: vi.fn(), getActionExecution: vi.fn() } }))
 vi.mock('../services/action-schedules.service', () => ({ actionSchedulesService: { setEnabled: vi.fn() } }))
 
+vi.mock('../services/action-webhooks.service', () => ({ actionWebhooksService: { list: vi.fn().mockResolvedValue([]), create: vi.fn(), rotate: vi.fn(), setEnabled: vi.fn(), remove: vi.fn() } }))
+
 const actions = [{ key: 'upload', name: 'upload', timeoutSeconds: 60, schedulable: true, allowedExecutionScopes: [], minimumIntervalSeconds: 60 }]
 const schedules = [{
   id: 's1', applicationId: 'a', actionKey: 'upload', name: 'upload', executionScope: 'App', scheduleType: 'Interval' as const,

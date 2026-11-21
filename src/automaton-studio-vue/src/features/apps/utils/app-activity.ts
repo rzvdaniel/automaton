@@ -23,6 +23,8 @@ export interface ActivityRun {
   status: string
   failureSummary?: string
   createdAtUtc: string
+  triggerType?: string
+  triggerName?: string
 }
 
 /** Runner connect and disconnect events belong on the Server page. */
@@ -43,7 +45,7 @@ export function buildActivity(
       kind: 'run',
       tone: failed ? 'failed' : isActiveRun(run.status) ? 'running' : run.status === 'Succeeded' ? 'ok' : 'none',
       subject: run.moduleKey,
-      text: failed ? (run.failureSummary || run.status.toLowerCase()) : run.status === 'Succeeded' ? 'ran' : run.status.toLowerCase(),
+      text: describeRun(run, failed),
       at: run.createdAtUtc,
       executionId: run.id,
     })
@@ -67,6 +69,12 @@ export function buildActivity(
   const near = (a: string, b: string) => Math.abs(new Date(a).getTime() - new Date(b).getTime()) < 5 * 60_000
   const logged = events.filter((event) => event.eventType.includes('Deploy'))
   return [...items, ...deploys.filter((deploy) => !logged.some((event) => near(event.createdAtUtc, deploy.at)))].sort((a, b) => b.at.localeCompare(a.at))
+}
+
+/** A run says what started it when that is not a person or a schedule: a webhook names itself. */
+function describeRun(run: ActivityRun, failed: boolean): string {
+  const base = failed ? (run.failureSummary || run.status.toLowerCase()) : run.status === 'Succeeded' ? 'ran' : run.status.toLowerCase()
+  return run.triggerType === 'Webhook' ? `${base} (started by webhook ${run.triggerName ?? ''})`.replace(' )', ')') : base
 }
 
 /** Settings are stored like secrets, but people see them as settings. */

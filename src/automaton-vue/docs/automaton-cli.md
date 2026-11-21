@@ -208,7 +208,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton status` | Show the current linked app, deploy settings, and publish state |
 | `automaton current-runner` | Show the Runner assigned to the Live environment |
 | `automaton validate` | Validate the current project before deploy or publish |
-| `automaton action` | Validate and run Actions in the linked App |
+| `automaton action` | Validate and run Actions in the linked App; `action webhook add\|list\|rotate\|remove` manages the webhooks that start an Action from outside |
 | `automaton secrets` | Check and fill the secrets this app declares in automaton.json (application.secrets) |
 | `automaton project` | Create projects, list yours and add the current app to one |
 | `automaton permissions` | Show the platform permissions this app requests and whether an administrator approved them |

@@ -58,3 +58,13 @@ describe('settings in the activity list', () => {
     expect(merged.map((item) => item.text).sort()).toEqual(['Secret S3_KEY set by Ann', 'Setting S3_BUCKET set by Ann'])
   })
 })
+
+describe('runs started by a webhook', () => {
+  it('say which webhook started them', () => {
+    const [item] = buildActivity(
+      [{ id: 'r1', moduleKey: 'docs-walk', status: 'Succeeded', createdAtUtc: '2026-11-21T10:00:00Z', triggerType: 'Webhook', triggerName: 'Docs walk' }],
+      [], [],
+    )
+    expect(item!.text).toBe('ran (started by webhook Docs walk)')
+  })
+})

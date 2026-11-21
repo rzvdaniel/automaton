@@ -61,6 +61,8 @@ export type AppActionExecution = {
   id: string
   appId: string
   moduleKey: string
+  triggerType?: string
+  triggerName?: string
   status: string
   exitCode?: number
   errorCode?: string

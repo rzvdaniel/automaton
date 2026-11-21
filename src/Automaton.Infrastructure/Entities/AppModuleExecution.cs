@@ -13,6 +13,8 @@ public class AppModuleExecution
     public Guid? RunnerId { get; set; }
     public string TriggerType { get; set; } = string.Empty;
     public Guid? RequestedByUserId { get; set; }
+    /// <summary>What started the run when the trigger type alone does not say, such as the name of a webhook.</summary>
+    public string? TriggerName { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? DeploymentHash { get; set; }
     public int? ExitCode { get; set; }
