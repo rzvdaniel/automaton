@@ -53,8 +53,8 @@ It does **not** write product code (exception: skills, docs and small chores the
   transcript stays empty can't be watched that way (the script says so): check its commits, PRs and test-server
   activity instead. A stalled agent is inspected, then resumed or restarted with a smaller task. Usage-limit stops
   need a resume after the reset.
-- **Cost.** Match the model to the task. Defaults (the configuration may override them): Haiku for light,
-  fixed-step tasks (run a check list, collect output, relabel, small doc edits); Sonnet 5.5 at low effort for
+- **Cost.** Match the model to the task. Defaults (the configuration may override them): Haiku at low effort for light,
+  fixed-step tasks (run a check list, collect output, relabel, documentation updates, the docs walk); Sonnet 5.5 at low effort for
   implementing issues; Opus 5.5 for reviews and security passes, where a missed bug costs more than the tokens, and
   for design or hard bugs. Give each agent a brief with the issue numbers,
   file areas and the facts you already know, so it does not rediscover them. Build- and test-heavy work goes where

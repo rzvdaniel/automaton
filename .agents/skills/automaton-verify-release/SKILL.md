@@ -152,7 +152,7 @@ and `<test-server>/docs/...`); the source is `src/automaton-vue/docs` at that ta
 - the next two requests from `docs/maintainers/docs-walk-requests.md`, rotating (on Linux, and on Windows PowerShell
   when a Windows machine is available).
 
-It records every step where the docs were wrong, missing or unclear, and every guess, and lists the changed pages it
+The walker runs on Haiku at low effort (subagent `model: haiku`, or `claude --model haiku --effort low` headless); so do the doc fixes it leads to. It records every step where the docs were wrong, missing or unclear, and every guess, and lists the changed pages it
 covered. Fix the docs, then walk again. Per-PR walks are out of scope (each PR's `Docs:` line and review cover them).
 The result must be in the release notes before the release check finishes:
 
