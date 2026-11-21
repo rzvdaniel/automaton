@@ -47,9 +47,12 @@ Create a to-do item for each step and tick them off.
    the test itself is wrong, and say so in the PR. Keep the evidence for the PR: the commands and what came back, for
    a bug the test that failed before and passes now, for a UI change a screenshot of this branch running locally.
    "Done" without output is a claim, not evidence.
-4. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes, including the "Check after
-   release" list. Start step 5 while CI runs. An empty check list means the run has not started; it is not a pass.
-5. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
+4. **Docs.** Find every user page the change makes wrong: search `src/automaton-vue/docs` for the feature's words
+   (commands, labels, messages). Update them in this PR and name them on the Docs line; "none" only with a real reason.
+   There is no separate docs walk before a release.
+5. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes, including the "Check after
+   release" list. Start step 6 while CI runs. An empty check list means the run has not started; it is not a pass.
+6. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
    applies, at most two rounds. For a high tier, spawn a separate `automaton-reviewer` subagent for the security pass; it
    posts with a different login than the main review (pr-review, Different logins).
    Start every review and security pass as the `automaton-reviewer` agent
@@ -57,14 +60,14 @@ Create a to-do item for each step and tick them off.
    post with (`gh auth status`) and compare it with the logins that already reviewed the PR: the main review and the security pass must
    come from different logins, and a re-review after a rebase or fixes counts as a main review. If you would collide,
    stop and report which other login must post.
-6. **Merge.** Run `python3 .agents/tools/merge-gate.py <N> --merge`; it squash-merges and deletes the branch only on
+7. **Merge.** Run `python3 .agents/tools/merge-gate.py <N> --merge`; it squash-merges and deletes the branch only on
    PASS. Never run `gh pr merge` yourself. Then watch the `main` run for your commit. Also hold anything the owner said to hold.
-7. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).
+8. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).
    - *Working alone:* release, upgrade the test server, run your "Check after release" list as real users, attach
      the proof and label the issue.
    - *In a batch* (the orchestrator said so): stop after the merge. The verifier runs your list on the batch release.
      Your handoff says the PR is merged and waiting for the batch check.
-8. **Hand off.** Remove `agent:in-progress` when the issue is labelled `verified` or handed to the verifier. Open
+9. **Hand off.** Remove `agent:in-progress` when the issue is labelled `verified` or handed to the verifier. Open
    issues for gaps you found. If the issue completes a roadmap step or testing showed the docs are wrong, fix
    `docs/roadmap/README.md` or the docs (user pages in `src/automaton-vue/docs`) in a small follow-up PR.
 

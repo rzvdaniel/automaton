@@ -28,6 +28,9 @@ issue number and its "Done when", the PR number, [`REVIEW.md`](../../../REVIEW.m
 reads the diff against the code around it, not the diff alone, and asks whether the change does what the issue asks,
 fits the system and breaks anything.
 
+**Docs line.** Check it against the diff: a user-visible change with "none", or a named page that does not match
+the change, is an Important finding.
+
 Pinned action shas (`uses: owner/repo@<sha>`) are checked by CI (`.agents/tools/check-action-pins.py`). When pinning, use the commit: `git ls-remote` shows it on the `^{}` (peeled) line, not the tag object line.
 
 **Security pass.** Looks only for security problems (in Claude Code: `/security-review`). For the high tier it is a

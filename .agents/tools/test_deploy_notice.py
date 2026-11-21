@@ -8,11 +8,6 @@ NOTES = """## AI check
 Verdict: Yellow
 - x
 
-## Docs walk
-
-Result: Pass
-Walked.
-
 ## Automaton Server 1.2.3
 
 2 pull request(s) merged since the previous release: #1, #2.
@@ -28,7 +23,7 @@ class T(unittest.TestCase):
     def test_success(self):
         out = dn.build("1.2.3", NOTES, "success", "success", "http://run")
         self.assertTrue(out.startswith("Production deploy 1.2.3: OK"))
-        for s in ("Yellow", "Pass", "- #1 First thing", "- #2 Second", "2 pull request(s)", "http://run"):
+        for s in ("Yellow", "- #1 First thing", "- #2 Second", "2 pull request(s)", "http://run"):
             self.assertIn(s, out)
 
     def test_failure_and_missing_notes(self):

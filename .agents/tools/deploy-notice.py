@@ -25,12 +25,11 @@ def build(version, notes, deploy, report, run_url):
     outcome = {"success": "deployed, public routes answered 200",
                "failure": "FAILED (not rolled back automatically; check the run)",
                "cancelled": "cancelled",
-               "skipped": "not run (blocked before deploy, for example by the docs walk or approval)"}.get(deploy, deploy)
+               "skipped": "not run (blocked before deploy, for example by approval)"}.get(deploy, deploy)
     summary, prs = shipped(notes)
     lines = [f"Production deploy {version}: {'OK' if deploy == 'success' else 'needs attention'}", "",
              f"**Version:** {version}", f"**Result:** {outcome}",
              f"**AI check:** {section_value(notes, 'AI check', 'Verdict')}",
-             f"**Docs walk:** {section_value(notes, 'Docs walk', 'Result')}",
              f"**Release report job:** {report or 'unknown'}", "", f"**Shipped:** {summary}"]
     lines += [f"- {p}" for p in prs]
     if run_url:

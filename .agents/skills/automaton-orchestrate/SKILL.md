@@ -54,7 +54,7 @@ It does **not** write product code (exception: skills, docs and small chores the
   activity instead. A stalled agent is inspected, then resumed or restarted with a smaller task. Usage-limit stops
   need a resume after the reset.
 - **Cost.** Match the model to the task. Defaults (the configuration may override them): Haiku at low effort for light,
-  fixed-step tasks (run a check list, collect output, relabel, documentation updates, the docs walk); Sonnet 5.5 at low effort for
+  fixed-step tasks (run a check list, collect output, relabel, documentation updates); Sonnet 5.5 at low effort for
   implementing issues; Opus 5.5 for reviews and security passes, where a missed bug costs more than the tokens, and
   for design or hard bugs. Give each agent a brief with the issue numbers,
   file areas and the facts you already know, so it does not rediscover them. Build- and test-heavy work goes where
@@ -87,8 +87,8 @@ for the owner as before. When on, after the batch is verified on the test server
 `python3 .agents/tools/autodeploy-check.py --from <previous-release> --to <release> --enabled`. On `AUTODEPLOY: yes`
 (every PR low or medium tier, no migration, no Runner, broker, installer or updater change, nothing flagged risky,
 every issue `verified`) deploy, run the post-deploy checks, and tell the owner what went out. On `AUTODEPLOY: owner`
-list the reasons and ask for the owner's "deploy". The prerequisites on #1222 (merge gate and docs walk as required
-checks, automatic rollback, deploy notice, a test server that mirrors production) must be closed before the owner
+list the reasons and ask for the owner's "deploy". The prerequisites on #1222 (merge gate as a required
+check, automatic rollback, deploy notice, a test server that mirrors production) must be closed before the owner
 switches it on; if a post-deploy check fails, roll back and report instead of fixing forward on production.
 
 ## Closing issues

@@ -2,10 +2,6 @@
 """Publish a proof page as the `proof` artifact on a GitHub issue.
 
 Usage: python3 proof.py <issue-number> proof.html [--repo owner/name]
-       python3 proof.py --docs-walk Pass|Fail <version> ["short note"] [--repo owner/name]
-
-The second form writes `## Docs walk` with `Result: Pass|Fail` into the release notes of server-v<version>
-(replacing an earlier one); Deploy production refuses a release whose notes do not say Pass.
 
 Screenshots go inside the page: write <img src="shots/name.png" alt="..."> with a path relative
 to the page, and each one is shrunk to a WebP at most 1000 px wide and embedded, so the proof
@@ -70,47 +66,7 @@ def gh(*args: str) -> str:
     return subprocess.run(["gh", *args], check=True, capture_output=True, text=True).stdout
 
 
-def set_docs_walk(body: str, result: str, note: str = "") -> str:
-    """Put the `## Docs walk` section before the report title (or at the end), replacing an old one."""
-    body = body.replace("\r\n", "\n")
-    body = re.sub(r"^## Docs walk[ \t]*$.*?(?=^## |\Z)", "", body, flags=re.M | re.S)
-    note = " ".join(note.split())[:300].lstrip("#")
-    lines = ["## Docs walk", "", f"Result: {result}"] + ([note] if note else []) + [""]
-    section = "\n".join(lines) + "\n"
-    title = re.search(r"^## Automaton Server", body, re.M)
-    at = title.start() if title else len(body)
-    head = body[:at].rstrip("\n")
-    return (head + "\n\n" if head else "") + section + body[at:]
-
-
-def docs_walk(args: list[str]) -> int:
-    repo = args[args.index("--repo") + 1] if "--repo" in args else "rzvdaniel/automaton"
-    if "--repo" in args:
-        del args[args.index("--repo"):args.index("--repo") + 2]
-    rest = args[1:]
-    if len(rest) < 2 or rest[0] not in ("Pass", "Fail") or not re.fullmatch(r"\d+\.\d+\.\d+", rest[1]):
-        print(__doc__, file=sys.stderr)
-        return 2
-    tag = f"server-v{rest[1]}"
-    try:
-        body = gh("release", "view", tag, "--repo", repo, "--json", "body", "--jq", ".body")
-        updated = set_docs_walk(body.rstrip("\n") + "\n", rest[0], rest[2] if len(rest) > 2 else "")
-        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as handle:
-            handle.write(updated)
-        try:
-            gh("release", "edit", tag, "--repo", repo, "--notes-file", handle.name)
-        finally:
-            os.unlink(handle.name)
-    except subprocess.CalledProcessError as error:
-        print(f"gh failed: {error.stderr.strip() or error}", file=sys.stderr)
-        return 1
-    print(f"{tag}: Docs walk Result: {rest[0]}")
-    return 0
-
-
 def main() -> int:
-    if len(sys.argv) > 1 and sys.argv[1] == "--docs-walk":
-        return docs_walk(sys.argv[1:])
     if len(sys.argv) < 3:
         print(__doc__, file=sys.stderr)
         return 2
