@@ -22,7 +22,7 @@ test.describe('as the system administrator', () => {
   test.afterAll(async () => { await page?.context().close() })
 
   test('Apps start page loads', async () => {
-    await goTo(page, '/')
+    await goTo(page, '/apps')
     await expect(heading(page, 'Apps')).toBeVisible()
     await shot(page, 'admin-apps-start')
   })
@@ -103,7 +103,7 @@ test.describe('as a regular user', () => {
   test.afterAll(async () => { await page?.context().close() })
 
   test('Apps start page loads and Admin is refused', async () => {
-    await goTo(page, '/')
+    await goTo(page, '/apps')
     await expect(heading(page, 'Apps')).toBeVisible()
     await shot(page, 'user-apps-start')
     await goTo(page, '/admin/users')
@@ -112,7 +112,7 @@ test.describe('as a regular user', () => {
 
   test('phone width has no horizontal scroll', async () => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await goTo(page, '/')
+    await goTo(page, '/apps')
     await expect(heading(page, 'Apps')).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(1)
