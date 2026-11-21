@@ -203,7 +203,8 @@ if $own_host; then
 # 3. systemd units, the fail2ban jails and filters the installer added.
 for unit in automaton-update.path automaton-update.service automaton-backup.timer automaton-backup.service \
     automaton-backup-request.path automaton-backup-request.service automaton-cleanup.timer automaton-cleanup.service \
-    automaton-restart.path automaton-restart.service automaton-os-update.path automaton-os-update.service; do
+    automaton-restart.path automaton-restart.service automaton-os-update.path automaton-os-update.service \
+    automaton-watchdog.timer automaton-watchdog.service; do
     if [[ -e "$systemd_dir/$unit" ]]; then
         act systemctl disable --now "$unit"; act rm -f -- "$systemd_dir/$unit"; removed+=("unit $unit")
     fi
