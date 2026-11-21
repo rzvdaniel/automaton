@@ -17,7 +17,7 @@ public interface IAppRuntimeRestarter
 }
 
 /// <summary>
-/// Queues a durable <c>restart-runtime</c> command for every running deployment target of an app. The Runner
+/// Queues a durable <c>restart-runtime</c> command for every running deployment target of an app, and every failed one that was deployed before (a Runner that recovered the previous container, or a restart that failed, leaves the target Failed while a container may still run). The Runner
 /// starts a new container from the deployed files, which loads current secrets, and replaces the old one once
 /// the new one is ready. A target being deployed is included too: its deployment may have loaded the old
 /// credential, and the Runner runs the restart after the deployment finishes.
@@ -64,7 +64,8 @@ public sealed class AppRuntimeRestarter(
     internal static IQueryable<RunningTarget> RunningTargets(ApplicationDbContext db, Guid appId)
         => db.AppDeploymentTargets
             .Where(target => target.WebAppId == appId && target.ExecutionRunnerId != null && target.GenericRuntimeDeployed
-                && (target.Status == DeploymentTargetStatus.Running || target.Status == DeploymentTargetStatus.Deploying) && !target.CleanupPending)
+                && (target.Status == DeploymentTargetStatus.Running || target.Status == DeploymentTargetStatus.Deploying
+                    || target.Status == DeploymentTargetStatus.Failed) && !target.CleanupPending)
             .Select(target => new RunningTarget(target.Id, target.ExecutionRunnerId!.Value));
 
     /// <summary>Running targets plus those whose last deploy failed but may still have a runtime on the Runner.</summary>

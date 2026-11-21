@@ -27,6 +27,10 @@ public sealed class AppRestartService(
                 throw new UnauthorizedAccessException("You do not have permission to restart this app.");
         }
         if (app.IsPaused) throw new InvalidOperationException("The app is paused. Resume it to start it again.");
-        return await restarter.RestartRunningAsync(appId, ct, wait: true);
+        try { return await restarter.RestartRunningAsync(appId, ct, wait: true); }
+        catch (RuntimeCommandFailedException error)
+        {
+            throw new RuntimeCommandFailedException($"{error.Message.TrimEnd()} The app keeps its previous settings: if it was running, it still runs.");
+        }
     }
 }

@@ -166,6 +166,9 @@ export function statusSentence(input: StatusInput): Segment[] {
   if (input.kind === 'tool') return toolSentence(input, now)
 
   if (input.failed) {
+    if (!input.deployError && input.lastDeployedAt) {
+      return [{ text: 'The latest start failed', strong: true }, { text: '. The app still runs the previous version or settings; Restart tries again.' }]
+    }
     const reason = input.deployError ? `: ${input.deployError}` : '.'
     return [{ text: 'The last deploy failed', strong: true }, { text: reason }, ...(input.lastDeployedAt ? [{ text: ' The app still runs the previous version.' }] : [])]
   }

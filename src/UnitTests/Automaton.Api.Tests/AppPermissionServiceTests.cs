@@ -87,7 +87,7 @@ public sealed class AppPermissionServiceTests
     }
 
     [Test]
-    public async Task RunningAndDeployingAssignedTargetsAreRestarted()
+    public async Task RunningDeployingAndFailedAssignedTargetsAreRestarted()
     {
         var (db, appId, _, _) = await CreateAsync();
         var runnerId = Guid.NewGuid();
@@ -104,7 +104,7 @@ public sealed class AppPermissionServiceTests
             return target;
         }
         var running = Target(_ => { });
-        Target(target => target.Status = DeploymentTargetStatus.Failed);
+        var failed = Target(target => target.Status = DeploymentTargetStatus.Failed);
         var deploying = Target(target =>
         {
             target.Status = DeploymentTargetStatus.Deploying;
@@ -123,7 +123,7 @@ public sealed class AppPermissionServiceTests
 
         Assert.That(selected, Is.EquivalentTo(new[]
         {
-            new AppRuntimeRestarter.RunningTarget(running.Id, runnerId), new AppRuntimeRestarter.RunningTarget(deploying.Id, runnerId)
+            new AppRuntimeRestarter.RunningTarget(running.Id, runnerId), new AppRuntimeRestarter.RunningTarget(deploying.Id, runnerId), new AppRuntimeRestarter.RunningTarget(failed.Id, runnerId)
         }));
     }
 

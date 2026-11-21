@@ -100,6 +100,7 @@ describe('status sentence', () => {
 
   it('says a web app is not live or that its deploy failed', () => {
     expect(text({ kind: 'web' })).toBe('Not live yet. Deploy it from your AI or with the CLI.')
+    expect(text({ kind: 'web', failed: true, lastDeployedAt: '2026-11-01T10:00:00Z' })).toBe('The latest start failed. The app still runs the previous version or settings; Restart tries again.')
     expect(text({ kind: 'web', failed: true, deployError: 'build broke' })).toBe('The last deploy failed: build broke')
     expect(text({ kind: 'web', failed: true, deployError: 'build broke', lastDeployedAt: '2026-11-01T10:00:00Z' })).toBe('The last deploy failed: build broke The app still runs the previous version.')
   })

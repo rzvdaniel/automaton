@@ -259,6 +259,17 @@ public sealed class AppPauseTests
     }
 
     [Test]
+    public async Task Restart_FailureSaysTheAppKeepsItsPreviousSettings()
+    {
+        await using var h = new Harness();
+        var restarter = new CountingRestarter { Failure = new RuntimeCommandFailedException("The app did not become ready. Last output of the app: bad TARGETS") };
+
+        var error = Assert.ThrowsAsync<RuntimeCommandFailedException>(() => RestartFor(h, OwnerId, restarter).RestartAsync(AppId, administrator: false, default));
+
+        Assert.That(error!.Message, Does.Contain("bad TARGETS").And.Contain("previous settings"));
+    }
+
+    [Test]
     public async Task ASaveThatLeavesAScheduleOffWhilePaused_KeepsItMarkedForResume()
     {
         await using var h = new Harness();
