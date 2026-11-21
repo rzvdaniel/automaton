@@ -41,8 +41,8 @@ A dated list of the owner's rules (process, quality bar, what is never done). Ad
 that should last.
 
 ## Accounts
-Who posts what, one line each. Example: `<main login>` (default `gh`) = main review; `<second login>` (the `security_gh` command in
-`.agents/environment.md`) = security pass by a separate reviewer; `<test login>` = test issues; `<owner>` = releases and production deploys.
+Who does what, one line each, for example `<test login>` = test issues, `<owner>` = releases and production deploys. Reviews need no
+accounts here: any agent posts with any login it has that differs from the other review's (pr-review).
 
 ## Reviewer accounts
 `merge-gate.py` needs the main review and the security pass from different GitHub logins.
