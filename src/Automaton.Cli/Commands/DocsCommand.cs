@@ -38,7 +38,7 @@ public static class DocsCommand
                     return;
                 }
 
-                var files = await client.ListScopedFilesAsync(appId, "source");
+                var files = await client.ListScopedFilesAsync(appId, "source", context.GetCancellationToken());
                 var shipsDocs = HasEntryPage(files);
                 var text = shipsDocs
                     ? await client.ReadScopedFileAsync(appId, "source", EntryPage, context.GetCancellationToken())

@@ -9,7 +9,8 @@ function escapeHtml(value: string): string {
 
 /** Links keep http(s), mailto, in-page and relative targets; any other scheme (javascript:, data:) shows as plain text. */
 function isSafeHref(href: string): boolean {
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href.replace(/&#39;|&quot;|&amp;/g, ''))
+  // Browsers ignore leading spaces and strip tabs and line breaks inside a URL, so judge the link as they read it.
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href.replace(/&#39;|&quot;|&amp;/g, '').replace(/[\u0000-\u0020\u007f]/g, ''))
   return !scheme || ['http', 'https', 'mailto'].includes(scheme[1]!.toLowerCase())
 }
 

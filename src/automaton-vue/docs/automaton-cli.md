@@ -209,7 +209,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton status` | Show the current linked app, deploy settings, and publish state |
 | `automaton current-runner` | Show the Runner assigned to the Live environment |
 | `automaton validate` | Validate the current project before deploy or publish |
-| `automaton action` | Validate and run Actions in the linked App |
+| `automaton action` | Validate and run Actions in the linked App; `action webhook add\|list\|rotate\|remove` manages the webhooks that start an Action from outside |
 | `automaton secrets` | Check and fill the secrets this app declares in automaton.json (application.secrets) |
 | `automaton project` | Create projects, list yours and add the current app to one |
 | `automaton permissions` | Show the platform permissions this app requests and whether an administrator approved them |
@@ -227,7 +227,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton runners` | List runners available on your Automaton account |
 | `automaton apps` | List apps in your personal workspace |
 | `automaton installation-status` | Show server version, resource counts and last backup |
-| `automaton notifications` | List the notifications for your account (the same feed as Studio Home) |
+| `automaton notifications [--json]` | List your notifications: server update, expiring certificate, offline Runner, failed backup, permission requests, failing apps. `acknowledge <key>` hides one |
 | `automaton server` | Update the Automaton server you are logged in to |
 | `automaton set-runner <runner>` | Assign or clear the Runner for the Live environment |
 | `automaton config` | View or update global CLI settings |

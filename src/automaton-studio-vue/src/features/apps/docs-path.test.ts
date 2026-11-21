@@ -23,6 +23,10 @@ describe('markdown for docs', () => {
     expect(html).toContain('href="other.md"')
   })
 
+  it('drops javascript: links hidden by spaces or tabs', () => {
+    expect(renderMarkdown('[a]( javascript:alert(1)) [b](java\tscript:alert(1))')).not.toContain('href')
+  })
+
   it('renders fenced code as escaped text', () => {
     expect(renderMarkdown('```\nautomaton docs <app>\n```')).toBe('<pre><code>automaton docs &lt;app&gt;</code></pre>')
   })
