@@ -82,7 +82,7 @@ const userMenuItems = computed<MenuItem[]>(() => [
   <aside class="app-sidebar" aria-label="Studio">
     <div class="rail">
       <div class="rail-brand">
-        <span class="rail-mark" aria-hidden="true">&gt;_</span>
+        <img class="rail-mark" src="/logo.svg" alt="" aria-hidden="true" />
         <span class="rail-name">Studio</span>
         <span v-if="SHOW_PREVIEW_BADGE" class="preview-pill" :title="previewTitle(serverVersion)" :aria-label="previewTitle(serverVersion)" role="note">Preview</span>
       </div>
@@ -155,15 +155,10 @@ const userMenuItems = computed<MenuItem[]>(() => [
 }
 
 .rail-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 2rem;
   height: 2rem;
   border-radius: 8px;
-  background: var(--signal);
-  color: var(--on-signal);
-  font: 500 0.95rem var(--mono);
+  display: block;
 }
 
 .rail-name {

@@ -5,7 +5,8 @@
     "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@site-nav/*": ["../../shared/site-nav/*"]
     }
   },
   "include": ["src/**/*"]
