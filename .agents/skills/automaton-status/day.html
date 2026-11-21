@@ -1,0 +1,235 @@
+<title>Automaton Day Status</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: an operations board. Header with day and counts, then "Needs you" first, then two columns: done today | agents now, then waiting, then filed. One row per item, a state dot, a link. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#15202b; --muted:#5a6773; --line:#d9dfe5; --accent:#2b59c3;
+  --ok:#1f7a4d; --run:#b7791f; --you:#c2410c; --bad:#b42318; --wait:#6b5bd2;
+  --chip-ok:#e3f3ea; --chip-run:#fbf0dc; --chip-you:#fdebe1; --chip-bad:#fbe4e2; --chip-wait:#ece9fb;
+  --display:"Space Grotesk",system-ui,sans-serif; --text:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17202a; --ink:#e6edf3; --muted:#9aa8b5; --line:#2a3642; --accent:#7aa2ff;
+  --ok:#4cc38a; --run:#e0b050; --you:#ff8a4c; --bad:#ff6b5e; --wait:#a99bff;
+  --chip-ok:#173527; --chip-run:#3a2e14; --chip-you:#3d2418; --chip-bad:#3d1d1b; --chip-wait:#262046; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --panel:#17202a; --ink:#e6edf3; --muted:#9aa8b5; --line:#2a3642; --accent:#7aa2ff;
+  --ok:#4cc38a; --run:#e0b050; --you:#ff8a4c; --bad:#ff6b5e; --wait:#a99bff;
+  --chip-ok:#173527; --chip-run:#3a2e14; --chip-you:#3d2418; --chip-bad:#3d1d1b; --chip-wait:#262046; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--text);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(26px,4vw,34px);margin:2px 0 0;text-wrap:balance}
+h2{font-family:var(--display);font-weight:600;font-size:17px;margin:0;display:flex;align-items:center;gap:8px}
+h2 .n{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:0 8px}
+.asof{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.counts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.count{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.count b{font-family:var(--display);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.count span{font-size:13px;color:var(--muted)}
+.count.you{border-color:var(--you)} .count.you b{color:var(--you)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+ul.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ul.rows li{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)}
+ul.rows li:first-child{border-top:0}
+.dot{width:9px;height:9px;border-radius:50%;transform:translateY(-1px)}
+.d-ok{background:var(--ok)}.d-run{background:var(--run)}.d-you{background:var(--you)}.d-bad{background:var(--bad)}.d-wait{background:var(--wait)}
+.t{min-width:0}.t small{display:block;color:var(--muted);font-size:13px;margin-top:1px}
+.ref{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+.chip{font-family:var(--mono);font-size:11.5px;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.c-ok{background:var(--chip-ok);color:var(--ok)}.c-run{background:var(--chip-run);color:var(--run)}.c-you{background:var(--chip-you);color:var(--you)}.c-bad{background:var(--chip-bad);color:var(--bad)}.c-wait{background:var(--chip-wait);color:var(--wait)}
+.you-panel{border-color:var(--you)}
+.sub{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.lane{display:flex;flex-direction:column;gap:6px}
+.lanehead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.lanehead b{font-family:var(--display);font-weight:600}
+.lanehead span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.task{display:grid;grid-template-columns:12px minmax(0,1fr);gap:10px;align-items:baseline;font-size:14px}
+.task code{font-family:var(--mono);font-size:12.5px}
+.task small{color:var(--muted)}
+.incident{border-left:4px solid var(--bad)}
+.incident p{margin:0;max-width:72ch}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.foot{font-size:13px;color:var(--muted)}
+.past{display:flex;flex-direction:column;gap:6px}
+.past details{border-top:1px solid var(--line);padding:8px 0}
+.past summary{cursor:pointer;font-family:var(--mono);font-size:13px}
+.past ul{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:3px;font-size:14px}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}.counts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:480px){.counts{grid-template-columns:repeat(2,minmax(0,1fr))}ul.rows li{grid-template-columns:12px minmax(0,1fr)}ul.rows li .ref,ul.rows li .chip{grid-column:2}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <div class="eyebrow">Day status · Friday 20 Nov 2026</div>
+    <h1>Automaton, end of day</h1>
+  </div>
+  <div class="asof">as of 18:18 UTC · production on 0.2.173 · test server on 0.2.173</div>
+</header>
+
+<section class="counts" aria-label="Today in numbers">
+  <div class="count"><b>32</b><span>PRs merged (8 platform, 24 apps)</span></div>
+  <div class="count"><b>4</b><span>issues closed as live</span></div>
+  <div class="count"><b>33</b><span>issues filed</span></div>
+  <div class="count"><b>4</b><span>agent tasks queued or running</span></div>
+  <div class="count you"><b>3</b><span>need you</span></div>
+</section>
+
+<section class="panel you-panel" aria-labelledby="you">
+  <h2 id="you">Needs you <span class="n">3</span></h2>
+  <ul class="rows">
+    <li><span class="dot d-you"></span><div class="t">Board views on <b>Agent work</b>: add a “Newest first” view (sort by Created, descending) and a “Today” view<small>The API can't create board views. Board 17 already has its columns and fields.</small></div><a class="ref" href="https://github.com/users/rzvdaniel/projects/17">board 17</a></li>
+    <li><span class="dot d-you"></span><div class="t">Say “deploy” for 0.2.174 once its release check passes<small>Not cut yet: waiting for the queued fixes below.</small></div><span class="chip c-wait">later today</span></li>
+    <li><span class="dot d-you"></span><div class="t">Approve Server Keeper's <code>server:cleanup</code> and <code>server:update-os</code> on production, then install the ~71 OS updates<small>After 0.2.174 shows the counts (#1438 merged today).</small></div><span class="chip c-wait">after deploy</span></li>
+  </ul>
+</section>
+
+<div class="grid2">
+  <div class="stack">
+    <section class="panel" aria-labelledby="done">
+      <h2 id="done">Done today <span class="n">highlights</span></h2>
+      <div class="sub">Platform</div>
+      <ul class="rows">
+        <li><span class="dot d-ok"></span><div class="t">OS update counts read from apt-check</div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1438">#1438</a></li>
+        <li><span class="dot d-ok"></span><div class="t">The updater refuses path and bundle options from a limited sudo rule</div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1435">#1435</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Home cards drag into a landing slot; one column on phones</div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1441">#1441</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Issue forms and an issue check; <code>needs-shape</code> stops builds</div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1450">#1450</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Review rules: main review and security pass from different logins; issue formatting</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton/pull/1446">#1446</a> · <a href="https://github.com/rzvdaniel/automaton/pull/1448">#1448</a></span></li>
+        <li><span class="dot d-ok"></span><div class="t">No task budget in the agent queue</div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1434">#1434</a></li>
+      </ul>
+      <div class="sub">Apps</div>
+      <ul class="rows">
+        <li><span class="dot d-ok"></span><div class="t">Server Keeper redesign: three tabs, one screen, phone layout</div><a class="ref" href="https://github.com/rzvdaniel/automaton-apps/pull/355">apps#355</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Gauntlet: scheduled install, use, uninstall and reinstall tests</div><a class="ref" href="https://github.com/rzvdaniel/automaton-apps/pull/344">apps#344</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Overseer: runs and shows the agent queue and its schedules</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton-apps/pull/345">apps#345</a> · <a href="https://github.com/rzvdaniel/automaton-apps/pull/347">#347</a></span></li>
+        <li><span class="dot d-ok"></span><div class="t">Overseer and Gauntlet build again (pip temp files in the build folder)</div><a class="ref" href="https://github.com/rzvdaniel/automaton-apps/pull/368">apps#368</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Server Keeper: session-ended message, restart button, unknown update status</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton-apps/pull/352">apps#352</a> · <a href="https://github.com/rzvdaniel/automaton-apps/pull/341">#341</a> · <a href="https://github.com/rzvdaniel/automaton-apps/pull/340">#340</a></span></li>
+      </ul>
+      <div class="sub">Closed as live</div>
+      <ul class="rows">
+        <li><span class="dot d-ok"></span><div class="t">Old runs, logs and audit events pruned (237 runs removed)</div><a class="ref" href="https://github.com/rzvdaniel/automaton/issues/1234">#1234</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Audit fails only on high advisories in shipped packages · unknown paths return 404 · Runner uninstall command copies cleanly</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton/issues/1286">#1286</a> · <a href="https://github.com/rzvdaniel/automaton/issues/1323">#1323</a> · <a href="https://github.com/rzvdaniel/automaton/issues/1242">#1242</a></span></li>
+      </ul>
+      <div class="sub">Machines</div>
+      <ul class="rows">
+        <li><span class="dot d-ok"></span><div class="t">Test server restored from the 19 Nov backup and updated to 0.2.173</div><a class="ref" href="https://github.com/rzvdaniel/automaton/issues/1453">#1453</a></li>
+        <li><span class="dot d-ok"></span><div class="t">Claude Code signed out and removed from production; runner-02 has the browser and test accounts</div><span class="chip c-ok">done</span></li>
+        <li><span class="dot d-ok"></span><div class="t">Release checks: #1135 and #1304 verified; #1314, #1324, #1276 verified-partial</div><span class="chip c-ok">runner-02</span></li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel" aria-labelledby="agents">
+      <h2 id="agents">Agents now</h2>
+      <div class="lane">
+        <div class="lanehead"><b>runner-01</b><span>builds · 1 running · 4 waiting</span></div>
+        <div class="task"><span class="dot d-run"></span><div><code>impl-1460</code> <small>clean up worktrees, free disk in the report</small></div></div>
+        <div class="task"><span class="dot d-wait"></span><div><code>fix-1435-sudo</code> <small>call /usr/bin/sudo in the updater</small></div></div>
+        <div class="task"><span class="dot d-wait"></span><div><code>impl-a366</code> <small>Overseer Pick-up across boards (with apps#360)</small></div></div>
+        <div class="task"><span class="dot d-wait"></span><div><code>impl-1459</code> <small>two skill rules for destructive tests</small></div></div>
+        <div class="task"><span class="dot d-wait"></span><div><code>rebase-1451</code> <small>reviewer-login rule, after a conflict</small></div></div>
+      </div>
+      <div class="lane">
+        <div class="lanehead"><b>runner-02</b><span>reviews and checks · idle</span></div>
+        <div class="task"><span class="dot d-ok"></span><div><code>verify-gaps-2</code> <small>finished: 2 verified, 3 partial</small></div></div>
+      </div>
+      <div class="lane">
+        <div class="lanehead"><b>Desktop</b><span>security passes, releases, production</span></div>
+        <div class="task"><span class="dot d-ok"></span><div>Security passes posted on #1435, #1446, #1450, #1451</div></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="waiting">
+      <h2 id="waiting">Waiting <span class="n">PRs</span></h2>
+      <ul class="rows">
+        <li><span class="dot d-wait"></span><div class="t">Restore keys with a chown BusyBox accepts<small>needs a security pass</small></div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1461">#1461</a></li>
+        <li><span class="dot d-wait"></span><div class="t">Uninstall removes only its own install; --confirm to delete data<small>needs a security pass</small></div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1462">#1462</a></li>
+        <li><span class="dot d-run"></span><div class="t">Worktree and cache cleanup on agent machines<small>being built</small></div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1463">#1463</a></li>
+        <li><span class="dot d-bad"></span><div class="t">Reviewer-login rule<small>conflicts with main; rebase queued</small></div><a class="ref" href="https://github.com/rzvdaniel/automaton/pull/1451">#1451</a></li>
+      </ul>
+      <div class="sub">Next release</div>
+      <ul class="rows">
+        <li><span class="dot d-wait"></span><div class="t"><b>0.2.174</b>: cut once the PRs above merge, update the test server, full release check on runner-02, then your deploy word</div><span class="chip c-wait">pending</span></li>
+      </ul>
+    </section>
+
+    <section class="panel" aria-labelledby="overseer">
+      <h2 id="overseer">Overseer switch-over</h2>
+      <ul class="rows">
+        <li><span class="dot d-ok"></span><div class="t">Built, installed on the test server, permission approved</div><span class="chip c-ok">done</span></li>
+        <li><span class="dot d-bad"></span><div class="t">Its four schedules weren't created: the CLI install skips them<small>Cron jobs stay on runner-01 until this is fixed.</small></div><a class="ref" href="https://github.com/rzvdaniel/automaton/issues/1464">#1464</a></li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<section class="panel incident" aria-labelledby="inc">
+  <h2 id="inc">Incident: test server data lost on 19 Nov</h2>
+  <p>An agent's uninstall test removed the test server's containers and volumes at 12:27 UTC. It went unnoticed for about a day. Restored from backup today; the cause and the follow-ups are on <a href="https://github.com/rzvdaniel/automaton/issues/1453">#1453</a>, with the backup work under <a href="https://github.com/rzvdaniel/automaton/issues/1454">#1454</a>.</p>
+</section>
+
+<section class="panel" aria-labelledby="filed">
+  <h2 id="filed">Filed today <span class="n">33</span></h2>
+  <div class="sub">Backups and recovery · parent #1454</div>
+  <ul class="rows">
+    <li><span class="dot d-wait"></span><div class="t">App data in backups, restore one app · release proves restore in CI · machine alerts when Automaton or its backup is missing</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton/issues/1455">#1455</a> · <a href="https://github.com/rzvdaniel/automaton/issues/1456">#1456</a> · <a href="https://github.com/rzvdaniel/automaton/issues/1457">#1457</a></span></li>
+    <li><span class="dot d-wait"></span><div class="t">Production and test watch each other · Backup Warden webhook and stale warning · weekly restore drill</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton-apps/issues/363">apps#363</a> · <a href="https://github.com/rzvdaniel/automaton-apps/issues/364">#364</a> · <a href="https://github.com/rzvdaniel/automaton-apps/issues/365">#365</a></span></li>
+  </ul>
+  <div class="sub">Agents and Overseer · parent apps#343</div>
+  <ul class="rows">
+    <li><span class="dot d-wait"></span><div class="t">Golem worker app · Pick-up across boards and schedules · skip needs-shape issues</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton-apps/issues/357">apps#357</a> · <a href="https://github.com/rzvdaniel/automaton-apps/issues/366">#366</a> · <a href="https://github.com/rzvdaniel/automaton-apps/issues/360">#360</a></span></li>
+  </ul>
+  <div class="sub">Found while testing</div>
+  <ul class="rows">
+    <li><span class="dot d-bad"></span><div class="t">CLI install skips an app's schedules · a too-old Runner fails with “unsupported permission”</div><span class="ref"><a href="https://github.com/rzvdaniel/automaton/issues/1464">#1464</a> · <a href="https://github.com/rzvdaniel/automaton/issues/1465">#1465</a></span></li>
+  </ul>
+  <div class="sub">Ideas for later</div>
+  <ul class="rows">
+    <li><span class="dot d-wait"></span><div class="t">Server Keeper offers new releases, installs them and can go back</div><a class="ref" href="https://github.com/rzvdaniel/automaton-apps/issues/358">apps#358</a></li>
+  </ul>
+</section>
+
+<section class="panel" aria-labelledby="past">
+  <h2 id="past">Past days</h2>
+  <div id="pastList" class="past"><p class="foot">No past days yet. Each “End of day” adds one here.</p></div>
+</section>
+<script>
+(function(){
+  var box=document.getElementById('pastList');
+  fetch('history.json').then(function(r){return r.ok?r.json():[]}).then(function(days){
+    if(!Array.isArray(days)||!days.length)return;
+    box.textContent='';
+    days.forEach(function(d){
+      var det=document.createElement('details');var sum=document.createElement('summary');
+      var c=d.counts||{};
+      sum.textContent=d.day+' · '+(c.merged||0)+' merged · '+(c.closed||0)+' live · '+(c.filed||0)+' filed';
+      det.appendChild(sum);
+      var ul=document.createElement('ul');
+      (d.top||[]).forEach(function(t,i){var li=document.createElement('li');var l=(d.links||[])[i];
+        if(l){var a=document.createElement('a');a.href=l;a.textContent=t;li.appendChild(a)}else{li.textContent=t}
+        ul.appendChild(li)});
+      det.appendChild(ul);box.appendChild(det);
+    });
+  }).catch(function(){});
+})();
+</script>
+
+<div class="legend" aria-label="Legend">
+  <span><i class="dot d-ok"></i>done</span><span><i class="dot d-run"></i>running</span><span><i class="dot d-wait"></i>waiting</span><span><i class="dot d-you"></i>needs you</span><span><i class="dot d-bad"></i>blocked or failed</span>
+</div>
+<p class="foot">Built from GitHub, the runner queues and the merge gate at 18:18 UTC. Ask “Status?” for a fresh one, or “Morning” for what ran overnight.</p>
+
+</div>
