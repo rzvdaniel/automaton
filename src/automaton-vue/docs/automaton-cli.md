@@ -144,6 +144,7 @@ deployed URL.
 ```bash
 automaton sync-ai
 automaton pull
+automaton docs <app>            # print the app's docs/README.md (its description if it ships none); --open shows the Docs tab in Studio
 automaton apps                  # your apps: ID, name, Runner, status (Paused when paused), public URL
 automaton installation-status   # server version, counts, last backup
 automaton notifications         # the same notices as Studio Home; add --json for scripts and agents
@@ -216,6 +217,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton link <app-id-or-slug>` | Link this directory to an existing Automaton app |
 | `automaton deploy <target>` | Build, upload, and deploy the app to Automaton |
 | `automaton open <environment>` | Open the current app in the browser |
+| `automaton docs <app>` | Print an app's docs (docs/README.md), or its description when it ships none |
 | `automaton logs <environment>` | Open runtime logs for an environment |
 | `automaton pull <app>` | Download editable app source files from the server |
 | `automaton publish` | Make the latest deployed app publicly accessible |

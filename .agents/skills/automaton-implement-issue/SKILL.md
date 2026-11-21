@@ -49,7 +49,7 @@ Create a to-do item for each step and tick them off.
    "Done" without output is a claim, not evidence.
 4. **Docs.** Find every user page the change makes wrong: search `src/automaton-vue/docs` for the feature's words
    (commands, labels, messages). Update them in this PR and name them on the Docs line; "none" only with a real reason.
-   There is no separate docs walk before a release.
+   An app's own `docs/` (apps repository) are part of that app's change too. There is no separate docs walk before a release.
 5. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes, including the "Check after
    release" list. Start step 6 while CI runs. An empty check list means the run has not started; it is not a pass.
 6. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
