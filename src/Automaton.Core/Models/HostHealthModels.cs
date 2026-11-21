@@ -32,6 +32,7 @@ public sealed record MachineHostHealth(
 
 /// <summary>
 /// Disk one app uses on a Runner's machine. Values the Runner cannot read are null.
+/// <c>CpuPercent</c> (of one core) and <c>MemoryBytes</c> are the live use of its running containers; null when it has none running.
 /// <c>ImageBytes</c> is the size of the Docker images its containers use (an image shared with other apps counts in full for each).
 /// </summary>
 public sealed record AppDiskUsage(
@@ -40,7 +41,9 @@ public sealed record AppDiskUsage(
     long? DataBytes,
     long? LogsBytes,
     long? ContainerBytes,
-    long? ImageBytes);
+    long? ImageBytes,
+    double? CpuPercent = null,
+    long? MemoryBytes = null);
 
 /// <summary>
 /// What fail2ban on the host reports, read from its database (never its socket). <c>Running</c> is false when fail2ban is

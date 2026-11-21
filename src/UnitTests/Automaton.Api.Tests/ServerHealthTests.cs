@@ -190,7 +190,7 @@ public sealed class ServerHealthTests
         db.WebApps.Add(new WebApp { Id = large, Name = "e2e-big", Created = DateTime.UtcNow, Updated = DateTime.UtcNow });
         await db.SaveChangesAsync();
         var reports = new HostHealthReportService(db);
-        var apps = new[] { new AppDiskUsage(small, 1, 2, 3, 4, 5), new AppDiskUsage(large, 100, 200, 0, 50, 1_000) };
+        var apps = new[] { new AppDiskUsage(small, 1, 2, 3, 4, 5), new AppDiskUsage(large, 100, 200, 0, 50, 1_000, 12.5, 4096) };
         await reports.ReportAsync(key, Sample() with { AppDisk = apps, DockerUnusedImagesBytes = 77 }, default);
         var memory = new MemoryCache(new MemoryCacheOptions());
         memory.Set(nameof(LatestReleaseClient), (string?)null);
@@ -203,9 +203,13 @@ public sealed class ServerHealthTests
             Assert.That(runner.Apps!.Select(item => item.AppId), Is.EqualTo(new[] { large, small }), "largest first");
             Assert.That(runner.Apps![0].AppName, Is.EqualTo("e2e-big"));
             Assert.That(runner.Apps[0].TotalBytes, Is.EqualTo(1_350));
+            Assert.That((runner.Apps[0].CpuPercent, runner.Apps[0].MemoryBytes), Is.EqualTo(((double?)12.5, (long?)4096)));
+            Assert.That(runner.Apps[1].CpuPercent, Is.Null);
             Assert.That(runner.Host!.DockerUnusedImagesBytes, Is.EqualTo(77));
             Assert.That(runner.Host.AppDisk, Is.Null, "the app list is not repeated inside the host figures");
         });
+        Assert.ThrowsAsync<ArgumentException>(() => reports.ReportAsync(
+            key, Sample(DateTime.UtcNow.AddSeconds(4)) with { AppDisk = [new AppDiskUsage(small, 1, null, null, null, null, 1, -5)] }, default));
         Assert.ThrowsAsync<ArgumentException>(() => reports.ReportAsync(
             key, Sample(DateTime.UtcNow.AddSeconds(5)) with { AppDisk = [new AppDiskUsage(small, -1, null, null, null, null)] }, default));
     }

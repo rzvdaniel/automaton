@@ -13,16 +13,17 @@ public sealed class AppDiskMeasurer(RunnerWorkspaceService workspace)
     private DateTime measuredAt = DateTime.MinValue;
     private IReadOnlyList<AppDiskUsage>? cached;
 
-    public IReadOnlyList<AppDiskUsage> Measure(Dictionary<Guid, (long Container, long Image)>? docker)
+    public IReadOnlyList<AppDiskUsage> Measure(Dictionary<Guid, (long Container, long Image)>? docker, Dictionary<Guid, (double? Cpu, long? Memory)>? live = null)
     {
-        if (cached is not null && DateTime.UtcNow - measuredAt < MaximumAge) return Merge(cached, docker);
+        if (cached is not null && DateTime.UtcNow - measuredAt < MaximumAge) return Merge(cached, docker, live);
         var ids = new HashSet<Guid>(ListApps(workspace.AppsRoot).Concat(ListApps(workspace.DataRoot)));
         cached = ids.Select(MeasureFiles).ToArray();
         measuredAt = DateTime.UtcNow;
-        return Merge(cached, docker);
+        return Merge(cached, docker, live);
     }
 
-    private static IReadOnlyList<AppDiskUsage> Merge(IReadOnlyList<AppDiskUsage> files, Dictionary<Guid, (long Container, long Image)>? docker)
+    private static IReadOnlyList<AppDiskUsage> Merge(
+        IReadOnlyList<AppDiskUsage> files, Dictionary<Guid, (long Container, long Image)>? docker, Dictionary<Guid, (double? Cpu, long? Memory)>? live)
     {
         var result = files.Select(item => docker is not null && docker.TryGetValue(item.AppId, out var usage)
             ? item with { ContainerBytes = usage.Container, ImageBytes = usage.Image }
@@ -30,7 +31,10 @@ public sealed class AppDiskMeasurer(RunnerWorkspaceService workspace)
         if (docker is not null)
             foreach (var (appId, usage) in docker.Where(pair => files.All(item => item.AppId != pair.Key)))
                 result.Add(new(appId, null, null, null, usage.Container, usage.Image));
-        return result;
+        if (live is null) return result;
+        foreach (var (appId, usage) in live.Where(pair => result.All(item => item.AppId != pair.Key)))
+            result.Add(new(appId, null, null, null, null, null));
+        return result.Select(item => live.TryGetValue(item.AppId, out var use) ? item with { CpuPercent = use.Cpu, MemoryBytes = use.Memory } : item).ToList();
     }
 
     private AppDiskUsage MeasureFiles(Guid appId)

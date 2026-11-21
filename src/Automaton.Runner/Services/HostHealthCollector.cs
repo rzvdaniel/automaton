@@ -41,7 +41,31 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
     {
         var json = await DockerDiskUsageAsync(token);
         var perApp = HostHealthParsers.ParseDockerAppUsage(json);
-        return (HostHealthParsers.ParseDockerDiskUsage(json), perApp, appDisk.Measure(perApp?.Apps));
+        return (HostHealthParsers.ParseDockerDiskUsage(json), perApp, appDisk.Measure(perApp?.Apps, await ReadAppStatsAsync(json, token)));
+    }
+
+    private const int MaximumStatsContainers = 100;
+
+    // Docker samples CPU for about a second per call, so the containers are read in parallel; an app sums its containers.
+    private static async Task<Dictionary<Guid, (double? Cpu, long? Memory)>?> ReadAppStatsAsync(string? dockerJson, CancellationToken token)
+    {
+        if (dockerJson is null) return null;
+        var running = HostHealthParsers.ParseRunningAppContainers(dockerJson).Take(MaximumStatsContainers).ToArray();
+        using var gate = new SemaphoreSlim(8);
+        var samples = await Task.WhenAll(running.Select(async item =>
+        {
+            await gate.WaitAsync(token);
+            try
+            {
+                var result = await RunAsync("curl", ["--silent", "--fail", "--max-time", "10", "--unix-socket", DockerSocket,
+                    $"http://localhost/containers/{Uri.EscapeDataString(item.ContainerId)}/stats?stream=false"], token);
+                return (item.AppId, Stats: result?.ExitCode == 0 ? HostHealthParsers.ParseContainerStats(result.Output) : (Cpu: (double?)null, Memory: (long?)null));
+            }
+            finally { gate.Release(); }
+        }));
+        return samples.GroupBy(sample => sample.AppId).ToDictionary(group => group.Key, group => (
+            group.Any(s => s.Stats.Cpu is not null) ? group.Sum(s => s.Stats.Cpu ?? 0) : (double?)null,
+            group.Any(s => s.Stats.Memory is not null) ? group.Sum(s => s.Stats.Memory ?? 0) : (long?)null));
     }
 
     private static async Task<(int? Cpus, double? Percent)> ReadCpuAsync(CancellationToken token)
