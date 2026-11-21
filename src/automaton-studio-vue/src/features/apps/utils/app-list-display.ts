@@ -1,4 +1,5 @@
 import type { AppListItem } from '../types/apps.types'
+import { getPublishedAppUrl, getStudioApplicationUrl } from './public-app-url'
 
 export type AppFilter = 'all' | 'web' | 'actions' | 'stopped'
 export type AppKind = 'Web app' | 'Website' | 'Action'
@@ -103,4 +104,10 @@ export function matchesSearch(app: AppListItem, query: string): boolean {
 export function catalogName(name: string): string {
   const short = name.replace(/^Automaton\s+/i, '').trim()
   return short || name
+}
+
+/** Where the app itself opens, or '' when it has no screen: the same check as the app page's Open app button (an Actions-only or not-yet-deployed app has none). */
+export function appOpenUrl(app: AppListItem): string {
+  if (app.actionsOnly || !app.liveEnvironment?.genericRuntimeDeployed) return ''
+  return app.canLaunchPublicly && app.publicUrl ? getPublishedAppUrl(app.publicUrl) : getStudioApplicationUrl(app.id)
 }

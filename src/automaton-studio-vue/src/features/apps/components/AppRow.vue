@@ -1,25 +1,31 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppMark from './AppMark.vue'
 import type { AppState } from '../utils/app-list-display'
 
 /** One app in the Apps list: a link to the app page, or a button when the person cannot open the page. */
-defineProps<{
+const props = defineProps<{
   id: string
   name: string
   line: string
   imageUrl?: string | null
   to?: string
+  /** The app itself: the row opens it in a new tab instead of linking to `to`. */
+  href?: string
   state?: AppState
   busy?: boolean
   label?: string
 }>()
 defineEmits<{ open: [] }>()
+const row = computed(() => props.href
+  ? { is: 'a', attrs: { href: props.href, target: '_blank', rel: 'noopener' } }
+  : props.to ? { is: RouterLink, attrs: { to: props.to } } : { is: 'button', attrs: { type: 'button' } })
 </script>
 
 <template>
   <div v-if="$slots.action" class="app-row app-row--split">
-    <component :is="to ? RouterLink : 'button'" class="app-row__main" :to="to" :type="to ? undefined : 'button'" :aria-label="label" @click="$emit('open')">
+    <component :is="row.is" v-bind="row.attrs" class="app-row__main" :aria-label="label" @click="$emit('open')">
       <AppMark :id="id" :name="name" :image-url="imageUrl" />
       <span class="app-row__text">
         <span class="app-row__name">{{ name }}</span>
@@ -31,7 +37,7 @@ defineEmits<{ open: [] }>()
     </component>
     <slot name="action" />
   </div>
-  <component :is="to ? RouterLink : 'button'" v-else class="app-row" :to="to" :type="to ? undefined : 'button'" :aria-busy="busy || undefined">
+  <component :is="row.is" v-else v-bind="row.attrs" class="app-row" :aria-busy="busy || undefined">
     <AppMark :id="id" :name="name" :image-url="imageUrl" />
     <span class="app-row__text">
       <span class="app-row__name">{{ name }}</span>
