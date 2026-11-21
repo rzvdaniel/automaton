@@ -3740,6 +3740,51 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("ServerCleanupSettings");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.ServerMaintenanceRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("RequestedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid?>("RunnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("citext");
+
+                    b.Property<int?>("UpgradedCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAtUtc");
+
+                    b.HasIndex("Kind", "RunnerId", "StartedAtUtc");
+
+                    b.ToTable("ServerMaintenanceRuns");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.Setting", b =>
                 {
                     b.Property<string>("Key")

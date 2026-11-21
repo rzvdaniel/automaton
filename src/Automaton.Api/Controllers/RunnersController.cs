@@ -94,11 +94,18 @@ public class RunnersController : BaseController
     /// <summary>Upgrades an online Runner to the server's configured image.</summary>
     [HttpPost("{id}/upgrade")]
     [Authorize(Policy = "DeveloperApiAccess")]
-    public async Task<IActionResult> Upgrade(Guid id, [FromServices] RunnerUpgradeService upgrade, CancellationToken cancellationToken)
+    public async Task<IActionResult> Upgrade(Guid id, [FromServices] RunnerUpgradeService upgrade,
+        [FromServices] ServerMaintenanceHistory history, CancellationToken cancellationToken)
     {
         if (!AppChangeKeyScope.IsAllowed(User))
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot upgrade Runners. Use a key with the Developer scope." });
-        try { return Accepted(await upgrade.StartAsync(id, cancellationToken)); }
+        try
+        {
+            var started = await upgrade.StartAsync(id, cancellationToken);
+            var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            await history.RecordUpgradeStartedAsync(id, email, DateTimeOffset.UtcNow, cancellationToken);
+            return Accepted(started);
+        }
         catch (UnauthorizedAccessException) { return Forbid(); }
         catch (InvalidOperationException exception) { return Conflict(new { message = exception.Message }); }
     }

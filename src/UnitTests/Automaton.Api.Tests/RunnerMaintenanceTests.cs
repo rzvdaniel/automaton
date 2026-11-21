@@ -304,18 +304,22 @@ public sealed class RunnerMaintenanceTests
         var fake = new FakeRunner();
         var upgrade = new RunnerUpgradeService(s.Db, s.Authorization, fake,
             Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Config.HostedRunnerOptions { DockerImage = "img@sha256:" + new string('a', 64) }));
+        var history = new ServerMaintenanceHistory(s.Db, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), upgrade);
         var admin = s.Tokens.Create(s.AppId, s.Admin);
 
-        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, default), app: false), Is.EqualTo(403), "not an app");
-        Assert.That(await s.Call(null, s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, default)), Is.EqualTo(403), "no viewer token");
-        Assert.That(await s.Call(s.Tokens.Create(s.AppId, s.Other), s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, default)), Is.EqualTo(403), "not an administrator");
-        Assert.That(await s.Call(admin, s.RunnerTwo, c => c.Upgrade(s.RunnerTwo, upgrade, default)), Is.EqualTo(403), "approved for runner-01 only");
+        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, history, default), app: false), Is.EqualTo(403), "not an app");
+        Assert.That(await s.Call(null, s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, history, default)), Is.EqualTo(403), "no viewer token");
+        Assert.That(await s.Call(s.Tokens.Create(s.AppId, s.Other), s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, history, default)), Is.EqualTo(403), "not an administrator");
+        Assert.That(await s.Call(admin, s.RunnerTwo, c => c.Upgrade(s.RunnerTwo, upgrade, history, default)), Is.EqualTo(403), "approved for runner-01 only");
         Assert.That(await s.Call(null, s.RunnerTwo, c => c.UpgradeStatus(s.RunnerTwo, upgrade, default)), Is.EqualTo(403));
         Assert.That(fake.Kind, Is.Null, "no refused call reached a Runner");
 
         s.Audit.Events.Clear();
-        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, default)), Is.EqualTo(202));
+        Assert.That(await s.Call(admin, s.RunnerOne, c => c.Upgrade(s.RunnerOne, upgrade, history, default)), Is.EqualTo(202));
         Assert.That(fake.Kind, Is.EqualTo("upgrade-runner"));
         Assert.That(s.Audit.Events.Single().Metadata, Does.Contain("runner-upgrade").And.Contain(s.Admin.ToString()));
+        var recorded = await s.Db.ServerMaintenanceRuns.SingleAsync();
+        Assert.That((recorded.Kind, recorded.RunnerId, recorded.State), Is.EqualTo(("runner-upgrade", s.RunnerOne, "running")));
+        Assert.That(recorded.RequestedBy, Does.Contain(s.Admin.ToString()));
     }
 }

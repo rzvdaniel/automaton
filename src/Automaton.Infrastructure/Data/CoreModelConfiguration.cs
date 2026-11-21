@@ -16,6 +16,7 @@ internal static class CoreModelConfiguration
         ConfigureActionSchedule(modelBuilder);
         ConfigureActionScheduleOccurrence(modelBuilder);
         ConfigureActionWebhook(modelBuilder);
+        ConfigureServerMaintenanceRun(modelBuilder);
         ConfigureAuditEvent(modelBuilder);
         ConfigureApplicationEvent(modelBuilder);
         ConfigureAppModuleExecution(modelBuilder);
@@ -112,6 +113,20 @@ internal static class CoreModelConfiguration
             entity.Property(e => e.Detail).HasMaxLength(500);
             entity.HasIndex(e => new { e.WebhookId, e.CalledAtUtc });
             entity.HasOne<ActionWebhook>().WithMany().HasForeignKey(e => e.WebhookId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureServerMaintenanceRun(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ServerMaintenanceRun>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Kind).IsRequired().HasMaxLength(32);
+            entity.Property(e => e.State).IsRequired().HasMaxLength(32);
+            entity.Property(e => e.RequestedBy).HasMaxLength(200);
+            entity.Property(e => e.Message).HasMaxLength(500);
+            entity.HasIndex(e => e.StartedAtUtc);
+            entity.HasIndex(e => new { e.Kind, e.RunnerId, e.StartedAtUtc });
         });
     }
 

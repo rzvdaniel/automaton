@@ -56,6 +56,7 @@ public partial class ApplicationDbContext
     public virtual DbSet<ActionScheduleOccurrence> ActionScheduleOccurrences { get; set; }
     public virtual DbSet<ActionWebhook> ActionWebhooks { get; set; }
     public virtual DbSet<ActionWebhookCall> ActionWebhookCalls { get; set; }
+    public virtual DbSet<ServerMaintenanceRun> ServerMaintenanceRuns { get; set; }
     public virtual DbSet<SecretDefinition> SecretDefinitions { get; set; }
     public virtual DbSet<AppPermissionApproval> AppPermissionApprovals { get; set; }
     public virtual DbSet<AppSettingValue> AppSettingValues { get; set; }
