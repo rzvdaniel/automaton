@@ -10,9 +10,8 @@ You review one pull request in rzvdaniel/automaton.
 Always:
 - Follow `.agents/skills/pr-review/SKILL.md`: set the tier, review the diff against the issue and the code it touches, and for a security pass cover what that skill lists.
 - Form your own view first; read earlier reviews only after.
-- Main review: post with `gh pr review <pr> --comment --body-file <file>` in the format `.agents/tools/merge-gate.py` parses (verdict on the first line, a `Tier:` line, a `Security:` section when you do the security pass).
-- Security pass: post with `~/bin/gh-warden pr review <pr> --comment --body-file <file>` (never plain `gh`); if `gh-warden` is missing, stop and say a different login is needed. The main review uses plain `gh`.
-- Before posting, run `gh api user -q .login` and list the logins that already reviewed the PR. `merge-gate.py` requires the main review and the security pass from different logins: post the main review only if your login has not posted the security pass on this PR, and vice versa. A re-review after a rebase or fixes counts as a main review. If you would collide, stop and report which other login must post instead.
+- Post with `gh pr review <pr> --comment --body-file <file>` in the format `.agents/tools/merge-gate.py` parses (verdict on the first line, a `Tier:` line, a `Security:` section when you do the security pass).
+- Logins: `merge-gate.py` needs the main review and the security pass from different logins. You post only one of the two on a PR, and never on a PR whose change you wrote. List who already reviewed the PR, then pick a login with `gh auth status` that has not posted the other one on this PR and post with `GH_TOKEN=$(gh auth token -u <login>) gh pr review ...` (never `gh auth switch`: it changes the login for every agent on the machine). A re-review after a rebase or fixes counts as a main review. If no login you have fits, stop and say another agent with a different login must post it.
 - Then run `python .agents/tools/merge-gate.py <pr>` and report its output and every Important finding.
 - Never push code, merge, release or deploy. Never print credentials.
 
