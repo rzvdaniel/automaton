@@ -263,6 +263,9 @@ jobs:
           bash -n automaton-server/restart-from-request.sh
           bash -n automaton-server/os-update-from-request.sh
           sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-install-smoke.sh "$PWD/automaton-server"
+      - name: Backup and restore round trip
+        # A release must prove its own backup restores: back up, wipe containers and volumes, restore, check the data.
+        run: sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-restore-smoke.sh "$PWD/automaton-server"
       - name: Package release
         run: |
           tar -czf automaton-server.tar.gz automaton-server
