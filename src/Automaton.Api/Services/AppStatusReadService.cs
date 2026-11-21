@@ -20,6 +20,8 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
                 app.Id,
                 app.Name,
                 app.IsPaused,
+                app.Category,
+                app.InstalledFromRepo,
                 Live = app.DeploymentTargets.Where(target => target.IsDefault)
                     .Select(target => new { target.Status, target.LastSuccessfulDeploymentAt, target.Slug }).FirstOrDefault(),
             }).ToListAsync(token);
@@ -38,7 +40,7 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
             var run = await LastRunAsync(app.Id, token);
             var next = await NextRunAsync(app.Id, token);
             result.Add(new AppStatusItem(app.Id, app.Name, app.IsPaused, app.Live?.Status.ToString() ?? "Unassigned",
-                app.Live?.LastSuccessfulDeploymentAt?.UtcDateTime, error, run, next));
+                app.Live?.LastSuccessfulDeploymentAt?.UtcDateTime, error, run, next, app.InstalledFromRepo is null ? null : app.Category));
         }
         return result;
     }
@@ -67,4 +69,4 @@ public sealed class AppStatusReadService(ApplicationDbContext db)
 }
 
 public sealed record AppStatusItem(Guid Id, string Name, bool IsPaused, string LiveStatus, DateTime? LastSuccessfulDeploymentAtUtc,
-    string? LastDeploymentError, AppListActionRunDto? LastActionRun, DateTime? NextActionRunAtUtc);
+    string? LastDeploymentError, AppListActionRunDto? LastActionRun, DateTime? NextActionRunAtUtc, string? Category = null);

@@ -135,9 +135,9 @@ public sealed class AppCatalogService(
             var (entry, _) = await LoadSourceAsync(source, refresh, cancellationToken);
             if (entry is null) continue;
             var exact = entry.Document.Apps.FirstOrDefault(item => InstalledKey(entry.Document.Repo, item.Folder) == key);
-            if (exact is not null) return new PinnedApp(entry.Document.Repo, exact.Folder, exact.Commit);
+            if (exact is not null) return new PinnedApp(entry.Document.Repo, exact.Folder, exact.Commit, exact.Category);
             var successor = moved is null ? entry.Document.Apps.FirstOrDefault(item => item.MovedFrom is { } from && InstalledKey(from.Repo, from.Folder) == key) : null;
-            if (successor is not null) moved = new PinnedApp(entry.Document.Repo, successor.Folder, successor.Commit);
+            if (successor is not null) moved = new PinnedApp(entry.Document.Repo, successor.Folder, successor.Commit, successor.Category);
         }
         return moved;
     }
@@ -399,7 +399,7 @@ public sealed class AppCatalogService(
     private sealed record StoredCache(DateTime FetchedAt, string? ETag, string Body);
 
     /// <summary>The repository and folder an app was installed from before it moved, and where it is pinned now.</summary>
-    public sealed record PinnedApp(string Repo, string Folder, string Commit);
+    public sealed record PinnedApp(string Repo, string Folder, string Commit, string? Category = null);
 
     internal sealed class CatalogPublisher
     {
