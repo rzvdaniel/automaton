@@ -6,6 +6,7 @@ import type { MenuItem } from 'primevue/menuitem'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { adminAppsService } from '@/features/admin/services/adminAppsService'
+import { waitingChanged } from '@/features/admin/composables/waitingApprovals'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { installService } from '@/features/install/services/install.service'
 import { SHOW_PREVIEW_BADGE, previewTitle } from '@/shared/preview'
@@ -48,6 +49,7 @@ async function refreshWaiting() {
 }
 onMounted(refreshWaiting)
 watch(() => route.path, refreshWaiting)
+watch(waitingChanged, refreshWaiting)
 
 const isActive = (item: RailItem) => item.match(route.path)
 

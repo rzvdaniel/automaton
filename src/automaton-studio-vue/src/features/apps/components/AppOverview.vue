@@ -39,8 +39,13 @@ const props = defineProps<{
   /** The sign-in address, for people the app is shared with. */
   privateAddress: string
   sharing: AppSharing | null
+  /** Permission requests waiting on this app; only given to system administrators, who can decide them. */
+  waitingPermissions?: ReadonlyArray<string>
+  /** Changes after a permission is decided, so the Permissions card reloads. */
+  permissionsVersion?: number
+  deciding?: boolean
 }>()
-const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-changed': []; 'targets-changed': [] }>()
+const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-changed': []; 'targets-changed': []; 'decide-permission': [permission: string, approved: boolean] }>()
 const toast = useToast()
 const { publisherOf } = usePublishers()
 const publisher = computed(() => publisherOf(props.app.id))
@@ -73,6 +78,12 @@ watch(() => props.app.id, async (id) => {
   if (secrets.status === 'fulfilled') secretNames.value = secrets.value.map((secret) => secret.name)
   if (perms.status === 'fulfilled') permissions.value = perms.value?.permissions ?? []
 }, { immediate: true })
+
+watch(() => props.permissionsVersion, async () => {
+  const id = props.app.id
+  const perms = await appsService.getPermissions(id).catch(() => null)
+  if (perms && props.app.id === id) permissions.value = perms.permissions ?? []
+})
 
 /** Only people who can change the app change who opens it. */
 const canShare = computed(() => props.app.canUpdate !== false)
@@ -162,6 +173,17 @@ const source = computed(() => {
 
 <template>
   <div class="overview">
+    <section v-if="waitingPermissions?.length" class="card notice" aria-label="Permission requests" data-testid="permission-notice">
+      <h2>Waiting for your approval</h2>
+      <div v-for="permission in waitingPermissions" :key="permission" class="row">
+        <span><span class="mono">{{ permission }}</span> <span class="hint">· this app asks for it</span></span>
+        <span class="notice__actions">
+          <Button label="Approve" size="small" :aria-label="`Approve ${permission}`" :disabled="deciding" @click="emit('decide-permission', permission, true)" />
+          <Button label="Deny" size="small" severity="secondary" outlined :aria-label="`Deny ${permission}`" :disabled="deciding" @click="emit('decide-permission', permission, false)" />
+        </span>
+      </div>
+    </section>
+
     <section class="card" aria-label="Status">
       <p class="status" data-testid="status-sentence">
         <template v-for="(part, index) in sentence" :key="index">
@@ -319,6 +341,8 @@ p.hint { margin: 0; }
 .end { display: inline-flex; align-items: center; gap: 10px; }
 .pill { padding: 3px 10px; border-radius: 999px; font-family: var(--mono); font-size: 12px; }
 .pill--ok { border: 1px solid var(--ok); color: var(--ok); }
+.notice { border-color: var(--signal); }
+.notice__actions { display: flex; gap: 8px; }
 .pill--bad { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
 .link--button { margin-left: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; cursor: pointer; }
 .details { margin: 8px 0 0; padding: 10px 12px; max-height: 280px; overflow: auto; border: 1px solid var(--row-line); border-radius: 10px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -17,8 +17,9 @@ vi.mock('../services/apps.service', () => ({
 }))
 import { appsService } from '../services/apps.service'
 
-const mountOverview = (extra: Partial<App>) => mount(AppOverview, {
+const mountOverview = (extra: Partial<App>, more: Record<string, unknown> = {}) => mount(AppOverview, {
   props: {
+    ...more,
     app: { id: 'app-1', name: 'Backup', isPaused: false, canUpdate: true, ...extra } as App,
     targets: [], executions: [], schedules: [], actions: [], address: '', publicAddress: '', privateAddress: '', sharing: null,
   },
@@ -78,5 +79,23 @@ describe('AppOverview catalog update', () => {
     expect(wrapper.text()).not.toContain('Traceback')
     await wrapper.get('[data-testid="update-deploy-details-toggle"]').trigger('click')
     expect(wrapper.get('[data-testid="update-deploy-details"]').text()).toContain('Traceback (most recent call last)')
+  })
+})
+
+describe('AppOverview waiting permissions', () => {
+  it('shows a notice with Approve and Deny near the top for an administrator', async () => {
+    const wrapper = mountOverview({}, { waitingPermissions: ['notify:email'] })
+    await flushPromises()
+    const notice = wrapper.get('[data-testid="permission-notice"]')
+    expect(notice.text()).toContain('notify:email')
+    await notice.get('[aria-label="Approve notify:email"]').trigger('click')
+    await notice.get('[aria-label="Deny notify:email"]').trigger('click')
+    expect(wrapper.emitted('decide-permission')).toEqual([['notify:email', true], ['notify:email', false]])
+  })
+
+  it('shows no notice or buttons when nothing is given (owner without admin rights)', async () => {
+    const wrapper = mountOverview({})
+    await flushPromises()
+    expect(wrapper.find('[data-testid="permission-notice"]').exists()).toBe(false)
   })
 })

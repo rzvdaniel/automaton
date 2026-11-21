@@ -7,6 +7,8 @@ export type AppViewKey = (typeof APP_VIEW_KEYS)[number]
 export interface AppTab {
   key: AppViewKey
   label: string
+  /** Count shown beside the label; hidden when 0. */
+  badge?: number
 }
 
 export const DEFAULT_APP_VIEW: AppViewKey = 'overview'
@@ -31,10 +33,12 @@ export interface AppTabOptions {
   /** Has an address people open (not a tool): Domain and Store listing. */
   isPublishable?: boolean
   isAdmin?: boolean
+  /** Permission requests waiting on this app; badge on the Admin tab. */
+  waitingPermissions?: number
 }
 
 /** The tabs of the app page, in order; each shows only when it applies to this app and person. */
-export function appTabs({ hasActions = false, hasSecrets = false, canManage = false, isPublishable = false, isAdmin = false }: AppTabOptions = {}): ReadonlyArray<AppTab> {
+export function appTabs({ hasActions = false, hasSecrets = false, canManage = false, isPublishable = false, isAdmin = false, waitingPermissions = 0 }: AppTabOptions = {}): ReadonlyArray<AppTab> {
   const keys: AppViewKey[] = ['overview', 'activity']
   if (hasActions) keys.push('actions')
   if (canManage || isAdmin) keys.push('source')
@@ -42,7 +46,7 @@ export function appTabs({ hasActions = false, hasSecrets = false, canManage = fa
   if (canManage && isPublishable) keys.push('domain', 'store')
   if (canManage) keys.push('settings')
   if (isAdmin) keys.push('admin')
-  return keys.map((key) => ({ key, label: LABELS[key] }))
+  return keys.map((key) => key === 'admin' && waitingPermissions > 0 ? { key, label: LABELS[key], badge: waitingPermissions } : { key, label: LABELS[key] })
 }
 
 /** Earlier `?view=` values and the tab each one now lives in. */
