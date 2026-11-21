@@ -389,6 +389,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
           KEEP: '30'
+          GH_REPO: ${{ github.repository }}
         run: |
           set -uo pipefail
           # Newest first by creation date; drafts are skipped, as is the release this run published.
