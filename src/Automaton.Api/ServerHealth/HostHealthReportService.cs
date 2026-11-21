@@ -75,8 +75,9 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
     {
         if (apps is null) return;
         if (apps.Count > 2000 || apps.Any(app => app.AppId == Guid.Empty
-            || new[] { app.FilesBytes, app.DataBytes, app.LogsBytes, app.ContainerBytes, app.ImageBytes }.Any(value => value < 0)))
-            throw new ArgumentException("App disk values must not be negative, and at most 2000 apps are accepted.");
+            || new[] { app.FilesBytes, app.DataBytes, app.LogsBytes, app.ContainerBytes, app.ImageBytes }.Any(value => value < 0)
+            || app.MemoryBytes < 0 || app.CpuPercent is < 0 or > 1_000_000))
+            throw new ArgumentException("App disk, CPU and memory values must not be negative, and at most 2000 apps are accepted.");
     }
 
     private static void ValidateFail2Ban(Fail2BanStatus? status)

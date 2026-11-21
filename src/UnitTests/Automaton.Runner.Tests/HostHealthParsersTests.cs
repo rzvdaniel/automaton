@@ -56,6 +56,29 @@ public class HostHealthParsersTests
     }
 
     [Test]
+    public void ContainerStats_GiveCpuPercentOfOneCoreAndMemoryWithoutCache_AndRunningAppContainersAreListed()
+    {
+        var app = Guid.NewGuid();
+        var (cpu, memory) = HostHealthParsers.ParseContainerStats("""
+            {"cpu_stats":{"cpu_usage":{"total_usage":300},"system_cpu_usage":2000,"online_cpus":2},
+             "precpu_stats":{"cpu_usage":{"total_usage":200},"system_cpu_usage":1000},
+             "memory_stats":{"usage":1000,"stats":{"inactive_file":400}}}
+            """);
+        var containers = HostHealthParsers.ParseRunningAppContainers($$$"""
+            {"Containers":[{"Id":"c1","State":"running","Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"Id":"c2","State":"exited","Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"Id":"c3","State":"running","Labels":{}}]}
+            """);
+        Assert.Multiple(() =>
+        {
+            Assert.That(cpu, Is.EqualTo(20.0), "100 / 1000 * 2 cpus * 100");
+            Assert.That(memory, Is.EqualTo(600));
+            Assert.That(HostHealthParsers.ParseContainerStats("nope"), Is.EqualTo(((double?)null, (long?)null)));
+            Assert.That(containers, Is.EqualTo(new[] { (app, "c1") }));
+        });
+    }
+
+    [Test]
     public void DockerDiskUsage_SumsLayersContainersVolumesAndUnsharedBuildCache()
     {
         var usage = HostHealthParsers.ParseDockerDiskUsage("""

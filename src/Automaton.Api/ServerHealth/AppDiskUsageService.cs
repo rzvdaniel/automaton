@@ -6,15 +6,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.ServerHealth;
 
-/// <summary>Disk an app uses, as measured by a Runner. Total is the sum of the parts that were measured.</summary>
+/// <summary>Disk an app uses, as measured by a Runner, and its running containers' CPU and memory. Total is the sum of the disk parts that were measured.</summary>
 public sealed record AppDiskUsageResponse(
     Guid AppId, string? AppName, long? FilesBytes, long? DataBytes, long? LogsBytes, long? ContainerBytes, long? ImageBytes,
-    long TotalBytes, DateTime? MeasuredAtUtc)
+    long TotalBytes, DateTime? MeasuredAtUtc, double? CpuPercent = null, long? MemoryBytes = null)
 {
     public static AppDiskUsageResponse From(AppDiskUsage usage, string? name, DateTime? measuredAt) => new(
         usage.AppId, name, usage.FilesBytes, usage.DataBytes, usage.LogsBytes, usage.ContainerBytes, usage.ImageBytes,
         (usage.FilesBytes ?? 0) + (usage.DataBytes ?? 0) + (usage.LogsBytes ?? 0) + (usage.ContainerBytes ?? 0) + (usage.ImageBytes ?? 0),
-        measuredAt);
+        measuredAt, usage.CpuPercent, usage.MemoryBytes);
 }
 
 /// <summary>Reads the per-app disk figures the Machine Management Runners report with their host health.</summary>

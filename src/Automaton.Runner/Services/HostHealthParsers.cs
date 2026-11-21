@@ -113,6 +113,58 @@ internal static partial class HostHealthParsers
         catch (InvalidOperationException) { return null; }
     }
 
+    /// <summary>Ids of running containers labelled with an app id, from Docker's <c>/system/df</c>.</summary>
+    public static IReadOnlyList<(Guid AppId, string ContainerId)> ParseRunningAppContainers(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json ?? "");
+            var found = new List<(Guid, string)>();
+            foreach (var container in Items(document.RootElement, "Containers"))
+            {
+                if (!container.TryGetProperty("State", out var state) || state.GetString() != "running"
+                    || !container.TryGetProperty("Id", out var id) || id.GetString() is not { Length: > 0 } containerId
+                    || !container.TryGetProperty("Labels", out var labels) || labels.ValueKind != JsonValueKind.Object
+                    || !labels.TryGetProperty("com.automaton.app-id", out var label) || !Guid.TryParse(label.GetString(), out var appId)) continue;
+                found.Add((appId, containerId));
+            }
+            return found;
+        }
+        catch (JsonException) { return []; }
+        catch (InvalidOperationException) { return []; }
+    }
+
+    /// <summary>
+    /// CPU percent (100 is one core, like <c>docker stats</c>) and memory bytes (usage without reclaimable page cache) from one
+    /// non-streaming Docker stats response.
+    /// </summary>
+    public static (double? Cpu, long? Memory) ParseContainerStats(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json ?? "");
+            var root = document.RootElement;
+            double? cpu = null;
+            if (root.TryGetProperty("cpu_stats", out var now) && root.TryGetProperty("precpu_stats", out var before))
+            {
+                var total = Number(now.TryGetProperty("cpu_usage", out var a) ? a : default, "total_usage")
+                    - Number(before.TryGetProperty("cpu_usage", out var b) ? b : default, "total_usage");
+                var system = Number(now, "system_cpu_usage") - Number(before, "system_cpu_usage");
+                var cpus = Math.Max(1, Number(now, "online_cpus"));
+                if (system > 0 && total >= 0) cpu = Math.Round(100.0 * total / system * cpus, 1);
+            }
+            long? memory = null;
+            if (root.TryGetProperty("memory_stats", out var stats) && stats.TryGetProperty("usage", out var usage) && usage.TryGetInt64(out var used))
+            {
+                var cache = stats.TryGetProperty("stats", out var detail) ? Math.Max(Number(detail, "inactive_file"), Number(detail, "total_inactive_file")) : 0;
+                memory = Math.Max(0, used - cache);
+            }
+            return (cpu, memory);
+        }
+        catch (JsonException) { return (null, null); }
+        catch (InvalidOperationException) { return (null, null); }
+    }
+
     private static (Dictionary<string, long> Sizes, long Unused) ReadImages(JsonElement root)
     {
         var sizes = new Dictionary<string, long>(StringComparer.Ordinal);
