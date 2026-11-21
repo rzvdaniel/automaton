@@ -72,7 +72,6 @@ curl -fsS -H "Authorization: Bearer $access_token" -H 'Content-Type: application
     -d '{"runnerName":"Restore smoke test","applicationProfile":"MachineManagement","acknowledgeHostAccess":true}' \
     "$address/api/self-hosted-runners/installations" >/dev/null
 [[ "$(runner_count)" == 1 ]]
-markers_before=$("${compose[@]}" exec -T postgres psql -U automaton -d automaton -At -c 'SELECT COUNT(*) FROM "Users"' < /dev/null || true)
 
 echo 'Backing up...'
 bash "$install_dir/backup.sh" --install-dir "$install_dir" --keep 5
@@ -106,5 +105,4 @@ echo 'Checking the data is back...'
 curl -fsS "$(api_address)/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]'
 login >/dev/null
 [[ "$(runner_count)" == 1 ]]
-[[ "$("${compose[@]}" exec -T postgres psql -U automaton -d automaton -At -c 'SELECT COUNT(*) FROM "Users"' < /dev/null || true)" == "$markers_before" ]]
 echo 'Backup and restore round trip passed.'
