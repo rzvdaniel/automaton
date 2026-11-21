@@ -177,7 +177,7 @@ function slotRects(sequence: number[]): SlotRect[] {
   return rects
 }
 function onPointerDown(event: PointerEvent, index: number) {
-  if (phone.value || event.button !== 0 || !measured.value || store.pinned.length < 2) return
+  if (event.button !== 0 || !measured.value || store.pinned.length < 2) return
   pending = { index, startX: event.clientX, startY: event.clientY }
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
@@ -578,19 +578,22 @@ onBeforeUnmount(() => {
 .pin-row__gear:hover { color: var(--ink); }
 .pin__actions { display: flex; justify-content: flex-end; gap: 2px; }
 .pin__icon--busy { opacity: 0.5; }
-.pin--dragging { z-index: 20; transform: rotate(1.5deg) scale(1.02); box-shadow: 0 18px 40px rgb(0 0 0 / 0.22); cursor: grabbing; pointer-events: none; transition: transform 160ms ease-out, box-shadow 160ms ease-out; }
-.pin-slot { box-sizing: border-box; border: 2px dashed var(--signal); border-radius: 12px; background: color-mix(in srgb, var(--signal) 8%, transparent); }
+.pin--dragging { z-index: 20; transform: rotate(1.2deg) scale(1.02); box-shadow: 0 18px 40px rgb(0 0 0 / 0.18); cursor: grabbing; pointer-events: none; transition: transform 160ms ease-out, box-shadow 160ms ease-out; }
+.pin-slot { --slot-accent: #ea580c; --slot-fill: #fff7ed; box-sizing: border-box; border: 2px dashed var(--slot-accent); border-radius: 14px; background: var(--slot-fill); animation: slot-pulse 1.4s ease-in-out infinite; }
+:global(.app-dark) .pin-slot { --slot-accent: #f97316; --slot-fill: #2a1c12; }
+@keyframes slot-pulse { 0%, 100% { background-color: var(--slot-fill); } 50% { background-color: color-mix(in srgb, var(--slot-fill) 50%, var(--paper)); } }
 .pin, .pin-slot { transition: top 260ms ease-out, left 260ms ease-out, width 260ms ease-out, transform 220ms ease-out, box-shadow 220ms ease-out; }
 .pin--dragging { transition: transform 160ms ease-out, box-shadow 160ms ease-out; }
 .pin--settling { z-index: 10; transition: top 220ms ease-out, left 220ms ease-out, width 220ms ease-out, transform 220ms ease-out, box-shadow 220ms ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .pin, .pin-slot, .pin--dragging, .pin--settling { transition: none; }
   .pin--dragging { transform: none; }
+  .pin-slot { animation: none; }
 }
 @media (max-width: 559px) {
   .pin__wide { display: none; }
   .pin--wide { grid-column: auto; }
-  .pin__link { cursor: auto; touch-action: auto; }
+  .pin__link { cursor: grab; touch-action: none; }
   .pin__actions .p-button { min-width: 44px; min-height: 44px; }
   .pin-row__gear { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   .home-cards--apps { grid-template-columns: minmax(0, 1fr); }
