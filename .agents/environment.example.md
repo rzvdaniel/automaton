@@ -27,6 +27,5 @@ that the end-to-end check runs after release on a maintainer's test server.
 - GitHub project boards, their numbers and fields, and which parent issue each kind of work goes under. Contributors
   without board access skip this: file the issue and the maintainers place it.
 
-
 ## Agents
 - Which agents run where (for example a headless agent on the test server), how to start them and where their logs are.
