@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Back up an Automaton server: a consistent database dump plus the API and Worker
-# Data Protection keys that decrypt it. Runs nightly from automaton-backup.timer.
+# Back up an Automaton server: a consistent database dump, the API and Worker Data Protection
+# keys that decrypt it, and the data of every app this host runs (web app data directories and
+# Compose volumes). Runs nightly from automaton-backup.timer.
 #
 #   backup.sh                  take a backup now and rotate old ones
 #   backup.sh --install-timer  install and start the nightly systemd timer, and the unit that starts a backup
@@ -18,7 +19,7 @@ while (($#)); do
         --keep) keep="${2:?Missing number of backups to keep}"; shift 2 ;;
         --install-timer) mode=timer; shift ;;
         --list) mode=list; shift ;;
-        --help) sed -n '2,9p' "$0"; exit 0 ;;
+        --help) sed -n '2,10p' "$0"; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -79,7 +80,7 @@ if os.path.isdir(root):
         path = os.path.join(root, name)
         if not (name.startswith('automaton-') and os.path.isdir(path) and os.path.isfile(os.path.join(path, 'SHA256SUMS'))):
             continue
-        size = sum(os.path.getsize(os.path.join(path, f)) for f in os.listdir(path))
+        size = sum(os.path.getsize(os.path.join(d, f)) for d, _, files in os.walk(path) for f in files)
         created = datetime.strptime(name[len('automaton-'):], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
         archive = os.path.join(root, name + '.tar.age')
         archive_size = None
@@ -203,6 +204,56 @@ initialize_backup_key() {
     }
 }
 
+# app-data:begin
+# Apps keep files outside the database: web apps and Actions in workspace/data/<appId> of each Runner
+# workspace volume on this host (declared storage mounts live inside it), Compose apps in the named
+# volumes of their Compose project. Each is archived on its own so one app can be restored alone.
+# Running containers of the app are paused (frozen, not stopped) while its data is copied.
+app_guid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+paused_containers=()
+resume_paused() {
+    if ((${#paused_containers[@]})); then docker unpause "${paused_containers[@]}" >/dev/null 2>&1 || true; fi
+    paused_containers=()
+}
+# archive_volume <label filter of containers to pause> <volume> <subdirectory> <output file> <helper image>
+archive_volume() {
+    local filter="$1" volume="$2" subdir="$3" out="$4" helper="$5" status=0
+    mapfile -t paused_containers < <(docker ps -q --filter status=running --filter "label=$filter")
+    if ((${#paused_containers[@]})); then docker pause "${paused_containers[@]}" >/dev/null || status=1; fi
+    if ((status == 0)); then
+        docker run --rm --user 0:0 --entrypoint sh -v "$volume:/v:ro" "$helper" -ec 'tar -C "/v/$1" -cf - .' _ "$subdir" \
+            < /dev/null | gzip > "$out" || status=1
+    fi
+    resume_paused
+    ((status == 0)) && tar -tzf "$out" > /dev/null
+}
+# backup_app_data <backup directory> <helper image with sh and tar> <server compose project>
+backup_app_data() {
+    local working="$1" helper="$2" server_project="$3" count=0 volume app project short
+    mkdir -m 0700 "$working/app-data"
+    local manifest="$working/app-data/manifest.tsv"
+    : > "$manifest"
+    while read -r volume; do
+        [[ -n "$volume" ]] || continue
+        while read -r app; do
+            [[ "$app" =~ $app_guid ]] || continue
+            count=$((count + 1))
+            archive_volume "com.automaton.app-id=$app" "$volume" "workspace/data/$app" "$working/app-data/$count.tar.gz" "$helper" \
+                || { echo "Could not back up the data of app $app." >&2; return 1; }
+            printf 'web\t%s\t%s\t%s\t%s\n' "$app" "$volume" "workspace/data/$app" "$count.tar.gz" >> "$manifest"
+        done < <(docker run --rm --user 0:0 --entrypoint sh -v "$volume:/v:ro" "$helper" -c 'ls -1 /v/workspace/data 2>/dev/null || true' < /dev/null)
+    done < <(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume)
+    while read -r volume project short; do
+        [[ -n "$volume" && -n "$project" && "$project" != "$server_project" ]] || continue
+        count=$((count + 1))
+        archive_volume "com.docker.compose.project=$project" "$volume" . "$working/app-data/$count.tar.gz" "$helper" \
+            || { echo "Could not back up volume $volume of Compose app $project." >&2; return 1; }
+        printf 'compose\t%s\t%s\t%s\t%s\n' "$project" "$volume" "$short" "$count.tar.gz" >> "$manifest"
+    done < <(docker volume ls --filter label=com.docker.compose.project --format '{{.Name}} {{.Label "com.docker.compose.project"}} {{.Label "com.docker.compose.volume"}}')
+    echo "Backed up the data of $count app volume(s)."
+}
+# app-data:end
+
 take_backup() {
     install -d -m 0700 "$install_dir/backups" "$backup_root"
     local name="automaton-$(date -u +%Y%m%dT%H%M%SZ)"
@@ -219,8 +270,12 @@ take_backup() {
     docker cp "$api:/app/data-protection-keys/." - | gzip > "$working/api-keys.tar.gz"
     docker cp "$worker:/app/data-protection-keys/." - | gzip > "$working/worker-keys.tar.gz"
     for archive in api-keys worker-keys; do tar -tzf "$working/$archive.tar.gz" >/dev/null; done
+    local server_project helper
+    server_project=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$api")
+    helper=$(docker inspect --format '{{.Config.Image}}' "$api")
+    backup_app_data "$working" "$helper" "$server_project"
     cp "$install_dir/version" "$working/version" 2>/dev/null || true
-    (cd "$working" && sha256sum database.dump api-keys.tar.gz worker-keys.tar.gz > SHA256SUMS && sha256sum -c --quiet SHA256SUMS)
+    (cd "$working" && sha256sum database.dump api-keys.tar.gz worker-keys.tar.gz $(find app-data -type f | sort) > SHA256SUMS && sha256sum -c --quiet SHA256SUMS)
     mv -- "$working" "$backup_root/$name"
     if [[ -n "$age_image" ]]; then
         [[ "$age_image" =~ @sha256:[0-9a-f]{64}$ ]] || { echo 'The release manifest has an invalid pinned age image.' >&2; return 1; }
@@ -250,7 +305,7 @@ case "$mode" in
         flock -n 9 || { echo 'Another backup is running.' >&2; exit 1; }
         # Lets the API refuse a server restart while this backup runs (the status directory is mounted read-only into it).
         install -d -m 0755 "$status_dir" && : > "$status_dir/backup.running"
-        trap 'rm -f -- "$status_dir/backup.running"' EXIT
+        trap 'resume_paused; rm -f -- "$status_dir/backup.running"' EXIT
         if take_backup; then
             write_status true ''
         else
