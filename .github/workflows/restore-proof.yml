@@ -1,0 +1,64 @@
+name: Backup restore proof
+
+# Proves a backup restores: install, create data, back up, wipe containers and volumes, restore, check the data.
+# Releases run the same test on their own bundle (server-release.yml); this one covers changes to the scripts, using
+# the images of the latest published server release with the scripts from this commit.
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/install/backup.sh
+      - docker/install/restore.sh
+      - docker/install/compose.yaml
+      - docker/install/configure.py
+      - scripts/install-automaton.sh
+      - scripts/update-automaton.sh
+      - scripts/tests/server-restore-smoke.sh
+      - .github/workflows/restore-proof.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - docker/install/backup.sh
+      - docker/install/restore.sh
+      - docker/install/compose.yaml
+      - docker/install/configure.py
+      - scripts/install-automaton.sh
+      - scripts/update-automaton.sh
+      - scripts/tests/server-restore-smoke.sh
+      - .github/workflows/restore-proof.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-proof-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  restore:
+    name: Backup restores
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble the bundle (latest release images, scripts from this commit)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release list --limit 100 --json tagName --jq '[.[] | select(.tagName | startswith("server-v"))][0].tagName')
+          mkdir latest
+          gh release download "$tag" --pattern automaton-server.tar.gz --dir latest
+          tar -xzf latest/automaton-server.tar.gz -C latest
+          mkdir automaton-server
+          cp latest/automaton-server/release.env automaton-server/
+          cp docker/install/{compose.yaml,configure.py,check_dns.py,explain_certificate_failure.py,backup.sh,restore.sh} automaton-server/
+          cp -r docker/install/fail2ban automaton-server/fail2ban
+          cp scripts/install-automaton.sh automaton-server/install.sh
+          cp scripts/update-automaton.sh automaton-server/update.sh
+      - name: Backup and restore round trip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-cryptography
+          sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-restore-smoke.sh "$PWD/automaton-server"
