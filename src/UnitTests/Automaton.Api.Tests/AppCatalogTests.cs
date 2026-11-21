@@ -285,7 +285,7 @@ public sealed class AppCatalogTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(pinned, Is.EqualTo(new AppCatalogService.PinnedApp("owner/store", "analytics/goatcounter", Commit)));
+            Assert.That(pinned, Is.EqualTo(new AppCatalogService.PinnedApp("owner/store", "analytics/goatcounter", Commit, "Analytics")));
             Assert.That(service.PinnedAsync("rzvdaniel/automaton-apps", "other", default).Result, Is.Null);
         });
     }

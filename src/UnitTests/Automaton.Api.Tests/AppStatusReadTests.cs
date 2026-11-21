@@ -38,6 +38,21 @@ public sealed class AppStatusReadTests
     }
 
     [Test]
+    public async Task TheCatalogCategoryIsReportedOnlyForAppsInstalledFromASource()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        fixture.App.Category = "Monitoring";
+        await fixture.Db.SaveChangesAsync();
+        var own = (await new AppStatusReadService(fixture.Db).ListAsync(default)).Single(i => i.Id == fixture.App.Id);
+        Assert.That(own.Category, Is.Null);
+
+        fixture.App.InstalledFromRepo = "owner/store";
+        await fixture.Db.SaveChangesAsync();
+        var installed = (await new AppStatusReadService(fixture.Db).ListAsync(default)).Single(i => i.Id == fixture.App.Id);
+        Assert.That(installed.Category, Is.EqualTo("Monitoring"));
+    }
+
+    [Test]
     public async Task AFailedLiveDeployReportsOnlyTheFirstLineOfItsError()
     {
         await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);

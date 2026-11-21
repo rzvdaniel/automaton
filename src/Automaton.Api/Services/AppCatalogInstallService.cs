@@ -95,6 +95,7 @@ public sealed partial class AppCatalogInstallService(
         var name = string.IsNullOrWhiteSpace(request.Name) ? manifest.Name : request.Name.Trim();
         if (name.Length > 200) name = name[..200];
 
+        var category = (await catalog.PinnedAsync(source.Repo, source.Folder, cancellationToken))?.Category;
         var id = Guid.NewGuid();
         var now = DateTime.UtcNow;
         var entity = new WebApp
@@ -111,6 +112,7 @@ public sealed partial class AppCatalogInstallService(
             InstalledFromRepo = source.Repo,
             InstalledFromFolder = source.Folder,
             InstalledFromCommit = source.Commit,
+            Category = string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
             Created = now,
             Updated = now
         };
