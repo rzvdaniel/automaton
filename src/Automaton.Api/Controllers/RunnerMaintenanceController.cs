@@ -52,11 +52,12 @@ public sealed class RunnerMaintenanceController(RunnerMaintenanceService mainten
 
     /// <summary>Upgrades this Runner to the server's configured image (409 when it is offline, busy or already current).</summary>
     [HttpPost("upgrade")]
-    public Task<IActionResult> Upgrade(Guid runnerId, [FromServices] RunnerUpgradeService upgrade, CancellationToken token)
+    public Task<IActionResult> Upgrade(Guid runnerId, [FromServices] RunnerUpgradeService upgrade, [FromServices] ServerMaintenanceHistory history, CancellationToken token)
         => ChangeAsync(runnerId, async (appId, viewer) =>
         {
             var started = await upgrade.StartAsync(runnerId, token, trusted: true);
             await maintenance.AuditUpgradeAsync(appId, viewer, runnerId, token);
+            await history.RecordUpgradeStartedAsync(runnerId, $"app {appId} for {viewer}", DateTimeOffset.UtcNow, token);
             return Accepted(started);
         }, token);
 
