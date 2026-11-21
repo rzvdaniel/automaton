@@ -117,6 +117,21 @@ jobs:
             [[ "$ok" == true ]] || exit 1
           done
 
+      # Starts Gauntlet's Smoke run against the new deploy. Never fails the deploy; the nightly schedule stays.
+      - name: Start the Smoke run
+        env:
+          VERSION: ${{ inputs.version }}
+          HOOK_URL: ${{ secrets.GAUNTLET_SMOKE_URL }}
+          HOOK_SECRET: ${{ secrets.GAUNTLET_SMOKE_SECRET }}
+        run: |
+          # The secret goes to curl on standard input, never in its arguments, and is masked in logs. Only the status is printed.
+          # A missing secret or a refused call never fails this workflow: Gauntlet's own schedules stay as the safety net.
+          if [[ -z "$HOOK_URL" || -z "$HOOK_SECRET" ]]; then echo "No Smoke webhook configured; skipping."; exit 0; fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 0; }
+          code=$(printf 'header = "Authorization: Bearer %s"\n' "$HOOK_SECRET" | curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            --config - -X POST -H 'Content-Type: application/json' --data "{\"version\":\"$VERSION\"}" "$HOOK_URL" || true)
+          echo "Smoke webhook answered ${code:-no answer} (202 = run started)."
+
   # Always runs, even when the deploy failed or was never approved. Opens an issue assigned to the repository owner,
   # so GitHub sends the owner an email or push notification (no extra service or secret). A failure here never
   # changes the deploy result.
