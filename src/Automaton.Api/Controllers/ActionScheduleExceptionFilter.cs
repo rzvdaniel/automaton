@@ -23,7 +23,7 @@ public sealed class ActionScheduleExceptionFilter : IExceptionFilter
             {
                 StatusCodes.Status403Forbidden => "Forbidden",
                 StatusCodes.Status404NotFound => "Not found",
-                _ => "Invalid schedule"
+                _ => "Invalid request"
             },
             Detail = context.Exception.Message
         }) { StatusCode = status };

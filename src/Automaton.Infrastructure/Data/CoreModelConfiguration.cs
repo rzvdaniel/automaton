@@ -15,6 +15,7 @@ internal static class CoreModelConfiguration
         ConfigureApplicationUser(modelBuilder);
         ConfigureActionSchedule(modelBuilder);
         ConfigureActionScheduleOccurrence(modelBuilder);
+        ConfigureActionWebhook(modelBuilder);
         ConfigureAuditEvent(modelBuilder);
         ConfigureApplicationEvent(modelBuilder);
         ConfigureAppModuleExecution(modelBuilder);
@@ -92,6 +93,28 @@ internal static class CoreModelConfiguration
             });
     }
 
+    private static void ConfigureActionWebhook(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ActionWebhook>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ActionKey).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
+            entity.Property(e => e.SecretHash).IsRequired().HasMaxLength(64);
+            entity.HasIndex(e => new { e.ApplicationId, e.ActionKey });
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<ActionWebhookCall>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Outcome).IsRequired().HasMaxLength(32);
+            entity.Property(e => e.Detail).HasMaxLength(500);
+            entity.HasIndex(e => new { e.WebhookId, e.CalledAtUtc });
+            entity.HasOne<ActionWebhook>().WithMany().HasForeignKey(e => e.WebhookId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
     private static void ConfigureAuditEvent(ModelBuilder modelBuilder)
     {
             modelBuilder.Entity<AuditEvent>(entity =>
@@ -144,6 +167,7 @@ internal static class CoreModelConfiguration
                 entity.Property(e => e.ModuleType).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.ModuleKey).IsRequired().HasMaxLength(64);
                 entity.Property(e => e.TriggerType).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.TriggerName).HasMaxLength(160);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.DeploymentHash).HasMaxLength(80);
                 entity.Property(e => e.ErrorCode).HasMaxLength(80);

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Button from 'primevue/button'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { actionSchedulesService, type ActionModule, type ActionSchedule } from '../services/action-schedules.service'
+import { actionWebhooksService, type ActionWebhook } from '../services/action-webhooks.service'
+import AppActionWebhooks from './AppActionWebhooks.vue'
 import { appsService, type AppActionExecution } from '../services/apps.service'
 import type { AppViewKey } from '../app-navigation'
 import { appActionErrorMessage } from '../utils/app-action-error'
@@ -27,6 +29,13 @@ const switching = ref<Record<string, boolean>>({})
 const started = ref<Record<string, AppActionExecution>>({})
 let stopped = false
 onUnmounted(() => { stopped = true })
+
+const webhooks = ref<ActionWebhook[]>([])
+async function loadWebhooks() {
+  try { webhooks.value = await actionWebhooksService.list(props.appId) } catch { webhooks.value = [] }
+}
+onMounted(loadWebhooks)
+const webhooksFor = (key: string) => webhooks.value.filter((item) => item.actionKey === key)
 
 const schedulesFor = (key: string) => props.schedules.filter((item) => item.actionKey === key)
 
@@ -130,6 +139,7 @@ async function setEnabled(schedule: ActionSchedule, enabled: boolean) {
               @update:model-value="setEnabled(item.schedule, $event)"
             />
           </div>
+          <AppActionWebhooks :app-id="appId" :action-key="row.action.key" :webhooks="webhooksFor(row.action.key)" :can-update="canUpdate" @changed="loadWebhooks" />
         </div>
         <div v-if="canUpdate" class="controls">
           <Button

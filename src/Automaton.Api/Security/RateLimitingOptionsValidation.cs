@@ -22,6 +22,7 @@ public class RateLimitingOptionsValidation : IValidateOptions<RateLimitingOption
         ValidatePolicy(options.PublicAppControllerExecution, nameof(options.PublicAppControllerExecution), errors);
         ValidatePolicy(options.PublicAppFlowExecution, nameof(options.PublicAppFlowExecution), errors);
         ValidatePolicy(options.PublicAppStepExecution, nameof(options.PublicAppStepExecution), errors);
+        ValidatePolicy(options.ActionWebhookCall, nameof(options.ActionWebhookCall), errors);
 
         if (options.MaxConcurrentMultipartRequests <= 0)
         {

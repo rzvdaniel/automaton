@@ -634,6 +634,7 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<IAppActionExecutionGateway>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<IRunnerActionCommands>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<ActionScheduleService>();
+        services.AddScoped<ActionWebhookService>();
         services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
         services.AddScoped<ScheduledActionExecutionHandler>();
         services.AddSupervisedHostedService<AppModuleExecutionReconciliationService>();

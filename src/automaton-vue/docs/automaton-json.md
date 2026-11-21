@@ -135,6 +135,21 @@ The schema is published at `/schemas/home-card.schema.json`. `automaton action r
 
 Every Action of an app whose runtime is running also gets `AUTOMATON_APP_INTERNAL_URL`, the address of the running app on the Runner's private network (for example `http://10.0.0.5:32768`), so a `home-card` Action can ask its own app for numbers. Only that app's Actions receive it; it is not set when the app is not running.
 
+## Start an Action from outside: webhooks
+
+A webhook lets something outside Automaton (a GitHub release, a monitor, another server) start one of your app's Actions without a schedule or a person. In Studio open the app's **Actions** tab and choose **Add webhook** under the Action; from a terminal run `automaton action webhook add <action-key> --name "Docs walk"`. The secret is shown once, so copy it then; `automaton action webhook rotate <action-key>` replaces it and the old one stops working at once. `list` shows each webhook with its last calls and `remove` deletes one.
+
+```bash
+curl -X POST https://api.example.com/api/hooks/<webhook-id> \
+  -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" \
+  -d '{"version": "0.2.175"}'
+```
+
+- The request's JSON body (at most 64 KB; empty means `{}`) becomes the Action's input and is checked against the Action's input schema. `X-Automaton-Webhook-Secret: <secret>` works instead of the `Authorization` header.
+- A call without the right secret gets 404, the same as an address that does not exist. A disabled webhook answers 403; a paused app answers 409 and does not run.
+- The Action runs as the person who created the webhook, and Activity shows the run as "started by webhook" with its name. A call while the Action is already running is skipped (409). Each webhook accepts 30 calls a minute (429 above that). Every call is audit-logged.
+- Signature checks of services such as GitHub are not built in yet; send the secret from your own workflow.
+
 ## Open paths: webhooks and callbacks
 
 An app's private address (`app-<id>.apps.<domain>`) asks every visitor to sign in to Automaton. An outside service that calls the app (a payment webhook, an OAuth callback) cannot sign in, so declare the paths it calls:

@@ -53,6 +53,8 @@ public sealed class AppDeletionService(
             await AppSecretService.RemoveAllForAppAsync(dataContext, appId, CancellationToken.None);
             dataContext.ActionSchedules.RemoveRange(await dataContext.ActionSchedules
                 .Where(schedule => schedule.ApplicationId == appId).ToListAsync());
+            dataContext.ActionWebhooks.RemoveRange(await dataContext.ActionWebhooks
+                .Where(hook => hook.ApplicationId == appId).ToListAsync());
             dataContext.WebApps.Remove(app);
             await dataContext.SaveChangesAsync();
         }
