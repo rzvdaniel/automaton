@@ -7,10 +7,17 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+/** Links keep http(s), mailto, in-page and relative targets; any other scheme (javascript:, data:) shows as plain text. */
+function isSafeHref(href: string): boolean {
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href.replace(/&#39;|&quot;|&amp;/g, ''))
+  return !scheme || ['http', 'https', 'mailto'].includes(scheme[1]!.toLowerCase())
+}
+
 function renderInlineMarkdown(value: string): string {
   let html = escapeHtml(value)
 
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text: string, href: string) =>
+    isSafeHref(href) ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>` : text)
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>')
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -36,8 +43,26 @@ export function renderMarkdown(markdown: string): string {
     listItems = []
   }
 
+  let codeLines: string[] | null = null
+
   for (const rawLine of lines) {
     const line = rawLine.trim()
+
+    if (line.startsWith('```')) {
+      if (codeLines === null) {
+        flushParagraph()
+        flushList()
+        codeLines = []
+      } else {
+        html.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`)
+        codeLines = null
+      }
+      continue
+    }
+    if (codeLines !== null) {
+      codeLines.push(rawLine)
+      continue
+    }
 
     if (!line) {
       flushParagraph()
@@ -76,6 +101,7 @@ export function renderMarkdown(markdown: string): string {
     paragraphLines.push(line)
   }
 
+  if (codeLines !== null) html.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`)
   flushParagraph()
   flushList()
 

@@ -144,6 +144,7 @@ deployed URL.
 ```bash
 automaton sync-ai
 automaton pull
+automaton docs <app>            # print the app's docs/README.md (its description if it ships none); --open shows the Docs tab in Studio
 automaton apps                  # your apps: ID, name, Runner, status (Paused when paused), public URL
 automaton installation-status   # server version, counts, last backup
 automaton notifications         # the same notices as Studio Home; add --json for scripts and agents
@@ -208,7 +209,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton status` | Show the current linked app, deploy settings, and publish state |
 | `automaton current-runner` | Show the Runner assigned to the Live environment |
 | `automaton validate` | Validate the current project before deploy or publish |
-| `automaton action` | Validate and run Actions in the linked App; `action webhook add\|list\|rotate\|remove` manages the webhooks that start an Action from outside |
+| `automaton action` | Validate and run Actions in the linked App |
 | `automaton secrets` | Check and fill the secrets this app declares in automaton.json (application.secrets) |
 | `automaton project` | Create projects, list yours and add the current app to one |
 | `automaton permissions` | Show the platform permissions this app requests and whether an administrator approved them |
@@ -216,6 +217,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton link <app-id-or-slug>` | Link this directory to an existing Automaton app |
 | `automaton deploy <target>` | Build, upload, and deploy the app to Automaton |
 | `automaton open <environment>` | Open the current app in the browser |
+| `automaton docs <app>` | Print an app's docs (docs/README.md), or its description when it ships none |
 | `automaton logs <environment>` | Open runtime logs for an environment |
 | `automaton pull <app>` | Download editable app source files from the server |
 | `automaton publish` | Make the latest deployed app publicly accessible |
@@ -225,7 +227,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton runners` | List runners available on your Automaton account |
 | `automaton apps` | List apps in your personal workspace |
 | `automaton installation-status` | Show server version, resource counts and last backup |
-| `automaton notifications [--json]` | List your notifications: server update, expiring certificate, offline Runner, failed backup, permission requests, failing apps. `acknowledge <key>` hides one |
+| `automaton notifications` | List the notifications for your account (the same feed as Studio Home) |
 | `automaton server` | Update the Automaton server you are logged in to |
 | `automaton set-runner <runner>` | Assign or clear the Runner for the Live environment |
 | `automaton config` | View or update global CLI settings |

@@ -1,6 +1,6 @@
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 
-export const APP_VIEW_KEYS = ['overview', 'activity', 'actions', 'source', 'secrets', 'domain', 'store', 'settings', 'admin'] as const
+export const APP_VIEW_KEYS = ['overview', 'activity', 'actions', 'docs', 'source', 'secrets', 'domain', 'store', 'settings', 'admin'] as const
 
 export type AppViewKey = (typeof APP_VIEW_KEYS)[number]
 
@@ -17,6 +17,7 @@ const LABELS: Record<AppViewKey, string> = {
   overview: 'Overview',
   activity: 'Activity',
   actions: 'Actions',
+  docs: 'Docs',
   source: 'Source',
   secrets: 'Secrets',
   domain: 'Domain',
@@ -41,7 +42,7 @@ export interface AppTabOptions {
 export function appTabs({ hasActions = false, hasSecrets = false, canManage = false, isPublishable = false, isAdmin = false, waitingPermissions = 0 }: AppTabOptions = {}): ReadonlyArray<AppTab> {
   const keys: AppViewKey[] = ['overview', 'activity']
   if (hasActions) keys.push('actions')
-  if (canManage || isAdmin) keys.push('source')
+  if (canManage || isAdmin) keys.push('docs', 'source')
   if (canManage && hasSecrets) keys.push('secrets')
   if (canManage && isPublishable) keys.push('domain', 'store')
   if (canManage) keys.push('settings')

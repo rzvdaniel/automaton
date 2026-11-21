@@ -15,10 +15,10 @@ describe('app page navigation', () => {
   it('shows each tab only where it applies', () => {
     const labels = (options: Parameters<typeof appTabs>[0]) => appTabs(options).map((tab) => tab.label)
     expect(labels({ canManage: true, isPublishable: true, hasSecrets: true, hasActions: true, isAdmin: true }))
-      .toEqual(['Overview', 'Activity', 'Actions', 'Source', 'Secrets', 'Domain', 'Store listing', 'Settings', 'Admin'])
-    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Source', 'Domain', 'Store listing', 'Settings'])
-    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Source', 'Settings'])
-    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Source', 'Admin'])
+      .toEqual(['Overview', 'Activity', 'Actions', 'Docs', 'Source', 'Secrets', 'Domain', 'Store listing', 'Settings', 'Admin'])
+    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Domain', 'Store listing', 'Settings'])
+    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Settings'])
+    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Admin'])
   })
 
   it('badges the Admin tab with the waiting permission requests, only when there are some', () => {

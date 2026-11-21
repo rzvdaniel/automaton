@@ -8,6 +8,7 @@ import { useToast } from 'primevue/usetoast'
 import AppActions from '../components/AppActions.vue'
 import AppActivity from '../components/AppActivity.vue'
 import AppSourceTab from '../components/AppSourceTab.vue'
+import AppDocsTab from '../components/AppDocsTab.vue'
 import AppAdminTab from '@/features/admin/components/AppAdminTab.vue'
 import AppDomainTab from '../components/AppDomainTab.vue'
 import AppSecrets from '../components/AppSecrets.vue'
@@ -460,6 +461,7 @@ async function handleSharingChanged() {
           :deploy-target="kind === 'tool' ? null : liveTarget"
           :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
         />
+        <AppDocsTab v-else-if="shownView === 'docs'" :app-id="app.id" :description="app.description" />
         <AppSourceTab v-else-if="shownView === 'source'" :app-id="app.id" :definition="app.application" />
         <AppSecrets
           v-else-if="shownView === 'secrets'"
