@@ -57,7 +57,7 @@ login() {
     curl -fsS -H 'Content-Type: application/json' -d "{\"email\":\"owner@example.invalid\",\"password\":\"$password\"}" "$(api_address)/api/Account/LoginUser" \
         | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])'
 }
-runner_count() {
+installation_marker_count() {
     "${compose[@]}" exec -T postgres psql -U automaton -d automaton -At -c "SELECT COUNT(*) FROM \"Settings\" WHERE \"Key\" = 'Installation.Complete'" < /dev/null
 }
 
@@ -67,11 +67,8 @@ address=$(api_address)
 token=$(cat "$CONFIG_DIR/secrets/setup-token")
 curl -fsS -H 'Content-Type: application/json' -H "X-Automaton-Setup-Token: $token" \
     -d "{\"name\":\"Initial Administrator\",\"email\":\"owner@example.invalid\",\"password\":\"$password\"}" "$address/api/install" >/dev/null
-access_token=$(login)
-curl -fsS -H "Authorization: Bearer $access_token" -H 'Content-Type: application/json' \
-    -d '{"runnerName":"Restore smoke test","applicationProfile":"MachineManagement","acknowledgeHostAccess":true}' \
-    "$address/api/self-hosted-runners/installations" >/dev/null
-[[ "$(runner_count)" == 1 ]]
+login >/dev/null
+[[ "$(installation_marker_count)" == 1 ]]
 
 echo 'Backing up...'
 bash "$install_dir/backup.sh" --install-dir "$install_dir" --keep 5
@@ -104,5 +101,5 @@ PATH="$shim:$PATH" bash "$install_dir/restore.sh" "$backup" --install-dir "$inst
 echo 'Checking the data is back...'
 curl -fsS "$(api_address)/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]'
 login >/dev/null
-[[ "$(runner_count)" == 1 ]]
+[[ "$(installation_marker_count)" == 1 ]]
 echo 'Backup and restore round trip passed.'
