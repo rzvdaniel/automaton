@@ -81,6 +81,7 @@ jobs:
       - run: bash scripts/tests/deploy-website-test.sh
       - run: bash -n docker/install/backup.sh docker/install/restore.sh
       - run: bash scripts/tests/backup-app-data-test.sh
+      - run: bash scripts/tests/backup-key-test.sh
       - run: bash -n scripts/uninstall-automaton.sh
       - run: bash scripts/tests/uninstall-automaton-test.sh
       - run: |

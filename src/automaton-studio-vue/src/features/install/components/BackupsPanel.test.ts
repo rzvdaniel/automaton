@@ -79,7 +79,23 @@ describe('BackupsPanel', () => {
     expect(wrapper.text()).toContain('sudo bash /opt/automaton-server/backup.sh')
     expect(wrapper.text()).toContain('age1recipient')
     expect(wrapper.text()).toContain('sudo cat /etc/automaton/secrets/backup-key')
+    expect(wrapper.find('[data-test="backup-key-on-server"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('older than')
+  })
+
+  it('says the private key is kept off the server when the host reports none', async () => {
+    vi.mocked(installService.getBackups).mockResolvedValueOnce({
+      available: true, lastAttemptAt: new Date().toISOString(), lastSuccessAt: new Date().toISOString(), lastError: null, keep: 7,
+      directory: '/opt/automaton-server/backups/nightly', backupNowCommand: 'sudo bash /opt/automaton-server/backup.sh',
+      backupRecipient: 'age1recipient', backupKeyCommand: null, backups: [],
+    })
+    vi.mocked(appsService.getApps).mockResolvedValueOnce([])
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="backup-key-off-server"]').text()).toContain('kept off this server')
+    expect(wrapper.find('[data-test="backup-key-on-server"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('sudo cat')
   })
 
   it('explains how to enable backups when the server has none set up', async () => {

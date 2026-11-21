@@ -69,6 +69,7 @@ write_status() {
 import json, os, shlex, sys, tempfile
 from datetime import datetime, timezone
 root, target, ok, error, keep, recipient_file, next_run = sys.argv[1:]
+identity_file = os.path.join(os.path.dirname(recipient_file), 'secrets', 'backup-key')
 previous = {}
 try:
     previous = json.load(open(target))
@@ -111,7 +112,8 @@ status = {
     'keep': int(keep),
     'directory': root,
     'backupRecipient': open(recipient_file).read().strip() if os.path.isfile(recipient_file) else None,
-    'backupKeyCommand': 'sudo cat ' + shlex.quote(os.path.join(os.path.dirname(recipient_file), 'secrets', 'backup-key')),
+    'backupKeyOnServer': os.path.isfile(identity_file),
+    'backupKeyCommand': 'sudo cat ' + shlex.quote(identity_file) if os.path.isfile(identity_file) else None,
     'backups': backups,
 }
 fd, temporary = tempfile.mkstemp(dir=os.path.dirname(target))
@@ -179,29 +181,33 @@ UNIT
     echo "Nightly backups enabled (automaton-backup.timer); keeping the newest $keep in $backup_root."
 }
 
+# Only the public key (backup-recipient) lives on the server. The private key is shown once when it is created
+# and removed; restoring needs it from the administrator's password manager (restore.sh --key <file>).
 initialize_backup_key() {
+    if [[ -s "$recipient_file" && ! -L "$recipient_file" ]]; then
+        return 0
+    fi
     docker pull --quiet "$age_image" >/dev/null 2>&1 || { echo 'Could not pull the pinned age image.' >&2; return 1; }
     install -d -m 0700 "$config_dir/secrets"
-    if [[ ! -e "$recipient_file" && ! -e "$identity_file" ]]; then
-        local generated recipient temporary_identity="$config_dir/secrets/.backup-key.partial"
+    local recipient
+    if [[ -s "$identity_file" && ! -L "$identity_file" ]]; then
+        recipient=$(docker run --rm -v "$config_dir/secrets:/keys:ro" "$age_image" age-keygen -y /keys/backup-key)
+        [[ "$recipient" =~ ^age1[0-9a-z]+$ ]] || { echo 'Could not read the encrypted backup recipient.' >&2; return 1; }
+    else
+        local generated temporary_identity="$config_dir/secrets/.backup-key.partial"
         generated=$(docker run --rm -v "$config_dir/secrets:/keys" "$age_image" age-keygen -o /keys/.backup-key.partial 2>&1 >/dev/null)
         recipient=$(sed -n 's/^Public key: //p' <<< "$generated")
         [[ "$recipient" =~ ^age1[0-9a-z]+$ ]] || { rm -f -- "$temporary_identity"; echo 'Could not initialize the encrypted backup key.' >&2; return 1; }
-        chmod 0600 "$temporary_identity"
-        mv -- "$temporary_identity" "$identity_file"
         printf '%s\n' "$recipient" > "$recipient_file"
         chmod 0644 "$recipient_file"
-    elif [[ -s "$identity_file" && ! -e "$recipient_file" ]]; then
-        local recipient
-        recipient=$(docker run --rm -v "$config_dir/secrets:/keys:ro" "$age_image" age-keygen -y /keys/backup-key)
-        [[ "$recipient" =~ ^age1[0-9a-z]+$ ]] || { echo 'Could not read the encrypted backup recipient.' >&2; return 1; }
-        printf '%s\n' "$recipient" > "$recipient_file"
-        chmod 0644 "$recipient_file"
+        echo 'SAVE THIS BACKUP KEY NOW in your password manager. It is shown only once and is not kept on this server;'
+        echo 'without it the encrypted backups cannot be restored:'
+        grep -v '^#' "$temporary_identity"
+        rm -f -- "$temporary_identity"
+        return 0
     fi
-    [[ -s "$recipient_file" && -s "$identity_file" && ! -L "$recipient_file" && ! -L "$identity_file" ]] || {
-        echo 'The encrypted backup key pair is incomplete.' >&2
-        return 1
-    }
+    printf '%s\n' "$recipient" > "$recipient_file"
+    chmod 0644 "$recipient_file"
 }
 
 # app-data:begin

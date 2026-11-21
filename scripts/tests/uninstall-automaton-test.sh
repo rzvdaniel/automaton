@@ -21,7 +21,7 @@ un() { bash /uninstall-automaton.sh "$@" >/out 2>&1; }
 mk() { # dir cfg domain: an install with a recognisable compose file and configuration
     mkdir -p "$1/backups/nightly" "$2/secrets"
     printf 'name: automaton-server\n' > "$1/compose.yaml"; touch "$1/update.sh" "$1/marker-file" "$1/backups/old"
-    printf '{"domain":"%s"}' "$3" > "$2/installation.json"; echo key-of-$3 > "$2/secrets/backup-key"
+    printf '{"domain":"%s"}' "$3" > "$2/installation.json"; echo key-of-$3 > "$2/secrets/backup-key"; echo age1recipient-of-$3 > "$2/backup-recipient"
     printf '#!/bin/bash\necho archive > "%s/backups/nightly/automaton-20260101T000000Z.tar.age"\n' "$1" > "$1/backup.sh"
 }
 stack() { # name dir: a stand-in server container labelled like Compose, from that directory

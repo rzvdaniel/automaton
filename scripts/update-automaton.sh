@@ -136,7 +136,7 @@ ensure_backups() {
     fi
     [[ -f "$install_dir/backup.sh" ]] || return 0
     if bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer \
-        && { [[ -s "$config_dir/secrets/backup-key" && -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then
+        && { [[ -s "$config_dir/backup-recipient" && -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then
         return 0
     fi
     echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2

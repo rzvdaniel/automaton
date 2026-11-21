@@ -15,7 +15,7 @@ public sealed record InstallationBackupStatus(
     string? Directory,
     string BackupNowCommand,
     string? BackupRecipient,
-    string BackupKeyCommand,
+    string? BackupKeyCommand,  // set only while the private key is still on the server; null means it is kept off the server
     IReadOnlyList<InstallationBackup> Backups,
     DateTimeOffset? NextRunAt = null,
     bool TriggerAvailable = false,
@@ -91,9 +91,8 @@ public static partial class InstallationBackups
     {
         var path = Path.Combine(configuration["Installation:StatusDirectory"] ?? DefaultStatusDirectory, "backup.json");
         var backupNow = $"sudo bash {InstallDirectory}/backup.sh";
-        const string backupKeyCommand = "sudo cat /etc/automaton/secrets/backup-key";
         if (!File.Exists(path))
-            return new(false, null, null, null, 0, null, backupNow, null, backupKeyCommand, []);
+            return new(false, null, null, null, 0, null, backupNow, null, null, []);
         try
         {
             await using var stream = File.OpenRead(path);
@@ -104,11 +103,11 @@ public static partial class InstallationBackups
                 .Select(backup => new InstallationBackup(backup.Name!, backup.CreatedAt, backup.SizeBytes,
                     $"sudo bash {InstallDirectory}/restore.sh {backup.Name}", backup.ArchiveSizeBytes, backup.ArchiveSha256))
                 .ToList();
-            return new(true, file.LastAttemptAt, file.LastSuccessAt, file.LastError, file.Keep, file.Directory, backupNow, file.BackupRecipient, file.BackupKeyCommand ?? backupKeyCommand, backups, file.NextRunAt);
+            return new(true, file.LastAttemptAt, file.LastSuccessAt, file.LastError, file.Keep, file.Directory, backupNow, file.BackupRecipient, file.BackupKeyCommand, backups, file.NextRunAt);
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
-            return new(true, null, null, "The backup status file could not be read.", 0, null, backupNow, null, backupKeyCommand, []);
+            return new(true, null, null, "The backup status file could not be read.", 0, null, backupNow, null, null, []);
         }
     }
 

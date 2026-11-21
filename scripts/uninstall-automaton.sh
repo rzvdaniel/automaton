@@ -111,8 +111,8 @@ if $delete_data && $final_backup; then
     final_backup_dir=/var/backups/automaton-final-$stamp
     if $dry_run; then echo "  [dry-run] final backup into $final_backup_dir"
     else
-        $have_docker && [[ -f "$install_dir/backup.sh" && -r "$config_dir/secrets/backup-key" ]] \
-            || { echo "No final backup possible (Docker, $install_dir/backup.sh or the backup key is missing). Nothing was changed; pass --no-final-backup to delete without one." >&2; exit 1; }
+        $have_docker && [[ -f "$install_dir/backup.sh" && -r "$config_dir/backup-recipient" ]] \
+            || { echo "No final backup possible (Docker, $install_dir/backup.sh or the backup recipient is missing). Nothing was changed; pass --no-final-backup to delete without one." >&2; exit 1; }
         bash "$install_dir/backup.sh" --install-dir "$install_dir" --keep 1000 >&2 \
             || { echo 'The final backup failed. Nothing was changed; pass --no-final-backup to delete without one.' >&2; exit 1; }
         newest=$(find "$install_dir/backups/nightly" -maxdepth 1 -name 'automaton-*.tar.age' -printf '%f\n' | sort | tail -n1)
@@ -120,10 +120,13 @@ if $delete_data && $final_backup; then
         install -d -m 0755 /var/backups && final_backup_dir=$(mktemp -d "$final_backup_dir.XXXX") || { echo 'Cannot create the final backup folder. Nothing was changed.' >&2; exit 1; }
         env_config=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" 2>/dev/null | cut -d= -f2- || true)
         [[ -z $env_config || $env_config == "$config_dir" ]] || { rmdir "$final_backup_dir"; echo "The install's .env says CONFIG_DIR=$env_config, not $config_dir: the backup key would not match. Nothing was changed." >&2; exit 1; }
-        cp -- "$install_dir/backups/nightly/$newest" "$config_dir/secrets/backup-key" "$final_backup_dir/"
+        key_copy=()
+        [[ -r "$config_dir/secrets/backup-key" ]] && key_copy=("$config_dir/secrets/backup-key")  # only servers that still hold the private key
+        cp -- "$install_dir/backups/nightly/$newest" "${key_copy[@]}" "$final_backup_dir/"
         (cd "$final_backup_dir" && [[ $(sha256sum < "$newest") == $(sha256sum < "$install_dir/backups/nightly/$newest") ]]) \
             || { echo 'The copy of the final backup does not match. Nothing was changed.' >&2; exit 1; }
-        removed+=("final backup saved in $final_backup_dir ($newest and backup-key; keep it private)")
+        if ((${#key_copy[@]})); then removed+=("final backup saved in $final_backup_dir ($newest and backup-key; keep it private)")
+        else removed+=("final backup saved in $final_backup_dir ($newest; decrypt it with the backup key from your password manager)"); fi
     fi
 fi
 $dry_run && echo 'Dry run: nothing is changed.'
