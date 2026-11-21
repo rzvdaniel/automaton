@@ -1,6 +1,7 @@
 ---
 title: Is Automaton for you?
 description: Who Automaton is for, who it is not for, and how it compares with a cloud provider.
+llms: false
 ---
 
 # Is Automaton for you?

@@ -113,11 +113,15 @@ for (const dir of sourceRoots) {
   }
 }
 
-// Every website page declares its title and description (the site and llms.txt read them); `order` puts it in llms.txt.
+// Every website page declares its title and description (the site and llms.txt read them); `order` puts it in llms.txt (or `llms: false` leaves it out).
 for (const name of fs.readdirSync(websiteDocs).filter(n => n.endsWith('.md'))) {
   const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(fs.readFileSync(path.join(websiteDocs, name), 'utf8'))?.[1] ?? ''
   for (const field of ['title', 'description']) {
     if (!new RegExp(`^${field}: *\\S`, 'm').test(front)) problems.push(`src/automaton-vue/docs/${name}: frontmatter lacks ${field}`)
+  }
+  // A page without a numeric `order` is missing from llms.txt; `llms: false` opts a page out on purpose.
+  if (!/^order: *\d+\s*$/m.test(front) && !/^llms: *false\s*$/m.test(front)) {
+    problems.push(`src/automaton-vue/docs/${name}: not listed in llms.txt (add a numeric \`order\` to its frontmatter, or \`llms: false\` to leave it out)`)
   }
 }
 

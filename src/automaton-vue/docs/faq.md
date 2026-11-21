@@ -1,6 +1,7 @@
 ---
 title: FAQ
 description: Short answers to common questions about Automaton.
+llms: false
 ---
 
 # FAQ

@@ -1,6 +1,7 @@
 ---
 title: Docs
 description: Automaton documentation. Install a server, add a Runner, deploy and publish apps, update and back up, with the CLI.
+llms: false
 ---
 
 # Documentation
