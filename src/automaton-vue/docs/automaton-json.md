@@ -209,6 +209,8 @@ Every installed app also receives `AUTOMATON_APP_ID`, its own app ID. Use it (or
 
 **Installing.** On a published app's store page, **Install on your server** opens Studio's install page (`/apps/install/<app id>`; the app must allow forking). It asks for a name, the settings and secrets, shows the permissions (a system administrator can approve them right there; otherwise one must approve them on the app page) and lists the schedules. Install creates your own copy, saves the values, deploys it and creates the schedules you kept. Installing the same app again makes an independent copy with its own name, values, approvals and schedules.
 
+**From the CLI.** `automaton catalog install` and `automaton catalog update` create the manifest's schedules the same way (they wait for the deployment first, because the schedules name Actions) and print which ones they created. `--no-schedules` skips them; `--schedule "Name"` (repeatable) keeps only those. `update` adds schedules the app does not have yet and leaves existing ones alone.
+
 ## Create or link
 
 Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`

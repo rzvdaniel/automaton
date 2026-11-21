@@ -53,24 +53,25 @@ public static class CatalogInstallCommand
         var secretsStdin = new Option<bool>("--secrets-stdin", "Read the secrets as NAME=VALUE lines from standard input");
         var wait = new Option<bool>("--wait", "Wait until the deployment has finished and report whether it succeeded");
         var json = new Option<bool>("--json", "Print the result as JSON (for agents)");
+        var (noSchedules, schedule) = ScheduleOptions();
         var command = new Command("install",
             "Install a catalog app, save its settings and secrets and deploy it. It prints the pinned commit and the permissions the app requests first.\n" +
             "Example: automaton catalog install flow-check --name my-flow --runner main --setting INTERVAL=60 --secrets-file ~/flow-secrets --wait\n" +
             "Secrets come only from --secrets-file, --secrets-stdin or, in a terminal, a hidden prompt.")
-        { id, source, name, runner, setting, secretsFile, secretsStdin, wait, json };
+        { id, source, name, runner, setting, secretsFile, secretsStdin, wait, noSchedules, schedule, json };
         command.SetHandler(async context =>
         {
             var parsed = context.ParseResult;
             var asJson = parsed.GetValueForOption(json);
             await RunAsync(asJson, () => InstallAsync(config, parsed.GetValueForArgument(id), parsed.GetValueForOption(source), parsed.GetValueForOption(name),
                 parsed.GetValueForOption(runner), parsed.GetValueForOption(setting) ?? [], parsed.GetValueForOption(secretsFile),
-                parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(wait), asJson));
+                parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(wait), asJson, parsed.GetValueForOption(noSchedules), parsed.GetValueForOption(schedule) ?? []));
         });
         return command;
     }
 
     private static async Task InstallAsync(ConfigService config, string id, string? sourceId, string? name, string? runnerReference,
-        string[] settingArguments, string? secretsFile, bool secretsStdin, bool wait, bool asJson)
+        string[] settingArguments, string? secretsFile, bool secretsStdin, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
     {
         // An empty value counts as not given (Studio skips them too), so it is asked for or refused before anything is created.
         var settings = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ParseSettings(settingArguments));
@@ -89,6 +90,7 @@ public static class CatalogInstallCommand
             throw new InvalidOperationException($"Missing required setting(s): {string.Join(", ", missingSettings)}. Add --setting NAME=VALUE for each. Nothing was installed.");
         if (missingSecrets.Count > 0) AskForSecrets(missingSecrets, secrets, secretsStdin, asJson, id);
 
+        var schedules = CatalogSchedules.Select(application, noSchedules, scheduleNames);
         var permissions = Strings(application, "permissions");
         if (!asJson)
         {
@@ -97,11 +99,11 @@ public static class CatalogInstallCommand
                 ? $"It requests these permissions (an administrator approves them in Studio): {string.Join(", ", permissions)}."
                 : "It requests no extra permissions.");
         }
-        await CreateAndDeployAsync(client, entry, application, name, runnerReference, settings, secrets, wait, asJson, permissions);
+        await CreateAndDeployAsync(client, entry, application, name, runnerReference, settings, secrets, wait, asJson, permissions, schedules);
     }
 
     private static async Task CreateAndDeployAsync(AutomatonApiClient client, JsonElement entry, JsonElement application, string? name, string? runnerReference,
-        Dictionary<string, string> settings, Dictionary<string, string> secrets, bool wait, bool asJson, List<string> permissions)
+        Dictionary<string, string> settings, Dictionary<string, string> secrets, bool wait, bool asJson, List<string> permissions, List<JsonElement> schedules)
     {
         var repo = Text(entry, "repo"); var folder = Text(entry, "folder"); var commit = Text(entry, "commit");
         string? runnerId = runnerReference is null ? null : RunnerReferenceResolver.Pick(await client.ListRunnersAsync(null), runnerReference, "id", "name");
@@ -114,18 +116,35 @@ public static class CatalogInstallCommand
                 await client.SetSettingValueAsync(appId, key, value);
             foreach (var (key, value) in secrets.Where(item => application.ValueKind != JsonValueKind.Object || !IsDefault(application, item.Key, item.Value)))
                 await client.SetSecretAsync(appId, "app", key, value, null);
-            var deployment = await client.DeployStoredSourceAsync(appId, wait);
-            var failure = wait ? DeploymentFailure(deployment) : null;
+            // The schedules name Actions that exist once the app is deployed, so creating them waits for the deployment, as Studio does.
+            var waitFor = wait || schedules.Count > 0;
+            var deployment = await client.DeployStoredSourceAsync(appId, waitFor);
+            var failure = waitFor ? DeploymentFailure(deployment) : null;
             if (failure is not null) throw new InvalidOperationException(failure);
+            var (created, existing) = await CatalogSchedules.CreateAsync(client, appId, Text(app, "name"), schedules);
             var operationId = Text(deployment, "operationId");
-            if (asJson) CliJson.Write(new { success = true, appId, name = Text(app, "name"), commit, permissions, deployed = wait, operationId = operationId.Length > 0 ? operationId : null });
-            else Console.WriteLine(wait ? $"Installed and deployed {Text(app, "name")} (app id {appId})." : $"Installed {Text(app, "name")} (app id {appId}); deployment started. Check it with: automaton apps");
+            if (asJson) CliJson.Write(new { success = true, appId, name = Text(app, "name"), commit, permissions, deployed = waitFor, schedulesCreated = created, operationId = operationId.Length > 0 ? operationId : null });
+            else
+            {
+                Console.WriteLine(waitFor ? $"Installed and deployed {Text(app, "name")} (app id {appId})." : $"Installed {Text(app, "name")} (app id {appId}); deployment started. Check it with: automaton apps");
+                PrintSchedules(created, existing);
+            }
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             // Includes a timeout while waiting and an unreadable answer: the person must still learn the app id.
-            throw new InvalidOperationException($"{exception.Message}\nThe app was created (app id {appId}); fix the problem in Studio or with automaton pull {appId}, then deploy again.", exception);
+            throw new InvalidOperationException($"{exception.Message}\nThe app was created (app id {appId}); fix the problem in Studio or with automaton pull {appId}, then deploy again. Schedules the app declares may be missing: check its Actions tab, or run automaton catalog update to create them.", exception);
         }
+    }
+
+    internal static (Option<bool> None, Option<string[]> Names) ScheduleOptions() =>
+        (new Option<bool>("--no-schedules", "Do not create the default schedules the app's install manifest offers"),
+         new Option<string[]>("--schedule", "Create only the manifest schedule with this name; repeat for more (default: all of them)") { AllowMultipleArgumentsPerToken = false });
+
+    internal static void PrintSchedules(List<string> created, List<string> existing)
+    {
+        if (created.Count > 0) Console.WriteLine($"Created {created.Count} schedule(s): {string.Join(", ", created)}.");
+        if (existing.Count > 0) Console.WriteLine($"Already there: {string.Join(", ", existing)}.");
     }
 
     /// <summary>A setting left at its default is not saved, so the app keeps following the default.</summary>
