@@ -207,6 +207,27 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task FailedRestartKeepsThePreviousContainerAndShowsTheAppFailing_UntilARestartWorks()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19051));
+        Assert.That(IsFailed(registry, appId, targetId), Is.False);
+        fake.StartReady = false;
+
+        Assert.ThrowsAsync<TimeoutException>(async () => await manager.RestartAsync(appId, targetId, CancellationToken.None));
+        Assert.That(IsFailed(registry, appId, targetId), Is.True, "Studio must not keep showing a healthy app after a failed restart.");
+
+        fake.StartReady = true;
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That(IsFailed(registry, appId, targetId), Is.False);
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task CrashingAppDeployFailureIncludesTheLastOutputLines()
     {
         var fake = new FakeContainerRuntime { StartReady = false, Logs = "starting\nKeyError: DATA_DIR is not set\n" };

@@ -426,6 +426,15 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
                 cancellationToken, artifact, candidateId);
         }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            var warnings = new List<string>();
+            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(
+                workspace.GetAppRuntimeCandidateDirectory(appId, deploymentTargetId, candidateId), warnings);
+            // Studio shows the app as failing until a start works again; the previous container keeps serving meanwhile.
+            registry.MarkFailed(appId, deploymentTargetId, $"The restart failed: {error.Message}");
+            throw;
+        }
         catch
         {
             var warnings = new List<string>();
