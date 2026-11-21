@@ -374,6 +374,31 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: gh release upload "server-v$VERSION" dist/* --clobber
 
+  # Keeps the newest KEEP server releases (the ones still worth rolling back to) and deletes older ones with their
+  # files. Tags stay: no --cleanup-tag. Drafts and the release just published are never deleted. It never fails a release.
+  prune:
+    needs: [bundle, cli-binaries]
+    if: always() && needs.bundle.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Delete releases older than the newest 30
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          KEEP: '30'
+        run: |
+          set -uo pipefail
+          # Newest first by creation date; drafts are skipped, as is the release this run published.
+          mapfile -t old < <(gh release list --limit 1000 --json tagName,isDraft,createdAt \
+            --jq "[.[] | select(.isDraft | not) | select(.tagName | startswith(\"server-v\"))] | sort_by(.createdAt) | reverse | .[$KEEP:][] | .tagName" || true)
+          for tag in "${old[@]}"; do
+            [[ -n "$tag" && "$tag" != "server-v$VERSION" ]] || continue
+            if gh release delete "$tag" --yes; then echo "Deleted release $tag"; else echo "::warning::Could not delete $tag"; fi
+          done
+
   # Keeps the CLI on NuGet in step with the server: a server release that changes the CLI or the
   # automaton.json contract (Automaton.Core) also publishes the CLI. It starts nuget.yml rather than
   # calling it, so publishing runs as nuget.yml and matches the NuGet trusted publishing policy.
