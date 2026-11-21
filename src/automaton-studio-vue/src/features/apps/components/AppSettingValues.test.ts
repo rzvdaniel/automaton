@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
@@ -8,7 +8,7 @@ import { appsService } from '../services/apps.service'
 import type { App } from '../types/apps.types'
 
 vi.mock('../services/apps.service', () => ({
-  appsService: { listSecrets: vi.fn(), listSettingValues: vi.fn().mockResolvedValue([]), setSettingValue: vi.fn(), deleteSettingValue: vi.fn(), deleteSecret: vi.fn(), restart: vi.fn() },
+  appsService: { listSettingValues: vi.fn().mockResolvedValue([]), setSettingValue: vi.fn(), deleteSettingValue: vi.fn(), deleteSecret: vi.fn(), restart: vi.fn() },
 }))
 
 const declared = [
@@ -21,9 +21,11 @@ const mountSettings = (extra: Partial<App> = {}) => mount(AppSettingValues, {
 })
 
 describe('AppSettingValues', () => {
+  beforeEach(() => { vi.mocked(appsService.listSettingValues).mockResolvedValue([]) })
+
   it('offers no restart for an Actions-only app and says changes apply on the next run', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([{ name: 'SITE', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' }])
-    vi.mocked(appsService.deleteSecret).mockResolvedValue()
+    vi.mocked(appsService.listSettingValues).mockResolvedValue([{ name: 'SITE', value: 'example.org', updatedAtUtc: '2026-11-01T03:00:00Z' }])
+    vi.mocked(appsService.deleteSettingValue).mockResolvedValue()
     const wrapper = mountSettings({ actionsOnly: true })
     await flushPromises()
     await wrapper.find('[aria-label="Use the default for SITE"]').trigger('click')
@@ -34,8 +36,7 @@ describe('AppSettingValues', () => {
   })
 
   it('lists every declared setting with its default, even when nothing was saved', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    const wrapper = mountSettings()
+        const wrapper = mountSettings()
     await flushPromises()
     const text = wrapper.text()
     expect(text).toContain('CHECK_INTERVAL_SECONDS')
@@ -47,8 +48,7 @@ describe('AppSettingValues', () => {
   })
 
   it('shows the current custom value, prefills the replace box, and resets to the default', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    vi.mocked(appsService.listSettingValues).mockResolvedValue([{ name: 'CHECK_INTERVAL_SECONDS', value: '45', updatedAtUtc: '2026-11-01T03:00:00Z' }])
+        vi.mocked(appsService.listSettingValues).mockResolvedValue([{ name: 'CHECK_INTERVAL_SECONDS', value: '45', updatedAtUtc: '2026-11-01T03:00:00Z' }])
     vi.mocked(appsService.deleteSettingValue).mockResolvedValue()
     const wrapper = mountSettings()
     await flushPromises()
@@ -68,8 +68,7 @@ describe('AppSettingValues', () => {
   })
 
   it('saves through the settings endpoint', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    vi.mocked(appsService.listSettingValues).mockResolvedValue([])
+        vi.mocked(appsService.listSettingValues).mockResolvedValue([])
     vi.mocked(appsService.setSettingValue).mockResolvedValue()
     const wrapper = mountSettings()
     await flushPromises()
@@ -80,18 +79,16 @@ describe('AppSettingValues', () => {
     expect(appsService.setSettingValue).toHaveBeenCalledWith('app-1', 'SITE', 'example.org')
   })
 
-  it('says a value set earlier must be saved again to show it', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([{ name: 'CHECK_INTERVAL_SECONDS', version: 1, updatedAtUtc: '2026-11-01T03:00:00Z' }])
-    vi.mocked(appsService.listSettingValues).mockResolvedValue([])
+  it('shows a value that was saved before the settings store, without asking to save it again', async () => {
+    vi.mocked(appsService.listSettingValues).mockResolvedValue([{ name: 'CHECK_INTERVAL_SECONDS', value: '45', updatedAtUtc: '2026-11-01T03:00:00Z' }])
     const wrapper = mountSettings()
     await flushPromises()
-    expect(wrapper.text()).toContain('set earlier, save again to show the value')
-    expect(wrapper.find('[data-testid="setting-current"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="setting-current"]').text()).toBe('45')
+    expect(wrapper.text()).not.toContain('save again')
   })
 
   it('prefills the default when no custom value is set', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    vi.mocked(appsService.listSettingValues).mockResolvedValue([])
+        vi.mocked(appsService.listSettingValues).mockResolvedValue([])
     const wrapper = mountSettings()
     await flushPromises()
     await wrapper.find('[aria-label="Set CHECK_INTERVAL_SECONDS"]').trigger('click')
@@ -99,8 +96,7 @@ describe('AppSettingValues', () => {
   })
 
   it('restarts the app from the card', async () => {
-    vi.mocked(appsService.listSecrets).mockResolvedValue([])
-    vi.mocked(appsService.restart).mockResolvedValue({ restarted: 1, confirmed: true })
+        vi.mocked(appsService.restart).mockResolvedValue({ restarted: 1, confirmed: true })
     const wrapper = mountSettings()
     await flushPromises()
 

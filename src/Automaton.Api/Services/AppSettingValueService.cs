@@ -21,6 +21,7 @@ public sealed class AppSettingValueService(
     {
         await EnsureCanUpdateAppAsync(appId, userId, token);
         var names = await DeclaredSettingNamesAsync(appId, token);
+        await MoveOlderOverridesAsync(appId, userId, names, token);
         var rows = await db.AppSettingValues.Where(setting => setting.AppId == appId && names.Contains(setting.Name))
             .OrderBy(setting => setting.Name).ToListAsync(token);
         return rows.Select(setting => new AppSettingValueSummary(setting.Name, setting.Value, setting.UpdatedAtUtc)).ToList();
@@ -58,6 +59,34 @@ public sealed class AppSettingValueService(
         var oldOverride = await secrets.DeleteAsync(appId, userId, name, token);
         if (row is not null || oldOverride) await RestartAsync(appId);
         return row is not null || oldOverride;
+    }
+
+    /// <summary>
+    /// Values saved as secrets before settings had their own store move to it once, on first read: the same value is
+    /// saved as a setting (which the app's environment already prefers), then the secret entry is removed. Nothing the
+    /// app runs with changes, so no restart. Declared secrets are never touched.
+    /// </summary>
+    private async Task MoveOlderOverridesAsync(Guid appId, Guid userId, HashSet<string> names, CancellationToken token)
+    {
+        if (names.Count == 0) return;
+        var older = await secrets.ReadAppOverridesAsync(appId, names, token);
+        if (older.Count == 0) return;
+        var have = await db.AppSettingValues.Where(setting => setting.AppId == appId && older.Keys.Contains(setting.Name))
+            .Select(setting => setting.Name).ToListAsync(token);
+        foreach (var (name, value) in older)
+        {
+            if (!have.Contains(name))
+            {
+                db.AppSettingValues.Add(new() { Id = Guid.NewGuid(), AppId = appId, Name = name, Value = value, UpdatedAtUtc = DateTime.UtcNow, UpdatedByUserId = userId });
+                try { await db.SaveChangesAsync(token); }
+                catch (DbUpdateException)
+                {
+                    // A concurrent first read saved it already: keep that row.
+                    db.ChangeTracker.Clear();
+                }
+            }
+            await secrets.DeleteAsync(appId, userId, name, token);
+        }
     }
 
     /// <summary>Running copies keep the old value until restarted, so a saved setting restarts them (queued, not awaited).</summary>

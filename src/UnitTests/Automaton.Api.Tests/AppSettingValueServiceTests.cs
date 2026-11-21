@@ -24,17 +24,44 @@ public sealed class AppSettingValueServiceTests
     }
 
     [Test]
+    public async Task APlainSettingSavedAsASecretMovesToTheSettingsStoreOnFirstReadKeepingItsValue()
+    {
+        var (settings, secrets, db, appId, ownerId) = Create("""{"settings":[{"name":"BUCKET","default":"d"}],"secrets":[{"name":"KEY"}]}""");
+        await secrets.SetAsync(appId, ownerId, "BUCKET", "my-bucket", CancellationToken.None);
+        await secrets.SetAsync(appId, ownerId, "KEY", "hunter2", CancellationToken.None);
+
+        var first = await settings.ListAsync(appId, ownerId, CancellationToken.None);
+        var second = await settings.ListAsync(appId, ownerId, CancellationToken.None);
+
+        Assert.That(first.Select(item => (item.Name, item.Value)), Is.EqualTo(new[] { ("BUCKET", "my-bucket") }));
+        Assert.That(second.Select(item => item.Value), Is.EqualTo(new[] { "my-bucket" }));
+        Assert.That((await secrets.ListAsync(appId, ownerId, CancellationToken.None)).Select(item => item.Name), Is.EqualTo(new[] { "KEY" }));
+        var env = await secrets.ResolveForExecutionAsync(appId, CancellationToken.None);
+        Assert.That(env["BUCKET"], Is.EqualTo("my-bucket"));
+        Assert.That(env["KEY"], Is.EqualTo("hunter2"));
+        Assert.That(await db.AppSettingValues.CountAsync(), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ASettingsValueAlreadySavedWinsOverAnOlderSecretOverrideWhichIsDropped()
+    {
+        var (settings, secrets, _, appId, ownerId) = Create("""{"settings":[{"name":"A"}]}""");
+        await settings.SetAsync(appId, ownerId, "A", "new", CancellationToken.None);
+        await secrets.SetAsync(appId, ownerId, "A", "cli", CancellationToken.None);
+
+        Assert.That((await settings.ListAsync(appId, ownerId, CancellationToken.None)).Single().Value, Is.EqualTo("new"));
+        Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None))["A"], Is.EqualTo("new"));
+    }
+
+    [Test]
     public async Task ASecretIsNeverReturnedEvenWhenTheContractRedeclaresItAsASetting()
     {
         var (settings, secrets, db, appId, ownerId) = Create("""{"secrets":[{"name":"S3_KEY"}]}""");
         await secrets.SetAsync(appId, ownerId, "S3_KEY", "hunter2", CancellationToken.None);
         var app = await db.WebApps.SingleAsync(app => app.Id == appId);
-        app.ApplicationContractJson = """{"settings":[{"name":"S3_KEY"}]}""";
-        await db.SaveChangesAsync();
-
-        Assert.That(await settings.ListAsync(appId, ownerId, CancellationToken.None), Is.Empty);
         app.ApplicationContractJson = """{"settings":[{"name":"S3_KEY"}],"secrets":[{"name":"S3_KEY"}]}""";
         await db.SaveChangesAsync();
+        Assert.That(await settings.ListAsync(appId, ownerId, CancellationToken.None), Is.Empty);
         Assert.ThrowsAsync<ArgumentException>(() => settings.SetAsync(appId, ownerId, "S3_KEY", "x", CancellationToken.None));
         Assert.That((await secrets.ResolveForExecutionAsync(appId, CancellationToken.None))["S3_KEY"], Is.EqualTo("hunter2"));
     }

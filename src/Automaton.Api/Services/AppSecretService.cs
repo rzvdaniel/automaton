@@ -389,6 +389,13 @@ public sealed class AppSecretService(
         return result;
     }
 
+    /// <summary>Current values of the app's own secret-store entries with these names (older plain-setting overrides), for moving them to the settings store.</summary>
+    internal async Task<Dictionary<string, string>> ReadAppOverridesAsync(Guid appId, HashSet<string> names, CancellationToken token)
+    {
+        var vaults = await VaultsAsync(appId, token);
+        return (await CurrentAsync(vaults.App, names, token)).ToDictionary(secret => secret.Name, secret => protector.Unprotect(secret.ProtectedValue), StringComparer.Ordinal);
+    }
+
     private sealed record CurrentSecret(string Name, string ProtectedValue, int Version);
 
     /// <summary>The current, unrevoked, unexpired version of each secret of an owner, optionally by name.</summary>
