@@ -42,7 +42,7 @@ The `automaton` commands run from your own machine, signed in to the server; onl
    automaton server update-status
    ```
 
-A release older than the installed one is refused unless you pass `--allow-downgrade` (Studio does not offer it).
+A release older than the installed one is refused unless you pass `--allow-downgrade` (Studio does not offer it). Only the newest 30 server releases are kept on GitHub, so you can go back at most that far; older release files are deleted (their tags stay).
 
 ## Restart the server
 
