@@ -87,6 +87,23 @@ Proven on a fresh server: install the same release (or newer) there, then:
 
 Users, projects, Runners and secrets come back, and new deployments work. Runners installed before the backup stay attached to the old server until you re-enroll them.
 
+## Alerts when something is missing
+
+The installer also sets up `automaton-watchdog.timer`, which runs on the machine itself (outside the containers) every 5 minutes, so it still works when Automaton is down. It alerts when:
+
+- a server container is missing or stopped ("Automaton is down: api, worker missing"). If every data volume still exists, it starts them again with `docker compose up -d` and says so;
+- a data volume is missing ("data volumes are missing: restore from backup"), with the exact `restore.sh` command. It never restores by itself and never starts containers then, because that would create an empty database;
+- Studio does not answer;
+- the last backup failed, or is more than 26 hours old.
+
+The same problem is sent once, again every 6 hours while it lasts, and a "recovered" message follows. Set where alerts go in `/etc/automaton/alerts.json` (root only):
+
+```json
+{"webhookUrl": "https://hooks.slack.com/services/...", "emailTo": "you@example.com"}
+```
+
+The webhook can be Slack, Discord, Telegram (`https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>`) or any URL that accepts a JSON `POST` with `text` and `content`. Email goes straight through the SMTP in `EmailConfig` of `appsettings.Production.json`, to `emailTo` or else `EmailConfig.AdminEmail`. Without a destination, problems only appear in `sudo journalctl -u automaton-watchdog.service`. To stop the containers for maintenance, first run `sudo systemctl stop automaton-watchdog.timer`, and start it again afterwards. Send a test message with `sudo python3 /opt/automaton-server/watchdog.py --test`.
+
 ## Verify it worked
 
 ```bash

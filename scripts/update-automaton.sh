@@ -473,7 +473,7 @@ install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
 install -m 0644 "$bundle/version" "$install_dir/version"
 install -m 0700 "$bundle/update.sh" "$install_dir/update.sh"
 install -m 0700 "$bundle/install.sh" "$install_dir/install.sh"
-for tool in configure.py explain_certificate_failure.py fail2ban.sh; do
+for tool in configure.py explain_certificate_failure.py fail2ban.sh watchdog.py; do
     [[ ! -f "$bundle/$tool" ]] || install -m 0700 "$bundle/$tool" "$install_dir/$tool"
 done
 if [[ -d "$bundle/fail2ban" ]]; then
@@ -487,6 +487,11 @@ ensure_website_deploy
 if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
     bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \
         || echo "Warning: fail2ban could not be set up. Run: sudo bash $install_dir/fail2ban.sh" >&2
+fi
+# Alerts when the containers, the data or the backup are missing; the update is complete without it.
+if [[ -f "$install_dir/watchdog.py" ]]; then
+    python3 "$install_dir/watchdog.py" --install-units --install-dir "$install_dir" \
+        || echo "Warning: the watchdog could not be enabled. Run: sudo python3 $install_dir/watchdog.py --install-units" >&2
 fi
 # Housekeeping runs only after success; a failure here never affects the completed update.
 # Only directories this updater created (server-v<version>-<UTC time>-<random>) are rotated.

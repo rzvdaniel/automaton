@@ -30,6 +30,9 @@ while (($#)); do
     esac
 done
 [[ $EUID -eq 0 ]] || { echo 'Run as root (sudo).' >&2; exit 1; }
+# Held for the whole restore so the watchdog does not start the stopped containers on a half-restored database.
+exec 8>"${AUTOMATON_LOCK_FILE:-/run/lock/automaton-install.lock}"
+flock -n 8 || { echo 'Another installation, update or restore is running.' >&2; exit 1; }
 [[ -z "$archive" || -z "$name" ]] || { echo 'Choose either a backup name or --archive, not both.' >&2; exit 2; }
 backup_root="$install_dir/backups/nightly"
 install -d -m 0700 "$install_dir/backups"

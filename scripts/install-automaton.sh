@@ -261,7 +261,7 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh os-update-from-request.sh fail2ban.sh configure.py explain_certificate_failure.py; do
+for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh os-update-from-request.sh fail2ban.sh watchdog.py configure.py explain_certificate_failure.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
 if ! $configure_only && [[ -d "$bundle_dir/fail2ban" ]]; then
@@ -332,5 +332,10 @@ fi
 if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
     bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \
         || echo "Warning: fail2ban could not be set up. Run: sudo bash $install_dir/fail2ban.sh" >&2
+fi
+# Alerts when the containers, the data or the backup are missing (best effort: the install is complete without it).
+if [[ -f "$install_dir/watchdog.py" ]]; then
+    python3 "$install_dir/watchdog.py" --install-units --install-dir "$install_dir" \
+        || echo "Warning: the watchdog could not be enabled. Run: sudo python3 $install_dir/watchdog.py --install-units" >&2
 fi
 printf 'Backups: nightly database and key backups are kept in %s/backups/nightly. Also enable your provider'"'"'s server backups (snapshots) and copy %s off-host.\n' "$install_dir" "$config_dir"
