@@ -114,7 +114,8 @@ export interface InstallationBackupStatus {
   directory: string | null
   backupNowCommand: string
   backupRecipient: string | null
-  backupKeyCommand: string
+  /** Set only while the private key is still on the server; null when it is kept off the server. */
+  backupKeyCommand: string | null
   backups: InstallationBackup[]
   /** When the host timer next starts a backup, if the host reports it. */
   nextRunAt?: string | null

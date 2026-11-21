@@ -30,6 +30,18 @@ public sealed class InstallationBackupsTests
     }
 
     [Test]
+    public async Task ReportsThePrivateKeyOnlyWhileTheHostStillHoldsIt()
+    {
+        using var directory = new AppAuthorizationTestData.TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "backup.json");
+        await File.WriteAllTextAsync(path, """{"backupRecipient":"age1r","backupKeyCommand":null,"backups":[]}""");
+        Assert.That((await InstallationBackups.ReadAsync(Configuration(directory.Path), CancellationToken.None)).BackupKeyCommand, Is.Null);
+
+        await File.WriteAllTextAsync(path, """{"backupRecipient":"age1r","backupKeyCommand":"sudo cat /etc/automaton/secrets/backup-key","backups":[]}""");
+        Assert.That((await InstallationBackups.ReadAsync(Configuration(directory.Path), CancellationToken.None)).BackupKeyCommand, Does.Contain("backup-key"));
+    }
+
+    [Test]
     public async Task ArchivePathRequiresAListedSafeNameAndRejectsSymlinks()
     {
         using var directory = new AppAuthorizationTestData.TemporaryDirectory();

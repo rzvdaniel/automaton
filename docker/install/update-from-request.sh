@@ -123,7 +123,9 @@ except FileNotFoundError:
 quoted = re.compile(r'(?i)("[^"\n]*(?:password|passwd|secret|token|api[_-]?key|authorization)[^"\n]*"\s*:\s*)"[^"\n]*"')
 scheme = re.compile(r'(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]+')
 plain = re.compile(r'(?i)((?:password|passwd|secret|token|api[_-]?key|authorization)\S*\s*[=:]\s*)\S+')
+age_key = re.compile(r'AGE-SECRET-KEY-[A-Z0-9]+')
 def mask(line):
+    line = age_key.sub('***', line)
     line = quoted.sub(r'\1"***"', line)
     line = scheme.sub(r'\1 ***', line)
     return plain.sub(r'\1***', line)

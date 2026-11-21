@@ -219,9 +219,13 @@ async function copy(command: string) {
         </div>
       </div>
 
-      <Message v-if="status.backupRecipient" severity="warn" :closable="false">
-        Encrypted archives need the backup key. Store the private key in a password manager. It stays on this server:
+      <Message v-if="status.backupRecipient && status.backupKeyCommand" severity="warn" :closable="false" data-test="backup-key-on-server">
+        The private backup key is still on this server, so anyone who breaks in could decrypt the backups. Save it in a password manager, then remove it from the server:
         <code>{{ status.backupKeyCommand }}</code>
+        <div class="mt-2"><code>{{ status.backupRecipient }}</code></div>
+      </Message>
+      <Message v-else-if="status.backupRecipient" severity="info" :closable="false" data-test="backup-key-off-server">
+        Backups are encrypted with the public key below. The private key is kept off this server (in your password manager); restoring needs it.
         <div class="mt-2"><code>{{ status.backupRecipient }}</code></div>
       </Message>
       <Message severity="info" :closable="false">
