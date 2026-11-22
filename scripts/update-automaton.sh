@@ -326,7 +326,7 @@ if (( available_kb < 10485760 )); then
     # Never volumes, images of existing containers or the backups. Unused images go too, including rollback ones (pull them again).
     echo 'Less than 10 GiB free: removing unused Docker images and build cache.'
     docker image prune -a -f >/dev/null 2>&1 || echo 'Warning: could not remove unused images.' >&2
-    docker builder prune -f >/dev/null 2>&1 || echo 'Warning: could not remove build cache.' >&2
+    docker builder prune -a -f >/dev/null 2>&1 || echo 'Warning: could not remove build cache.' >&2
     after_kb=$(df -Pk "$disk_path" | awk 'NR==2 {print $4}')
     echo "Freed $(( (after_kb - available_kb) / 1024 )) MiB; $(( after_kb / 1048576 )) GiB free now."
     available_kb=$after_kb

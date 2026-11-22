@@ -423,7 +423,7 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
         self.assertIn('Freed', result.stdout)
         calls = [json.loads(line) for line in log.read_text().splitlines()]
         self.assertIn(['image', 'prune', '-a', '-f'], calls)
-        self.assertIn(['builder', 'prune', '-f'], calls)
+        self.assertIn(['builder', 'prune', '-a', '-f'], calls)
         self.assertFalse([c for c in calls if 'volume' in c or c[:2] == ['system', 'prune']])
 
     def test_still_short_after_pruning_names_what_uses_the_disk(self):
