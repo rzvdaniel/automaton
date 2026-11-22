@@ -51,6 +51,7 @@ public static class CatalogInstallCommand
         var setting = new Option<string[]>("--setting", "NAME=VALUE for a setting the app declares; repeat for more (settings are not secret)") { AllowMultipleArgumentsPerToken = false };
         var secretsFile = new Option<string?>("--secrets-file", "File with NAME=VALUE lines for the app's secrets (never pass a secret as an argument)");
         var secretsStdin = new Option<bool>("--secrets-stdin", "Read the secrets as NAME=VALUE lines from standard input");
+        var secretFile = new Option<string[]>("--secret-file", "NAME=PATH: read one secret's value from a file, line breaks kept (for a multi-line secret such as an SSH key); repeat for more");
         var wait = new Option<bool>("--wait", "Wait until the deployment has finished and report whether it succeeded");
         var json = new Option<bool>("--json", "Print the result as JSON (for agents)");
         var (noSchedules, schedule) = ScheduleOptions();
@@ -58,24 +59,24 @@ public static class CatalogInstallCommand
             "Install a catalog app, save its settings and secrets and deploy it. It prints the pinned commit and the permissions the app requests first.\n" +
             "Example: automaton catalog install flow-check --name my-flow --runner main --setting INTERVAL=60 --secrets-file ~/flow-secrets --wait\n" +
             "Secrets come only from --secrets-file, --secrets-stdin or, in a terminal, a hidden prompt.")
-        { id, source, name, runner, setting, secretsFile, secretsStdin, wait, noSchedules, schedule, json };
+        { id, source, name, runner, setting, secretsFile, secretsStdin, secretFile, wait, noSchedules, schedule, json };
         command.SetHandler(async context =>
         {
             var parsed = context.ParseResult;
             var asJson = parsed.GetValueForOption(json);
             await RunAsync(asJson, () => InstallAsync(config, parsed.GetValueForArgument(id), parsed.GetValueForOption(source), parsed.GetValueForOption(name),
                 parsed.GetValueForOption(runner), parsed.GetValueForOption(setting) ?? [], parsed.GetValueForOption(secretsFile),
-                parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(wait), asJson, parsed.GetValueForOption(noSchedules), parsed.GetValueForOption(schedule) ?? []));
+                parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(secretFile) ?? [], parsed.GetValueForOption(wait), asJson, parsed.GetValueForOption(noSchedules), parsed.GetValueForOption(schedule) ?? []));
         });
         return command;
     }
 
     private static async Task InstallAsync(ConfigService config, string id, string? sourceId, string? name, string? runnerReference,
-        string[] settingArguments, string? secretsFile, bool secretsStdin, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
+        string[] settingArguments, string? secretsFile, bool secretsStdin, string[] secretFiles, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
     {
         // An empty value counts as not given (Studio skips them too), so it is asked for or refused before anything is created.
         var settings = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ParseSettings(settingArguments));
-        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin));
+        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin, null, secretFiles));
         using var client = Connect(config);
         var entry = Pick(await AllAsync(client, null, null, sourceId, false, refresh: true), id, sourceId);
         if (entry.TryGetProperty("requiresNewerServer", out var newer) && newer.ValueKind == JsonValueKind.True)

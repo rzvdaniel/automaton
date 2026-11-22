@@ -15,7 +15,7 @@ public class CatalogUpdateCommandTests
         Assert.That(update.Name, Is.EqualTo("update"));
         Assert.That(update.Arguments.Select(a => a.Name), Is.EqualTo(new[] { "app" }));
         Assert.That(update.Options.Select(o => o.Name), Is.EquivalentTo(
-            new[] { "check", "confirm-edited", "secrets-file", "secrets-stdin", "wait", "no-schedules", "schedule", "json" }));
+            new[] { "check", "confirm-edited", "secrets-file", "secrets-stdin", "secret-file", "wait", "no-schedules", "schedule", "json" }));
         Assert.That(update.Description, Does.Contain("--confirm-edited").And.Contain("--secrets-file"));
     }
 
