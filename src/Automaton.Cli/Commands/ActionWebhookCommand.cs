@@ -23,69 +23,76 @@ public static class ActionWebhookCommand
     {
         var key = new Argument<string>("action-key");
         var name = new Option<string?>("--name", "A name for the webhook (default: the Action key)");
-        var command = new Command("add", "Add a webhook to an Action and print its secret once") { key, name };
-        command.SetHandler(async (string actionKey, string? hookName) =>
+        var app = ActionCommand.AppOption();
+        var command = new Command("add", "Add a webhook to an Action and print its secret once") { key, name, app };
+        command.SetHandler(async (string actionKey, string? hookName, string? appRef) =>
         {
-            var (server, apiKey, appId) = ActionCommand.Resolve(config);
-            using var client = new AutomatonApiClient(server, apiKey);
             await Guard(async () =>
-                PrintSecret(await client.CreateActionWebhookAsync(appId, actionKey, string.IsNullOrWhiteSpace(hookName) ? actionKey : hookName)));
-        }, key, name);
+            {
+                var (server, apiKey, appId) = await ActionCommand.ResolveAsync(config, appRef);
+                using var client = new AutomatonApiClient(server, apiKey);
+                PrintSecret(await client.CreateActionWebhookAsync(appId, actionKey, string.IsNullOrWhiteSpace(hookName) ? actionKey : hookName));
+            });
+        }, key, name, app);
         return command;
     }
 
     private static Command BuildList(ConfigService config)
     {
         var key = new Argument<string?>("action-key", () => null, "Only this Action's webhooks");
-        var command = new Command("list", "List webhooks and their last calls") { key };
-        command.SetHandler(async (string? actionKey) =>
+        var app = ActionCommand.AppOption();
+        var command = new Command("list", "List webhooks and their last calls") { key, app };
+        command.SetHandler(async (string? actionKey, string? appRef) =>
         {
-            var (server, apiKey, appId) = ActionCommand.Resolve(config);
-            using var client = new AutomatonApiClient(server, apiKey);
             await Guard(async () =>
             {
+                var (server, apiKey, appId) = await ActionCommand.ResolveAsync(config, appRef);
+                using var client = new AutomatonApiClient(server, apiKey);
                 foreach (var hook in (await client.ListActionWebhooksAsync(appId)).EnumerateArray()
                              .Where(item => actionKey is null || item.GetProperty("actionKey").GetString() == actionKey))
                     Console.WriteLine(Describe(hook));
             });
-        }, key);
+        }, key, app);
         return command;
     }
 
     private static Command BuildRotate(ConfigService config)
     {
-        var key = new Argument<string>("action-key");
+        var key = new Argument<string>("action-key-or-id", "The Action's key, or the webhook's ID from the list");
         var name = NameOption();
-        var command = new Command("rotate", "Replace a webhook's secret; the old one stops working at once") { key, name };
-        command.SetHandler(async (string actionKey, string? hookName) =>
+        var app = ActionCommand.AppOption();
+        var command = new Command("rotate", "Replace a webhook's secret; the old one stops working at once") { key, name, app };
+        command.SetHandler(async (string actionKey, string? hookName, string? appRef) =>
         {
-            var (server, apiKey, appId) = ActionCommand.Resolve(config);
-            using var client = new AutomatonApiClient(server, apiKey);
             await Guard(async () =>
             {
+                var (server, apiKey, appId) = await ActionCommand.ResolveAsync(config, appRef);
+                using var client = new AutomatonApiClient(server, apiKey);
                 var hook = await Find(client, appId, actionKey, hookName);
                 PrintSecret(await client.RotateActionWebhookAsync(appId, hook.GetProperty("id").GetGuid()));
             });
-        }, key, name);
+        }, key, name, app);
         return command;
     }
 
     private static Command BuildRemove(ConfigService config)
     {
-        var key = new Argument<string>("action-key");
+        var key = new Argument<string>("action-key-or-id", "The Action's key, or the webhook's ID from the list");
         var name = NameOption();
-        var command = new Command("remove", "Remove a webhook") { key, name };
-        command.SetHandler(async (string actionKey, string? hookName) =>
+        var app = ActionCommand.AppOption();
+        var command = new Command("remove", "Remove a webhook") { key, name, app };
+        command.AddAlias("delete");
+        command.SetHandler(async (string actionKey, string? hookName, string? appRef) =>
         {
-            var (server, apiKey, appId) = ActionCommand.Resolve(config);
-            using var client = new AutomatonApiClient(server, apiKey);
             await Guard(async () =>
             {
+                var (server, apiKey, appId) = await ActionCommand.ResolveAsync(config, appRef);
+                using var client = new AutomatonApiClient(server, apiKey);
                 var hook = await Find(client, appId, actionKey, hookName);
                 await client.DeleteActionWebhookAsync(appId, hook.GetProperty("id").GetGuid());
                 Console.WriteLine($"Removed webhook {hook.GetProperty("name").GetString()}.");
             });
-        }, key, name);
+        }, key, name, app);
         return command;
     }
 
@@ -97,6 +104,8 @@ public static class ActionWebhookCommand
 
     internal static JsonElement Pick(JsonElement webhooks, string actionKey, string? name)
     {
+        var byId = ActionScheduleCommand.MatchId(webhooks.EnumerateArray().ToList(), actionKey, item => item.GetProperty("id").GetGuid());
+        if (byId is not null) return byId.Value;
         var matches = webhooks.EnumerateArray()
             .Where(item => item.GetProperty("actionKey").GetString() == actionKey
                 && (string.IsNullOrEmpty(name) || string.Equals(item.GetProperty("name").GetString(), name, StringComparison.OrdinalIgnoreCase)))
@@ -114,7 +123,7 @@ public static class ActionWebhookCommand
         var last = calls.GetArrayLength() > 0
             ? $"last call {calls[0].GetProperty("outcome").GetString()} {calls[0].GetProperty("calledAtUtc").GetString()}"
             : "not called yet";
-        return $"{hook.GetProperty("actionKey").GetString()}\t{hook.GetProperty("name").GetString()}\t{state}\t{hook.GetProperty("url").GetString()}\t{last}";
+        return $"{hook.GetProperty("id").GetGuid().ToString("N")[..8]}\t{hook.GetProperty("actionKey").GetString()}\t{hook.GetProperty("name").GetString()}\t{state}\t{hook.GetProperty("url").GetString()}\t{last}";
     }
 
     private static void PrintSecret(JsonElement hook)

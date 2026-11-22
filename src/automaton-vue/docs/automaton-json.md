@@ -137,7 +137,9 @@ Every Action of an app whose runtime is running also gets `AUTOMATON_APP_INTERNA
 
 ## Start an Action from outside: webhooks
 
-A webhook lets something outside Automaton (a GitHub release, a monitor, another server) start one of your app's Actions without a schedule or a person. In Studio open the app's **Actions** tab and choose **Add webhook** under the Action; from a terminal run `automaton action webhook add <action-key> --name "Docs walk"`. The secret is shown once, so copy it then; `automaton action webhook rotate <action-key>` replaces it and the old one stops working at once. `list` shows each webhook with its last calls and `remove` deletes one.
+A webhook lets something outside Automaton (a GitHub release, a monitor, another server) start one of your app's Actions without a schedule or a person. In Studio open the app's **Actions** tab and choose **Add webhook** under the Action; from a terminal run `automaton action webhook add <action-key> --name "Docs walk"`. The secret is shown once, so copy it then; `automaton action webhook rotate <action-key or id>` replaces it and the old one stops working at once. `list` shows each webhook with its ID and last calls, and `delete` (or `remove`) deletes one. Add `--app <name or id>` to any of them to work on an app you may update without being in its linked folder.
+
+Schedules use cron only: five fields (minute hour day-of-month month day-of-week, no seconds) and a time zone. `automaton action schedule list --app overseer` shows ID, Action, cron, time zone, on/off and next run (`--json` for scripts). `add <action> --cron "0 2 * * 1-5" --tz Europe/Bucharest` creates one and prints its next three runs; `edit <id> --cron "*/15 * * * *"` changes only the options you give; `on <id>` and `off <id>` switch it; `delete <id>` asks first (`--yes` skips the question). A bad cron expression or time zone is refused with the reason before anything is saved.
 
 ```bash
 curl -X POST https://api.example.com/api/hooks/<webhook-id> \
