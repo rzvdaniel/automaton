@@ -42,7 +42,7 @@ describe('cron-schedule', () => {
   it('finds runs in zones that are not a whole hour from UTC', () => {
     expect(nextRuns('0 2 * * *', 'Asia/Kolkata', 1, from)[0]!.toISOString()).toBe('2026-11-22T20:30:00.000Z')
     expect(nextRuns('*/15 * * * *', 'Asia/Kolkata', 3, from).map((d) => d.toISOString())).toEqual(['2026-11-22T11:15:00.000Z', '2026-11-22T11:30:00.000Z', '2026-11-22T11:45:00.000Z'])
-    expect(nextRuns('45 5 * * *', 'Asia/Kathmandu', 1, from)[0]!.toISOString()).toBe('2026-11-22T00:00:00.000Z'.replace('22T00', '23T00'))
+    expect(nextRuns('45 5 * * *', 'Asia/Kathmandu', 1, from)[0]!.toISOString()).toBe('2026-11-23T00:00:00.000Z')
   })
 
   it('follows a clock change', () => {
