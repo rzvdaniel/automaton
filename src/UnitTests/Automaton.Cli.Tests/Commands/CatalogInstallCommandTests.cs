@@ -121,6 +121,16 @@ public class CatalogInstallCommandTests
     }
 
     [Test]
+    public void Check_AnExplicitEmptySecretCountsAsGiven()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse("""{"secrets":[{"name":"TOKEN"}]}""");
+
+        var (_, _, missingSecrets) = CatalogInstallValues.Check(document.RootElement, new Dictionary<string, string>(), new Dictionary<string, string> { ["TOKEN"] = "" });
+
+        Assert.That(missingSecrets, Is.Empty);
+    }
+
+    [Test]
     public void Check_ReportsMissingRequiredSettingsAndSecrets_ButNotDefaultsOrVaultSecrets()
     {
         var (unknown, missingSettings, missingSecrets) = CatalogInstallValues.Check(Application, new Dictionary<string, string>(), new Dictionary<string, string>());

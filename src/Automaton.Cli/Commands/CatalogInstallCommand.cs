@@ -74,9 +74,10 @@ public static class CatalogInstallCommand
     private static async Task InstallAsync(ConfigService config, string id, string? sourceId, string? name, string? runnerReference,
         string[] settingArguments, string? secretsFile, bool secretsStdin, string[] secretFiles, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
     {
-        // An empty value counts as not given (Studio skips them too), so it is asked for or refused before anything is created.
+        // An empty setting counts as not given (Studio skips them too). An explicit empty secret (NAME=) is kept unset, not asked for.
         var settings = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ParseSettings(settingArguments));
-        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin, null, secretFiles));
+        var givenSecrets = CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin, null, secretFiles);
+        var secrets = CatalogInstallValues.WithoutEmpty(givenSecrets);
         using var client = Connect(config);
         var entry = Pick(await AllAsync(client, null, null, sourceId, false, refresh: true), id, sourceId);
         if (entry.TryGetProperty("requiresNewerServer", out var newer) && newer.ValueKind == JsonValueKind.True)
@@ -85,7 +86,7 @@ public static class CatalogInstallCommand
         var installSource = await client.GetCatalogInstallSourceAsync(repo, folder, commit);
         var application = installSource.TryGetProperty("application", out var contract) ? contract : default;
 
-        var (unknown, missingSettings, missingSecrets) = CatalogInstallValues.Check(application, settings, secrets);
+        var (unknown, missingSettings, missingSecrets) = CatalogInstallValues.Check(application, settings, givenSecrets); // an explicit NAME= is a decision to leave the secret unset
         if (unknown.Count > 0) throw new InvalidOperationException($"{Text(entry, "name")} does not declare: {string.Join(", ", unknown)}. Nothing was installed.");
         if (missingSettings.Count > 0)
             throw new InvalidOperationException($"Missing required setting(s): {string.Join(", ", missingSettings)}. Add --setting NAME=VALUE for each. Nothing was installed.");
