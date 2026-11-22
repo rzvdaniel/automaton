@@ -114,21 +114,21 @@ def read_review(review: dict) -> dict:
 
 
 def security_row(tier: str, reviews: list[dict], review: dict | None, head: str) -> tuple[str, str, str]:
-    """A high-tier change needs the Security: section in a review by someone other than the main reviewer."""
+    """A high-tier change needs the Security: section in a separate review of the final commit (same login is fine)."""
     if tier != "high":
         ok = review and review["security"] and review["commit"] == head
         return ("PASS", "security", "security pass recorded") if ok else (
             "FAIL", "security", "this change needs a 'Security:' section in the review of the final commit")
-    who = lambda item: (item.get("author") or {}).get("login")
     at_head = [item for item in reviews if read_review(item)["commit"] == head]
-    passes = [item for item in at_head if read_review(item)["security"]]
+    # A security pass is its own review: a Security: section and no Tier: line (the Tier: line marks a main review).
+    passes = [item for item in at_head if read_review(item)["security"] and not read_review(item)["tier"]]
     if not passes:
         return ("FAIL", "security", "a high-tier change needs a separate review with a 'Security:' section on the final commit")
     # The main review is any other non-blocking review of the final commit; the last-review check covers the verdict.
     others = [item for item in at_head if read_review(item)["verdict"] != "changes"
-              and any(who(item) != who(sec) for sec in passes)]
+              and any(item is not sec for sec in passes)]
     if not others:
-        return ("FAIL", "security", "the security pass must come from a different reviewer than the main review")
+        return ("FAIL", "security", "the security pass must be a separate review from the main review")
     return ("PASS", "security", "separate security pass recorded")
 
 

@@ -132,8 +132,9 @@ class Gate(unittest.TestCase):
         main = review("APPROVE\nTier: high", at="2026-01-01T00:00:00Z")
         second = review("APPROVE\nSecurity: checked the token permissions", at="2026-01-02T00:00:00Z", who="security-reviewer")
         self.assertEqual(failed(gate.check(pr(paths, [main, second]), PATTERNS)), [])
+        # A separate review by the same login counts: each comes from its own reviewer run.
         same = review("APPROVE\nSecurity: ok", at="2026-01-02T00:00:00Z")
-        self.assertEqual(failed(gate.check(pr(paths, [main, same]), PATTERNS)), ["security"])
+        self.assertEqual(failed(gate.check(pr(paths, [main, same]), PATTERNS)), [])
         stale = review("APPROVE\nSecurity: ok", commit="old", at="2026-01-02T00:00:00Z", who="security-reviewer")
         self.assertIn("security", failed(gate.check(pr(paths, [main, stale]), PATTERNS)))
         bare = review("APPROVE\nTier: high")

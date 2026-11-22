@@ -54,12 +54,10 @@ Create a to-do item for each step and tick them off.
    release" list. Start step 6 while CI runs. An empty check list means the run has not started; it is not a pass.
 6. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
    applies, at most two rounds. For a high tier, spawn a separate `automaton-reviewer` subagent for the security pass; it
-   posts with a different login than the main review (pr-review, Different logins).
+   posts its own separate review; the same reviewer login is fine (pr-review, Different logins).
    Start every review and security pass as the `automaton-reviewer` agent
-   ([definition](../../../.claude/agents/automaton-reviewer.md)), never a generic agent. Before posting, pick the login you will
-   post with (`gh auth status`) and compare it with the logins that already reviewed the PR: the main review and the security pass must
-   come from different logins, and a re-review after a rebase or fixes counts as a main review. If you would collide,
-   stop and report which other login must post.
+   ([definition](../../../.claude/agents/automaton-reviewer.md)), never a generic agent. Reviewers post with a login other than the PR author's;
+   a re-review after a rebase or fixes counts as a main review.
 7. **Merge.** Run `python3 .agents/tools/merge-gate.py <N> --merge`; it squash-merges and deletes the branch only on
    PASS. Never run `gh pr merge` yourself. Then watch the `main` run for your commit. Also hold anything the owner said to hold.
 8. **Deliver.** Follow the [verify-release skill](../automaton-verify-release/SKILL.md).

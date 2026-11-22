@@ -34,15 +34,13 @@ the change, is an Important finding.
 Pinned action shas (`uses: owner/repo@<sha>`) are checked by CI (`.agents/tools/check-action-pins.py`). When pinning, use the commit: `git ls-remote` shows it on the `^{}` (peeled) line, not the tag object line.
 
 **Security pass.** Looks only for security problems (in Claude Code: `/security-review`). For the high tier it is a
-second fresh agent, posting with a different login than the main review (see Different logins). For a medium change it is part of the same review (one agent, one more section), required on
+second fresh agent, posting its own separate review (see Different logins). For a medium change it is part of the same review (one agent, one more section), required on
 the security-pass paths and whenever the change adds or changes an endpoint, a permission check, secret handling, a
 file path or shell command built from input, or anything an app or anonymous visitor can reach.
 
 **Different logins.** Reviewers and security passes start as the `automaton-reviewer` agent
 ([`.claude/agents/automaton-reviewer.md`](../../../.claude/agents/automaton-reviewer.md)), never a generic agent.
-`merge-gate.py` requires the main review and the separate security pass to come from different GitHub logins. Any `automaton-reviewer` agent (never the agent that
-wrote the change) may post either one with any login it has, but one agent posts only one of the two on a PR. Before posting, list who already reviewed the PR, then pick a login with `gh auth status` that has not posted the other one on this PR and post with `GH_TOKEN=$(gh auth token -u <login>) gh pr review ...` (never `gh auth switch`: it changes the login for every agent on the machine). If no login you have fits, stop and say another agent with a different login must post it. A re-review after a rebase
-or fixes counts as a main review.
+`merge-gate.py` requires the main review and the security pass to be separate reviews of the final commit (the security pass has a `Security:` section and no `Tier:` line); the same login may post both, because each comes from its own fresh `automaton-reviewer` run. One agent posts only one of the two on a PR, and never on a PR whose change it wrote. Post with any login you have except the PR author's: `GH_TOKEN=$(gh auth token -u <login>) gh pr review ...` (never `gh auth switch`: it changes the login for every agent on the machine). A re-review after a rebase or fixes counts as a main review.
 
 **Confirm before posting.** For each Important finding, reproduce it when that is cheap (a failing test, a command and
 its output); otherwise say what would confirm it and how sure you are. Drop guesses. A wrong finding costs a commit and
