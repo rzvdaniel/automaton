@@ -137,6 +137,9 @@ class Gate(unittest.TestCase):
         self.assertEqual(failed(gate.check(pr(paths, [main, same]), PATTERNS)), [])
         stale = review("APPROVE\nSecurity: ok", commit="old", at="2026-01-02T00:00:00Z", who="security-reviewer")
         self.assertIn("security", failed(gate.check(pr(paths, [main, stale]), PATTERNS)))
+        # Two security passes and no main review (no Tier: line anywhere) do not pass.
+        twin = review("APPROVE\nSecurity: ok", at="2026-01-02T00:00:00Z")
+        self.assertEqual(failed(gate.check(pr(paths, [same, twin]), PATTERNS)), ["security"])
         bare = review("APPROVE\nTier: high")
         self.assertEqual(failed(gate.check(pr(paths, [bare]), PATTERNS)), ["security"])
 
