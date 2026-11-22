@@ -60,4 +60,11 @@ public sealed class RunnerUpgradeCommandTests
         await process.WaitForExitAsync();
         Assert.That(process.ExitCode, Is.EqualTo(0), error);
     }
+
+    [Test]
+    public void APinnedImageIsReportedExactlyAsConfigured()
+    {
+        var script = RunnerUpgradeCommand.BuildScript(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", Image, "Runner");
+        Assert.That(script, Does.Contain("case \"$image\" in *@sha256:*) resolved=\"$image\" ;;"));
+    }
 }
