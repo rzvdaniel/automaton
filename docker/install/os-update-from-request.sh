@@ -42,7 +42,7 @@ status_dir="$os_dir/status"
 request="$requests/request.json"
 log_file="$status_dir/last.log"
 backup_lock=${AUTOMATON_BACKUP_LOCK_FILE:-/run/lock/automaton-backup.lock}
-export REQUESTED_BY='' REQUESTED_AT='' STARTED_AT='' FINISHED_AT='' SCOPE='' MESSAGE='' UPGRADED=''
+export REQUESTED_BY='' REQUESTED_AT='' STARTED_AT='' FINISHED_AT='' SCOPE='' MESSAGE='' UPGRADED='' TOTAL='' HELD_BACK=''
 
 install_units() {
     # The API container runs as root, so requests/ is root-only on the host as well; status/ is mounted read-only.
@@ -97,6 +97,21 @@ try:
 except OSError:
     pass
 upgraded = env.get('UPGRADED', '')
+total = env.get('TOTAL', '')
+# Progress comes from apt's own log: every "Unpacking <package>" line is one package done or in progress.
+unpacked, current, error = 0, None, None
+try:
+    with open(env['LOG_FILE'], 'r', encoding='utf-8', errors='replace') as stream:
+        for line in stream:
+            if line.startswith('Unpacking '):
+                unpacked += 1
+            if line.startswith(('Unpacking ', 'Setting up ')):
+                current = line.strip()[:200]
+            elif line.startswith('E: '):
+                error = line.strip()[:300]
+except OSError:
+    pass
+held = [name for name in env.get('HELD_BACK', '').split() if len(name) <= 120][:50]
 status = {
     'state': env['STATE'],
     'requestedBy': value('REQUESTED_BY'),
@@ -107,6 +122,11 @@ status = {
     'upgradedCount': int(upgraded) if upgraded.isdigit() else None,
     'restartRequired': os.path.exists(env['REBOOT_REQUIRED_FILE']) if env['STATE'] in ('succeeded', 'failed') else None,
     'message': value('MESSAGE'),
+    'totalCount': int(total) if total.isdigit() else None,
+    'progressCount': unpacked if env['STATE'] in ('running', 'succeeded', 'failed') and env.get('STARTED_AT') else None,
+    'currentPackage': current if env['STATE'] == 'running' else None,
+    'errorLine': error if env['STATE'] == 'failed' else None,
+    'heldBack': held if env['STATE'] == 'succeeded' else None,
     'logTail': tail if env['STATE'] in ('succeeded', 'failed') else None,
 }
 target = sys.argv[1]
@@ -184,7 +204,7 @@ print(scope)
 PY
 }
 
-apt_env() { DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a "$@"; }
+apt_env() { LC_ALL=C DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a "$@"; }
 
 # Names of the packages with a pending security update (apt simulates the upgrade; no package changes).
 security_packages() {
@@ -195,14 +215,28 @@ security_packages() {
 run_apt() {
     # DPkg::Lock::Timeout waits for another apt or dpkg (for example unattended-upgrades after boot) instead of failing.
     local -a conf=(-y -o Dpkg::Options::=--force-confold -o DPkg::Lock::Timeout=300)
+    local -a command
     if [[ "$SCOPE" == all ]]; then
-        apt_env "$apt" "${conf[@]}" upgrade >>"$log_file" 2>&1
-        return
+        command=(upgrade)
+    else
+        local -a packages
+        mapfile -t packages < <(security_packages)
+        if ((${#packages[@]} == 0)); then echo 'No security updates are waiting.' >>"$log_file"; return 0; fi
+        command=(--only-upgrade install "${packages[@]}")
     fi
-    local -a packages
-    mapfile -t packages < <(security_packages)
-    if ((${#packages[@]} == 0)); then echo 'No security updates are waiting.' >>"$log_file"; return 0; fi
-    apt_env "$apt" "${conf[@]}" --only-upgrade install "${packages[@]}" >>"$log_file" 2>&1
+    # apt runs in the background so status.json can report how far it got every few seconds (the page shows it).
+    apt_env "$apt" "${conf[@]}" "${command[@]}" >>"$log_file" 2>&1 &
+    local pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep "${AUTOMATON_OS_UPDATE_POLL:-3}"
+        kill -0 "$pid" 2>/dev/null && write_status running
+    done
+    wait "$pid"
+}
+
+# Packages that "apt-get upgrade" keeps back (a new kernel, for example), one per line.
+held_back_packages() {
+    apt_env "$apt" -s upgrade 2>/dev/null | awk '/^The following packages have been kept back:/ {on=1; next} on && /^ / {for (i=1;i<=NF;i++) print $i; next} {on=0}'
 }
 
 run_request() {
@@ -217,7 +251,7 @@ run_request() {
     [[ -e "$request" || -L "$request" ]] || return 0
 
     local reason parsed
-    REQUESTED_AT=$(now) REQUESTED_BY='' SCOPE='' MESSAGE='' STARTED_AT='' FINISHED_AT='' UPGRADED=''
+    REQUESTED_AT=$(now) REQUESTED_BY='' SCOPE='' MESSAGE='' STARTED_AT='' FINISHED_AT='' UPGRADED='' TOTAL='' HELD_BACK=''
     if ! reason=$(validate_request 2>&1 >"$os_dir/parsed.txt"); then
         rm -rf -- "$request" "$os_dir/parsed.txt"
         case "$reason" in "The update request is invalid."|"The update scope"*) ;; *) reason='The update request is invalid.' ;; esac
@@ -247,11 +281,14 @@ run_request() {
     write_status running
     local before after
     before=$(apt_env "$apt" -s upgrade 2>/dev/null | grep -c '^Inst ')
+    if [[ "$SCOPE" == all ]]; then TOTAL=$before; else TOTAL=$(security_packages | grep -c .); fi
+    write_status running
     local apt_ok=0
     run_apt && apt_ok=1
     if ((apt_ok)); then
         after=$(apt_env "$apt" -s upgrade 2>/dev/null | grep -c '^Inst ')
         UPGRADED=$((before > after ? before - after : 0))
+        HELD_BACK=$(held_back_packages | tr '\n' ' ')
         FINISHED_AT=$(now)
         MESSAGE="Installed $UPGRADED update(s)."
         write_status succeeded

@@ -154,6 +154,29 @@ public sealed class ServerOsUpdateTests
     }
 
     [Test]
+    public async Task Read_ReportsProgressTheCurrentPackageTheErrorLineAndHeldBackPackages()
+    {
+        using var host = new Host();
+        _ = host.Requests;
+        var path = Path.Combine(host.Status, "status.json");
+        File.WriteAllText(path, JsonSerializer.Serialize(new
+        {
+            state = "running", scope = "all", startedAtUtc = Now.AddMinutes(-1), totalCount = 76, progressCount = 31,
+            currentPackage = "Unpacking containerd.io (2.1.5-1) over (2.1.4-1) ..."
+        }));
+        var running = await ServerOsUpdate.ReadAsync(host.Configuration, Now, default);
+        Assert.That((running.State, running.TotalCount, running.ProgressCount), Is.EqualTo(("running", 76, 31)));
+        Assert.That(running.CurrentPackage, Does.StartWith("Unpacking containerd.io"));
+        File.WriteAllText(path, JsonSerializer.Serialize(new
+        {
+            state = "succeeded", scope = "all", upgradedCount = 75, heldBack = new[] { "linux-image-generic", "" }
+        }));
+        Assert.That((await ServerOsUpdate.ReadAsync(host.Configuration, Now, default)).HeldBack, Is.EqualTo(new[] { "linux-image-generic" }));
+        File.WriteAllText(path, JsonSerializer.Serialize(new { state = "failed", errorLine = "E: Sub-process /usr/bin/dpkg returned an error code (1)" }));
+        Assert.That((await ServerOsUpdate.ReadAsync(host.Configuration, Now, default)).ErrorLine, Does.StartWith("E: Sub-process"));
+    }
+
+    [Test]
     public void ServerUpdateOs_IsASupportedPermission_WithItsOwnAppOnlyPolicy_AndAdminOnlyPost()
     {
         Assert.That(Automaton.Core.Models.ApplicationContractValidator.SupportedPermissions, Does.Contain("server:update-os"));
