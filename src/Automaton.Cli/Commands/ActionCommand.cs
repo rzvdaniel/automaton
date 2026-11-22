@@ -19,6 +19,7 @@ public static class ActionCommand
         command.AddCommand(BuildRollback(config));
         command.AddCommand(BuildDeleteVersion(config));
         command.AddCommand(ActionWebhookCommand.Build(config));
+        command.AddCommand(ActionScheduleCommand.Build(config));
         return command;
     }
 
@@ -189,6 +190,30 @@ public static class ActionCommand
             Console.WriteLine(response.GetProperty("message").GetString());
         }, key, version);
         return command;
+    }
+
+    internal static Option<string?> AppOption() => new(["--app", "-a"], "App name or ID (any app you may update); default: the linked folder's app");
+
+    /// <summary>The server, key and app for a command: the app named by <c>--app</c> (no linked folder needed), else the linked folder's app.</summary>
+    internal static async Task<(string Server, string ApiKey, string AppId)> ResolveAsync(ConfigService config, string? app)
+    {
+        if (string.IsNullOrWhiteSpace(app)) return Resolve(config);
+        var (server, apiKey) = config.ResolveCredentials(directory: Directory.GetCurrentDirectory());
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException("Run automaton login to connect to your server.");
+        using var client = new AutomatonApiClient(server, apiKey);
+        JsonElement found;
+        try { found = await client.GetAppByIdOrSlugAsync(app); }
+        catch (InvalidOperationException)
+        {
+            var byName = (await client.ListAppsAsync()).EnumerateArray()
+                .Where(item => item.TryGetProperty("name", out var n) && string.Equals(n.GetString(), app.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+            if (byName.Count != 1) throw new InvalidOperationException(byName.Count == 0
+                ? $"App '{app}' was not found. Use an app ID, slug or exact name of an app you can access."
+                : $"More than one app is named '{app}'; use its ID.");
+            found = byName[0];
+        }
+        return (server, apiKey, found.GetProperty("id").GetString() ?? throw new InvalidOperationException($"App '{app}' has no id."));
     }
 
     internal static (string Server, string ApiKey, string AppId) Resolve(ConfigService config)

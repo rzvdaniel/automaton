@@ -913,6 +913,27 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> UpdateActionScheduleAsync(Guid id, object schedule, CancellationToken ct = default)
+    {
+        using var resp = await _http.PutAsync($"api/action-schedules/{id}",
+            new StringContent(JsonSerializer.Serialize(schedule, JsonOptions), System.Text.Encoding.UTF8, "application/json"), ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> SetActionScheduleEnabledAsync(Guid id, bool enabled, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/action-schedules/{id}/{(enabled ? "enable" : "disable")}", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task DeleteActionScheduleAsync(Guid id, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/action-schedules/{id}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     // ── Projects ──────────────────────────────────────────────────────────────
 
     public async Task<JsonElement> ListProjectsAsync(CancellationToken ct = default)
