@@ -7,6 +7,9 @@
 #   stalled [minutes]          list running tasks with no log output for N minutes (default 30)
 #   requeue <name> [note]      stop a running task and queue it again (note is appended to its prompt)
 #   pause | resume             create/remove the pause file (worker and orchestrator wait)
+# After each task the worker (queue empty, AGENT_BOARD=<owner>/<project>, AGENT_AUTOPICK!=0) queues the top
+# "Ready for agents" card as pick-<repo>-<n> and moves it to Running; a failed or timed-out pick-* task sends its
+# card back to Inbox with the last log lines. See autopick below.
 # The worker is the only process that starts claude-task. It waits on flock, never on pgrep.
 set -euo pipefail
 Q=${AGENT_QUEUE_HOME:-$HOME/agent-queue}
@@ -32,13 +35,76 @@ now() { date +%s; }
 # find <dir> <name>: exact task file match (names may contain '-')
 find_task() { local f b; for f in "$Q/$1"/*.task; do b=${f##*/}; [[ ${b#*-} == "$2.task" ]] && { echo "$f"; return 0; }; done; return 1; }
 
+# --- pick on finish (AGENT_BOARD=<owner>/<project number>, e.g. rzvdaniel/17) ---
+GH=${AGENT_QUEUE_GH:-gh}
+SELF=$(readlink -f "$0")
+board_items() { # id<TAB>owner/repo<TAB>number<TAB>status, in board order
+  "$GH" project item-list "${AGENT_BOARD##*/}" --owner "${AGENT_BOARD%%/*}" --format json -L 200 \
+    --jq '.items[]|select(.content.type=="Issue")|[.id,.content.repository,.content.number,.status]|@tsv'
+}
+board_move() { # <owner/repo> <number> <status name>
+  local id pid f
+  id=$(board_items | awk -F'\t' -v r="$1" -v n="$2" '$2==r && $3==n {print $1; exit}')
+  [[ -n $id ]] || return 1
+  pid=$("$GH" project view "${AGENT_BOARD##*/}" --owner "${AGENT_BOARD%%/*}" --format json --jq .id) || return 1
+  f=$("$GH" project field-list "${AGENT_BOARD##*/}" --owner "${AGENT_BOARD%%/*}" --format json \
+    --jq ".fields[]|select(.name==\"Status\")|[.id,(.options[]|select(.name==\"$3\")|.id)]|@tsv") || return 1
+  [[ $f == *$'\t'* ]] || return 1
+  "$GH" project item-edit --id "$id" --project-id "$pid" --field-id "${f%%$'\t'*}" --single-select-option-id "${f#*$'\t'}" >/dev/null
+}
+# newest finished task file of a name in done/failed/cancelled
+last_finished() { local f best= d; for d in done failed cancelled; do for f in "$Q/$d"/*-"$1".task; do [[ -e $f && ${f#*/*-} != "" && $(b=${f##*/}; echo "${b#*-}") == "$1.task" ]] && { [[ -z $best || $f -nt $best ]] && best=$f; }; done; done; echo "$best"; }
+# send the card of a failed or timed-out pick-<repo>-<n> task back to Inbox with the last log lines
+return_card() { # <task name> <exit code>
+  [[ ${AGENT_AUTOPICK:-1} == 0 || -z ${AGENT_BOARD:-} || ! $1 =~ ^pick-(.+)-([0-9]+)$ ]] && return 0
+  local repo=${AGENT_BOARD%%/*}/${BASH_REMATCH[1]} num=${BASH_REMATCH[2]} why="failed (exit $2)" tail_
+  [[ $2 == 124 ]] && why="timed out"
+  tail_=$(tail -n 12 "$Q/logs/$1.log" 2>/dev/null | cut -c1-300 || true)
+  "$GH" issue comment "$num" -R "$repo" --body "Task \`$1\` $why. Moved back to Inbox. Last log lines:
+\`\`\`
+$tail_
+\`\`\`
+Comment here and move the card to Ready for agents to try again." >/dev/null 2>&1 || true
+  board_move "$repo" "$num" Inbox || true
+  f=$(last_finished "$1"); [[ -n $f ]] && touch "$f"   # after the comment: only newer comments reopen the card
+}
+# queue the top Ready card that is shaped and has no unanswered failure; one card per call
+autopick() {
+  [[ ${AGENT_AUTOPICK:-1} == 0 || -z ${AGENT_BOARD:-} || -e $Q/PAUSE ]] && return 0
+  local pend=("$Q"/pending/*.task); (( ${#pend[@]} )) && return 0
+  local id repo num st name info nsl done_ last f ft
+  while IFS=$'\t' read -r id repo num st; do
+    [[ $st == "Ready for agents" ]] || continue
+    name=pick-${repo##*/}-$num
+    info=$("$GH" issue view "$num" -R "$repo" --json labels,body,comments --jq \
+      '[([.labels[].name]|index("needs-shape")!=null), (.body|test("(^|\\n)\\W*Done when";"i")), ((.comments|map(.createdAt)|last) // "none")]|@tsv' 2>/dev/null) || continue
+    IFS=$'\t' read -r nsl done_ last <<< "$info"
+    if [[ $nsl == true || $done_ != true ]]; then
+      "$GH" issue comment "$num" -R "$repo" --body "Moved back to Inbox: the issue has the needs-shape label or no Done when section. Add a Done when, then move the card to Ready for agents." >/dev/null 2>&1 || true
+      board_move "$repo" "$num" Inbox || true
+      echo "$(date -Is) autopick $name unshaped, moved back" >> "$Q/worker.log"; continue
+    fi
+    f=$(last_finished "$name")
+    if [[ -n $f && $f == */failed/* ]]; then
+      ft=$(stat -c %Y "$f"); [[ $last != none ]] && (( $(date -d "$last" +%s) > ft )) || continue
+    fi
+    "$SELF" add "$name" >/dev/null 2>>"$Q/worker.log" <<< "Implement https://github.com/$repo/issues/$num. Follow the repository's AGENTS.md. Stop at the merged pull request: do not release, upgrade or deploy. Write the handoff on the issue." || continue
+    board_move "$repo" "$num" Running || true
+    echo "$(date -Is) autopick $name" >> "$Q/worker.log"; return 0
+  done < <(board_items)
+}
+
 cmd=${1:-status}; shift || true
 case $cmd in
 add)
   name=${1:?usage: agent-queue add <name> [prompt-file]}; valid "$name"
   shopt -s nullglob
+  exec 8> "$Q/add.lock"; flock 8   # Overseer Pick-up and the worker never queue the same card twice
   find_task pending "$name" >/dev/null && die "$name is already queued"
   find_task running "$name" >/dev/null && die "$name is already running"
+  if [[ $name == pick-* ]]; then
+    f=$(last_finished "$name"); [[ -z $f ]] || (( $(date +%s) - $(stat -c %Y "$f") > 3600 )) || die "$name finished within the last hour"
+  fi
   # impl-<N> / impl-apps-<N>: refuse an issue that isn't shaped yet (needs-shape label, no Done when).
   if [[ $name =~ ^impl-(apps-)?([0-9]+)(-|$) ]] && command -v "${AGENT_QUEUE_GH:-gh}" >/dev/null; then
     num=${BASH_REMATCH[2]} repo=rzvdaniel/automaton; [[ -n ${BASH_REMATCH[1]} ]] && repo=rzvdaniel/automaton-apps
@@ -147,8 +213,9 @@ worker)
       rm -f "$Q/running/.requeue-$n"; rm -f "$Q/running/$b"
       cp "$Q/.requeue-$n" "$Q/pending/$(date +%s%N)-$n.task"; rm -f "$Q/.requeue-$n"; st=requeued
     elif (( rc == 0 )); then mv "$Q/running/$b" "$Q/done/$b"; st=done
-    else mv "$Q/running/$b" "$Q/failed/$b"; st="failed($rc)"; fi
+    else mv "$Q/running/$b" "$Q/failed/$b"; st="failed($rc)"; touch "$Q/failed/$b"; return_card "$n" "$rc" || true; fi
     echo "$(date -Is) end $n $st" >> "$Q/worker.log"
+    autopick || echo "$(date -Is) autopick error" >> "$Q/worker.log"
   done ;;
 *) die "unknown command '$cmd'" ;;
 esac
