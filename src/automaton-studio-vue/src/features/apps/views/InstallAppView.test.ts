@@ -44,6 +44,18 @@ describe('InstallAppView', () => {
     expect(install.attributes('disabled')).toBeUndefined()
   })
 
+  it('shows the app README before install, and nothing when the app ships none', async () => {
+    vi.mocked(appsService.getInstallSource).mockResolvedValue({ id: 'src-1', name: 'Gauntlet', readme: '# Gauntlet\n\nRuns **trials**.', application: {} })
+    const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="install-readme"]').html()).toContain('<strong>trials</strong>')
+
+    vi.mocked(appsService.getInstallSource).mockResolvedValue({ id: 'src-1', name: 'Plain', application: {} })
+    const plain = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
+    await flushPromises()
+    expect(plain.find('[data-testid="install-readme"]').exists()).toBe(false)
+  })
+
   it('installs with settings, secrets, approval and a schedule, in order', async () => {
     vi.mocked(appsService.getInstallSource).mockResolvedValue({
       id: 'src-1', name: 'Off-site Backup', creatorDisplayName: 'Me',
