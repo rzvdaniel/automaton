@@ -1,0 +1,17 @@
+name: Agent pick next
+
+# Restarts the chain after a pause; every agent-issue run also picks at its end.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pick:
+    runs-on: [self-hosted, agent]
+    timeout-minutes: 5
+    steps:
+      - run: bash "$HOME/automaton/.agents/tools/agent-board.sh" pick
