@@ -70,7 +70,7 @@ public static class CatalogUpdateCommand
         }
         if (check)
         {
-            if (asJson) WriteCheck(update, appId, retryOnly);
+            await ReportCheckAsync(client, app, name, update, noSchedules, scheduleNames, asJson, retryOnly);
             Environment.ExitCode = UpdateAvailableExitCode;
             return;
         }
@@ -88,9 +88,8 @@ public static class CatalogUpdateCommand
         var installed = CatalogInstallCommand.Text(update, "installedCommit");
         var latest = CatalogInstallCommand.Text(update, "latestCommit");
         var newSecrets = CatalogInstallCommand.Strings(update, "newSecrets");
-        var source = await client.GetCatalogInstallSourceAsync(CatalogInstallCommand.Text(app, "installedFromRepo"), CatalogInstallCommand.Text(app, "installedFromFolder"), latest);
-        var application = source.TryGetProperty("application", out var contract) ? contract : default;
-        var schedules = CatalogSchedules.Select(application, noSchedules, scheduleNames);
+        var application = await ContractAsync(client, app, latest);
+        var (plan, _) = await PlanSchedulesAsync(client, app, name, update, noSchedules, scheduleNames);
         var required = await RequiredSecretsAsync(client, application, newSecrets, secrets);
         var missing = required.Where(secret => !secrets.ContainsKey(secret)).ToList();
         if (missing.Count > 0) AskForSecrets(missing, secrets, secretsStdin, asJson, appReference);
@@ -98,16 +97,16 @@ public static class CatalogUpdateCommand
         try
         {
             foreach (var (key, value) in secrets) await client.SetSecretAsync(appId, "app", key, value, null);
-            var waitFor = wait || schedules.Count > 0;
+            var waitFor = wait || plan.Any(change => change.Kind != ScheduleChange.Keep);
             var deployment = await client.UpdateCatalogAppAsync(appId, confirmEdited, waitFor);
             var failure = waitFor ? CatalogInstallCommand.DeploymentFailure(deployment) : null;
             if (failure is not null) throw new InvalidOperationException(failure);
-            var (created, existing) = await CatalogSchedules.CreateAsync(client, appId, name, schedules);
+            var (created, updatedSchedules, removedSchedules) = await CatalogScheduleSync.ApplyAsync(client, appId, name, plan);
             wait = waitFor;
             var operationId = CatalogInstallCommand.Text(deployment, "operationId");
-            if (asJson) CliJson.Write(new { success = true, appId, updated = true, installedCommit = installed, latestCommit = latest, deployed = wait, schedulesCreated = created, operationId = operationId.Length > 0 ? operationId : null });
+            if (asJson) CliJson.Write(new { success = true, appId, updated = true, installedCommit = installed, latestCommit = latest, deployed = wait, schedulesCreated = created, schedulesUpdated = updatedSchedules, schedulesRemoved = removedSchedules, schedulesKept = plan.Where(change => change.Kind == ScheduleChange.Keep).Select(change => change.Name), operationId = operationId.Length > 0 ? operationId : null });
             else Console.WriteLine(retry ? (wait ? $"Redeployed {name} at {Short(latest)}." : $"Retrying the deploy of {name} at {Short(latest)}. Check it with: automaton apps show {appId}") : wait ? $"Updated and deployed {name} to {Short(latest)}." : $"Updating {name} to {Short(latest)}; deployment started. Check it with: automaton apps show {appId}");
-            if (!asJson) CatalogInstallCommand.PrintSchedules(created, existing);
+            if (!asJson) PrintScheduleChanges(created, updatedSchedules, removedSchedules, plan);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException && secrets.Count > 0)
         {
@@ -137,7 +136,43 @@ public static class CatalogUpdateCommand
         }
     }
 
-    private static void WriteCheck(JsonElement update, string appId, bool retry)
+    private static async Task ReportCheckAsync(AutomatonApiClient client, JsonElement app, string name, JsonElement update, bool noSchedules, string[] scheduleNames, bool asJson, bool retryOnly)
+    {
+        var plan = (await PlanSchedulesAsync(client, app, name, update, noSchedules, scheduleNames)).Plan;
+        if (!asJson && plan.Count > 0) Console.WriteLine($"Schedules: {string.Join("; ", plan.Select(CatalogScheduleSync.Describe))}.");
+        if (asJson) WriteCheck(update, CatalogInstallCommand.Text(app, "id"), retryOnly, plan);
+    }
+
+    /// <summary>The new version's contract (for its required secrets and schedules).</summary>
+    private static async Task<JsonElement> ContractAsync(AutomatonApiClient client, JsonElement app, string commit)
+    {
+        var source = await client.GetCatalogInstallSourceAsync(CatalogInstallCommand.Text(app, "installedFromRepo"), CatalogInstallCommand.Text(app, "installedFromFolder"), commit);
+        return source.TryGetProperty("application", out var contract) ? contract : default;
+    }
+
+    /// <summary>What the update does to the app's default schedules: --no-schedules none; --schedule only those names, and nothing is removed then.</summary>
+    private static async Task<(List<ScheduleChange> Plan, List<JsonElement> Chosen)> PlanSchedulesAsync(AutomatonApiClient client, JsonElement app, string name, JsonElement update, bool noSchedules, string[] scheduleNames)
+    {
+        var application = await ContractAsync(client, app, CatalogInstallCommand.Text(update, "latestCommit"));
+        var chosen = CatalogSchedules.Select(application, noSchedules, scheduleNames);
+        if (noSchedules) return ([], chosen);
+        var all = CatalogSchedules.Select(application, false, []);
+        var installed = CatalogInstallCommand.Text(update, "installedCommit");
+        var previous = installed == CatalogInstallCommand.Text(update, "latestCommit") ? all
+            : await CatalogScheduleSync.ReadDeclaredAsync(client, CatalogInstallCommand.Text(app, "installedFromRepo"), CatalogInstallCommand.Text(app, "installedFromFolder"), installed);
+        var have = CatalogScheduleSync.ForApp(await client.ListActionSchedulesAsync(), CatalogInstallCommand.Text(app, "id"));
+        return (CatalogScheduleSync.Plan(name, have, previous, chosen, all, scheduleNames.Length == 0), chosen);
+    }
+
+    private static void PrintScheduleChanges(List<string> created, List<string> updated, List<string> removed, List<ScheduleChange> plan)
+    {
+        if (created.Count > 0) Console.WriteLine($"Created {created.Count} schedule(s): {string.Join(", ", created)}.");
+        if (updated.Count > 0) Console.WriteLine($"Updated {updated.Count} schedule(s): {string.Join(", ", plan.Where(change => change.Kind == ScheduleChange.Update).Select(CatalogScheduleSync.Describe))}.");
+        if (removed.Count > 0) Console.WriteLine($"Removed {removed.Count} schedule(s): {string.Join(", ", removed)}.");
+        foreach (var kept in plan.Where(change => change.Kind == ScheduleChange.Keep)) Console.WriteLine($"Schedule {CatalogScheduleSync.Describe(kept)}.");
+    }
+
+    private static void WriteCheck(JsonElement update, string appId, bool retry, List<ScheduleChange> plan)
     {
         var running = CatalogInstallCommand.Text(update, "runningCommit");
         var deployFailed = Flag(update, "deployFailed");
@@ -149,7 +184,8 @@ public static class CatalogUpdateCommand
             newSettings = CatalogInstallCommand.Strings(update, "newSettings"), newSecrets = CatalogInstallCommand.Strings(update, "newSecrets"),
             newPermissions = CatalogInstallCommand.Strings(update, "newPermissions"),
             deployFailed, deployError = deployFailed ? CatalogInstallCommand.Text(update, "deployError") : null,
-            runningCommit = running.Length > 0 ? running : null, retry
+            runningCommit = running.Length > 0 ? running : null, retry,
+            schedules = plan.Select(change => new { change = change.Kind, name = change.Name, detail = change.Detail })
         });
     }
 

@@ -34,22 +34,32 @@ public static class CatalogSchedules
             var name = Name(item);
             var full = $"{appName.Trim()}: {name}";
             if (have.Contains(full)) { existing.Add(name); continue; }
-            var cron = Str(item, "cron");
-            await client.CreateActionScheduleAsync(new
-            {
-                applicationId = appId, actionKey = Str(item, "action"), name = full,
-                description = Str(item, "description") is { Length: > 0 } text ? text : null,
-                executionScope = "AppRunner", scheduleType = cron.Length > 0 ? "Cron" : "Interval",
-                cronExpression = cron.Length > 0 ? cron : null,
-                intervalSeconds = cron.Length > 0 || !item.TryGetProperty("intervalSeconds", out var seconds) || seconds.ValueKind != JsonValueKind.Number ? (int?)null : seconds.GetInt32(),
-                timeZone = Str(item, "timeZone") is { Length: > 0 } zone ? zone : "Etc/UTC",
-                enabled = true, concurrencyPolicy = "SkipIfRunning", misfirePolicy = "Skip",
-                input = item.TryGetProperty("input", out var input) && input.ValueKind == JsonValueKind.Object ? input : JsonDocument.Parse("{}").RootElement
-            });
+            await client.CreateActionScheduleAsync(Body(appId, full, item, null));
             created.Add(name);
         }
         return (created, existing);
     }
 
-    private static string Str(JsonElement item, string property) => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(property, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : "";
+    /// <summary>The body Studio posts for a manifest schedule; <paramref name="current"/> (an existing schedule) keeps its on/off state and policies.</summary>
+    internal static object Body(string appId, string fullName, JsonElement item, JsonElement? current)
+    {
+        var cron = Str(item, "cron");
+        return new
+        {
+            applicationId = appId, actionKey = Str(item, "action"), name = fullName,
+            description = Str(item, "description") is { Length: > 0 } text ? text : null,
+            executionScope = "AppRunner", scheduleType = cron.Length > 0 ? "Cron" : "Interval",
+            cronExpression = cron.Length > 0 ? cron : null,
+            intervalSeconds = cron.Length > 0 || !item.TryGetProperty("intervalSeconds", out var seconds) || seconds.ValueKind != JsonValueKind.Number ? (int?)null : seconds.GetInt32(),
+            timeZone = Str(item, "timeZone") is { Length: > 0 } zone ? zone : "Etc/UTC",
+            enabled = current is null || Str(current.Value, "enabled") == "True",
+            concurrencyPolicy = Kept(current, "concurrencyPolicy", "SkipIfRunning"),
+            misfirePolicy = Kept(current, "misfirePolicy", "Skip"),
+            input = item.TryGetProperty("input", out var input) && input.ValueKind == JsonValueKind.Object ? input : JsonDocument.Parse("{}").RootElement
+        };
+    }
+
+    private static string Kept(JsonElement? current, string property, string fallback) => current is { } item && Str(item, property) is { Length: > 0 } value ? value : fallback;
+
+    internal static string Str(JsonElement item, string property) => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(property, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : "";
 }
