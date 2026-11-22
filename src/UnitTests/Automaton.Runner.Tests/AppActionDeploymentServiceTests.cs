@@ -61,6 +61,25 @@ public class AppActionDeploymentServiceTests
         }
     }
 
+    [Test]
+    public async Task PublishedActionRecordsThePythonItsEnvironmentWasBuiltFor()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var store = new AppActionVersionStore(workspace);
+        var staging = Path.Combine(root, "staging");
+        Directory.CreateDirectory(staging);
+        File.WriteAllText(Path.Combine(staging, "action.yaml"), "x");
+
+        Directory.CreateDirectory(workspace.GetAppActionRuntimeRoot(appId, targetId, "py"));
+        await store.PublishAsync(appId, targetId, "py", staging, "sha256:abc", CancellationToken.None,
+            "container:python:3.12-slim");
+
+        var current = workspace.GetAppActionCurrentDirectory(appId, targetId, "py");
+        Assert.That(AppActionVersionStore.ReadCurrentHash(current), Is.EqualTo("sha256:abc"));
+        Assert.That(AppActionVersionStore.ReadCurrentPythonRuntime(current), Is.EqualTo("container:python:3.12-slim"));
+    }
+
     private string CreateBashAction(Guid appId, Guid targetId, string script)
     {
         var directory = Path.Combine(workspace.GetAppSourceRoot(appId, targetId), "actions", "hello");
