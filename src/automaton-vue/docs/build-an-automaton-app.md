@@ -8,7 +8,7 @@ order: 70
 
 An app is a folder with `automaton.json` and source in any language. This page shows the two common shapes. The complete field list is the [automaton.json reference](./automaton-json).
 
-An app can describe itself: put a `docs/` folder next to `automaton.json` with `docs/README.md` as the entry page (other `.md` pages in `docs/` can be linked with relative links; images in `docs/` (png, jpg, svg, webp, up to 5 MB) show with `![Alt](plans.png)`). `automaton deploy` uploads it with the rest of the source, so each deployed version shows its own docs in the app's **Docs** tab in Studio and through `automaton docs <app>`. An app without `docs/` shows its description. Update the docs in the same change as the app.
+An app can describe itself: put a `docs/` folder next to `automaton.json` with `docs/README.md` as the entry page (other `.md` pages in `docs/` can be linked with relative links; images in `docs/` (png, jpg, svg, webp, up to 5 MB) show with `![Alt](plans.png)`). `automaton deploy` uploads it with the rest of the source, so each deployed version shows its own docs in the app's **Docs** tab in Studio and through `automaton docs <app>`. The catalog's install page shows the same `docs/README.md` (read at the pinned commit) as a README section before you install. An app without `docs/` shows its description. Update the docs in the same change as the app.
 
 ## Prerequisites
 

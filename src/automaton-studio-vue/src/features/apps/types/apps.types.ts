@@ -538,6 +538,8 @@ export interface InstallSource {
   description?: string | null
   creatorDisplayName?: string
   application?: InstallManifest | null
+  /** The app's docs/README.md (Markdown) for catalog and Git installs; absent when it ships none. */
+  readme?: string | null
   /** Set when the app comes from a Git repository (a catalog entry or a pasted URL) rather than this server. */
   git?: GitAppSource
 }

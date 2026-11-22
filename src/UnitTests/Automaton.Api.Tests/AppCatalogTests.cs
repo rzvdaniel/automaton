@@ -483,6 +483,20 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task GetSource_ReturnsTheDocsReadmeAtTheCommit_OrNullWhenThereIsNone()
+    {
+        var manifest = """{"name":"Hello","summary":"s","application":{}}""";
+        var with = Zip(("apps-" + Commit + "/hello/automaton.json", manifest), ("apps-" + Commit + "/hello/docs/README.md", "# Hello\n\nDoes things."), ("apps-" + Commit + "/README.md", "root"));
+        var without = Zip(("apps-" + Commit + "/hello/automaton.json", manifest), ("apps-" + Commit + "/README.md", "root"));
+
+        var found = await CreateInstaller(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(with) })).GetSourceAsync(new("owner/apps", "hello", Commit), default);
+        var missing = await CreateInstaller(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(without) })).GetSourceAsync(new("owner/apps", "hello", Commit), default);
+
+        Assert.That(found.Readme, Is.EqualTo("# Hello\n\nDoes things."));
+        Assert.That(missing.Readme, Is.Null);
+    }
+
+    [Test]
     public void GetSource_WithoutAutomatonJson_IsRefused()
     {
         var zip = Zip(("apps-" + Commit + "/README.md", "hi"));

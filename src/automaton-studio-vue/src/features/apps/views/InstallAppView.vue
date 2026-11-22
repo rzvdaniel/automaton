@@ -13,6 +13,7 @@ import { actionSchedulesService } from '../services/action-schedules.service'
 import { adminAppsService } from '@/features/admin/services/adminAppsService'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { getDeploymentTargetRunnerOptions } from '../utils/deployment-target-runner'
+import { renderMarkdown } from '@/shared/utils/markdown'
 import { describeCron } from '../utils/app-overview'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { InstallManifest, InstallSource } from '../types/apps.types'
@@ -43,6 +44,7 @@ const error = ref<string | null>(null)
 
 const manifest = computed<InstallManifest>(() => source.value?.application ?? {})
 const isAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+const readmeHtml = computed(() => (source.value?.readme?.trim() ? renderMarkdown(source.value.readme) : ''))
 const permissions = computed(() => manifest.value.permissions ?? [])
 const missingRequired = computed(() => [
   ...(manifest.value.settings ?? []).filter((item) => item.required && !item.default && !settings[item.name]?.trim()).map((item) => item.name),
@@ -309,6 +311,11 @@ function openInstalledApp() {
               <dd><a :href="`https://github.com/${source.git.repo}/tree/${source.git.commit}/${source.git.folder}`" target="_blank" rel="noopener"><code>{{ source.git.commit.slice(0, 12) }}</code></a></dd>
             </dl>
             <small class="text-color-secondary">You get your own copy; you can install the same app more than once.</small>
+          </section>
+
+          <section v-if="readmeHtml" class="install-summary flex flex-column gap-2" aria-labelledby="install-readme">
+            <h3 id="install-readme" class="m-0">README</h3>
+            <article class="prose" data-testid="install-readme" v-html="readmeHtml" />
           </section>
 
           <section v-if="permissions.length" class="install-summary flex flex-column gap-2" aria-labelledby="install-permissions">

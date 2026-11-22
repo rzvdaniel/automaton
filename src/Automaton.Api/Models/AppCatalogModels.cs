@@ -75,6 +75,8 @@ public sealed class CatalogInstallSourceModel
     public string Folder { get; set; } = string.Empty;
     public string Commit { get; set; } = string.Empty;
     public ApplicationContract? Application { get; set; }
+    /// <summary>The app's docs/README.md at the pinned commit, or null when it ships none (or it is too large).</summary>
+    public string? Readme { get; set; }
 }
 
 public sealed class CatalogInstallRequest

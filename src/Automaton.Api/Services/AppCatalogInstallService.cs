@@ -83,8 +83,20 @@ public sealed partial class AppCatalogInstallService(
             Repo = source.Repo,
             Folder = source.Folder,
             Commit = source.Commit,
-            Application = manifest.Application
+            Application = manifest.Application,
+            Readme = await ReadReadmeAsync(package, source, cancellationToken)
         };
+    }
+
+    private const int MaxReadmeBytes = 256 * 1024;
+
+    /// <summary>docs/README.md from the app's folder; null when missing or larger than 256 KB.</summary>
+    internal static async Task<string?> ReadReadmeAsync(ZipArchive package, GitAppSource source, CancellationToken cancellationToken)
+    {
+        var file = AppFiles(package, source).FirstOrDefault(item => item.Path == "docs/README.md");
+        if (file.Entry is null || file.Entry.Length > MaxReadmeBytes) return null;
+        using var reader = new StreamReader(file.Entry.Open());
+        return await reader.ReadToEndAsync(cancellationToken);
     }
 
     public async Task<AppModel> InstallAsync(CatalogInstallRequest request, CancellationToken cancellationToken)
