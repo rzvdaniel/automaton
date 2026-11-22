@@ -47,6 +47,22 @@ public class AiGuidancePackServiceTests
     }
 
     [Test]
+    public void Sync_WritesGeneratedFilesWithoutByteOrderMark()
+    {
+        var projectRoot = CreateTempDirectory("automaton-cli-guidance-bom");
+        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}\n");
+
+        var result = new AiGuidancePackService().Sync(projectRoot, GetExportSources(), AiGuidanceAdapters.Claude);
+
+        Assert.That(result.GeneratedFiles, Is.Not.Empty);
+        foreach (var path in result.GeneratedFiles)
+        {
+            var head = File.ReadAllBytes(path).Take(3).ToArray();
+            Assert.That(head, Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }), path);
+        }
+    }
+
+    [Test]
     public void Sync_RemovesPreviouslyGeneratedReferencesAndManifest()
     {
         var projectRoot = CreateTempDirectory("automaton-cli-guidance-cleanup");

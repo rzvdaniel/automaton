@@ -30,7 +30,7 @@ public sealed class AiGuidancePackService
                 Directory.CreateDirectory(targetDirectory);
             }
 
-            File.WriteAllText(targetPath, RenderVariables(source.Content, variables), Encoding.UTF8);
+            File.WriteAllText(targetPath, RenderVariables(source.Content, variables), new UTF8Encoding(false));
             generatedFiles.Add(targetPath);
         }
         DeleteLegacyAiGuidance(directory);
@@ -205,7 +205,7 @@ public sealed class AiGuidancePackService
                 Directory.CreateDirectory(targetDirectory);
             }
 
-            File.WriteAllText(targetPath, content + Environment.NewLine, Encoding.UTF8);
+            File.WriteAllText(targetPath, content + Environment.NewLine, new UTF8Encoding(false));
             generatedFiles.Add(targetPath);
         }
     }
