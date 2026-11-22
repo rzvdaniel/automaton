@@ -1,0 +1,22 @@
+name: Agent lessons
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent
+  cancel-in-progress: false
+
+jobs:
+  lessons:
+    uses: ./.github/workflows/agent-job.yml
+    with:
+      prompt-file: .agents/jobs/lessons.md
+      timeout: 60m
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

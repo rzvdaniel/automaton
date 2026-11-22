@@ -1,0 +1,50 @@
+name: Agent issue
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    # Only the owner or the bot adding agent:go; never a pull_request trigger.
+    if: github.event.label.name == 'agent:go' && contains(fromJSON('["rzvdaniel","rzvdaniel-bot"]'), github.actor)
+    concurrency:
+      group: agent
+      cancel-in-progress: false
+    runs-on: [self-hosted, agent]
+    timeout-minutes: 190
+    steps:
+      - name: Run Claude
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          PROMPT_FILE: .agents/jobs/implement-issue.md
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          AGENT_TASK_TIMEOUT: 180m
+        run: bash "$HOME/automaton/.agents/tools/agent-run.sh"
+
+  finish:
+    needs: run
+    if: always() && needs.run.result != 'skipped'
+    runs-on: [self-hosted, agent]
+    timeout-minutes: 10
+    env:
+      REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.issue.number }}
+      RESULT: ${{ needs.run.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Move the card and pick the next one
+        run: |
+          B="$HOME/automaton/.agents/tools/agent-board.sh"
+          gh issue edit "$NUMBER" -R "$REPO" --remove-label agent:go || true
+          if [ "$RESULT" = success ]; then
+            "$B" move "$REPO" "$NUMBER" "In review" || true
+          else
+            gh issue edit "$NUMBER" -R "$REPO" --add-label agent:failed || true
+            gh issue comment "$NUMBER" -R "$REPO" --body "Agent run failed ($RESULT): $RUN_URL. Back to Ready. Comment here to let it run again." || true
+            "$B" move "$REPO" "$NUMBER" "Ready for agents" || true
+          fi
+          "$B" pick
