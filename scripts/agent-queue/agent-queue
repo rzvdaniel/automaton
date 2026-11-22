@@ -39,6 +39,14 @@ add)
   shopt -s nullglob
   find_task pending "$name" >/dev/null && die "$name is already queued"
   find_task running "$name" >/dev/null && die "$name is already running"
+  # impl-<N> / impl-apps-<N>: refuse an issue that isn't shaped yet (needs-shape label, no Done when).
+  if [[ $name =~ ^impl-(apps-)?([0-9]+)(-|$) ]] && command -v "${AGENT_QUEUE_GH:-gh}" >/dev/null; then
+    num=${BASH_REMATCH[2]} repo=rzvdaniel/automaton; [[ -n ${BASH_REMATCH[1]} ]] && repo=rzvdaniel/automaton-apps
+    shape=$("${AGENT_QUEUE_GH:-gh}" issue view "$num" -R "$repo" --json labels,body \
+      --jq '([.labels[].name]|index("needs-shape")!=null), (.body|test("(^|\\n)\\W*Done when"; "i"))' 2>/dev/null | tr '\n' ' ')
+    [[ $shape == "true "* ]] && die "$repo#$num has needs-shape: add a Done when first"
+    [[ $shape == *" false " ]] && die "$repo#$num has no Done when section"
+  fi
   seq=$(date +%s%N)
   if [[ -n ${2:-} ]]; then cp "$2" "$Q/pending/$seq-$name.task.tmp"; else cat > "$Q/pending/$seq-$name.task.tmp"; fi
   [[ -s $Q/pending/$seq-$name.task.tmp ]] || { rm -f "$Q/pending/$seq-$name.task.tmp"; die "empty prompt"; }

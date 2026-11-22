@@ -11,6 +11,14 @@ sleep 1; echo "end $1" >> "$AGENT_QUEUE_HOME/order"
 F
 chmod +x "$t/fake"; export AGENT_QUEUE_RUNNER=$t/fake
 fail() { echo "FAIL: $*"; exit 1; }
+cat > "$t/gh" <<'F'
+#!/usr/bin/env bash
+case "$*" in *" 7 "*) printf 'true\nfalse\n';; *" 8 "*) printf 'false\nfalse\n';; *) printf 'false\ntrue\n';; esac
+F
+chmod +x "$t/gh"
+AGENT_QUEUE_GH=$t/gh bash -c 'echo x | "$0" add impl-7' "$d/agent-queue" 2>/dev/null && fail "needs-shape issue queued" || true
+AGENT_QUEUE_GH=$t/gh bash -c 'echo x | "$0" add impl-apps-8' "$d/agent-queue" 2>/dev/null && fail "issue without Done when queued" || true
+AGENT_QUEUE_GH=$t/gh bash -c 'echo x | "$0" add impl-9' "$d/agent-queue" >/dev/null || fail "shaped issue refused"; "$d/agent-queue" cancel impl-9 >/dev/null
 for x in a b c d; do echo $x | "$d/agent-queue" add $x; done
 echo again | "$d/agent-queue" add a 2>/dev/null && fail "duplicate accepted" || true
 echo x | "$d/agent-queue" add x-e; echo y | "$d/agent-queue" add e; "$d/agent-queue" cancel e >/dev/null; [[ -n $(ls "$t"/q/pending/*-x-e.task) && -z $(ls "$t"/q/pending/*-e.task 2>/dev/null | grep -v x-e) ]] || fail "cancel e hit x-e"; "$d/agent-queue" cancel x-e >/dev/null
