@@ -34,7 +34,7 @@ public sealed class RunnerUpgradeService(
         if (!RunnerPresenceEvaluator.IsOnline(entity.ConnectionId, entity.LastHeartbeatAtUtc, DateTime.UtcNow))
             throw new InvalidOperationException("The Runner is offline. Run the manual upgrade command on its server instead.");
         if (IsCurrent(entity.ImageDigest, image))
-            throw new InvalidOperationException("The Runner already uses the current image.");
+            return new(id, RunnerUpgradeStates.Reconnected, "The Runner already uses the current image.", entity.ImageDigest);
         var since = DateTime.UtcNow - BusyWindow;
         if (await IsBusyAsync(id, since, token))
             throw new InvalidOperationException("The Runner is running a deploy or an Action. Try again when it has finished.");

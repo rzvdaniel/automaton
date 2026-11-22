@@ -77,7 +77,9 @@ public sealed class RunnerUpgradeServiceTests
     public async Task ARunnerOnTheCurrentImageIsNotUpgraded()
     {
         var (service, fake, runner, _) = SetUp(digest: Image);
-        Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(runner, default));
+        var status = await service.StartAsync(runner, default);
+        Assert.That(status.State, Is.EqualTo(RunnerUpgradeStates.Reconnected));
+        Assert.That(status.Message, Does.Contain("already uses the current image"));
         Assert.That(fake.Kind, Is.Null);
     }
 
