@@ -48,7 +48,8 @@ internal static partial class RunnerUpgradeCommand
             # A pinned image is reported exactly as configured: RepoDigests may list another digest first.
             case "$image" in *@sha256:*) resolved="$image" ;; *) resolved=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image") ;; esac
             case "$resolved" in *@sha256:*) ;; *) echo 'The Runner image did not resolve to an immutable digest.' >&2; exit 1 ;; esac
-            if [ "$(docker inspect --format '{{.Image}}' "$container")" = "$(docker image inspect --format '{{.Id}}' "$image")" ]               && docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" | grep -Fxq {{{nameLine}}}; then
+            if [ "$(docker inspect --format '{{.Image}}' "$container")" = "$(docker image inspect --format '{{.Id}}' "$image")" ]               && docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" | grep -Fxq {{{nameLine}}} \
+              && docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" | grep -Fxq "AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved"; then
               echo 'The Runner already uses the current image.'
               exit 0
             fi

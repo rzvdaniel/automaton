@@ -67,4 +67,11 @@ public sealed class RunnerUpgradeCommandTests
         var script = RunnerUpgradeCommand.BuildScript(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", Image, "Runner");
         Assert.That(script, Does.Contain("case \"$image\" in *@sha256:*) resolved=\"$image\" ;;"));
     }
+
+    [Test]
+    public void ARunnerThatReportsAnotherDigestIsRecreatedEvenOnTheCurrentImage()
+    {
+        var script = RunnerUpgradeCommand.BuildScript(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", Image, "Runner");
+        Assert.That(script, Does.Contain("grep -Fxq \"AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved\""));
+    }
 }
