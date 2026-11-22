@@ -144,7 +144,13 @@ public sealed class AppActionDeploymentService
             appId,
             deploymentTargetId,
             action.Key);
-        if (string.Equals(AppActionVersionStore.ReadCurrentHash(currentDirectory), contentHash, StringComparison.Ordinal))
+        // A virtual environment links to the Python it was built with. The same content built for another Python
+        // (host Runner or another container image) is rebuilt, so the Action starts where it will run.
+        var pythonRuntime = action.Manifest.Spec.Runtime == AppActionRuntimes.Python
+            ? machineManagement ? $"container:{containerPolicy!.RuntimeImage}" : "host"
+            : null;
+        if (string.Equals(AppActionVersionStore.ReadCurrentHash(currentDirectory), contentHash, StringComparison.Ordinal)
+            && string.Equals(AppActionVersionStore.ReadCurrentPythonRuntime(currentDirectory), pythonRuntime, StringComparison.Ordinal))
         {
             return new AppActionDeploymentResult
             {
@@ -185,7 +191,7 @@ public sealed class AppActionDeploymentService
 
             AppActionDeploymentOutputGuard.CopyValidatedTree(stagingDirectory, publishingDirectory);
             await versionStore.PublishAsync(appId, deploymentTargetId, action.Key,
-                publishingDirectory, contentHash, cancellationToken);
+                publishingDirectory, contentHash, cancellationToken, pythonRuntime);
             return new AppActionDeploymentResult
             {
                 ActionKey = action.Key,

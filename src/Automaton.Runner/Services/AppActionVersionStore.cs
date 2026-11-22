@@ -75,13 +75,14 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
         string actionKey,
         string stagingDirectory,
         string contentHash,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? pythonRuntime = null)
     {
         var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, actionKey);
         await AppActionDeploymentOutputGuard.WriteMetadataAsync(
             stagingDirectory,
             DeploymentMetadataFileName,
-            JsonSerializer.Serialize(new { contentHash, preparedAtUtc = DateTime.UtcNow }),
+            JsonSerializer.Serialize(new { contentHash, preparedAtUtc = DateTime.UtcNow, pythonRuntime }),
             cancellationToken);
         AppActionDeploymentOutputGuard.EnsureSafeTree(stagingDirectory);
 
@@ -119,6 +120,15 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
         if (!File.Exists(path)) return null;
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         return document.RootElement.TryGetProperty("contentHash", out var value) ? value.GetString() : null;
+    }
+
+    /// <summary>The Python the current deployment's virtual environment was built for, or null when not recorded.</summary>
+    public static string? ReadCurrentPythonRuntime(string currentDirectory)
+    {
+        var path = Path.Combine(currentDirectory, DeploymentMetadataFileName);
+        if (!File.Exists(path)) return null;
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        return document.RootElement.TryGetProperty("pythonRuntime", out var value) ? value.GetString() : null;
     }
 
     public static string HashSuffix(string? hash)
