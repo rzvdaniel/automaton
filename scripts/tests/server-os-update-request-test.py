@@ -8,6 +8,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 
 REPO = Path(__file__).resolve().parents[2]
@@ -18,13 +19,21 @@ FAKE_APT = r'''#!/usr/bin/env bash
 state="$AUTOMATON_FAKE_DIR/done"
 echo "$*" >> "$AUTOMATON_FAKE_DIR/calls"
 if [[ "$1" == -s ]]; then
-    [[ -e "$state" ]] && exit 0
-    echo 'Inst openssl [1] (2 Ubuntu:24.04/noble-security [amd64])'
-    echo 'Inst vim [1] (2 Ubuntu:24.04/noble-updates [amd64])'
+    if [[ ! -e "$state" ]]; then
+        echo 'Inst openssl [1] (2 Ubuntu:24.04/noble-security [amd64])'
+        echo 'Inst vim [1] (2 Ubuntu:24.04/noble-updates [amd64])'
+    fi
+    echo 'The following packages have been kept back:'
+    echo '  linux-image-generic linux-headers-generic'
+    echo '0 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.'
     exit 0
 fi
 [[ -e "$AUTOMATON_FAKE_FAIL" ]] && { echo 'E: could not get lock'; exit 100; }
 echo "apt ran: $*"
+echo 'Unpacking openssl (2) over (1) ...'
+[[ -n "$AUTOMATON_FAKE_SLOW" ]] && sleep 2
+echo 'Unpacking vim (2) over (1) ...'
+echo 'Setting up vim (2) ...'
 touch "$state"
 '''
 
@@ -100,6 +109,36 @@ class OsUpdateFromRequestTests(unittest.TestCase):
         self.assertIn('-o Dpkg::Options::=--force-confold', upgrade[0])
         self.assertTrue(self.status()['restartRequired'])
 
+    def test_all_scope_reports_total_progress_and_the_packages_apt_holds_back(self):
+        self.request({'requestedBy': 'x', 'scope': 'all'})
+        self.assertEqual(self.run_script().returncode, 0)
+        status = self.status()
+        self.assertEqual((status['totalCount'], status['progressCount']), (2, 2))
+        self.assertIsNone(status['currentPackage'])
+        self.assertEqual(status['heldBack'], ['linux-image-generic', 'linux-headers-generic'])
+
+    def test_status_shows_progress_and_the_current_package_while_apt_runs(self):
+        self.environment['AUTOMATON_FAKE_SLOW'] = '1'
+        self.environment['AUTOMATON_OS_UPDATE_POLL'] = '0.5'
+        self.request({'requestedBy': 'x', 'scope': 'all'})
+        process = subprocess.Popen(['bash', str(SCRIPT), '--install-dir', str(self.install)], env=self.environment,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        seen = None
+        for _ in range(40):
+            time.sleep(0.2)
+            try:
+                status = self.status()
+            except (OSError, ValueError):
+                continue
+            if status['state'] == 'running' and status.get('progressCount'):
+                seen = status
+                break
+        process.communicate(timeout=30)
+        self.assertIsNotNone(seen, 'no running status with progress was written')
+        self.assertEqual(seen['totalCount'], 2)
+        self.assertIn('Unpacking', seen['currentPackage'])
+        self.assertIsNone(seen['heldBack'])
+
     def test_a_failed_apt_run_is_reported_with_its_log(self):
         self.fail_marker.write_text('')
         self.request({'requestedBy': 'x', 'scope': 'all'})
@@ -107,6 +146,7 @@ class OsUpdateFromRequestTests(unittest.TestCase):
         status = self.status()
         self.assertEqual(status['state'], 'failed')
         self.assertIn('could not get lock', status['logTail'])
+        self.assertEqual(status['errorLine'], 'E: could not get lock')
 
     def test_refuses_while_a_backup_holds_its_lock(self):
         self.backup_lock.write_text('')

@@ -16,7 +16,12 @@ public sealed record ServerOsUpdateStatus(
     bool? RestartRequired,
     string? RequestedBy,
     string? Message,
-    string? LogTail);
+    string? LogTail,
+    int? TotalCount = null,
+    int? ProgressCount = null,
+    string? CurrentPackage = null,
+    string? ErrorLine = null,
+    IReadOnlyList<string>? HeldBack = null);
 
 /// <summary>
 /// Installs the host's OS updates. Like backups, server updates and restarts, the API never runs apt: it drops a request
@@ -37,7 +42,9 @@ public static class ServerOsUpdate
         string state = "idle";
         string? scope = null, requestedBy = null, message = null, logTail = null;
         DateTimeOffset? requestedAt = null, finishedAt = null;
-        int? upgraded = null;
+        int? upgraded = null, total = null, progress = null;
+        string? current = null, errorLine = null;
+        IReadOnlyList<string>? heldBack = null;
         bool? restartRequired = null;
         var requests = RequestsDirectory(configuration);
         try
@@ -55,6 +62,8 @@ public static class ServerOsUpdate
                     scope = file.Scope; requestedBy = file.RequestedBy; message = file.Message; logTail = file.LogTail;
                     requestedAt = file.RequestedAtUtc; finishedAt = file.FinishedAtUtc;
                     upgraded = file.UpgradedCount; restartRequired = file.RestartRequired;
+                    total = file.TotalCount; progress = file.ProgressCount; current = file.CurrentPackage; errorLine = file.ErrorLine;
+                    heldBack = file.HeldBack?.Where(name => !string.IsNullOrWhiteSpace(name)).Take(50).ToArray();
                 }
             }
         }
@@ -64,7 +73,8 @@ public static class ServerOsUpdate
         }
         var target = Path.Combine(requests, "request.json");
         if (File.Exists(target) || Directory.Exists(target)) state = "requested";
-        return new(Directory.Exists(requests), state, scope, requestedAt, finishedAt, upgraded, restartRequired, requestedBy, message, logTail);
+        return new(Directory.Exists(requests), state, scope, requestedAt, finishedAt, upgraded, restartRequired, requestedBy, message, logTail,
+            total, progress, current, errorLine, heldBack);
     }
 
     /// <summary>True while an OS update is waiting for the host or running, so a restart or a second update must wait.</summary>
@@ -125,5 +135,10 @@ public static class ServerOsUpdate
         public bool? RestartRequired { get; init; }
         public string? Message { get; init; }
         public string? LogTail { get; init; }
+        public int? TotalCount { get; init; }
+        public int? ProgressCount { get; init; }
+        public string? CurrentPackage { get; init; }
+        public string? ErrorLine { get; init; }
+        public string[]? HeldBack { get; init; }
     }
 }
