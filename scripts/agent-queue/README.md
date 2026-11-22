@@ -29,3 +29,14 @@ tree is clean (no uncommitted or untracked files) and HEAD is exactly the head o
 its working directory. Ignored files (such as a local `.env`) go with the worktree. Everything else is kept and the reason is printed. `agent-cleanup caches` (Sundays 05:00)
 clears NuGet and npm caches when free space is under 15 GiB. `agent-cleanup disk` prints the free space; the morning
 report includes it. Repos: `AGENT_CLEAN_REPOS`; `AGENT_CLEAN_DRY=1` only prints. Not the server's own cleanup (Server Keeper).
+
+## Pick on finish, timeout, restart (#1556)
+
+With `AGENT_BOARD=<owner>/<project>` (for example `rzvdaniel/17`) in the worker's environment, the worker uses runner's own `gh`
+login: after every task, with nothing pending, it takes the top **Ready for agents** card, queues it as `pick-<repo>-<n>`
+and moves it to **Running**. A card with `needs-shape` or no **Done when** goes back to **Inbox** with one comment. A card
+whose last `pick-` task failed is skipped until the issue has a newer comment. A failed or timed-out `pick-` task moves its
+card to **Inbox** and comments the last 12 log lines. `agent-queue add pick-…` refuses a name that is pending, running or finished
+within the hour (Overseer's Pick-up uses the same names and stays as the backstop). `AGENT_AUTOPICK=0` turns it off.
+`claude-task` stops a run after `AGENT_TASK_TIMEOUT` (default `3h`, `timeout` syntax) and exits 124. To restart the worker after
+an error use `agent-queue-worker.service` (systemd, `Restart=always`).

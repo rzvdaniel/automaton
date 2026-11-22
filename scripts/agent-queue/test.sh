@@ -44,6 +44,44 @@ r=$(limit_deadline "hit your limit resets soonish"); (( r >= now + 3890 && r <= 
 n='Note from agent-queue: the previous run stopped at the usage limit.'
 echo task > "$t/lt"; for i in 1 2; do grep -qF "$n" "$t/lt" || printf '\n\n%s more\n' "$n" >> "$t/lt"; done
 [[ $(grep -cF "$n" "$t/lt") == 1 ]] || fail "note duplicated"
+# pick on finish: fake gh holding a board (Ready: 20 shaped+ok, 21 unshaped, 22 shaped+fails, 23 shaped+ok)
+b=$t/board; mkdir -p "$b"; for n in 20 21 22 23; do echo "Ready for agents" > "$b/$n"; done
+cat > "$t/ghb" <<F
+#!/usr/bin/env bash
+b=$b; a="\$*"
+case "\$a" in
+  "project item-list"*) for n in 20 21 22 23; do printf 'ID%s\to/automaton\t%s\t%s\n' \$n \$n "\$(cat \$b/\$n)"; done;;
+  "project view"*) echo PID;;
+  "project field-list"*) case "\$a" in *Inbox*) printf 'FID\tOPT-Inbox\n';; *Running*) printf 'FID\tOPT-Running\n';; esac;;
+  "project item-edit"*) id=\${a#*--id }; id=\${id%% *}; o=\${a##*option-id }; echo "\${o#OPT-}" > \$b/\${id#ID};;
+  "issue view"*) n=\$3; [[ \$n == 21 ]] && printf 'true\ttrue\tnone\n' || printf 'false\ttrue\t%s\n' "\$(cat \$b/comment-\$n 2>/dev/null || echo none)";;
+  "issue comment"*) n=\$3; echo "\$*" >> \$b/comments-\$n; date -u -d '+2 seconds' +%FT%TZ > \$b/comment-\$n;;
+esac
+F
+chmod +x "$t/ghb"
+cat > "$t/fake2" <<'F'
+#!/usr/bin/env bash
+cat >/dev/null; echo "run $1" >> "$AGENT_QUEUE_HOME/order2"; [[ $1 == pick-automaton-22 ]] && exit 3; exit 0
+F
+chmod +x "$t/fake2"
+rm -rf "$t/q/pending"/* "$t/q/done"/* "$t/q/failed"/*; cat "$t/q/order2" 2>/dev/null || true
+echo seed | "$d/agent-queue" add seed
+AGENT_QUEUE_RUNNER=$t/fake2 AGENT_QUEUE_GH=$t/ghb AGENT_BOARD=o/9 AGENT_QUEUE_ONCE=1 "$d/agent-queue" worker
+[[ $(tr '\n' ' ' < "$t/q/order2") == "run seed run pick-automaton-20 run pick-automaton-22 run pick-automaton-23 " ]] || fail "pick order: $(cat "$t/q/order2")"
+[[ $(cat $b/21) == Inbox && $(wc -l < $b/comments-21) == 1 ]] || fail "unshaped card not sent back once"
+[[ $(cat $b/22) == Inbox && $(cat $b/20) == Running ]] || fail "failed card not returned / ok card not Running"
+grep -q "Last log lines" $b/comments-22 || fail "no log lines on failed card"
+# failed card is skipped until a newer comment; unrelated Ready card is picked instead
+echo "Ready for agents" > $b/22; echo "Ready for agents" > $b/23
+echo seed | "$d/agent-queue" add seed2
+( cd "$t"; AGENT_QUEUE_RUNNER=$t/fake2 AGENT_QUEUE_GH=$t/ghb AGENT_BOARD=o/9 AGENT_QUEUE_ONCE=1 "$d/agent-queue" worker )
+tail -1 "$t/q/order2" | grep -q "pick-automaton-22" && fail "failed card picked again without a comment"
+# the same name is refused for an hour after it finished (no double pick)
+echo x | "$d/agent-queue" add pick-automaton-23 2>/dev/null && fail "recent pick re-queued" || true
+AGENT_AUTOPICK=0 AGENT_QUEUE_RUNNER=$t/fake2 AGENT_QUEUE_GH=$t/ghb AGENT_BOARD=o/9 AGENT_QUEUE_ONCE=1 "$d/agent-queue" worker
+# claude-task timeout
+mkdir -p "$t/bin"; printf '#!/bin/sh\nsleep 30\n' > "$t/bin/claude"; chmod +x "$t/bin/claude"
+git init -q "$t/ctw"; o=$(echo p | AGENT_WORKDIR=$t/ctw HOME=$t PATH=$t/bin:$PATH AGENT_TASK_TIMEOUT=2 "$d/claude-task" tt 2>&1 || true); [[ $o == *"timed out"* ]] || fail "claude-task did not time out: $o"
 # agent-cleanup: removes merged clean worktrees, keeps unpushed/dirty/open ones
 export AGENT_CLEAN_REPOS=$t/repo GH=$t/gh
 git init -q --bare "$t/origin.git"; git init -q -b main "$t/repo"; cd "$t/repo"
