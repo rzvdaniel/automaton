@@ -15,9 +15,9 @@ const hook: ActionWebhook = {
   url: 'https://api.example.test/api/hooks/w1', calls: [{ calledAtUtc: new Date().toISOString(), outcome: 'Started' }],
 }
 
-function mountIt(webhooks: ActionWebhook[] = [hook], canUpdate = true) {
+function mountIt(webhooks: ActionWebhook[] = [hook], canUpdate = true, adding = false) {
   return mount(AppActionWebhooks, {
-    props: { appId: 'a', actionKey: 'docs-walk', webhooks, canUpdate },
+    props: { appId: 'a', actionKey: 'docs-walk', actionName: 'Docs walk', webhooks, canUpdate, adding },
     global: { plugins: [PrimeVue, ToastService] },
   })
 }
@@ -35,7 +35,7 @@ describe('AppActionWebhooks', () => {
   it('adds a webhook and shows its secret once', async () => {
     vi.mocked(actionWebhooksService.create).mockResolvedValue({ ...hook, secret: 'whk_secret' })
     const wrapper = mountIt()
-    await wrapper.get('[data-testid="webhook-add"]').trigger('click')
+    await wrapper.setProps({ adding: true })
     await wrapper.get('[data-testid="webhook-name-input"]').setValue('Docs walk')
     await wrapper.get('[data-testid="webhook-create"]').trigger('click')
     await flushPromises()
@@ -47,10 +47,14 @@ describe('AppActionWebhooks', () => {
   it('rotates the secret and removes the webhook', async () => {
     vi.mocked(actionWebhooksService.rotate).mockResolvedValue({ ...hook, secret: 'whk_new' })
     const wrapper = mountIt()
+    await wrapper.get('[data-testid="webhook-edit"]').trigger('click')
     await wrapper.get('[data-testid="webhook-rotate"]').trigger('click')
+    await wrapper.get('[data-testid="webhook-rotate-confirm"]').trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-testid="webhook-secret"]').text()).toContain('whk_new')
     await wrapper.get('[data-testid="webhook-remove"]').trigger('click')
+    expect(actionWebhooksService.remove).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="webhook-remove-confirm"]').trigger('click')
     await flushPromises()
     expect(actionWebhooksService.remove).toHaveBeenCalledWith('a', 'w1')
   })
@@ -64,8 +68,9 @@ describe('AppActionWebhooks', () => {
   })
 
   it('offers no changes to people who cannot update the app', () => {
-    const wrapper = mountIt([hook], false)
-    expect(wrapper.find('[data-testid="webhook-add"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="webhook-rotate"]').exists()).toBe(false)
+    const wrapper = mountIt([hook], false, true)
+    expect(wrapper.find('[data-testid="webhook-add-form"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="webhook-edit"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="webhook-switch"]').exists()).toBe(false)
   })
 })

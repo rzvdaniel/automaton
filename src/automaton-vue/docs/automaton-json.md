@@ -226,6 +226,8 @@ Every installed app also receives `AUTOMATON_APP_ID`, its own app ID. Use it (or
 
 **From the CLI.** `automaton catalog install` and `automaton catalog update` create the manifest's schedules the same way (they wait for the deployment first, because the schedules name Actions) and print which ones they created. `--no-schedules` skips them; `--schedule "Name"` (repeatable) keeps only those. `update` adds schedules the app does not have yet and leaves existing ones alone.
 
+An app owner can also change an installed app's schedules in Studio: on the **Actions** tab each Action lists its triggers (schedules and webhooks). **Edit** on a schedule opens a form to run it every N minutes or hours, every day at a time, or on a cron expression, in a time zone, with the next three run times shown; **Delete…** asks first, and **+ Add schedule** adds one under the Action. Cron is the only stored timing: "every" and "daily at" only write the cron expression, and a stored expression that fits one of them opens as that choice. People who may only view the app see none of these buttons.
+
 ## Create or link
 
 Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`
