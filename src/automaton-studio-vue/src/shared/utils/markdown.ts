@@ -29,6 +29,26 @@ function renderInlineMarkdown(value: string): string {
   return html
 }
 
+function splitRow(line: string): string[] {
+  let row = line.trim()
+  if (row.startsWith('|')) row = row.slice(1)
+  if (row.endsWith('|') && !row.endsWith('\\|')) row = row.slice(0, -1)
+  return row.split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, '|'))
+}
+
+function isTableDivider(line: string): boolean {
+  const trimmed = line.trim()
+  return trimmed.includes('-') && /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$/.test(trimmed) && (trimmed.includes('|'))
+}
+
+function renderTable(header: string[], aligns: string[], rows: string[][]): string {
+  const cell = (tag: string, value: string, index: number) =>
+    `<${tag}${aligns[index] ? ` style="text-align:${aligns[index]}"` : ''}>${renderInlineMarkdown(value)}</${tag}>`
+  const head = `<tr>${header.map((value, i) => cell('th', value, i)).join('')}</tr>`
+  const body = rows.map((row) => `<tr>${header.map((_, i) => cell('td', row[i] ?? '', i)).join('')}</tr>`).join('')
+  return `<div class="table-scroll"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>`
+}
+
 export function renderMarkdown(markdown: string): string {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
   const html: string[] = []
@@ -49,7 +69,8 @@ export function renderMarkdown(markdown: string): string {
 
   let codeLines: string[] | null = null
 
-  for (const rawLine of lines) {
+  for (let index = 0; index < lines.length; index++) {
+    const rawLine = lines[index]!
     const line = rawLine.trim()
 
     if (line.startsWith('```')) {
@@ -66,6 +87,22 @@ export function renderMarkdown(markdown: string): string {
     if (codeLines !== null) {
       codeLines.push(rawLine)
       continue
+    }
+
+    if (line.includes('|') && index + 1 < lines.length && isTableDivider(lines[index + 1]!)) {
+      const header = splitRow(line)
+      const dividers = splitRow(lines[index + 1]!)
+      if (header.length === dividers.length) {
+        flushParagraph()
+        flushList()
+        const aligns = dividers.map((d) => (d.startsWith(':') && d.endsWith(':') ? 'center' : d.endsWith(':') ? 'right' : d.startsWith(':') ? 'left' : ''))
+        const rows: string[][] = []
+        index += 2
+        while (index < lines.length && lines[index]!.trim() && lines[index]!.includes('|')) rows.push(splitRow(lines[index++]!))
+        index--
+        html.push(renderTable(header, aligns, rows))
+        continue
+      }
     }
 
     if (!line) {
