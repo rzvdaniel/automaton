@@ -360,6 +360,9 @@ function openInstalledApp() {
 </template>
 
 <style scoped>
+.prose :deep(.table-scroll) { overflow-x: auto; max-width: 100%; margin: 12px 0; }
+.prose :deep(table) { border-collapse: collapse; font-size: 14px; }
+.prose :deep(th), .prose :deep(td) { border: 1px solid var(--line); padding: 6px 10px; vertical-align: top; }
 .install-app {
   max-width: 72rem;
 }

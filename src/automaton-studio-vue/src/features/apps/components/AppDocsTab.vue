@@ -92,4 +92,8 @@ onBeforeUnmount(revokeImages)
 .prose :deep(img) { max-width: 100%; height: auto; }
 .prose :deep(pre) { overflow: auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
 .prose :deep(code) { font-family: var(--mono); font-size: 13px; }
+.prose :deep(.table-scroll) { overflow-x: auto; max-width: 100%; margin: 12px 0; }
+.prose :deep(table) { border-collapse: collapse; font-size: 14px; }
+.prose :deep(th), .prose :deep(td) { border: 1px solid var(--line); padding: 6px 10px; vertical-align: top; }
+.prose :deep(th) { font-weight: 600; }
 </style>
