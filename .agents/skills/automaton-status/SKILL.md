@@ -1,18 +1,16 @@
 ---
 name: automaton-status
-description: Use when the owner asks for a status ("Status?", "End of day") or a morning report ("Morning", "What happened overnight?"). Publishes a live status page as an artifact from real GitHub, queue and gate data.
+description: Use when the owner asks for a status ("Status?", "End of day") or a morning report ("Morning", "What happened overnight?"). Answers in chat from real GitHub, queue and gate data; no page.
 ---
 
-# Status pages
+# Status in chat
 
-Two live pages, each with a fixed link the owner bookmarks. Their URLs are in `.agents/orchestrator.config.md` (`Status pages`). Update the same page every time; never make a new one unless the config has no URL yet (then publish once and record the URL).
+Answer in the chat. No artifact or page.
 
-| Owner says | Page | Template |
-|---|---|---|
-| "Status?", "End of day", any time | **Day** | `day.html` |
-| "Morning", "What happened overnight?" | **Morning** | `morning.html` |
-
-Publishing needs the Artifact tool, so this runs in the Desktop orchestrator session.
+| Owner says | Report |
+|---|---|
+| "Status?", "End of day", any time | **Day** |
+| "Morning", "What happened overnight?" | **Morning** (adds Overnight and Inbox) |
 
 ## Gather (real data only)
 
@@ -28,19 +26,11 @@ Never fill a row from memory of the session. Each row comes from one of these, a
 | Overnight (Morning) | the queue's finished tasks since 20:00 the day before, each with the last lines of its log (`~/agent-queue/logs/<name>.log`), and the newest morning report |
 | Inbox (Morning) | board items with Status `Inbox` on the agent board in the config, newest first |
 | Health | test server and production answer (`/api/install/status`), versions from `automaton installation-status` |
-| Needs you | owner actions from the handover issue, gate results that wait on the owner, and anything blocked on a decision |
+| Needs you | owner actions, gate results that wait on the owner, and anything blocked on a decision |
 
-## Build
+## Write
 
-- Copy the template, keep its CSS and section order, and replace only the content of each section. Empty sections say so in one line ("Nothing ran overnight"); never delete them.
-- **Needs you** is always first. One row per item: dot, plain words, link. States: `d-ok` done, `d-run` running, `d-wait` waiting, `d-you` needs the owner, `d-bad` blocked or failed.
-- Counts at the top match the rows below. Put the time (UTC) in the header and the footer.
-- Group long lists (Filed) by parent issue, three to six rows per group, several numbers per row.
-
-## History (Day page)
-
-The Day page reads `history.json` published next to it: one array, newest first, of `{"day":"2026-11-20","counts":{...},"top":["…","…"],"links":[…]}`. On "End of day", read the current file from the artifact (`action: "read"`, `path: "history.json"`), add today's entry at the front, keep the last 60 days, and publish it with the page. Other status requests leave it as it is.
-
-## Answer
-
-One line with the link and the top "Needs you" item. The page holds the rest.
+- **Needs you** first, then Agents now, Waiting, Merged, Closed, Filed (Morning: Overnight and Inbox after Needs you).
+- Time (UTC) and each environment's version in the first line.
+- Short bullets, one item each, with the issue or PR number. Empty sections get one line ("Nothing ran overnight").
+- Group long lists (Filed) by parent issue, several numbers per bullet.

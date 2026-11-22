@@ -1,6 +1,6 @@
 ---
 name: automaton-status
-description: Publish the live Day or Morning status page when the owner asks "Status?", "End of day" or "Morning".
+description: Answer "Status?", "End of day" or "Morning" in chat with the live Day or Morning report.
 ---
 
-Read and follow `.agents/skills/automaton-status/SKILL.md`, then the `Status pages` section of `.agents/orchestrator.config.md`.
+Read and follow `.agents/skills/automaton-status/SKILL.md`, then the `Status reports` section of `.agents/orchestrator.config.md`.
