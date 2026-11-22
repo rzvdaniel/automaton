@@ -39,6 +39,14 @@ add)
   shopt -s nullglob
   find_task pending "$name" >/dev/null && die "$name is already queued"
   find_task running "$name" >/dev/null && die "$name is already running"
+  # impl-<N> / impl-apps-<N>: refuse an issue that isn't shaped yet (needs-shape label, no Done when).
+  if [[ $name =~ ^impl-(apps-)?([0-9]+)(-|$) ]] && command -v "${AGENT_QUEUE_GH:-gh}" >/dev/null; then
+    num=${BASH_REMATCH[2]} repo=rzvdaniel/automaton; [[ -n ${BASH_REMATCH[1]} ]] && repo=rzvdaniel/automaton-apps
+    shape=$("${AGENT_QUEUE_GH:-gh}" issue view "$num" -R "$repo" --json labels,body \
+      --jq '([.labels[].name]|index("needs-shape")!=null), (.body|test("(^|\\n)\\W*Done when"; "i"))' 2>/dev/null | tr '\n' ' ')
+    [[ $shape == "true "* ]] && die "$repo#$num has needs-shape: add a Done when first"
+    [[ $shape == *" false " ]] && die "$repo#$num has no Done when section"
+  fi
   seq=$(date +%s%N)
   if [[ -n ${2:-} ]]; then cp "$2" "$Q/pending/$seq-$name.task.tmp"; else cat > "$Q/pending/$seq-$name.task.tmp"; fi
   [[ -s $Q/pending/$seq-$name.task.tmp ]] || { rm -f "$Q/pending/$seq-$name.task.tmp"; die "empty prompt"; }
@@ -46,7 +54,7 @@ add)
   if [[ $name == verify* ]]; then
     pre="Rules: follow AGENTS.md and .agents/skills/automaton-verify-release/SKILL.md. Never touch production. Never print credentials. End with the proof per issue and a PASS/FAIL summary."
   else
-    pre="Rules: follow AGENTS.md and .agents/skills/automaton-implement-issue/SKILL.md end to end (tests, PR, independent Opus review and security pass per pr-review, merge-gate.py); start reviews and security passes as subagent_type automaton-reviewer, never a generic agent. If the issue has the needs-shape label, do not build: report what is missing. Merge only if the task says so; a tier-high PR stops at the handoff and names that the Desktop orchestrator posts the separate security pass; never release, upgrade or deploy unless it says so. Test scripts that delete, uninstall, restore or prune only in a throwaway container or on runner-02, never on a host with a live server. If a command changes or breaks anything outside the task, say so first in the handoff. Never touch production. Never print credentials. End with the implement-issue handoff."
+    pre="Rules: follow AGENTS.md and .agents/skills/automaton-implement-issue/SKILL.md end to end (tests, PR, independent Opus review and security pass per pr-review, merge-gate.py); start reviews and security passes as subagent_type automaton-reviewer, never a generic agent. If the issue has the needs-shape label, do not build: report what is missing. Merge only if the task says so; a tier-high PR gets its separate security pass from a new automaton-reviewer as its own review (pr-review, Different logins), then merges when the gate passes; never release, upgrade or deploy unless it says so. Test scripts that delete, uninstall, restore or prune only in a throwaway container or on runner-02, never on a host with a live server. If a command changes or breaks anything outside the task, say so first in the handoff. Never touch production. Never print credentials. End with the implement-issue handoff."
   fi
   { printf '%s\n\n' "$pre"; cat "$t"; } > "$t.2" && mv "$t.2" "$t"
   mv "$t" "$Q/pending/$seq-$name.task"
