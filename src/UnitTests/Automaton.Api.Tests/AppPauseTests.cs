@@ -28,15 +28,7 @@ public sealed class AppPauseTests
 
         public Harness()
         {
-            var plan = new SubscriptionPlan
-            {
-                Id = Guid.NewGuid(), Name = "Test",
-                CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities())
-            };
-            Db.AddRange(plan, new ApplicationUser
-            {
-                Id = OwnerId, UserName = "owner", PublicUsername = "owner", SubscriptionPlanId = plan.Id, SubscriptionPlan = plan
-            });
+            Db.Add(new ApplicationUser { Id = OwnerId, UserName = "owner", PublicUsername = "owner" });
             Db.SaveChanges();
             AppAuthorizationTestData.SeedApp(Db, AppId, OwnerId, "my-app");
         }
@@ -227,18 +219,15 @@ public sealed class AppPauseTests
         await using var h = new Harness();
         var on = h.AddSchedule("nightly", enabled: true);
         await h.ServiceFor(OwnerId).PauseAsync(AppId, administrator: false, default);
-        var plan = await h.Db.SubscriptionPlans.SingleAsync();
-        plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
-        {
-            ScheduledActions = new ScheduledActionsCapability { Enabled = false }
-        });
+        // An interval below the server's minimum cannot be turned on.
+        on.IntervalSeconds = 10;
         await h.Db.SaveChangesAsync();
 
         var first = await h.ServiceFor(OwnerId).ResumeAsync(AppId, administrator: false, default);
         Assert.That(first.Warnings, Has.Count.EqualTo(1));
         Assert.That((await h.Db.ActionSchedules.FindAsync(on.Id))!.PausedByApp, Is.True);
 
-        plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities());
+        (await h.Db.ActionSchedules.FindAsync(on.Id))!.IntervalSeconds = 600;
         await h.Db.SaveChangesAsync();
         var second = await h.ServiceFor(OwnerId).ResumeAsync(AppId, administrator: false, default);
 

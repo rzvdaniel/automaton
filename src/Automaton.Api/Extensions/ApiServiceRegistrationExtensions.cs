@@ -756,7 +756,6 @@ internal static class ApiOperationsRegistration
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
         services.AddTransient<RunnerExecutionResultReadyCapSubscriber>();
         services.AddScoped<RunnerConnectionLifecycleService>();
-        services.AddScoped<AdminSubscriptionPlanOperationsService>();
         return services;
     }
 }
@@ -824,9 +823,6 @@ internal static class ApiAiClientRegistration
         services.AddScoped<IAiChatHistoryService, AiChatHistoryService>();
         services.AddScoped<ITokenBudgetService, TokenBudgetService>();
         services.AddScoped<IAppVerificationStrategyResolver, AppVerificationStrategyResolver>();
-        services.Configure<StripeOptions>(applicationBuilder.Configuration.GetSection("Stripe"));
-        services.AddScoped<StripeWebhookService>();
-        services.AddScoped<StripeService>();
         return services;
     }
 }

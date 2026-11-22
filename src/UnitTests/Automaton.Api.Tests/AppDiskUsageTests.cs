@@ -20,11 +20,7 @@ public sealed class AppDiskUsageTests
     private static (ApplicationDbContext Db, Func<Guid, AppDiskUsageService> For) Create()
     {
         var db = AppAuthorizationTestData.CreateDbContext();
-        var plan = new SubscriptionPlan
-        {
-            Id = Guid.NewGuid(), Name = "Test", CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities())
-        };
-        db.AddRange(plan, new ApplicationUser { Id = OwnerId, UserName = "owner", PublicUsername = "owner", SubscriptionPlanId = plan.Id, SubscriptionPlan = plan });
+        db.Add(new ApplicationUser { Id = OwnerId, UserName = "owner", PublicUsername = "owner" });
         db.SaveChanges();
         AppAuthorizationTestData.SeedApp(db, AppId, OwnerId, "my-app");
         return (db, userId =>

@@ -12,15 +12,19 @@ namespace Automaton.Api.Tests;
 public sealed class ActionScheduleEnableValidationTests
 {
     [Test]
-    public async Task Enable_RejectsWhenPlanCapabilityWasRemoved()
+    public async Task Create_AllowsMoreThanTenSchedules()
     {
         await using var fixture = await Fixture.CreateAsync();
-        fixture.Plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
+        for (var i = 0; i < 12; i++)
         {
-            ScheduledActions = new ScheduledActionsCapability { Enabled = false }
-        });
-        await fixture.Db.SaveChangesAsync();
-        Assert.That(async () => await fixture.EnableAsync(), Throws.InvalidOperationException);
+            var request = new SaveActionScheduleRequest
+            {
+                ApplicationId = fixture.Schedule.ApplicationId, ActionKey = "scheduled-action", Name = $"Schedule {i}",
+                IntervalSeconds = 600, Enabled = true
+            };
+            await fixture.Service.CreateAsync(request, fixture.User.Id, administrator: false, CancellationToken.None);
+        }
+        Assert.That(await fixture.Db.ActionSchedules.CountAsync(), Is.EqualTo(13));
     }
 
     [Test]
@@ -115,21 +119,6 @@ public sealed class ActionScheduleEnableValidationTests
     }
 
     [Test]
-    public async Task Dispatch_StillRejectsRemovedPlanCapability()
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        fixture.Schedule.ScheduleType = ActionScheduleTypes.OneTime;
-        fixture.Schedule.RunAtUtc = DateTime.UtcNow.AddMinutes(-1);
-        fixture.Plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
-        {
-            ScheduledActions = new ScheduledActionsCapability { Enabled = false }
-        });
-        await fixture.Db.SaveChangesAsync();
-        await Assert.ThatAsync(async () => await fixture.Service.ValidateForDispatchAsync(fixture.Schedule, CancellationToken.None),
-            Throws.InvalidOperationException);
-    }
-
-    [Test]
     public async Task Dispatch_StillRejectsActionNoLongerSchedulable()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -209,7 +198,6 @@ public sealed class ActionScheduleEnableValidationTests
     {
         public required ApplicationDbContext Db { get; init; }
         public required ApplicationUser User { get; init; }
-        public required SubscriptionPlan Plan { get; init; }
         public required ActionSchedule Schedule { get; init; }
         public required StubResolver Resolver { get; init; }
         public required ActionScheduleService Service { get; init; }
@@ -219,19 +207,11 @@ public sealed class ActionScheduleEnableValidationTests
             var options = new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
             var db = new ApplicationDbContext(options);
-            var plan = new SubscriptionPlan
-            {
-                Id = Guid.NewGuid(),
-                Name = "Test",
-                CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities())
-            };
             var user = new ApplicationUser
             {
                 Id = Guid.NewGuid(),
                 UserName = "schedule-user",
-                PublicUsername = "schedule-user",
-                SubscriptionPlanId = plan.Id,
-                SubscriptionPlan = plan
+                PublicUsername = "schedule-user"
             };
             var schedule = new ActionSchedule
             {
@@ -250,13 +230,12 @@ public sealed class ActionScheduleEnableValidationTests
                 InputJson = "{}",
                 Enabled = false
             };
-            db.AddRange(plan, user, schedule);
+            db.AddRange(user, schedule);
             await db.SaveChangesAsync();
             var resolver = new StubResolver();
             return new Fixture
             {
                 Db = db,
-                Plan = plan,
                 User = user,
                 Schedule = schedule,
                 Resolver = resolver,

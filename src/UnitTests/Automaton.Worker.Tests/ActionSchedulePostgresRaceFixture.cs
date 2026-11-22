@@ -12,22 +12,13 @@ internal static class ActionSchedulePostgresRaceFixture
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(connectionString).Options);
 
-    internal static async Task<Guid> SeedAsync(ApplicationDbContext db, int maximum, bool queued)
+    internal static async Task<Guid> SeedAsync(ApplicationDbContext db, bool queued)
     {
         var ownerId = Guid.NewGuid();
-        var plan = new SubscriptionPlan
-        {
-            Id = Guid.NewGuid(), Name = $"schedule-race-{ownerId:N}",
-            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
-            {
-                ScheduledActions = new ScheduledActionsCapability { MaximumConcurrentExecutions = maximum }
-            })
-        };
-        db.SubscriptionPlans.Add(plan);
         db.Users.Add(new ApplicationUser
         {
             Id = ownerId, PublicUsername = $"race-{ownerId:N}"[..32],
-            UserName = $"race-{ownerId:N}", SubscriptionPlanId = plan.Id
+            UserName = $"race-{ownerId:N}"
         });
         for (var i = 0; i < 3; i++)
         {

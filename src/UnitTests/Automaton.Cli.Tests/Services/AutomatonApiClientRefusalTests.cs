@@ -11,8 +11,8 @@ public sealed class AutomatonApiClientRefusalTests
     public void RefusedRequestMessageIsTheServersReason()
     {
         var error = Refuse(HttpStatusCode.BadRequest,
-            "{\"title\":\"Invalid request\",\"status\":400,\"detail\":\"This plan allows at most 5 schedules.\"}");
-        Assert.That(error.Message, Is.EqualTo("This plan allows at most 5 schedules."));
+            "{\"title\":\"Invalid request\",\"status\":400,\"detail\":\"The schedule interval is too short.\"}");
+        Assert.That(error.Message, Is.EqualTo("The schedule interval is too short."));
         Assert.That(error.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 

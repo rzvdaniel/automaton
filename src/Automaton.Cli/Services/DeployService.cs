@@ -672,16 +672,6 @@ public sealed class DeployService
         }
 
         if (ContainsAny(message,
-                "Your subscription plan does not include a hosted runner",
-                "hosted runner configuration for your subscription plan",
-                "hosted runner specification configured for your subscription plan"))
-        {
-            nextSteps.Add("The active subscription plan does not have a usable Hosted Runner capability or specification.");
-            nextSteps.Add("Ask an administrator to enable Hosted Runner and map an active specification to the plan, then rerun automaton deploy.");
-            return;
-        }
-
-        if (ContainsAny(message,
                 "No active runner host has enough available capacity",
                 "selected Runner Host has no Infrastructure Runner assigned",
                 "Normal hosted Runner provisioning requires an Infrastructure Runner transport"))

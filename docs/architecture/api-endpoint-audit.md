@@ -23,7 +23,6 @@ Also removed: the Studio client methods for those calls (`apps.service.ts`) and 
 |---|---|
 | `api/projects`, `api/projects/{id}/members`, `apps`, `runners` | CLI (`project`, `runners install`, `share`) and the Studio share dialog (`listMyTeams`) |
 | `api/ai-guidance` (`AiGuidanceController`) | CLI (`AiGuidancePackService`) |
-| `api/webhooks/stripe` (`StripeWebhookController`) | Stripe calls it; not a Studio caller |
 | `POST api/hooks/{id}` (`ActionWebhookCallsController`) | Anonymous on purpose: outside callers start an app's Action with the webhook's secret (404 without it); managed through `api/apps/{id}/action-webhooks` by Studio and `automaton action webhook` |
 | `PUT /api/admin/settings/store` | API-only app store on/off switch, documented in the Admin docs; no Studio page |
 | `organizations/apps/assigned`, `organizations/{id}/apps/assigned` | Studio app list and organization dashboard |

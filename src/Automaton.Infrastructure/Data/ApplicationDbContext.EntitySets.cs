@@ -83,5 +83,4 @@ public partial class ApplicationDbContext
     public virtual DbSet<AiChatSessionUser> AiChatSessionUsers { get; set; }
     public virtual DbSet<ApplicationEvent> ApplicationEvents { get; set; }
     public virtual DbSet<UserSetting> UserSettings { get; set; }
-    public virtual DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
 }

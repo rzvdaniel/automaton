@@ -14,33 +14,7 @@ namespace Automaton.Api.Extensions
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await dbContext.Database.MigrateAsync(cancellationToken);
 
-            await EnsureFreeSubscriptionPlanAsync(dbContext, cancellationToken);
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-
             return app;
-        }
-
-        private static async Task EnsureFreeSubscriptionPlanAsync(
-            ApplicationDbContext dbContext,
-            CancellationToken cancellationToken)
-        {
-            var freePlan = await dbContext.SubscriptionPlans
-                .SingleOrDefaultAsync(x => x.Id == SubscriptionPlanIds.Free, cancellationToken);
-            if (freePlan == null)
-            {
-                freePlan = new SubscriptionPlan
-                {
-                    Id = SubscriptionPlanIds.Free,
-                    Name = "Free",
-                    Description = "Free Automaton plan.",
-                    IsDefault = true,
-                    IsActive = true,
-                    SortOrder = 0,
-                    CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(PlanCapabilities.Default)
-                };
-                dbContext.SubscriptionPlans.Add(freePlan);
-            }
         }
     }
 }
