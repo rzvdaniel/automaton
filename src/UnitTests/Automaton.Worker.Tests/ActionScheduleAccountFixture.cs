@@ -22,15 +22,7 @@ internal static class ActionScheduleAccountFixture
 
     internal static async Task SeedAsync(ApplicationDbContext db, Guid ownerId, ActionSchedule first, ActionSchedule second)
     {
-        var planId = Guid.NewGuid();
-        var capabilities = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
-        {
-            ScheduledActions = new ScheduledActionsCapability { MaximumConcurrentExecutions = 1 }
-        });
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO SubscriptionPlans (Id, CapabilitiesJson) VALUES ({planId}, {capabilities})");
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO AspNetUsers (Id, SubscriptionPlanId) VALUES ({ownerId}, {planId})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO AspNetUsers (Id) VALUES ({ownerId})");
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WebApps (Id) VALUES ({first.ApplicationId})");
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WebApps (Id) VALUES ({second.ApplicationId})");
         db.ActionSchedules.Add(second);

@@ -165,7 +165,7 @@ public sealed class ActionScheduleProcessor(
 
     private async Task<ClaimResult> PersistOccurrenceAsync(
         ActionSchedule schedule,
-        ScheduledActionsCapability capability,
+        ScheduleLimits capability,
         DateTime nowUtc,
         CancellationToken cancellationToken)
     {
@@ -199,7 +199,7 @@ public sealed class ActionScheduleProcessor(
 
     private async Task<string> DetermineClaimedOccurrenceStatusAsync(
         ActionSchedule schedule,
-        ScheduledActionsCapability capability,
+        ScheduleLimits capability,
         DateTime scheduledFor,
         DateTime nowUtc,
         CancellationToken cancellationToken)
@@ -209,8 +209,6 @@ public sealed class ActionScheduleProcessor(
             return DetermineOccurrenceStatus(schedule, active, scheduledFor < nowUtc.Subtract(MisfireTolerance));
         var ownerId = schedule.OwnerUserId!.Value;
         var atCapacity = await CountActiveExecutionsAsync(ownerId, cancellationToken) >= capability.MaximumConcurrentExecutions;
-        if (await CountMonthlyOccurrencesAsync(ownerId, nowUtc, cancellationToken) >= capability.MonthlyExecutionLimit)
-            return ActionScheduleOccurrenceStatuses.Skipped;
         return atCapacity ? ActionScheduleOccurrenceStatuses.Queued
             : DetermineOccurrenceStatus(schedule, active, scheduledFor < nowUtc.Subtract(MisfireTolerance));
     }
@@ -275,28 +273,15 @@ public sealed class ActionScheduleProcessor(
             await events.PublishAsync(ToEvent(occurrence), ct);
     }
 
-    private async Task<ScheduledActionsCapability?> GetCurrentCapabilityAsync(ActionSchedule schedule, CancellationToken ct)
+    private async Task<ScheduleLimits?> GetCurrentCapabilityAsync(ActionSchedule schedule, CancellationToken ct)
     {
         if (IsUnmetered(schedule))
         {
             if (!IsSystem(schedule) && !await db.WebApps.AnyAsync(x => x.Id == schedule.ApplicationId, ct)) return null;
-            return new ScheduledActionsCapability
-            {
-                Enabled = true,
-                MaximumSchedules = int.MaxValue,
-                MinimumIntervalSeconds = 1,
-                MaximumConcurrentExecutions = int.MaxValue,
-                MonthlyExecutionLimit = int.MaxValue
-            };
+            return ScheduleLimits.Unlimited;
         }
         if (!schedule.OwnerUserId.HasValue || !await db.WebApps.AnyAsync(x => x.Id == schedule.ApplicationId, ct)) return null;
-        var capabilityJson = await db.Users.Where(x => x.Id == schedule.OwnerUserId.Value)
-            .Select(x => x.SubscriptionPlan != null ? x.SubscriptionPlan.CapabilitiesJson : null).SingleOrDefaultAsync(ct);
-        if (capabilityJson == null)
-            capabilityJson = await db.SubscriptionPlans.Where(x => x.Id == SubscriptionPlanIds.Free)
-                .Select(x => x.CapabilitiesJson).SingleOrDefaultAsync(ct);
-        var capability = PlanCapabilitiesSerializer.Deserialize(capabilityJson).ScheduledActions;
-        return capability.Enabled ? capability : null;
+        return ScheduleLimits.Default;
     }
 
     private Task LockAccountAdmissionAsync(Guid? ownerId, CancellationToken ct)
@@ -320,18 +305,9 @@ public sealed class ActionScheduleProcessor(
             .CountAsync(x => x.Schedule.OwnerUserId == ownerUserId
                 && (x.Schedule.SystemIdentity == null || !x.Schedule.SystemIdentity.StartsWith(HomeCardScheduleIdentity.Prefix)), ct);
 
-    private Task<int> CountMonthlyOccurrencesAsync(Guid ownerUserId, DateTime nowUtc, CancellationToken ct)
-    {
-        var start = new DateTime(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        return db.ActionScheduleOccurrences.CountAsync(x => x.Schedule.OwnerUserId == ownerUserId
-            && (x.Schedule.SystemIdentity == null || !x.Schedule.SystemIdentity.StartsWith(HomeCardScheduleIdentity.Prefix))
-            && x.CreatedAtUtc >= start
-            && x.Status != ActionScheduleOccurrenceStatuses.Skipped, ct);
-    }
-
     private static bool IsSystem(ActionSchedule schedule) => schedule.OwnerType == ActionScheduleOwnerTypes.System;
 
-    /// <summary>Platform schedules (system ones and an app's home-card refresh) do not use the owner's plan limits.</summary>
+    /// <summary>Platform schedules (system ones and an app's home-card refresh) are not limited.</summary>
     private static bool IsUnmetered(ActionSchedule schedule) => IsSystem(schedule) || HomeCardScheduleIdentity.IsPlatformSchedule(schedule);
 
     internal static void Advance(ActionSchedule schedule, DateTime scheduledForUtc, DateTime nowUtc)

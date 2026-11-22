@@ -60,9 +60,6 @@ public class UsersService
                 (current, error) => current + (" - " + error.Description + "\n\r"));
             throw new InvalidOperationException(exceptionText);
         }
-
-        // Assign default subscription plan allowance
-        await AssignDefaultPlanAsync(user.Id);
     }
 
     public async Task CreateUserWithoutPasswordAsync(ApplicationUser user)
@@ -88,8 +85,6 @@ public class UsersService
                 (current, error) => current + (" - " + error.Description + "\n\r"));
             throw new InvalidOperationException(exceptionText);
         }
-
-        await AssignDefaultPlanAsync(user.Id);
     }
 
     public async Task UpdatePassword(Guid userId, string oldPassword, string newPassword)
@@ -832,30 +827,6 @@ public class UsersService
             slug = slug.Substring(0, 32).TrimEnd('-', '_');
 
         return slug;
-    }
-
-    private async Task AssignDefaultPlanAsync(Guid userId)
-    {
-        try
-        {
-            var defaultPlan = await _db.SubscriptionPlans
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.IsDefault && p.IsActive);
-
-            if (defaultPlan != null)
-            {
-                var user = await _userManager.FindByIdAsync(userId.ToString());
-                if (user != null)
-                {
-                    user.SubscriptionPlanId = defaultPlan.Id;
-                    await _userManager.UpdateAsync(user);
-                }
-            }
-        }
-        catch
-        {
-            // Never block registration because of billing setup failure
-        }
     }
 }
 

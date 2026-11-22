@@ -34,9 +34,6 @@ public sealed class ActionScheduleService
         return await query.OrderBy(x => x.Name).ToListAsync(ct);
     }
 
-    public Task<ScheduledActionsCapability> GetCapabilityAsync(Guid userId, CancellationToken ct)
-        => GetCapabilityAsync(userId, administrator: false, ct);
-
     public async Task<ActionSchedule> GetAsync(Guid id, Guid userId, bool administrator, CancellationToken ct)
         => await FindAuthorizedAsync(id, userId, administrator, ct);
 
@@ -44,11 +41,7 @@ public sealed class ActionScheduleService
     {
         if (request.ApplicationId == InfrastructureAppTrust.PlatformAppId)
             throw new InvalidOperationException("Legacy System Application schedules are retired.");
-        var capability = await GetCapabilityAsync(userId, administrator: false, ct);
-        if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
-        if (await db.ActionSchedules.CountAsync(x => x.OwnerType == ActionScheduleOwnerTypes.User && x.OwnerUserId == userId
-                && (x.SystemIdentity == null || !x.SystemIdentity.StartsWith(HomeCardSchedules.IdentityPrefix)), ct) >= capability.MaximumSchedules)
-            throw new InvalidOperationException($"This plan allows at most {capability.MaximumSchedules} schedules.");
+        var capability = ScheduleLimits.Default;
 
         var schedule = new ActionSchedule
         {
@@ -72,8 +65,7 @@ public sealed class ActionScheduleService
             || request.ApplicationId == InfrastructureAppTrust.PlatformAppId)
             throw new InvalidOperationException("Legacy System Application schedules are retired.");
         var validationUserId = schedule.OwnerUserId ?? userId;
-        var capability = await GetCapabilityAsync(validationUserId, administrator: false, ct);
-        if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
+        var capability = ScheduleLimits.Default;
         await ApplyAsync(schedule, request, validationUserId, capability, ct);
         await db.SaveChangesAsync(ct);
         await AuditAsync(schedule, AuditEventTypes.ActionScheduleUpdated, "update", "Action schedule updated", ct);
@@ -87,8 +79,7 @@ public sealed class ActionScheduleService
         {
             await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
             var validationUserId = schedule.OwnerUserId ?? userId;
-            var capability = await GetCapabilityAsync(validationUserId, administrator: false, ct);
-            if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
+            var capability = ScheduleLimits.Default;
             await ValidateEffectiveAsync(schedule, validationUserId, capability, DateTime.UtcNow, ct);
             schedule.NextRunAtUtc = ActionSchedulePolicy.CalculateNextRun(schedule, DateTime.UtcNow)
                 ?? throw new InvalidOperationException("The schedule has no future occurrence.");
@@ -139,12 +130,11 @@ public sealed class ActionScheduleService
             || schedule.ApplicationId == InfrastructureAppTrust.PlatformAppId)
             throw new InvalidOperationException("Legacy System Application schedules are retired.");
         var userId = schedule.OwnerUserId ?? Guid.Empty;
-        var capability = await GetCapabilityAsync(userId, administrator: false, ct);
-        if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
+        var capability = ScheduleLimits.Default;
         await ValidateEffectiveAsync(schedule, userId, capability, DateTime.UtcNow, ct, requireFutureRun: false);
     }
 
-    private async Task ApplyAsync(ActionSchedule schedule, SaveActionScheduleRequest request, Guid userId, ScheduledActionsCapability capability, CancellationToken ct)
+    private async Task ApplyAsync(ActionSchedule schedule, SaveActionScheduleRequest request, Guid userId, ScheduleLimits capability, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 160) throw new InvalidOperationException("Schedule name is required and cannot exceed 160 characters.");
         AppActionManifestParser.ValidateKey(request.ActionKey);
@@ -179,7 +169,7 @@ public sealed class ActionScheduleService
     internal static void ApplyTimingFields(ActionSchedule schedule, SaveActionScheduleRequest request)
         => ActionSchedulePolicy.ApplyTimingFields(schedule, request);
 
-    private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, ScheduledActionsCapability capability, DateTime nowUtc, CancellationToken ct, bool requireFutureRun = true)
+    private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, ScheduleLimits capability, DateTime nowUtc, CancellationToken ct, bool requireFutureRun = true)
     {
         if (schedule.OwnerType == ActionScheduleOwnerTypes.System
             || schedule.ApplicationId == InfrastructureAppTrust.PlatformAppId)
@@ -215,14 +205,6 @@ public sealed class ActionScheduleService
 
     internal static DateTime? CalculateNextRun(ActionSchedule schedule, DateTime afterUtc)
         => ActionSchedulePolicy.CalculateNextRun(schedule, afterUtc);
-
-    private async Task<ScheduledActionsCapability> GetCapabilityAsync(Guid userId, bool administrator, CancellationToken ct)
-    {
-        if (administrator) return new ScheduledActionsCapability { Enabled = true, MaximumSchedules = int.MaxValue, MinimumIntervalSeconds = 1, MaximumConcurrentExecutions = int.MaxValue, MonthlyExecutionLimit = int.MaxValue };
-        var json = await db.Users.Where(x => x.Id == userId).Select(x => x.SubscriptionPlan != null ? x.SubscriptionPlan.CapabilitiesJson : null).SingleAsync(ct);
-        if (json == null) json = await db.SubscriptionPlans.Where(x => x.Id == SubscriptionPlanIds.Free).Select(x => x.CapabilitiesJson).SingleOrDefaultAsync(ct);
-        return PlanCapabilitiesSerializer.Deserialize(json).ScheduledActions;
-    }
 
     private async Task<ActionSchedule> FindAuthorizedAsync(Guid id, Guid userId, bool administrator, CancellationToken ct)
     {

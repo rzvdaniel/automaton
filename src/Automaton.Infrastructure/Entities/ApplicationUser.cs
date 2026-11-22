@@ -51,21 +51,6 @@ namespace Automaton.Api.Entities
         public virtual ICollection<Organization> OwnedOrganizations { get; set; }
         public virtual ICollection<OrganizationMember> OrganizationMemberships { get; set; }
 
-        // Stripe billing
-        /// <summary>Stripe Customer ID (cus_xxx). Created on first checkout.</summary>
-        public string StripeCustomerId { get; set; }
-
-        /// <summary>Active Stripe Subscription ID (sub_xxx). Null on Free plan.</summary>
-        public string StripeSubscriptionId { get; set; }
-
-        /// <summary>Current Automaton subscription plan. Null means no paid plan is assigned.</summary>
-        public Guid? SubscriptionPlanId { get; set; }
-
-        /// <summary>
-        /// Grants access to internal hosted-runner plans whose catalog visibility is test-users-only.
-        /// </summary>
-        public bool CanAccessHostedRunnerTestPlans { get; set; }
-
         /// <summary>
         /// UTC timestamp when the account was first registered.
         /// </summary>
@@ -100,7 +85,5 @@ namespace Automaton.Api.Entities
         /// Admin user who soft deleted the account.
         /// </summary>
         public Guid? DeletedByUserId { get; set; }
-
-        public virtual SubscriptionPlan SubscriptionPlan { get; set; }
     }
 }

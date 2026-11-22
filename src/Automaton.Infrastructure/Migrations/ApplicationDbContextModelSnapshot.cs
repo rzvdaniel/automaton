@@ -1316,9 +1316,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<string>("Bio")
                         .HasColumnType("text");
 
-                    b.Property<bool>("CanAccessHostedRunnerTestPlans")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -1392,15 +1389,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
-                    b.Property<string>("StripeCustomerId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripeSubscriptionId")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("SubscriptionPlanId")
-                        .HasColumnType("uuid");
-
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 
@@ -1416,8 +1404,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
-
-                    b.HasIndex("SubscriptionPlanId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -3810,68 +3796,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.ToTable("Settings");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.SubscriptionPlan", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CapabilitiesJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("citext");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<bool>("IsDefault")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("citext");
-
-                    b.Property<decimal>("PriceUsd")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("StripePriceId")
-                        .HasMaxLength(100)
-                        .HasColumnType("citext");
-
-                    b.Property<string>("StripeProductId")
-                        .HasMaxLength(100)
-                        .HasColumnType("citext");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsActive");
-
-                    b.HasIndex("IsDefault");
-
-                    b.HasIndex("SortOrder");
-
-                    b.ToTable("SubscriptionPlans");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.UserGitHubToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4650,16 +4574,6 @@ namespace Automaton.Infrastructure.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("WebApp");
-                });
-
-            modelBuilder.Entity("Automaton.Api.Entities.ApplicationUser", b =>
-                {
-                    b.HasOne("Automaton.Api.Entities.SubscriptionPlan", "SubscriptionPlan")
-                        .WithMany()
-                        .HasForeignKey("SubscriptionPlanId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("SubscriptionPlan");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.ApplicationUserRole", b =>

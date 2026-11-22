@@ -35,7 +35,6 @@ internal static class ManagedRunnerBootstrapTestData
             UserName = $"user-{userId:N}@automaton.test",
             Email = $"user-{userId:N}@automaton.test",
             PublicUsername = $"user-{userId:N}",
-            SubscriptionPlanId = planId,
         });
         db.SaveChanges();
     }
@@ -72,18 +71,9 @@ internal static class ManagedRunnerBootstrapTestData
             Name = "Test Hosted Runner",
             IsActive = true
         };
-        var plan = new SubscriptionPlan
-        {
-            Id = Guid.NewGuid(),
-            Name = enabled ? "Hosted" : "No Hosted",
-            IsActive = true,
-            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(PlanCapabilities.Default)
-        };
-
         db.HostedRunnerSpecifications.Add(specification);
-        db.SubscriptionPlans.Add(plan);
         db.SaveChanges();
-        return plan.Id;
+        return specification.Id;
     }
 
     public static RunnerHost SeedRunnerHost(ApplicationDbContext db, bool remote = false)

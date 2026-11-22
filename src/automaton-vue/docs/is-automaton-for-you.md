@@ -28,7 +28,7 @@ Automaton is a self-hosted platform for deploying web apps, APIs and scheduled j
 | --- | --- | --- |
 | Control | You choose the machines, location and what runs where | The provider decides within its product |
 | Data location | On your servers | In the provider's regions |
-| Cost | Set by the server plans you choose, plus a domain; the software is free (Apache 2.0). Measured figures: see the table below | Depends on the provider's pricing model |
+| Cost | Set by the server you choose, plus a domain; the software is free (Apache 2.0). Measured figures: see the table below | Depends on the provider's pricing model |
 | Maintenance | You update the server and Runners and keep backups | The provider operates the platform |
 | Availability | One server per Runner; if it is down, its apps are down | Redundancy and failover available |
 | Scale | Add Runner machines yourself | Elastic scale on demand |

@@ -11,16 +11,14 @@ namespace Automaton.Worker.Tests;
 public sealed class ActionSchedulePostgresRaceTests
 {
     [TestCase(1, false)]
-    [TestCase(2, false)]
     [TestCase(1, true)]
-    [TestCase(2, true)]
     public async Task DistinctSchedulesAcrossWorkers_RespectAccountCapacityAndRecoverQueuedWork(int maximum, bool queued)
     {
         await using var database = await PostgresTestDatabase.CreateAsync();
         var connectionString = database.ConnectionString;
         await using var db = ActionSchedulePostgresRaceFixture.Open(connectionString);
         Assert.That(await db.Database.GetPendingMigrationsAsync(), Is.Empty);
-        var ownerId = await ActionSchedulePostgresRaceFixture.SeedAsync(db, maximum, queued);
+        var ownerId = await ActionSchedulePostgresRaceFixture.SeedAsync(db, queued);
         await RaceAsync(connectionString);
         await AssertCapacityAsync(db, ownerId, maximum);
 

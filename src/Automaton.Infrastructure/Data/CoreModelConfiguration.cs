@@ -44,12 +44,6 @@ internal static class CoreModelConfiguration
     {
             modelBuilder.Entity<ApplicationUser>(entity =>
             {
-                entity.HasOne(e => e.SubscriptionPlan)
-                    .WithMany()
-                    .HasForeignKey(e => e.SubscriptionPlanId)
-                    .OnDelete(DeleteBehavior.SetNull);
-
-                entity.HasIndex(e => e.SubscriptionPlanId);
             });
     }
 

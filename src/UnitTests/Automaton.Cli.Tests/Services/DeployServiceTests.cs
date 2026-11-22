@@ -250,38 +250,6 @@ public class DeployServiceTests
     }
 
     [Test]
-    public async Task DeployAsync_WhenHostedRunnerPlanDoesNotIncludeCapability_ReturnsPlanSpecificNextSteps()
-    {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
-        WriteBackendController(projectRoot);
-
-        var service = new DeployService(
-            configService,
-            (_, _, _, _, _, _, _) => Task.FromResult((
-                new DeployUploadResult(1, 0, 0.1),
-                new DeployRuntimeResult(
-                    false,
-                    0,
-                    "Your subscription plan does not include a hosted runner.",
-                    "managedRunnerProvisionFailed",
-                    false))));
-
-        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
-
-        Assert.That(result.NextSteps, Does.Contain("The active subscription plan does not have a usable Hosted Runner capability or specification."));
-        Assert.That(result.NextSteps, Does.Contain("Ask an administrator to enable Hosted Runner and map an active specification to the plan, then rerun automaton deploy."));
-        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Your subscription plan does not include a hosted runner.");
-    }
-
-    [Test]
     public async Task DeployAsync_WhenRunnerHostLacksInfrastructureRunner_DoesNotBlamePlan()
     {
         var projectRoot = CreateProjectRoot();

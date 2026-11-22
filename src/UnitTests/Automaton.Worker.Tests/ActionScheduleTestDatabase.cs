@@ -42,8 +42,7 @@ internal sealed class ActionScheduleTestDatabase : IAsyncDisposable
 
     private static Task CreateTablesAsync(ApplicationDbContext db)
         => db.Database.ExecuteSqlRawAsync("""
-            CREATE TABLE AspNetUsers (Id TEXT PRIMARY KEY, SubscriptionPlanId TEXT NULL);
-            CREATE TABLE SubscriptionPlans (Id TEXT PRIMARY KEY, CapabilitiesJson TEXT NULL);
+            CREATE TABLE AspNetUsers (Id TEXT PRIMARY KEY);
             CREATE TABLE WebApps (Id TEXT PRIMARY KEY);
             CREATE TABLE ActionSchedules (
                 Id TEXT PRIMARY KEY, OwnerType TEXT NOT NULL, OwnerUserId TEXT NULL, SystemIdentity TEXT NULL,

@@ -24,20 +24,20 @@ public sealed class CapTransactionalEventExecutorTests
     {
         private readonly SqliteConnection connection;
         private readonly ApplicationDbContext dbContext;
-        private readonly SubscriptionPlan plan;
+        private readonly Setting setting;
         private readonly RecordingCapPublisher publisher;
         private readonly CapTransactionalEventExecutor executor;
 
         private CapTransactionScenario(
             SqliteConnection connection,
             ApplicationDbContext dbContext,
-            SubscriptionPlan plan,
+            Setting setting,
             RecordingCapPublisher publisher,
             CapTransactionalEventExecutor executor)
         {
             this.connection = connection;
             this.dbContext = dbContext;
-            this.plan = plan;
+            this.setting = setting;
             this.publisher = publisher;
             this.executor = executor;
         }
@@ -45,7 +45,7 @@ public sealed class CapTransactionalEventExecutorTests
         public static async Task<bool> RunAsync()
         {
             await using var scenario = await CreateAsync();
-            await scenario.CommitPlanChangeAsync();
+            await scenario.CommitSettingChangeAsync();
             return await scenario.IsCommittedAsync();
         }
 
@@ -54,15 +54,15 @@ public sealed class CapTransactionalEventExecutorTests
             var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
             var dbContext = await CreateDbContextAsync(connection);
-            var plan = new SubscriptionPlan { Id = Guid.NewGuid(), Name = "Pro", IsDefault = false };
-            dbContext.SubscriptionPlans.Add(plan);
+            var setting = new Setting { Key = "test", Value = "before", UpdatedAt = DateTime.UtcNow };
+            dbContext.Settings.Add(setting);
             await dbContext.SaveChangesAsync();
 
             var publisher = CreatePublisher();
             return new CapTransactionScenario(
                 connection,
                 dbContext,
-                plan,
+                setting,
                 publisher,
                 new CapTransactionalEventExecutor(dbContext, publisher));
         }
@@ -75,12 +75,12 @@ public sealed class CapTransactionalEventExecutorTests
             return new RecordingCapPublisher(services);
         }
 
-        private async Task CommitPlanChangeAsync()
+        private async Task CommitSettingChangeAsync()
         {
             await executor.ExecuteAsync(async cancellationToken =>
             {
                 Assert.That(publisher.Transaction?.AutoCommit, Is.False);
-                plan.IsDefault = true;
+                setting.Value = "after";
                 await dbContext.SaveChangesAsync(cancellationToken);
             });
         }
@@ -88,7 +88,7 @@ public sealed class CapTransactionalEventExecutorTests
         private async Task<bool> IsCommittedAsync()
         {
             dbContext.ChangeTracker.Clear();
-            return (await dbContext.SubscriptionPlans.SingleAsync(item => item.Id == plan.Id)).IsDefault;
+            return (await dbContext.Settings.SingleAsync(item => item.Key == setting.Key)).Value == "after";
         }
 
         private static async Task<ApplicationDbContext> CreateDbContextAsync(SqliteConnection connection)
@@ -96,19 +96,11 @@ public sealed class CapTransactionalEventExecutorTests
             var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
             var dbContext = new ApplicationDbContext(options);
             await dbContext.Database.ExecuteSqlRawAsync("""
-            CREATE TABLE "SubscriptionPlans" (
-                "Id" TEXT NOT NULL PRIMARY KEY,
-                "Name" TEXT NOT NULL,
+            CREATE TABLE "Settings" (
+                "Key" TEXT NOT NULL PRIMARY KEY,
+                "Value" TEXT NOT NULL,
                 "Description" TEXT NULL,
-                "PriceUsd" TEXT NOT NULL,
-                "StripeProductId" TEXT NULL,
-                "StripePriceId" TEXT NULL,
-                "IsDefault" INTEGER NOT NULL DEFAULT 0,
-                "IsActive" INTEGER NOT NULL DEFAULT 1,
-                "CapabilitiesJson" TEXT NOT NULL,
-                "SortOrder" INTEGER NOT NULL DEFAULT 0,
-                "CreatedAt" TEXT NOT NULL,
-                "UpdatedAt" TEXT NULL
+                "UpdatedAt" TEXT NOT NULL
             );
             """);
             return dbContext;

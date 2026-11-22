@@ -28,7 +28,6 @@ internal static class HostedRunnerAuditTestData
             Email = $"user-{userId:N}@automaton.test",
             UserName = $"user-{userId:N}@automaton.test",
             PublicUsername = $"user-{userId:N}"[..32],
-            SubscriptionPlanId = planId,
             SecurityStamp = Guid.NewGuid().ToString("N")
         });
         db.SaveChanges();
@@ -41,8 +40,7 @@ internal static class HostedRunnerAuditTestData
 
     public static Guid ConfigureSpecificationResources(ApplicationDbContext db, Guid planId)
     {
-        var plan = db.SubscriptionPlans.Single(x => x.Id == planId);
-        var specification = db.HostedRunnerSpecifications.Single(x => x.Name == $"{plan.Name} legacy specification");
+        var specification = db.HostedRunnerSpecifications.Single(x => x.Id == planId);
         specification.Resources = new HostedRunnerResources
         {
             CpuLimit = 0.75m,
@@ -121,9 +119,7 @@ internal static class HostedRunnerAuditTestData
     {
         var host = db.RunnerHosts.FirstOrDefault() ?? SeedRunnerHost(db);
         var effectivePlanId = planId ?? SeedHostedRunnerPlan(db);
-        var plan = db.SubscriptionPlans.Single(x => x.Id == effectivePlanId);
-        var specificationId = db.HostedRunnerSpecifications
-            .Single(x => x.Name == $"{plan.Name} legacy specification").Id;
+        var specificationId = effectivePlanId;
         EnsureUserExists(db, userId, effectivePlanId);
         var runner = new Runner
         {
@@ -165,17 +161,9 @@ internal static class HostedRunnerAuditTestData
             Name = $"{planName}{codeSuffix} legacy specification",
             IsActive = true
         };
-        var plan = new SubscriptionPlan
-        {
-            Id = Guid.NewGuid(),
-            Name = $"{planName}{codeSuffix}",
-            IsActive = true,
-            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(PlanCapabilities.Default)
-        };
         db.HostedRunnerSpecifications.Add(specification);
-        db.SubscriptionPlans.Add(plan);
         db.SaveChanges();
-        return plan.Id;
+        return specification.Id;
     }
 
     private static void EnsureUserExists(ApplicationDbContext db, Guid userId, Guid planId)
@@ -191,7 +179,6 @@ internal static class HostedRunnerAuditTestData
             Email = $"user-{userId:N}@automaton.test",
             UserName = $"user-{userId:N}@automaton.test",
             PublicUsername = $"user-{userId:N}"[..32],
-            SubscriptionPlanId = planId,
             SecurityStamp = Guid.NewGuid().ToString("N")
         });
     }
