@@ -718,6 +718,13 @@ class AppsService {
     return data.preview === false ? null : data.content ?? ''
   }
 
+  /** An image from the app's source as a blob, fetched with the user's sign-in. */
+  async readSourceImage(appId: string, path: string): Promise<Blob> {
+    const encoded = path.split('/').map(encodeURIComponent).join('/')
+    const { data } = await apiClient.get<Blob>(`/api/apps/${appId}/source/${encoded}`, { params: { raw: true }, responseType: 'blob' })
+    return data
+  }
+
   /**
    * Build file tree from flat list of file paths
    */

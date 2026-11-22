@@ -17,6 +17,9 @@ function isSafeHref(href: string): boolean {
 function renderInlineMarkdown(value: string): string {
   let html = escapeHtml(value)
 
+  // Images: only relative ones render (as data-docs-src, which the Docs tab loads with the user's sign-in); others show their alt text.
+  html = html.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, alt: string, src: string) =>
+    /^[a-z][a-z0-9+.-]*:|^\/\//i.test(src) ? alt : `<img data-docs-src="${src}" alt="${alt}">`)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text: string, href: string) =>
     isSafeHref(href) ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>` : text)
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')

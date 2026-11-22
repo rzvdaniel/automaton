@@ -21,6 +21,11 @@ public sealed class AppSourceController(
     AppFileStorageService storage) : ControllerBase
 {
     private const int MaxPreviewBytes = 1024 * 1024;
+    private const int MaxImageBytes = 5 * 1024 * 1024;
+    private static readonly Dictionary<string, string> ImageTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".svg"] = "image/svg+xml", [".webp"] = "image/webp"
+    };
 
     [HttpGet]
     public async Task<IActionResult> Files(Guid appId, CancellationToken token)
@@ -31,7 +36,7 @@ public sealed class AppSourceController(
     }
 
     [HttpGet("{*path}")]
-    public async Task<IActionResult> File(Guid appId, string path, CancellationToken token)
+    public async Task<IActionResult> File(Guid appId, string path, CancellationToken token, [FromQuery] bool raw = false)
     {
         var owner = await FindOwnerAsync(appId, token);
         if (owner is null) return Forbid();
@@ -41,6 +46,16 @@ public sealed class AppSourceController(
         try { bytes = await storage.ReadSourceFileBytesAsync(owner.Value, appId, path); }
         catch (UnauthorizedAccessException) { return BadRequest(new { success = false, message = "Invalid path" }); }
         if (bytes is null) return NotFound(new { success = false, message = "File not found" });
+        if (raw)
+        {
+            // Images of the app's docs/ folder, for the Docs tab; nothing else is served as a file.
+            if (!path.StartsWith("docs/", StringComparison.Ordinal) || !ImageTypes.TryGetValue(Path.GetExtension(path), out var type))
+                return NotFound(new { success = false, message = "File not found" });
+            if (bytes.Length > MaxImageBytes) return StatusCode(StatusCodes.Status413PayloadTooLarge, new { success = false, message = "Image too large" });
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'; style-src 'unsafe-inline'";
+            return File(bytes, type);
+        }
         // Text is detected by content: a NUL byte in the first 8 KB means binary; very large files are not previewed.
         if (bytes.Length > MaxPreviewBytes || Array.IndexOf(bytes, (byte)0, 0, Math.Min(bytes.Length, 8000)) >= 0)
             return Ok(new { success = true, editable = false, preview = false, content = "" });

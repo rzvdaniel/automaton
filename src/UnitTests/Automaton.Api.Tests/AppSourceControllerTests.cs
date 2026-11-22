@@ -39,6 +39,17 @@ public sealed class AppSourceControllerTests
             Assert.That(read.GetType().GetProperty("content")!.GetValue(read), Is.EqualTo("{\"stored\":1}"));
             Assert.That(await Controller(db, storage, developer).File(appId, "../_metadata.json", default), Is.TypeOf<BadRequestObjectResult>());
             Assert.That(await Controller(db, storage, developer).File(appId, "/etc/passwd", default), Is.TypeOf<BadRequestObjectResult>());
+            Directory.CreateDirectory(Path.Combine(root, "source", "docs"));
+            File.WriteAllBytes(Path.Combine(root, "source", "docs", "plans.png"), new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 1 });
+            File.WriteAllBytes(Path.Combine(root, "source", "docs", "big.png"), new byte[6 * 1024 * 1024]);
+            File.WriteAllBytes(Path.Combine(root, "source", "logo.png"), new byte[] { 1, 2 });
+            var image = await Controller(db, storage, developer).File(appId, "docs/plans.png", default, raw: true) as FileContentResult;
+            Assert.That(image!.ContentType, Is.EqualTo("image/png"));
+            Assert.That(image.FileContents, Has.Length.EqualTo(6));
+            Assert.That(await Controller(db, storage, developer).File(appId, "logo.png", default, raw: true), Is.TypeOf<NotFoundObjectResult>(), "outside docs/");
+            Assert.That(await Controller(db, storage, developer).File(appId, "automaton.json", default, raw: true), Is.TypeOf<NotFoundObjectResult>(), "not an image");
+            Assert.That(await Controller(db, storage, developer).File(appId, "docs/big.png", default, raw: true), Is.TypeOf<ObjectResult>().With.Property("StatusCode").EqualTo(413));
+            Assert.That(await Controller(db, storage, viewer).File(appId, "docs/plans.png", default, raw: true), Is.TypeOf<ForbidResult>());
             Assert.That(await Controller(db, storage, viewer).Files(appId, default), Is.TypeOf<ForbidResult>(), "view-only member");
             Assert.That(await Controller(db, storage, viewer).File(appId, "automaton.json", default), Is.TypeOf<ForbidResult>());
             Assert.That(await Controller(db, storage, Guid.NewGuid()).Files(appId, default), Is.TypeOf<ForbidResult>(), "a stranger");
@@ -53,6 +64,9 @@ public sealed class AppSourceControllerTests
     private static AppSourceController Controller(Automaton.Api.Data.ApplicationDbContext db, AppFileStorageService storage, Guid userId)
     {
         var users = AppAuthorizationTestData.CreateUserContextService(userId);
-        return new AppSourceController(db, new ResourceAuthorizationService(db, users), users, storage);
+        return new AppSourceController(db, new ResourceAuthorizationService(db, users), users, storage)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }
+        };
     }
 }
