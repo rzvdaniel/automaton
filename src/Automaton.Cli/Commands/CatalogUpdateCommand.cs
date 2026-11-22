@@ -17,6 +17,7 @@ public static class CatalogUpdateCommand
         var confirmEdited = new Option<bool>("--confirm-edited", "Allow the update to replace files that were edited after the install");
         var secretsFile = new Option<string?>("--secrets-file", "File with NAME=VALUE lines for secrets the new version needs (never pass a secret as an argument)");
         var secretsStdin = new Option<bool>("--secrets-stdin", "Read the secrets as NAME=VALUE lines from standard input");
+        var secretFile = new Option<string[]>("--secret-file", "NAME=PATH: read one secret's value from a file, line breaks kept (for a multi-line secret such as an SSH key); repeat for more");
         var wait = new Option<bool>("--wait", "Wait until the deployment has finished and report whether it succeeded");
         var json = new Option<bool>("--json", "Print the result as JSON (for agents)");
         var (noSchedules, schedule) = CatalogInstallCommand.ScheduleOptions();
@@ -24,20 +25,20 @@ public static class CatalogUpdateCommand
             "Update an app installed from the catalog to the commit the catalog pins now and redeploy it; data, settings, secrets and existing schedules stay; default schedules the app lacks (also ones you deleted on purpose) are created again (--no-schedules skips them).\n" +
             "Example: automaton catalog update harbour --wait\n" +
             "Without an update it says so and exits 0. Files edited after the install need --confirm-edited; new secrets need --secrets-file or --secrets-stdin.")
-        { app, check, confirmEdited, secretsFile, secretsStdin, wait, noSchedules, schedule, json };
+        { app, check, confirmEdited, secretsFile, secretsStdin, secretFile, wait, noSchedules, schedule, json };
         command.SetHandler(async context =>
         {
             var parsed = context.ParseResult;
             var asJson = parsed.GetValueForOption(json);
             await CatalogInstallCommand.RunAsync(asJson, () => UpdateAsync(config, parsed.GetValueForArgument(app), parsed.GetValueForOption(check),
-                parsed.GetValueForOption(confirmEdited), parsed.GetValueForOption(secretsFile), parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(wait), asJson, parsed.GetValueForOption(noSchedules), parsed.GetValueForOption(schedule) ?? []));
+                parsed.GetValueForOption(confirmEdited), parsed.GetValueForOption(secretsFile), parsed.GetValueForOption(secretsStdin), parsed.GetValueForOption(secretFile) ?? [], parsed.GetValueForOption(wait), asJson, parsed.GetValueForOption(noSchedules), parsed.GetValueForOption(schedule) ?? []));
         });
         return command;
     }
 
-    private static async Task UpdateAsync(ConfigService config, string appReference, bool check, bool confirmEdited, string? secretsFile, bool secretsStdin, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
+    private static async Task UpdateAsync(ConfigService config, string appReference, bool check, bool confirmEdited, string? secretsFile, bool secretsStdin, string[] secretFiles, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
     {
-        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin));
+        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin, null, secretFiles));
         using var client = CatalogInstallCommand.Connect(config);
         var app = await client.GetAppByIdOrSlugAsync(appReference);
         var appId = CatalogInstallCommand.Text(app, "id");

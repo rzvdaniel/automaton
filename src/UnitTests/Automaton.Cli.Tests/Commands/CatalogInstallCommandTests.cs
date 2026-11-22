@@ -30,7 +30,7 @@ public class CatalogInstallCommandTests
     {
         var install = CatalogInstallCommand.BuildInstall(new ConfigService());
         Assert.That(install.Options.Select(o => o.Name), Is.EquivalentTo(
-            new[] { "source", "name", "runner", "setting", "secrets-file", "secrets-stdin", "wait", "no-schedules", "schedule", "json" }));
+            new[] { "source", "name", "runner", "setting", "secrets-file", "secrets-stdin", "secret-file", "wait", "no-schedules", "schedule", "json" }));
         Assert.That(install.Description, Does.Contain("--secrets-file").And.Contain("hidden prompt"));
     }
 
@@ -38,6 +38,43 @@ public class CatalogInstallCommandTests
     public void List_FiltersByTextCategorySourceAndInstalled() =>
         Assert.That(CatalogInstallCommand.BuildList(new ConfigService()).Options.Select(o => o.Name),
             Is.EquivalentTo(new[] { "search", "category", "source", "installed", "refresh", "json" }));
+
+    [Test]
+    public void ParseLines_ReadsAHeredocBlockAsOneMultiLineValue_AndKeepsTheLinesAfterIt()
+    {
+        var values = CatalogInstallValues.ParseLines("A=1\r\nSSH_KEY<<END\r\n-----BEGIN KEY-----\r\nabc=\r\n-----END KEY-----\r\nEND\r\nB=2\r\n", "file");
+        Assert.Multiple(() =>
+        {
+            Assert.That(values["SSH_KEY"], Is.EqualTo("-----BEGIN KEY-----\nabc=\n-----END KEY-----\n"));
+            Assert.That(values["A"], Is.EqualTo("1"));
+            Assert.That(values["B"], Is.EqualTo("2"));
+        });
+    }
+
+    [Test]
+    public void ParseLines_RefusesAnUnclosedBlock_WithoutShowingTheValue()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => CatalogInstallValues.ParseLines("K<<END\nsecret-line\n", "f"))!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure.Message, Does.Contain("not closed"));
+            Assert.That(failure.Message, Does.Not.Contain("secret-line"));
+        });
+    }
+
+    [Test]
+    public void ReadSecrets_SecretFileGivesTheWholeFileAsTheValue_AndRefusesBadArguments()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "line1\r\nline2\r\n");
+            Assert.That(CatalogInstallValues.ReadSecrets(null, false, null, ["SSH_KEY=" + path])["SSH_KEY"], Is.EqualTo("line1\nline2\n"));
+            Assert.Throws<InvalidOperationException>(() => CatalogInstallValues.ReadSecrets(null, false, null, ["NOPATH"]));
+            Assert.Throws<InvalidOperationException>(() => CatalogInstallValues.ReadSecrets(null, false, null, ["K=" + path + ".missing"]));
+        }
+        finally { File.Delete(path); }
+    }
 
     [Test]
     public void ParseLines_SkipsCommentsAndBlanks_KeepsEverythingAfterTheFirstEquals_AndHandlesCrlf()
