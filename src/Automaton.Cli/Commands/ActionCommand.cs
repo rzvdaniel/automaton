@@ -108,7 +108,7 @@ public static class ActionCommand
         try
         {
             using var body = JsonDocument.Parse(message[start..]);
-            foreach (var name in new[] { "title", "message", "detail" })
+            foreach (var name in new[] { "detail", "message", "title" })
                 if (body.RootElement.ValueKind == JsonValueKind.Object
                     && body.RootElement.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String)
                     return value.GetString()!;

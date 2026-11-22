@@ -1208,9 +1208,27 @@ public class AutomatonApiClient : IDisposable
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync();
+            var reason = ServerReason(body);
             throw new HttpRequestException(
-                $"API error {(int)resp.StatusCode} {resp.ReasonPhrase}: {body}");
+                reason ?? $"API error {(int)resp.StatusCode} {resp.ReasonPhrase}: {body}",
+                null, resp.StatusCode);
         }
+    }
+
+    /// <summary>The server's own reason from a problem or error body (detail, message, then title), or null.</summary>
+    internal static string? ServerReason(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+            foreach (var name in new[] { "detail", "message", "title" })
+                if (doc.RootElement.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(value.GetString()))
+                    return value.GetString();
+        }
+        catch (JsonException) { }
+        return null;
     }
 
     public void Dispose() => _http.Dispose();
