@@ -62,23 +62,30 @@ function offsetMinutes(at: number, timeZone: string): number {
 export function nextRuns(expression: string, timeZone: string, count = 3, from: Date = new Date()): Date[] {
   const cron = parseCron(expression)
   if (!cron) return []
+  const zone = timeZone || 'UTC'
   const runs: Date[] = []
   const hourMs = 3600_000
+  const quarterMs = 900_000
   let hourStart = Math.floor(from.getTime() / hourMs) * hourMs
-  for (let i = 0; i < 24 * 731 && runs.length < count; i++, hourStart += hourMs) {
-    let offset: number
-    try { offset = offsetMinutes(hourStart, timeZone || 'UTC') } catch { return [] }
-    const local = new Date(hourStart + offset * 60000)
-    const monthOk = cron.month.has(local.getUTCMonth() + 1)
-    const domOk = cron.dayOfMonth.has(local.getUTCDate())
-    const dowOk = cron.dayOfWeek.has(local.getUTCDay())
-    const dayOk = cron.anyDay || cron.anyWeekday ? domOk && dowOk : domOk || dowOk
-    if (!monthOk || !dayOk || !cron.hour.has(local.getUTCHours())) continue
-    for (const minute of [...cron.minute].sort((a, b) => a - b)) {
-      const at = hourStart + (minute - local.getUTCMinutes()) * 60000
-      if (at > from.getTime() && at >= hourStart) { runs.push(new Date(at)); if (runs.length === count) break }
+  try {
+    for (let i = 0; i < 24 * 731 && runs.length < count; i++, hourStart += hourMs) {
+      // Every zone's offset is a multiple of 15 minutes, so a quarter hour is never split by local time.
+      const startOffset = offsetMinutes(hourStart, zone)
+      const split = offsetMinutes(hourStart + hourMs - 1, zone) !== startOffset
+      for (let q = 0; q < 4; q++) {
+        const block = hourStart + q * quarterMs
+        const local = new Date(block + (split ? offsetMinutes(block, zone) : startOffset) * 60000)
+        const dom = cron.dayOfMonth.has(local.getUTCDate())
+        const dow = cron.dayOfWeek.has(local.getUTCDay())
+        const dayOk = cron.anyDay || cron.anyWeekday ? dom && dow : dom || dow
+        if (!cron.month.has(local.getUTCMonth() + 1) || !dayOk || !cron.hour.has(local.getUTCHours())) continue
+        for (let k = 0; k < 15 && runs.length < count; k++) {
+          const at = block + k * 60000
+          if (at > from.getTime() && cron.minute.has(local.getUTCMinutes() + k)) runs.push(new Date(at))
+        }
+      }
     }
-  }
+  } catch { return [] }
   return runs
 }
 
@@ -144,5 +151,5 @@ export function formatNextRuns(runs: ReadonlyArray<Date>, timeZone: string, now:
     return `${new Intl.DateTimeFormat('en-GB', { timeZone: zone, weekday: 'short', day: 'numeric', month: 'short' }).format(run)} ${time}`
   })
   const list = text.length > 1 ? `${text.slice(0, -1).join(', ')} and ${text[text.length - 1]}` : text.join('')
-  return `${list} ${zone === 'UTC' ? 'UTC' : zone}`
+  return `${list} ${zone}`
 }

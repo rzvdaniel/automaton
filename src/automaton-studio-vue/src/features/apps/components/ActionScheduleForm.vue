@@ -115,6 +115,7 @@ async function remove() {
       </template>
       <Select v-model="timeZone" :options="zones" filter aria-label="Time zone" data-testid="schedule-zone" />
     </div>
+    <p v-if="schedule?.scheduleType === 'Interval'" class="hint" data-testid="interval-note">This schedule repeats on a fixed interval. Saving stores it as the timing shown here.</p>
     <p v-if="problem" class="problem" role="alert" data-testid="schedule-problem">{{ problem }}</p>
     <p v-else-if="nextLine" class="hint" data-testid="schedule-next">Next runs: {{ nextLine }}</p>
 
