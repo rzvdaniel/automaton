@@ -11,6 +11,9 @@ namespace Automaton.Runner.Console.Services;
 /// </summary>
 internal sealed class RunnerLogSinkSync(RunnerRuntimeRegistry? registry, ILogger logger)
 {
+    // Heartbeats build a new instance each time, so the last failure is kept per process.
+    private static string? lastFailure;
+
     public async Task SyncAsync(HubConnection hub, CancellationToken cancellationToken)
     {
         if (registry is null || !LogForwarding.IsSwitchable) return;
@@ -19,6 +22,7 @@ internal sealed class RunnerLogSinkSync(RunnerRuntimeRegistry? registry, ILogger
             var reports = Reports(registry.Snapshot());
             var assignment = await hub.InvokeAsync<LogSinkAssignment?>("SyncLogSink", reports, cancellationToken);
             LogForwarding.SetAddress(assignment?.Address);
+            lastFailure = null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -28,7 +32,12 @@ internal sealed class RunnerLogSinkSync(RunnerRuntimeRegistry? registry, ILogger
         {
             // An older server does not know the method, or the server is unreachable: stop sending until it answers again.
             LogForwarding.SetAddress(null);
-            logger.Debug(exception, "Could not sync the log receiver");
+            // Warn once per distinct failure, not every heartbeat; a later success re-arms it.
+            if (lastFailure != exception.Message)
+            {
+                lastFailure = exception.Message;
+                logger.Warning(exception, "Could not sync the log receiver; logs are not shipped until it works");
+            }
         }
     }
 
