@@ -38,7 +38,8 @@ public static class CatalogUpdateCommand
 
     private static async Task UpdateAsync(ConfigService config, string appReference, bool check, bool confirmEdited, string? secretsFile, bool secretsStdin, string[] secretFiles, bool wait, bool asJson, bool noSchedules, string[] scheduleNames)
     {
-        var secrets = CatalogInstallValues.WithoutEmpty(CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin, null, secretFiles));
+        var givenSecrets = CatalogInstallValues.ReadSecrets(secretsFile, secretsStdin, null, secretFiles);
+        var secrets = CatalogInstallValues.WithoutEmpty(givenSecrets);
         using var client = CatalogInstallCommand.Connect(config);
         var app = await client.GetAppByIdOrSlugAsync(appReference);
         var appId = CatalogInstallCommand.Text(app, "id");
@@ -79,11 +80,11 @@ public static class CatalogUpdateCommand
         if (edited && !confirmEdited)
             throw new InvalidOperationException($"{name} was edited after it was installed; the update replaces those changes. Add --confirm-edited to go on. Nothing was changed.");
 
-        await ApplyAsync(client, app, name, update, confirmEdited, secrets, secretsStdin, wait, asJson, appReference, noSchedules, scheduleNames, retryOnly);
+        await ApplyAsync(client, app, name, update, confirmEdited, secrets, givenSecrets.Keys.ToHashSet(), secretsStdin, wait, asJson, appReference, noSchedules, scheduleNames, retryOnly);
     }
 
     private static async Task ApplyAsync(AutomatonApiClient client, JsonElement app, string name, JsonElement update, bool confirmEdited,
-        Dictionary<string, string> secrets, bool secretsStdin, bool wait, bool asJson, string appReference, bool noSchedules, string[] scheduleNames, bool retry = false)
+        Dictionary<string, string> secrets, HashSet<string> givenNames, bool secretsStdin, bool wait, bool asJson, string appReference, bool noSchedules, string[] scheduleNames, bool retry = false)
     {
         var appId = CatalogInstallCommand.Text(app, "id");
         var installed = CatalogInstallCommand.Text(update, "installedCommit");
@@ -91,7 +92,7 @@ public static class CatalogUpdateCommand
         var newSecrets = CatalogInstallCommand.Strings(update, "newSecrets");
         var application = await ContractAsync(client, app, latest);
         var (plan, _) = await PlanSchedulesAsync(client, app, name, update, noSchedules, scheduleNames);
-        var required = await RequiredSecretsAsync(client, application, newSecrets, secrets);
+        var required = RequiredSecrets(application, newSecrets, givenNames);
         var missing = required.Where(secret => !secrets.ContainsKey(secret)).ToList();
         if (missing.Count > 0) AskForSecrets(missing, secrets, secretsStdin, asJson, appReference);
 
@@ -115,13 +116,13 @@ public static class CatalogUpdateCommand
         }
     }
 
-    /// <summary>The new secrets the person must give: declared by the new version, without a source and not optional. Refuses secrets it does not declare.</summary>
-    private static Task<List<string>> RequiredSecretsAsync(AutomatonApiClient client, JsonElement application, List<string> newSecrets, Dictionary<string, string> given)
+    /// <summary>The new secrets the person must give: declared by the new version, without a source and not optional. An explicit empty value (NAME=) counts as given and leaves it unset. Refuses secrets it does not declare.</summary>
+    internal static List<string> RequiredSecrets(JsonElement application, List<string> newSecrets, HashSet<string> given)
     {
-        if (newSecrets.Count == 0 && given.Count == 0) return Task.FromResult(new List<string>());
-        var (unknown, _, missing) = CatalogInstallValues.Check(application, new Dictionary<string, string>(), given);
+        if (newSecrets.Count == 0 && given.Count == 0) return [];
+        var (unknown, _, missing) = CatalogInstallValues.Check(application, new Dictionary<string, string>(), given.ToDictionary(name => name, _ => string.Empty));
         if (unknown.Count > 0) throw new InvalidOperationException($"The new version does not declare: {string.Join(", ", unknown)}. Nothing was changed.");
-        return Task.FromResult(missing.Where(newSecrets.Contains).ToList());
+        return missing.Where(newSecrets.Contains).ToList();
     }
 
     private static void AskForSecrets(List<string> missing, Dictionary<string, string> secrets, bool stdinUsed, bool asJson, string app)

@@ -74,4 +74,27 @@ public class PermissionsAdminCommandsTests
         Assert.Throws<InvalidOperationException>(() => PermissionsAdminCommands.PickApp(Items(("1", "Harbour")), "missing"));
         Assert.Throws<InvalidOperationException>(() => PermissionsAdminCommands.PickApp(Items(("1", "Harbour"), ("2", "harbour")), "Harbour"));
     }
+
+    private static readonly System.Text.Json.JsonElement Contract = System.Text.Json.JsonDocument.Parse(
+        """{"secrets":[{"name":"HOOK","optional":true},{"name":"CHECKIN","optional":true},{"name":"TOKEN"}]}""").RootElement;
+
+    [Test]
+    public void RequiredSecrets_MissingOptionalNewSecretDoesNotBlock()
+        => Assert.That(CatalogUpdateCommand.RequiredSecrets(Contract, ["HOOK"], []), Is.Empty);
+
+    [Test]
+    public void RequiredSecrets_MissingRequiredNewSecretBlocks()
+        => Assert.That(CatalogUpdateCommand.RequiredSecrets(Contract, ["HOOK", "TOKEN"], ["CHECKIN"]), Is.EqualTo(new[] { "TOKEN" }));
+
+    [Test]
+    public void RequiredSecrets_ExplicitEmptyValueLeavesASecretUnsetWithoutBlocking()
+    {
+        var given = CatalogInstallValues.ReadSecrets(null, true, new StringReader("TOKEN=\nHOOK=https://x\n"));
+        Assert.That(CatalogUpdateCommand.RequiredSecrets(Contract, ["TOKEN"], given.Keys.ToHashSet()), Is.Empty);
+        Assert.That(CatalogInstallValues.WithoutEmpty(given).Keys, Is.EqualTo(new[] { "HOOK" }));
+    }
+
+    [Test]
+    public void RequiredSecrets_RefusesASecretTheNewVersionDoesNotDeclare()
+        => Assert.Throws<InvalidOperationException>(() => CatalogUpdateCommand.RequiredSecrets(Contract, [], ["NOPE"]));
 }
