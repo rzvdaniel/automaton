@@ -66,6 +66,25 @@ public class CommandJsonShapeTests
     }
 
     [Test]
+    public async Task AppsDeleteRequiresYesAndResolvesNames()
+    {
+        var projectRoot = CreateProjectRoot();
+        var output = await InvokeAndCaptureAsync(InventoryCommands.BuildApps(new ConfigService()), projectRoot, ["delete", "demo", "--json"]);
+        using var document = JsonDocument.Parse(output);
+        Assert.That(document.RootElement.GetProperty("success").GetBoolean(), Is.False);
+        Assert.That(document.RootElement.GetProperty("error").GetString(), Does.Contain("--yes"));
+
+        var first = new Automaton.Cli.Models.AppInventoryItem(Guid.NewGuid(), "Demo", true, "demo-slug", null, null);
+        var second = new Automaton.Cli.Models.AppInventoryItem(Guid.NewGuid(), "Twin", false, null, null, null);
+        var third = new Automaton.Cli.Models.AppInventoryItem(Guid.NewGuid(), "twin", false, null, null, null);
+        var apps = new[] { first, second, third };
+        Assert.That(InventoryCommands.ResolveAppId(apps, "demo-slug"), Is.EqualTo(first.Id.ToString()));
+        Assert.That(InventoryCommands.ResolveAppId(apps, "demo"), Is.EqualTo(first.Id.ToString()));
+        Assert.Throws<InvalidOperationException>(() => InventoryCommands.ResolveAppId(apps, "twin"));
+        Assert.Throws<InvalidOperationException>(() => InventoryCommands.ResolveAppId(apps, "missing"));
+    }
+
+    [Test]
     public async Task DeleteCommandRequiresExplicitConfirmationBeforeCredentialsOrNetwork()
     {
         var projectRoot = CreateProjectRoot();

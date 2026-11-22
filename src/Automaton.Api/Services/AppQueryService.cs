@@ -82,14 +82,19 @@ public sealed class AppQueryService(
         return true;
     }
 
+    private static IQueryable<WebApp> WithDetails(IQueryable<WebApp> apps) => apps
+        .Include(x => x.WebAppUsers)
+        .Include(x => x.WebAppScreenshots)
+        .Include(x => x.DeploymentTargets);
+
     public AppModel? Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)
-        var appEntity = authorizationService.GetAccessibleAppsQuery()
-            .Include(x => x.WebAppUsers)
-            .Include(x => x.WebAppScreenshots)
-            .Include(x => x.DeploymentTargets)
-            .SingleOrDefault(x => x.Id == id);
+        var appEntity = WithDetails(authorizationService.GetAccessibleAppsQuery()).SingleOrDefault(x => x.Id == id);
+
+        // Administrators open any app on the server (read-only: CanUpdate stays false unless they also own it).
+        if (appEntity == null && authorizationService.IsAdministratorAsync(UserId).Result)
+            appEntity = WithDetails(dataContext.WebApps).SingleOrDefault(x => x.Id == id && x.DeletionClaimId == null);
 
         if (appEntity == null)
         {

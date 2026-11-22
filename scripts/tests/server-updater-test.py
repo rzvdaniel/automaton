@@ -71,11 +71,16 @@ elif args[:2]==['image','inspect'] and '{{.Created}} {{.Id}}' in args:
     print(created.get(args[-1],'2000-01-01T00:00:00Z'), args[-1])
 elif args[:2]==['image','inspect'] and '{{.Id}}' in args:
     print(args[-1] if args[-1].startswith('sha256:') else 'sha256:pinned')
+elif args[:2]==['image','prune'] or args[:2]==['builder','prune']:
+    if os.environ.get('FAKE_PRUNE_FREES')=='1': open(os.environ['FAKE_PRUNED'],'w').close()
+elif args[:2]==['system','df']: print('TYPE TOTAL ACTIVE SIZE RECLAIMABLE')
 elif args[0]=='cp':
     with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
         data=b'key-or-data'
         item=tarfile.TarInfo('entry'); item.size=len(data)
         archive.addfile(item, io.BytesIO(data))
+elif args[0]=='ps':
+    if os.environ.get('FAKE_WEBSITE_HOST')=='1' and 'label=com.docker.compose.service=website-green' in args: print('abc123')
 elif args[0]=='compose':
     if 'config' in args and '--format' in args: print(open(args[args.index('-f')+1]).read())
     elif 'config' in args and '--services' in args: print(*json.load(open(args[args.index('-f')+1]))['services'], sep=chr(10))
@@ -84,14 +89,24 @@ elif args[0]=='compose':
         # The updater runs pg_dump (custom format) and pg_restore --list in the postgres service.
         if args[args.index('exec')+1:][:2]!=['-T','postgres']: sys.exit(2)
         command=args[args.index('postgres')+1:]
-        if command[0]=='pg_dump':
+        if command[0]=='psql' and '-c' in command and 'DROP SCHEMA public CASCADE' in command[command.index('-c')+1]:
+            open(os.environ['FAKE_STATE']+'.schema-reset','w').close()
+        elif command[0]=='psql':
+            print(os.environ.get('FAKE_MIGRATIONS_AFTER','5') if os.environ.get('FAKE_UP_FAIL') and os.path.exists(os.environ['FAKE_STATE']) else '5')
+        elif command[0]=='pg_restore' and '--single-transaction' in command and '--exit-on-error' in command and '--clean' not in command:
+            if sys.stdin.buffer.read()!=b'PGDMP-fake-custom-archive': sys.exit(1)
+            # A table the new migration added would make the restore fail unless the schema was emptied first.
+            if os.environ.get('FAKE_MIGRATION_ADDS_TABLE')=='1' and not os.path.exists(os.environ['FAKE_STATE']+'.schema-reset'): sys.exit(1)
+        elif command[0]=='pg_dump':
             if '--format=custom' not in command or command[command.index('-d')+1]!='automaton': sys.exit(2)
             sys.stdout.buffer.write(b'PGDMP-fake-custom-archive')
         elif command[:2]==['pg_restore','--list']:
             if sys.stdin.buffer.read()!=b'PGDMP-fake-custom-archive': sys.exit(1)
             print('; Archive created by fake pg_dump')
         else: sys.exit(2)
-    elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
+    elif 'up' in args:
+        if os.environ.get('FAKE_UP_FAIL')=='1' and not os.path.exists(os.environ['FAKE_STATE']):
+            open(os.environ['FAKE_STATE'],'w').close(); sys.exit(1)
 ''')
         (self.bin / 'curl').write_text("""#!/bin/sh
 case "$*" in
@@ -100,7 +115,19 @@ case "$*" in
   *) echo '{"installationComplete":true}' ;;
 esac
 """)
-        (self.bin / 'df').write_text('#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 29000000 4%% /\\n"\n')
+        for tool in ('systemctl', 'journalctl'):
+            (self.bin / tool).write_text('#!/bin/sh\n[ -z "$FAKE_DOCKER_LOG" ] || echo "[\\"%s\\", \\"$*\\"]" >> "$FAKE_DOCKER_LOG"\n' % tool)
+        (self.bin / 'df').write_text('''#!/bin/sh
+# FAKE_DF_LOW_KB: free space until the fake docker has pruned images (it creates $FAKE_PRUNED), then 29000000.
+free=29000000
+if [ -n "$FAKE_DF_LOW_KB" ] && [ ! -e "$FAKE_PRUNED" ]; then free=$FAKE_DF_LOW_KB; fi
+printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 %s 4%% /\\n" "$free"
+''')
+        # visudo -cf: fail on request, otherwise accept only the one expected line.
+        (self.bin / 'visudo').write_text('''#!/bin/sh
+[ "$FAKE_VISUDO_FAIL" != 1 ] || { echo "visudo: syntax error" >&2; exit 1; }
+grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-deploy-website$' "$2"
+''')
         for tool in self.bin.iterdir():
             tool.chmod(0o755)
         self.update_dir = self.root / 'update'
@@ -108,7 +135,7 @@ esac
         self.systemd_dir.mkdir()
         # Never touch the host's systemd units or /var/lib/automaton.
         self.environment = os.environ | {'PATH': str(self.bin) + ':' + os.environ['PATH'],
-                                         'AUTOMATON_UPDATE_TEST': '1', 'AUTOMATON_UPDATE_DIR': str(self.update_dir),
+                                         'AUTOMATON_UPDATE_TEST': '1', 'FAKE_STATE': str(self.root / 'up-failed'), 'AUTOMATON_UPDATE_DIR': str(self.update_dir),
                                          'AUTOMATON_SYSTEMD_DIR': str(self.systemd_dir)}
 
     def bundle(self, target=None, compose_file=None, with_update_trigger=True):
@@ -120,8 +147,10 @@ esac
         (source / 'version').write_text('server-v0.1.2\n')
         shutil.copy2(REPO / 'scripts/update-automaton.sh', source / 'update.sh')
         shutil.copy2(REPO / 'scripts/install-automaton.sh', source / 'install.sh')
+        shutil.copy2(REPO / 'docker/install/cleanup.sh', source / 'cleanup.sh')
         if with_update_trigger:
             shutil.copy2(REPO / 'docker/install/update-from-request.sh', source / 'update-from-request.sh')
+        shutil.copytree(REPO / 'docker/production-host', source / 'production-host', dirs_exist_ok=True)
         archive = self.root / 'automaton-server.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
             tar.add(source, arcname='automaton-server')
@@ -134,6 +163,44 @@ esac
                                '--install-dir', str(self.install), '--config-dir', str(self.config),
                                '--bundle', str(archive), '--checksum', str(checksum)],
                               env=self.environment | (extra or {}), capture_output=True, text=True)
+
+    def test_sudo_from_a_limited_account_refuses_paths_and_bundles(self):
+        archive, checksum = self.bundle()
+        result = self.update(archive, checksum, extra={'SUDO_USER': 'no-such-limited-account'})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('root shell', result.stderr)
+        self.assertFalse((self.install / 'backups').exists())
+        # a root shell that came through `sudo -i` as root is not limited
+        result = self.update(archive, checksum, extra={'SUDO_USER': 'root'})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_sudo_from_an_administrator_may_use_bundles(self):
+        archive, checksum = self.bundle()
+        stub = self.bin / 'sudo'
+        stub.write_text('#!/bin/sh\necho "    (ALL : ALL) ALL"\n')
+        stub.chmod(0o755)
+        # the script calls /usr/bin/sudo, so run a copy that points at the stub
+        script = self.root / 'update-with-stub-sudo.sh'
+        script.write_text((REPO / 'scripts/update-automaton.sh').read_text().replace('/usr/bin/sudo', str(stub)))
+        result = subprocess.run(['bash', str(script), '--version', 'server-v0.1.2', '--install-dir', str(self.install),
+                                 '--config-dir', str(self.config), '--bundle', str(archive), '--checksum', str(checksum)],
+                                env=self.environment | {'SUDO_USER': 'an-administrator'}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_a_fake_sudo_earlier_on_the_path_is_not_trusted(self):
+        archive, checksum = self.bundle()
+        stub = self.bin / 'sudo'
+        stub.write_text('#!/bin/sh\necho "    (ALL : ALL) ALL"\n')
+        stub.chmod(0o755)
+        result = self.update(archive, checksum, extra={'SUDO_USER': 'no-such-limited-account'})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('root shell', result.stderr)
+
+    def test_sudo_from_a_limited_account_refuses_allow_downgrade(self):
+        result = subprocess.run(['bash', str(REPO / 'scripts/update-automaton.sh'), '--allow-downgrade'],
+                                env=self.environment | {'SUDO_USER': 'no-such-limited-account'}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('root shell', result.stderr)
 
     def test_upgrades_after_verified_backup(self):
         result = self.update(*self.bundle())
@@ -168,6 +235,29 @@ esac
         self.assertEqual(len(folders), 1)
         self.assertTrue((folders[0] / 'SHA256SUMS').is_file())
         self.assertFalse(list(nightly.glob('*.tar.age')))
+
+    def test_cleanup_script_removes_the_old_host_timer_and_nothing_else(self):
+        script = REPO / 'docker/install/cleanup.sh'
+        (self.systemd_dir / 'automaton-cleanup.timer').write_text('[Timer]\n')
+        (self.systemd_dir / 'automaton-cleanup.service').write_text('[Service]\n')
+        (self.systemd_dir / 'automaton-backup.timer').write_text('[Timer]\n')
+        log = self.root / 'cleanup.log'
+        environment = self.environment | {'FAKE_DOCKER_LOG': str(log)}
+        for _ in range(2):  # safe to repeat
+            result = subprocess.run(['bash', str(script), '--install-dir', str(self.install), '--remove-timer'],
+                                    env=environment, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.systemd_dir / 'automaton-cleanup.timer').exists())
+        self.assertFalse((self.systemd_dir / 'automaton-cleanup.service').exists())
+        self.assertTrue((self.systemd_dir / 'automaton-backup.timer').exists())
+        self.assertFalse(log.exists() and 'prune' in log.read_text(), 'the host script no longer cleans anything itself')
+
+    def test_update_removes_the_old_cleanup_timer(self):
+        (self.systemd_dir / 'automaton-cleanup.timer').write_text('[Timer]\n')
+        result = self.update(*self.bundle())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.install / 'cleanup.sh').stat().st_mode & 0o777, 0o700)
+        self.assertFalse((self.systemd_dir / 'automaton-cleanup.timer').exists())
 
     def test_enables_updates_from_studio_before_the_api_is_recreated(self):
         log = self.root / 'docker.log'
@@ -239,7 +329,7 @@ esac
     def test_unhealthy_public_api_prevents_update_completion(self):
         result = self.update(*self.bundle(), extra={'FAKE_API_HEALTH': 'unexpected response'})
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Public route validation failed', result.stderr)
+        self.assertIn('public route validation failed', result.stderr)
         self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.1')
 
     def test_override_sidecar_is_not_pulled_or_required(self):
@@ -325,6 +415,31 @@ esac
         removed = [args[-1] for args in calls if args[:2] == ['image', 'rm'] and args[-1].startswith('sha256:')]
         self.assertEqual(removed, ['sha256:old1', 'sha256:old2'])
 
+    def test_prunes_unused_docker_data_when_disk_is_short_and_continues(self):
+        log = self.root / 'docker.log'
+        low = {'FAKE_DOCKER_LOG': str(log), 'FAKE_DF_LOW_KB': '8000000', 'FAKE_PRUNED': str(self.root / 'pruned'), 'FAKE_PRUNE_FREES': '1'}
+        result = self.update(*self.bundle(), extra=low)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Freed', result.stdout)
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        self.assertIn(['image', 'prune', '-a', '-f'], calls)
+        self.assertIn(['builder', 'prune', '-f'], calls)
+        self.assertFalse([c for c in calls if 'volume' in c or c[:2] == ['system', 'prune']])
+
+    def test_still_short_after_pruning_names_what_uses_the_disk(self):
+        low = {'FAKE_DF_LOW_KB': '8000000', 'FAKE_PRUNED': str(self.root / 'pruned')}
+        result = self.update(*self.bundle(), extra=low)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('At least 10 GiB free disk space is required', result.stderr)
+        self.assertIn('TYPE TOTAL ACTIVE SIZE RECLAIMABLE', result.stderr)
+        self.assertIn('Backups in', result.stderr)
+
+    def test_does_not_prune_when_enough_space_is_free(self):
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('prune', log.read_text())
+
     def test_keep_backups_option_and_failed_update_keep_everything(self):
         created, manual = self.old_backups(3)
         failed = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1'})
@@ -362,6 +477,25 @@ esac
         backup, = (self.install / 'backups').iterdir()
         self.assertTrue((backup / 'database.dump').is_file())
 
+    def test_failed_update_rolls_back_and_restores_database_when_a_migration_ran(self):
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1', 'FAKE_MIGRATIONS_AFTER': '6', 'FAKE_DOCKER_LOG': str(log)})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Rolled back: the server answers on server-v0.1.1', result.stderr)
+        self.assertIn('Database restored: yes', result.stderr)
+        self.assertIn('pg_restore', log.read_text())
+        self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.1')
+
+    def test_rollback_restores_into_a_clean_schema_when_the_migration_added_a_table(self):
+        result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1', 'FAKE_MIGRATIONS_AFTER': '6', 'FAKE_MIGRATION_ADDS_TABLE': '1'})
+        self.assertIn('Database restored: yes', result.stderr)
+        self.assertNotIn('Database restore failed', result.stderr)
+
+    def test_failed_update_rolls_back_without_database_restore_when_no_migration_ran(self):
+        result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1', 'FAKE_MIGRATIONS_AFTER': '5'})
+        self.assertIn('Rolled back: the server answers on server-v0.1.1', result.stderr)
+        self.assertIn('Database restored: no', result.stderr)
+
     def test_preserves_and_uses_reviewed_override_for_both_manifests(self):
         override = self.install / 'compose.override.yaml'
         content = 'services:\n  postgres:\n    image: example.invalid/retained-postgres@sha256:' + '9' * 64 + '\n'
@@ -388,6 +522,96 @@ esac
         self.assertIn('non-symlink', result.stderr)
         self.assertFalse((self.install / 'backups').exists())
 
+    def website_host(self, authorized_keys_line='restrict,command="/usr/local/bin/automaton-deploy" ssh-ed25519 AAAA deploy-production', forced_command=True):
+        """A temporary host root with a deploy account, and an existing forced-command script on request."""
+        host = self.root / 'host'
+        home = self.root / 'home/deployer'
+        (home / '.ssh').mkdir(parents=True, exist_ok=True)
+        (home / '.ssh/authorized_keys').write_text(authorized_keys_line + '\n')
+        other = self.root / 'home/other'
+        other.mkdir(parents=True, exist_ok=True)
+        passwd = self.root / 'passwd'
+        passwd.write_text(f'root:x:0:0::/root:/bin/bash\ndeployer:x:1001:1001::{home}:/bin/bash\nother:x:1002:1002::{other}:/bin/bash\n')
+        (host / 'usr/local/bin').mkdir(parents=True, exist_ok=True)
+        if forced_command:
+            (host / 'usr/local/bin/automaton-deploy').write_text('#!/bin/sh\necho old\n')
+        return host, self.environment | {'AUTOMATON_HOST_ROOT': str(host), 'AUTOMATON_PASSWD_FILE': str(passwd), 'FAKE_WEBSITE_HOST': '1'}
+
+    def installed(self, host):
+        return {name: (host / name).stat() for name in (
+            'usr/local/bin/automaton-deploy-website', 'usr/local/lib/automaton/docker-compose.website.yml',
+            'etc/sudoers.d/automaton-deploy-website', 'usr/local/bin/automaton-deploy')}
+
+    def test_website_host_installs_the_deploy_step_from_the_verified_bundle(self):
+        host, environment = self.website_host()
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        files = {name: stat.st_mode & 0o777 for name, stat in self.installed(host).items()}
+        self.assertEqual(files, {'usr/local/bin/automaton-deploy-website': 0o755, 'usr/local/lib/automaton/docker-compose.website.yml': 0o644,
+                                 'etc/sudoers.d/automaton-deploy-website': 0o440, 'usr/local/bin/automaton-deploy': 0o755})
+        for stat in self.installed(host).values():
+            self.assertEqual((stat.st_uid, stat.st_gid), (0, 0))
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy-website').read_bytes(), (REPO / 'docker/production-host/automaton-deploy-website').read_bytes())
+        self.assertEqual((host / 'etc/sudoers.d/automaton-deploy-website').read_text(),
+                         'deployer ALL=(root) NOPASSWD: /usr/local/bin/automaton-deploy-website\n')
+        forced = (host / 'usr/local/bin/automaton-deploy').read_text()
+        self.assertIn(r'^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$', forced)
+        self.assertIn(r'^sudo\ /usr/local/bin/automaton-deploy-website\ [0-9]+\.[0-9]+\.[0-9]+$', forced)
+        self.assertEqual(sorted(path.name for path in (host / 'usr/local/bin').iterdir()), ['automaton-deploy', 'automaton-deploy-website'])
+        self.assertEqual(sorted(path.name for path in (host / 'etc/sudoers.d').iterdir()), ['automaton-deploy-website'])
+
+    def test_forced_command_is_only_rewritten_when_it_exists(self):
+        host, environment = self.website_host(forced_command=False)
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((host / 'usr/local/bin/automaton-deploy-website').is_file())
+        self.assertFalse((host / 'usr/local/bin/automaton-deploy').exists())
+
+    def test_normal_host_gets_nothing_new(self):
+        host, environment = self.website_host()
+        result = self.update(*self.bundle(), extra=environment | {'FAKE_WEBSITE_HOST': '0'})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy').read_text(), '#!/bin/sh\necho old\n')
+        self.assertEqual([path.name for path in (host / 'usr/local/bin').iterdir()], ['automaton-deploy'])
+        self.assertFalse((host / 'etc').exists())
+        self.assertFalse((host / 'usr/local/lib').exists())
+
+    def test_website_deploy_setup_is_idempotent(self):
+        host, environment = self.website_host()
+        archive, checksum = self.bundle()
+        self.assertEqual(self.update(archive, checksum, extra=environment).returncode, 0)
+        before = {name: (stat.st_mtime_ns, stat.st_ino) for name, stat in self.installed(host).items()}
+        (self.install / 'release.env').write_text(manifest('2'))  # same release again: the re-run path
+        result = self.update(archive, checksum, extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('Installed ', result.stdout)
+        self.assertEqual(before, {name: (stat.st_mtime_ns, stat.st_ino) for name, stat in self.installed(host).items()})
+
+    def test_stale_website_files_are_replaced(self):
+        host, environment = self.website_host()
+        (host / 'usr/local/bin/automaton-deploy-website').write_text('old')
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Installed ' + str(host / 'usr/local/bin/automaton-deploy-website'), result.stdout)
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy-website').read_bytes(), (REPO / 'docker/production-host/automaton-deploy-website').read_bytes())
+
+    def test_sudoers_that_fails_validation_is_not_installed_and_the_forced_command_is_kept(self):
+        host, environment = self.website_host()
+        result = self.update(*self.bundle(), extra=environment | {'FAKE_VISUDO_FAIL': '1'})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)  # the update itself still completes
+        self.assertIn('did not validate', result.stderr)
+        self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.2')
+        self.assertEqual(list((host / 'etc/sudoers.d').iterdir()), [])
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy').read_text(), '#!/bin/sh\necho old\n')
+
+    def test_no_single_deploy_account_means_no_sudoers_line(self):
+        host, environment = self.website_host(authorized_keys_line='ssh-ed25519 AAAA ordinary-key')
+        result = self.update(*self.bundle(), extra=environment)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('No single account', result.stderr)
+        self.assertEqual(list((host / 'etc/sudoers.d').iterdir()), [])
+        self.assertEqual((host / 'usr/local/bin/automaton-deploy').read_text(), '#!/bin/sh\necho old\n')
+
     def test_no_version_selects_latest_stable_distribution(self):
         (self.bin / 'curl').write_text('''#!/bin/sh
 case "$*" in
@@ -403,6 +627,14 @@ esac
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('selected:ghcr.io/rzvdaniel/automaton-server-distribution:server-v0.1.10', result.stderr)
         self.assertFalse((self.install / 'backups').exists())
+
+
+class RestoreScriptTests(unittest.TestCase):
+    def test_key_restore_uses_options_busybox_chown_accepts(self):
+        # The helper image is the API/Worker image, whose BusyBox chown has no --reference (#1452).
+        text = (REPO / 'docker/install/restore.sh').read_text()
+        self.assertNotIn('--reference', text)
+        self.assertIn('chown -R "$o" /keys', text)
 
 
 if __name__ == '__main__':

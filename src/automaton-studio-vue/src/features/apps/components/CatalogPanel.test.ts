@@ -5,21 +5,26 @@ import { flushPromises, mount } from '@vue/test-utils'
 const getCatalog = vi.fn()
 const getCatalogSources = vi.fn()
 const resolveGitUrl = vi.fn()
+const getCatalogUpdate = vi.fn()
+const applyCatalogUpdate = vi.fn()
 const push = vi.fn()
 const replace = vi.fn()
 const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }))
 const roles = vi.hoisted(() => ({ value: [] as string[] }))
 vi.mock('@/features/auth/stores/auth.store', () => ({ useAuthStore: () => ({ user: { roles: roles.value } }) }))
-vi.mock('../services/apps.service', () => ({ appsService: { getCatalogSources: (...a: unknown[]) => getCatalogSources(...a), getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a) } }))
+vi.mock('../services/apps.service', () => ({ appsService: { getCatalogSources: (...a: unknown[]) => getCatalogSources(...a), getCatalog: (...a: unknown[]) => getCatalog(...a), resolveGitUrl: (...a: unknown[]) => resolveGitUrl(...a), getCatalogUpdate: (...a: unknown[]) => getCatalogUpdate(...a), applyCatalogUpdate: (...a: unknown[]) => applyCatalogUpdate(...a) } }))
 vi.mock('vue-router', async () => ({ ...(await vi.importActual<object>('vue-router')), useRouter: () => ({ push, replace }), useRoute: () => ({ query: routeQuery.value }) }))
 
 import source from './CatalogPanel.vue?raw'
+import { readFileSync } from 'node:fs'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import CatalogPanel from './CatalogPanel.vue'
 
 const RouterLink = { props: ['to'], template: '<a class="link" :data-to="JSON.stringify(to)"><slot /></a>' }
+const pageFamily = readFileSync('src/assets/styles/page-family.css', 'utf8')
 const entry = { id: 'backup', name: 'Off-site Backup', summary: 'Copies backups away', category: 'Maintenance', repo: 'o/apps', folder: 'm/backup', commit: '0123456789abcdef0123456789abcdef01234567', minServerVersion: '0.2.31', permissions: ['backups:read'], requiresNewerServer: false, installedAppId: null, sourceId: 'official', sourceName: 'Official', customSource: false }
-const mountPanel = () => mount(CatalogPanel, { attachTo: document.body, global: { plugins: [PrimeVue], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
+const mountPanel = () => mount(CatalogPanel, { attachTo: document.body, global: { plugins: [PrimeVue, ToastService], stubs: { RouterLink, CatalogSources: { template: '<div class="sources-stub" />' } } } })
 const button = (label: string) => document.body.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
 
 describe('CatalogPanel', () => {
@@ -32,17 +37,46 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Off-site Backup')
     expect(wrapper.text()).toContain('Asks for backups:read')
-    expect(wrapper.find('a[aria-label="Source of Off-site Backup"]').attributes('href')).toBe('https://github.com/o/apps/tree/0123456789abcdef0123456789abcdef01234567/m/backup')
     expect(wrapper.find('.link').attributes('data-to')).toContain('"commit":"0123456789abcdef0123456789abcdef01234567"')
+    await wrapper.find('button[aria-label="Details of Off-site Backup"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector('a[aria-label="Source of Off-site Backup"]')!.getAttribute('href')).toBe('https://github.com/o/apps/tree/0123456789abcdef0123456789abcdef01234567/m/backup')
+    expect(document.body.textContent).toContain('Commit 0123456')
+    wrapper.unmount()
   })
 
-  it('shows Installed with a Manage link for an installed entry', async () => {
+  it('shows Open and Manage, not Install, for an app installed from the official source', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, sourceId: 'official', customSource: false, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    const open = wrapper.find('a.catalog-open')
+    expect(open.text()).toBe('Open')
+    expect(open.attributes('target')).toBe('_blank')
+    expect(open.attributes('href')).toContain('/apps/app-7/application')
+    expect(wrapper.find('.catalog-installed').text()).toBe('Manage')
+    expect(wrapper.find('.catalog-install').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps the Catalog and Installed chips on a labelled row and styles main buttons with ink on paper', () => {
+    expect(source).toContain(':show-label="true"')
+    expect(pageFamily).toMatch(/\.p-button\.btn-main \{[^}]*background: var\(--ink\)[^}]*color: var\(--paper\)/)
+    expect(pageFamily).not.toMatch(/\.p-button\.btn-main \{[^}]*on-signal/)
+  })
+
+  it('opens the running app from the main button and keeps Manage as a link to Studio', async () => {
     getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-1' }], fetchedAt: null, stale: false, unavailable: false, message: null })
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.text()).toContain('Installed')
-    expect(wrapper.text()).toContain('Manage')
-    expect(wrapper.find('.link').attributes('data-to')).toContain('app-1')
+    expect(wrapper.find('a.catalog-installed').attributes('data-to')).toBe(JSON.stringify({ name: 'app-editor', params: { id: 'app-1' } }))
+    await wrapper.find('button[aria-label="Details of Off-site Backup"]').trigger('click')
+    await flushPromises()
+    const open = document.body.querySelector('a.catalog-details__open')!
+    expect(open.getAttribute('href')).toContain('/apps/app-1/application')
+    expect(open.getAttribute('target')).toBe('_blank')
+    expect(document.body.textContent).toContain('Manage')
+    expect(document.body.querySelector('.link')!.getAttribute('data-to')).toContain('app-1')
+    wrapper.unmount()
   })
 
   it('warns when the list is the saved copy', async () => {
@@ -59,6 +93,15 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('The catalog could not be loaded')
     await wrapper.findAll('button').find((b) => b.text() === 'Retry')!.trigger('click')
+    expect(getCatalog).toHaveBeenLastCalledWith(true, expect.objectContaining({ page: 1 }))
+  })
+
+  it('loads the list without a refresh, and the Refresh button asks the server to read the catalog again', async () => {
+    getCatalog.mockResolvedValue({ apps: [entry], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(getCatalog).toHaveBeenLastCalledWith(false, expect.objectContaining({ page: 1 }))
+    await wrapper.findAll('button').find((b) => b.text() === 'Refresh')!.trigger('click')
     expect(getCatalog).toHaveBeenLastCalledWith(true, expect.objectContaining({ page: 1 }))
   })
 
@@ -91,7 +134,7 @@ describe('CatalogPanel', () => {
   })
 
   it('styles panels and links with the Studio theme tokens, not undefined legacy ones', () => {
-    expect(source).toContain('var(--p-content-background)')
+    expect(source).toContain('var(--line)')
     expect(source).toContain('var(--p-primary-color)')
     expect(source).not.toMatch(/var\(--surface-/)
   })
@@ -145,12 +188,19 @@ describe('CatalogPanel', () => {
   const facets = { categories: [{ value: 'Maintenance', label: 'Maintenance', count: 10 }, { value: 'Tools', label: 'Tools', count: 20 }], sources: [{ value: 'official', label: 'Official', count: 20 }, { value: 'acme', label: 'Acme', count: 10 }] }
   const big = (extra: object = {}) => ({ apps: many(24), fetchedAt: null, stale: false, unavailable: false, message: null, total: 30, totalApps: 30, page: 1, pageSize: 24, ...facets, ...extra })
 
-  it('hides the filters and the pager while the catalog has 12 apps or fewer', async () => {
+  it('drops the Automaton prefix from official names and shows no access line when an app asks for none', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, name: 'Automaton Flow Check', permissions: [] }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('.app-row__name').text()).toBe('Flow Check')
+    expect(wrapper.text()).not.toContain('Asks for')
+  })
+
+  it('shows the search and chips for a small catalog too but no pager', async () => {
     getCatalog.mockResolvedValue({ ...big({ apps: many(3), total: 3, totalApps: 3 }) })
     const wrapper = mountPanel()
     await flushPromises()
-    expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Installed')
+    expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
     expect(wrapper.find('.p-paginator').exists()).toBe(false)
   })
 
@@ -159,9 +209,14 @@ describe('CatalogPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
     expect(wrapper.find('input[aria-label="Search apps"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Maintenance (10)')
+    expect(wrapper.text()).toContain('Maintenance · 10')
+    const chip = (label: string) => wrapper.findAll('button.apps-pill').find((b) => b.text() === label)!
+    await chip('Installed').trigger('click')
+    expect(replace).toHaveBeenLastCalledWith({ query: { installed: '1' } })
+    await chip('All catalogs').trigger('click')
+    expect(replace).toHaveBeenLastCalledWith({ query: {} })
     expect(wrapper.text()).toContain('Installed')
-    expect(wrapper.find('[aria-label="Catalog"]').text()).toContain('Acme (10)')
+    expect(wrapper.find('[aria-label="Catalog"]').text()).toContain('Acme · 10')
     expect(wrapper.find('.p-paginator').exists()).toBe(true)
   })
 
@@ -172,7 +227,7 @@ describe('CatalogPanel', () => {
     await flushPromises()
     expect(getCatalog).toHaveBeenCalledWith(false, { q: 'back', category: 'Tools', source: 'official', installed: true, page: 2, pageSize: 24 })
     expect((wrapper.find('input[aria-label="Search apps"]').element as HTMLInputElement).value).toBe('back')
-    await wrapper.findAll('button').find((b) => b.text() === 'Maintenance (10)')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Maintenance · 10')!.trigger('click')
     expect(replace).toHaveBeenCalledWith({ query: { q: 'back', category: 'Maintenance', source: 'official', installed: '1' } })
   })
 
@@ -196,5 +251,43 @@ describe('CatalogPanel', () => {
     expect(wrapper.text()).toContain('No apps match')
     await wrapper.findAll('button').find((b) => b.text() === 'Clear filters')!.trigger('click')
     expect(replace).toHaveBeenCalledWith({ query: {} })
+  })
+
+  it('shows Update available with an Update button on an installed app whose catalog version is newer', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    getCatalogUpdate.mockResolvedValue({ available: true, installedCommit: 'aaaaaaa1', latestCommit: 'bbbbbbb2', edited: false })
+    applyCatalogUpdate.mockResolvedValue({})
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(getCatalogUpdate).toHaveBeenCalledWith('app-7')
+    expect(wrapper.get('[data-testid="catalog-update"]').text()).toContain('Update available')
+    await wrapper.get('button[aria-label="Update Off-site Backup"]').trigger('click')
+    await flushPromises()
+    expect(applyCatalogUpdate).toHaveBeenCalledWith('app-7', false)
+    expect(wrapper.find('[data-testid="catalog-update"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('offers Retry with one short failure line for a failed catalog app on its installed commit', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    getCatalogUpdate.mockResolvedValue({ available: true, installedCommit: 'aaaaaaa1', latestCommit: 'aaaaaaa1', edited: false, deployFailed: true, deployError: 'Build failed:\n  File "x.py", line 1\nValueError: bad pin' })
+    const wrapper = mountPanel()
+    await flushPromises()
+    const note = wrapper.get('[data-testid="catalog-update"]').text()
+    expect(note).toContain('Last deploy failed')
+    expect(note).toContain('Build failed: ValueError: bad pin')
+    expect(note).not.toContain('File "x.py"')
+    expect(wrapper.find('button[aria-label="Retry Off-site Backup"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('shows no update row when the app is current or the check fails', async () => {
+    getCatalog.mockResolvedValue({ apps: [{ ...entry, installedAppId: 'app-7' }], fetchedAt: null, stale: false, unavailable: false, message: null })
+    getCatalogUpdate.mockRejectedValue(new Error('403'))
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="catalog-update"]').exists()).toBe(false)
+    expect(wrapper.find('a.catalog-open').exists()).toBe(true)
+    wrapper.unmount()
   })
 })

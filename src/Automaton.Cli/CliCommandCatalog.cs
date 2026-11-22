@@ -36,13 +36,17 @@ internal static class CliCommandCatalog
         root.AddCommand(LinkCommand.Build(config));
         root.AddCommand(DeployCommand.Build(config));
         root.AddCommand(OpenCommand.Build(config));
+        root.AddCommand(DocsCommand.Build(config));
         root.AddCommand(LogsCommand.Build(config));
         root.AddCommand(PullCommand.Build(config));
         root.AddCommand(PublishCommand.Build(config));
         root.AddCommand(ShareCommand.Build(config));
+        root.AddCommand(PauseCommand.BuildPause(config));
+        root.AddCommand(PauseCommand.BuildResume(config));
         root.AddCommand(RunnersCommand.Build(config));
         root.AddCommand(InventoryCommands.BuildApps(config));
         root.AddCommand(InventoryCommands.BuildInstallationStatus(config));
+        root.AddCommand(NotificationsCommand.Build(config));
         root.AddCommand(ServerCommand.Build(config));
         root.AddCommand(SetRunnerCommand.Build(config));
         root.AddCommand(ConfigCommand.Build(config));

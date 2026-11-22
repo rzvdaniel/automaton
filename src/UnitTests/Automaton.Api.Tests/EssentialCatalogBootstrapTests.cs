@@ -29,24 +29,116 @@ public sealed class EssentialCatalogBootstrapTests
     }
 
     [Test]
-    public void BootstrapSelectsOnlyMissingOfficialEntriesAtTheirCatalogCommits()
+    public void BootstrapInstallsOnlyTheDefaultAppsAtTheirCatalogCommit()
     {
         const string commit = "0123456789abcdef0123456789abcdef01234567";
-        var entries = EssentialCatalogBootstrapService.AppIds.Select(id => Entry(id, commit)).ToList();
+        var entries = new[] { "server-console", "victorialogs", "website-monitor", "heartbeat" }.Select(id => Entry(id, commit)).ToList();
         entries.Add(Entry("server-console", "ffffffffffffffffffffffffffffffffffffffff", source: "custom"));
         var response = new CatalogResponse(entries, DateTime.UtcNow, false, false, null);
-        var installed = new HashSet<(string Repo, string Folder)> { ("rzvdaniel/automaton-apps", "maintenance/heartbeat") };
 
-        var missing = EssentialCatalogBootstrapService.MissingEssentials(response, installed);
+        Assert.That(EssentialCatalogBootstrapService.AppIds, Is.EquivalentTo(new[] { "server-console", "victorialogs" }));
+        var (available, skipped) = EssentialCatalogBootstrapService.SelectEssentials(response)!.Value;
+        Assert.That(available.Select(app => (app.Id, app.Commit)), Is.EquivalentTo(new[] { ("server-console", commit), ("victorialogs", commit) }));
+        Assert.That(skipped, Is.Empty);
+        Assert.That(ServerConsoleProvisioningService.DefaultApps["victorialogs"], Is.EqualTo(new[] { "logs:receive" }), "log forwarding needs only this");
+        Assert.That(ServerConsoleProvisioningService.DefaultApps.ContainsKey("gate-keeper"), Is.False, "not until it ships");
+        Assert.That(EssentialCatalogBootstrapService.SelectEssentials(response with { Unavailable = true }), Is.Null);
+        Assert.That(EssentialCatalogBootstrapService.SelectEssentials(response with { Stale = true }), Is.Null);
+    }
 
-        Assert.That(missing!.Select(app => (app.Id, app.Commit)), Is.EqualTo(new[]
-        {
-            ("server-console", commit), ("website-monitor", commit)
-        }));
-        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response, entries.Take(3)
-            .Select(app => (app.Repo, app.Folder)).ToHashSet()), Is.Empty);
-        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Unavailable = true }, installed), Is.Null);
-        Assert.That(EssentialCatalogBootstrapService.MissingEssentials(response with { Stale = true }, installed), Is.Null);
+    [Test]
+    public void AMissingOrTooNewCatalogEntrySkipsOnlyThatApp()
+    {
+        const string commit = "0123456789abcdef0123456789abcdef01234567";
+        var missing = new CatalogResponse([Entry("server-console", commit)], DateTime.UtcNow, false, false, null);
+        var (available, skipped) = EssentialCatalogBootstrapService.SelectEssentials(missing)!.Value;
+        Assert.That(available.Select(app => app.Id), Is.EqualTo(new[] { "server-console" }));
+        Assert.That(skipped, Is.EqualTo(new[] { "victorialogs" }));
+
+        var tooNew = new CatalogResponse([Entry("server-console", commit) with { RequiresNewerServer = true }, Entry("victorialogs", commit)], DateTime.UtcNow, false, false, null);
+        (available, skipped) = EssentialCatalogBootstrapService.SelectEssentials(tooNew)!.Value;
+        Assert.That(available.Select(app => app.Id), Is.EqualTo(new[] { "victorialogs" }));
+        Assert.That(skipped, Is.EqualTo(new[] { "server-console" }));
+    }
+
+    [Test]
+    public void TheRetryWindowEndsAfterADay()
+    {
+        var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Assert.That(EssentialCatalogBootstrapService.WindowElapsed(start, start.AddHours(23)), Is.False);
+        Assert.That(EssentialCatalogBootstrapService.WindowElapsed(start, start.AddHours(24)), Is.True);
+    }
+
+    [Test]
+    public async Task AnAppRemovedDuringARetryIsNotInstalledOrApprovedAgain()
+    {
+        var steps = new List<string>();
+        Assert.That(await Installer(find: null, marked: Guid.NewGuid(), steps), Is.Null);
+        Assert.That(steps, Is.Empty);
+    }
+
+    [Test]
+    public async Task AnAppTheAdministratorInstalledIsNeverApproved()
+    {
+        var steps = new List<string>();
+        Assert.That(await Installer(find: Guid.NewGuid(), marked: null, steps), Is.Null, "VictoriaLogs installed by the administrator keeps logs:receive pending");
+        Assert.That(steps, Is.Empty);
+    }
+
+    [Test]
+    public async Task ANewInstallIsMarkedBeforeItIsApprovedAndARetryOnlyFinishesIt()
+    {
+        var steps = new List<string>();
+        Assert.That(await Installer(find: null, marked: null, steps), Is.Not.Null);
+        Assert.That(steps, Is.EqualTo(new[] { "install", "mark", "approve", "deploy" }));
+
+        steps.Clear();
+        var ours = Guid.NewGuid();
+        await Installer(find: ours, marked: ours, steps);
+        Assert.That(steps, Is.EqualTo(new[] { "approve", "deploy" }));
+
+        steps.Clear();
+        Assert.That(await Installer(find: Guid.NewGuid(), marked: ours, steps), Is.Null, "removed, then installed again by the administrator");
+        Assert.That(steps, Is.Empty);
+    }
+
+    private static Task<Guid?> Installer(Guid? find, Guid? marked, List<string> steps) =>
+        ServerConsoleProvisioningService.RunInstallerAsync(
+            find: () => Task.FromResult(find), install: () => { steps.Add("install"); return Task.FromResult(Guid.NewGuid()); },
+            markInstalled: _ => { steps.Add("mark"); return Task.CompletedTask; }, marked,
+            approve: _ => { steps.Add("approve"); return Task.CompletedTask; }, needsDeploy: _ => Task.FromResult(true),
+            deploy: _ => { steps.Add("deploy"); return Task.CompletedTask; },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, default, "VictoriaLogs");
+
+    [Test]
+    public async Task ServerConsoleIsInstalledApprovedAndDeployed()
+    {
+        var steps = new List<string>();
+        var appId = Guid.NewGuid();
+        var result = await ServerConsoleProvisioningService.RunAsync(
+            find: () => Task.FromResult<Guid?>(null), install: () => { steps.Add("install"); return Task.FromResult(appId); },
+            approve: id => { steps.Add("approve"); return Task.CompletedTask; }, needsDeploy: _ => Task.FromResult(true),
+            deploy: id => { steps.Add("deploy"); return Task.CompletedTask; },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, default, "Server Console");
+
+        Assert.That(result, Is.EqualTo(appId));
+        Assert.That(steps, Is.EqualTo(new[] { "install", "approve", "deploy" }));
+        Assert.That(ServerConsoleProvisioningService.ApprovedPermissions, Is.EqualTo(new[] { "server:read", "notify:email", "server:cleanup" }));
+    }
+
+    [Test]
+    public async Task AnInstalledEssentialThatWasNeverDeployedIsDeployed()
+    {
+        var deployed = new List<Guid>();
+        var appId = Guid.NewGuid();
+        var result = await ServerConsoleProvisioningService.RunAsync(
+            find: () => Task.FromResult<Guid?>(appId), install: () => throw new InvalidOperationException(),
+            approve: _ => Task.CompletedTask, needsDeploy: _ => Task.FromResult(true),
+            deploy: id => { deployed.Add(id); return Task.CompletedTask; },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, default, "Website Monitor");
+
+        Assert.That(result, Is.EqualTo(appId));
+        Assert.That(deployed, Is.EqualTo(new[] { appId }));
     }
 
     private static CatalogEntryDto Entry(string id, string commit, string source = "official") =>

@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+using Automaton.Core.Enums;
+
 namespace Automaton.Api.Entities;
 
 public class CliAuthorizationRequest
@@ -32,4 +34,7 @@ public class CliAuthorizationRequest
     public DateTime? CredentialIssuedAt { get; set; }
     public Guid? ApiKeyId { get; set; }
     public Guid? UserId { get; set; }
+
+    /// <summary>The key type the CLI asked for: Developer (default) or PermissionsAdmin.</summary>
+    public ApiKeyScope RequestedScope { get; set; } = ApiKeyScope.Developer;
 }

@@ -46,7 +46,7 @@ internal sealed class RetiredStorageScheduleCleanupFixture : IAsyncDisposable
             await db.Database.ExecuteSqlRawAsync("""
                 CREATE TABLE ActionSchedules (
                     Id TEXT PRIMARY KEY, OwnerType TEXT NOT NULL, SystemIdentity TEXT NULL,
-                    ApplicationId TEXT NOT NULL, ActionKey TEXT NOT NULL, Enabled INTEGER NOT NULL,
+                    ApplicationId TEXT NOT NULL, ActionKey TEXT NOT NULL, Enabled INTEGER NOT NULL, PausedByApp INTEGER NOT NULL DEFAULT 0,
                     NextRunAtUtc TEXT NULL, ConcurrencyPolicy TEXT NOT NULL, MisfirePolicy TEXT NOT NULL,
                     CreatedAtUtc TEXT NOT NULL, UpdatedAtUtc TEXT NOT NULL, CronExpression TEXT NULL, ScheduleType TEXT NULL,
                     Name TEXT NULL, Description TEXT NULL, ExecutionScope TEXT NULL, TimeZone TEXT NULL, InputJson TEXT NULL,

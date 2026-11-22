@@ -2,17 +2,19 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Data;
 using Microsoft.AspNetCore.DataProtection;
+using Automaton.Api.Authentication;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-public sealed class CliAuthorizationService
+public class CliAuthorizationService
 {
     // 5 s keeps polling (plus create and complete) under the 20 requests a minute per IP limit.
     private const int PollIntervalSeconds = 5;
@@ -25,14 +27,17 @@ public sealed class CliAuthorizationService
     private readonly IAuditEventService auditEventService;
     private readonly ILogger<CliAuthorizationService> logger;
     private readonly IDataProtector credentialProtector;
+    private readonly UserManager<ApplicationUser> userManager;
 
     public CliAuthorizationService(
         ApplicationDbContext dbContext,
         ApiKeyService apiKeyService,
         IAuditEventService auditEventService,
         ILogger<CliAuthorizationService> logger,
-        IDataProtectionProvider dataProtectionProvider)
+        IDataProtectionProvider dataProtectionProvider,
+        UserManager<ApplicationUser> userManager)
     {
+        this.userManager = userManager;
         this.dbContext = dbContext;
         this.apiKeyService = apiKeyService;
         this.auditEventService = auditEventService;
@@ -43,8 +48,11 @@ public sealed class CliAuthorizationService
     public async Task<CliAuthorizationCreated> CreateAsync(
         string? deviceName,
         string? remoteIp,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ApiKeyScope scope = ApiKeyScope.Developer)
     {
+        if (scope is not (ApiKeyScope.Developer or ApiKeyScope.PermissionsAdmin))
+            throw new ArgumentOutOfRangeException(nameof(scope), "Only the Developer and PermissionsAdmin key types can be requested.");
         var verifier = CreateToken(32);
         var userCode = await CreateUniqueUserCodeAsync(cancellationToken);
         var now = DateTime.UtcNow;
@@ -56,7 +64,8 @@ public sealed class CliAuthorizationService
             DeviceName = NormalizeDeviceName(deviceName),
             RemoteIp = remoteIp,
             CreatedAt = now,
-            ExpiresAt = now.AddMinutes(LifetimeMinutes)
+            ExpiresAt = now.AddMinutes(scope == ApiKeyScope.PermissionsAdmin ? PermissionsAdminKey.LoginRequestLifetimeMinutes : LifetimeMinutes),
+            RequestedScope = scope
         };
 
         dbContext.CliAuthorizationRequests.Add(request);
@@ -139,15 +148,39 @@ public sealed class CliAuthorizationService
             return CliAuthorizationPollResult.Completed;
         }
 
-        // The key is created only when the CLI polls after explicit browser approval.
-        // It remains encrypted until the CLI acknowledges that it saved the credential,
-        // allowing safe retries if the first response is interrupted.
-        var keyName = $"CLI - {request.DeviceName}";
+        if (request.RequestedScope == ApiKeyScope.PermissionsAdmin && !await IsActiveAdministratorAsync(request.UserId.Value))
+        {
+            // The approver lost the role (or was locked out) between approval and the CLI's poll: no key.
+            request.CancelledAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteRefusedAuditAsync(request, request.UserId.Value, false, cancellationToken);
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+            return CliAuthorizationPollResult.Denied;
+        }
+
+        var rawKey = await IssueCredentialAsync(request, request.UserId.Value, cancellationToken);
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+
+        logger.LogInformation("CLI authorization completed for user {UserId} on device {DeviceName}", request.UserId, request.DeviceName);
+        return new CliAuthorizationPollResult(rawKey, request.UserId.Value);
+    }
+
+    // The key is created only when the CLI polls after explicit browser approval.
+    // It remains encrypted until the CLI acknowledges that it saved the credential,
+    // allowing safe retries if the first response is interrupted.
+    private async Task<string> IssueCredentialAsync(CliAuthorizationRequest request, Guid userId, CancellationToken cancellationToken)
+    {
+        var permissionsAdmin = request.RequestedScope == ApiKeyScope.PermissionsAdmin;
         var (rawKey, entity) = await apiKeyService.CreateApiKeyAsync(
-            request.UserId.Value,
-            keyName,
-            ApiKeyScope.Developer,
-            "Developer credential created by Automaton CLI authorization.",
+            userId,
+            permissionsAdmin ? $"CLI permissions admin - {request.DeviceName}" : $"CLI - {request.DeviceName}",
+            permissionsAdmin ? ApiKeyScope.PermissionsAdmin : ApiKeyScope.Developer,
+            permissionsAdmin
+                ? "Admin key to approve app permissions, created by Automaton CLI authorization."
+                : "Developer credential created by Automaton CLI authorization.",
+            expiresAt: permissionsAdmin ? DateTime.UtcNow.AddDays(PermissionsAdminKey.DefaultLifetimeDays) : null,
             saveChanges: false,
             source: ApiKeySource.CliAuthorization);
 
@@ -155,14 +188,8 @@ public sealed class CliAuthorizationService
         request.CredentialIssuedAt = DateTime.UtcNow;
         request.ApiKeyId = entity.Id;
         await dbContext.SaveChangesAsync(cancellationToken);
-
         await WriteCredentialIssuedAuditAsync(request, entity, cancellationToken);
-
-        if (transaction is not null)
-            await transaction.CommitAsync(cancellationToken);
-
-        logger.LogInformation("CLI authorization completed for user {UserId} on device {DeviceName}", request.UserId, request.DeviceName);
-        return new CliAuthorizationPollResult(rawKey, request.UserId.Value);
+        return rawKey;
     }
 
     private Task WriteCredentialIssuedAuditAsync(
@@ -185,9 +212,60 @@ public sealed class CliAuthorizationService
                 entity.Scope,
                 entity.ExpiresAt,
                 entity.KeyPrefix,
-                Source = "cli-device-authorization"
+                Source = "cli-device-authorization",
+                RequestId = request.Id,
+                request.DeviceName,
+                request.RemoteIp,
+                ApproverUserId = request.UserId
             }
         }, cancellationToken);
+
+    /// <summary>True only for a user who is a system administrator and not locked out, read from the database.</summary>
+    public virtual async Task<bool> IsActiveAdministratorAsync(Guid userId)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        return user is not null
+            && !await userManager.IsLockedOutAsync(user)
+            && PermissionsAdminKey.IsAdministrator(await userManager.GetRolesAsync(user));
+    }
+
+    /// <summary>
+    /// Whether this user may approve the request. An admin key request needs a system administrator signed in to Studio
+    /// (never an API key), re-read from the database; a refusal is audited and nothing is created.
+    /// </summary>
+    public async Task<bool> MayApproveAsync(Guid requestId, string userCode, Guid userId, bool viaApiKey, CancellationToken cancellationToken)
+    {
+        var request = await dbContext.CliAuthorizationRequests.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
+        // An unknown, expired, finished or wrongly-coded request is left to ApproveAsync (generic 400), so this reveals nothing.
+        if (request is null || request.RequestedScope != ApiKeyScope.PermissionsAdmin || request.ExpiresAt <= DateTime.UtcNow
+            || request.CompletedAt.HasValue || !string.Equals(request.UserCode, userCode.Trim(), StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (!viaApiKey && await IsActiveAdministratorAsync(userId))
+            return true;
+
+        await WriteRefusedAuditAsync(request, userId, viaApiKey, cancellationToken);
+        return false;
+    }
+
+    private Task WriteRefusedAuditAsync(CliAuthorizationRequest request, Guid userId, bool viaApiKey, CancellationToken cancellationToken)
+        => auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.ApiKey,
+            EntityId = request.Id,
+            EventType = AuditEventTypes.ApiKeyCreated,
+            Message = "Approval of an admin CLI key was refused",
+            Outcome = AuditOutcomes.Denied,
+            ActorUserId = userId,
+            Metadata = new { RequestId = request.Id, request.DeviceName, request.RemoteIp, Scope = request.RequestedScope, ViaApiKey = viaApiKey }
+        }, cancellationToken);
+
+    public async Task<ApiKeyScope?> GetRequestedScopeAsync(Guid requestId, CancellationToken cancellationToken)
+        => await dbContext.CliAuthorizationRequests.AsNoTracking()
+            .Where(x => x.Id == requestId)
+            .Select(x => (ApiKeyScope?)x.RequestedScope)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<bool> CompleteAsync(
         Guid requestId,
@@ -246,7 +324,8 @@ public sealed class CliAuthorizationService
             request.RemoteIp,
             request.CreatedAt,
             request.ExpiresAt,
-            status);
+            status,
+            request.RequestedScope.ToString());
     }
 
     public async Task<bool> CancelAsync(
@@ -326,7 +405,8 @@ public sealed record CliAuthorizationDetails(
     string? RemoteIp,
     DateTime CreatedAt,
     DateTime ExpiresAt,
-    string Status);
+    string Status,
+    string Scope);
 
 public sealed class CliAuthorizationPollResult
 {
@@ -346,6 +426,7 @@ public sealed class CliAuthorizationPollResult
     public static CliAuthorizationPollResult Expired => new(null, null, "expired");
     public static CliAuthorizationPollResult Completed => new(null, null, "completed");
     public static CliAuthorizationPollResult Cancelled => new(null, null, "cancelled");
+    public static CliAuthorizationPollResult Denied => new(null, null, "denied");
     public static CliAuthorizationPollResult Invalid => new(null, null, "invalid");
     public CliAuthorizationPollResult(string apiKey, Guid userId) : this(apiKey, userId, "authorized") { }
 }

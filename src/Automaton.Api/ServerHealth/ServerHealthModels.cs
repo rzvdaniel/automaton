@@ -4,8 +4,12 @@ namespace Automaton.Api.ServerHealth;
 
 public sealed record ServerVersionInfo(string? Version, string? LatestVersion, bool? UpdateAvailable);
 
+/// <param name="Host">The latest figures this Runner reported about its own machine; null until it has reported.</param>
+/// <param name="HostAgeSeconds">How old <paramref name="Host"/> is.</param>
+/// <param name="Apps">Disk use of each app on this machine, largest first.</param>
 public sealed record ServerRunnerInfo(
-    string Name, string Status, string? Version, DateTime? LastHeartbeatAtUtc, bool UpgradeAvailable);
+    string Name, string Status, string? Version, DateTime? LastHeartbeatAtUtc, bool UpgradeAvailable,
+    MachineHostHealth? Host = null, int? HostAgeSeconds = null, IReadOnlyList<AppDiskUsageResponse>? Apps = null);
 
 public sealed record CertificateInfo(string Host, DateTime? NotAfterUtc, int? DaysRemaining, string? Error);
 

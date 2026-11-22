@@ -161,7 +161,7 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
     {
         var result = await ExecuteExistingAsync(scope, HostContainerOperationKinds.InspectContainer, id, cancellationToken);
         EnsureSuccess(result);
-        return new(result.ContainerId, result.Exists, result.Running, result.Labels, result.HostAddress, result.HostPort, result.ContainerPort);
+        return new(result.ContainerId, result.Exists, result.Running, result.Labels, result.HostAddress, result.HostPort, result.ContainerPort, result.Restarting, result.RestartCount);
     }
 
     public async Task<bool> IsRunningAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
@@ -180,6 +180,12 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
     public async Task StopAndRemoveAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
         => EnsureSuccess(await ExecuteExistingAsync(scope, HostContainerOperationKinds.RemoveContainer, id, cancellationToken));
 
+    public async Task StopAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        => EnsureSuccess(await ExecuteExistingAsync(scope, HostContainerOperationKinds.StopContainer, id, cancellationToken));
+
+    public async Task EnableAutoRestartAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        => EnsureSuccess(await ExecuteExistingAsync(scope, HostContainerOperationKinds.EnableAutoRestart, id, cancellationToken));
+
     public async Task RemoveTargetContainersAsync(ApplicationContainerScope application, CancellationToken cancellationToken = default)
     {
         var scope = await ScopeAsync(application.AppId, application.DeploymentTargetId, Guid.Empty);
@@ -192,6 +198,9 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         return await execute(new() { Scope = scope, Operation = operation, ContainerId = id }, cancellationToken);
     }
 
+    /// <summary>Raised until the Runner has connected to the server; start-up recovery treats it as "not yet", not as an error.</summary>
+    internal const string IdentityRequiredMessage = "Machine Runner identity is required for brokered runtime operations.";
+
     private async Task<HostContainerScope> ScopeAsync(Guid appId, Guid targetId, Guid attemptId)
     {
         var profile = await loadProfile()
@@ -200,7 +209,7 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         {
             var configuredRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID");
             if (!Guid.TryParse(configuredRunnerId, out var machineRunnerId) || machineRunnerId == Guid.Empty)
-                throw new InvalidOperationException("Machine Runner identity is required for brokered runtime operations.");
+                throw new InvalidOperationException(IdentityRequiredMessage);
             return new(Guid.Empty, Guid.Empty, appId, targetId, attemptId, machineRunnerId);
         }
 

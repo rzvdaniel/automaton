@@ -1,51 +1,34 @@
 ---
 title: Troubleshooting
 description: Fixes for apps that do not start after deploy, failing requests, login problems and blank pages.
+order: 140
 ---
 
 # Troubleshooting
 
-Common problems and how to fix them.
+Common problems and how to fix them. For install problems see [Install with your AI agent](./install-with-ai) and [Install the server](./install-server#common-errors).
 
 ---
 
-## Server-side execution is not active after deploy
+## App deployed but not running
 
-**Symptom:** You deployed an app with server-side code, but its execution target is not running.
+**Symptom:** `automaton deploy` printed `Deploy complete`, but the app does not answer or `automaton apps` does not say `Running`.
 
-**Causes and fixes:**
-
-- **No execution target available yet** — Deploy can still upload the server runtime successfully even when no execution target is online. In that case, bring one online and rerun deploy.
-- **No runner connected in Studio** — Go to **Runners** and check that at least one runner shows as Online. If all runners are Offline or Unknown, server routes cannot become active yet.
-- **Build or startup error** — Check the deploy log for the failing command and file or line number.
-- **Health check failure** — Confirm that the runtime listens on `AUTOMATON_PORT` and serves a successful response at the configured health path.
-- **No runner available** — Runtime files can upload successfully while execution waits for a runner. Assign or select a runner and deploy again.
-
----
-
-## Requests to server-side code fail
-
-**Symptom:** A client request to a same-origin server route fails.
-
-**Causes and fixes:**
-
-- **Runtime not deployed** — Deploy the changed runtime before reloading the preview.
-- **Runtime uploaded but not running** — Rerun `automaton deploy --runner <runner-id-or-name>` after a runner is online.
-- **Route or input mismatch** — Check the route, method, request body, and response status.
-- **Runtime returned an error** — Inspect the response and runner logs for the failing command.
+- **Not finished yet** - `Deploy complete` only means the package was applied. Wait for `Running` in `automaton apps`.
+- **No Runner online** - Check `automaton runners` (or **Runners** in Studio). Add or start a Runner, then deploy again.
+- **Build or startup error** - Read `automaton logs` for the failing command and file or line.
+- **Health check failure** - The app must listen on `AUTOMATON_PORT` and answer the health path in `automaton.json`.
+- **Request to server code fails** - Deploy the changed code first; then check the route, method, body and the response status in the logs.
 
 ---
 
 ## Runner shows as Offline or Unknown
 
-**Symptom:** The Runners page shows a runner as Offline or Unknown even after it started.
+**Symptom:** `automaton runners` or the Runners page shows a Runner as offline after it started.
 
-**Causes and fixes:**
-
-- **Server URL mismatch** — The runner must be configured with the same server URL that the Studio is using. Check `AUTOMATON_SERVER_URL` in the runner config.
-- **API key not valid** — Confirm the runner API key is active (it should have runner scope, not execute scope). Rotate the key in API Keys settings if needed.
-- **Firewall / network issue** — The runner connects outbound over HTTPS to the Studio server. Make sure port 443 (or the port your server uses) is not blocked.
-- **Runner crashed on startup** — Run the runner manually (`automaton-runner` or `docker compose logs runner`) and look for startup errors.
+- **Port 5671** - The Runner connects outbound to the `api` host on port 5671 (TLS). It must be reachable from the Runner machine; the `api` host must not be proxied.
+- **Runner stopped** - Check `docker ps` on the Runner host and the container's logs for startup errors.
+- **Enrollment expired** - Run `automaton runners install` again; each command is single use.
 
 ---
 
@@ -61,11 +44,9 @@ Common problems and how to fix them.
 
 **Symptom:** `automaton deploy` exits with a 401 or 403 error.
 
-**Fixes:**
-
-- Run `automaton login --server <url> --key <your-key>` again to refresh the stored credentials, or use `automaton config --server <url> --key <your-key>` if you want explicit manual configuration.
-- Confirm the API key has `execute` scope (not read-only).
-- Confirm the server URL in `automaton.json` matches the server you logged into.
+- Sign in again: `automaton login --server <api-url>` (on a server without a browser, `automaton login --device`, see [Log in without a browser](./automaton-cli#log-in-without-a-browser)).
+- Check which server is active with `automaton profiles` and `automaton whoami`.
+- A user without permission on the app gets 403; ask the app's owner.
 
 ---
 
@@ -78,3 +59,7 @@ Common problems and how to fix them.
 - **Entry point mismatch** — Confirm that the public target's configured output directory contains the entry file expected by the runtime.
 - **Build step not run** — Run the configured build command before deploying, or put that command and its output directory in `automaton.json` so the CLI can do it automatically.
 - **JavaScript error on load** — Open the browser console in the preview and look for errors.
+
+## Search server logs in the browser
+
+Install the VictoriaLogs app from the catalog and approve its `logs:receive` permission (a system administrator can do it on the install page). Within about a minute the API, the Worker and the Runner that hosts the app send their logs to it, with no setting and no restart; they keep writing their log files too. Filter by level (`severity_text:Error`) and watch live. Pausing, uninstalling or revoking the permission stops it quietly. Only a Runner installed by Automaton (it publishes a gateway the server has verified) serves the automatic choice, and logs travel over plain `http` on the server's private network. With two such apps on different Runners, the first one to report keeps it. A Runner on another machine than the app sends nothing until you set `Logging__Otlp__Endpoint` to an `https` address of the app on that Runner (use `http` only on the same server or Docker network). The same setting on the API, the Worker or a Runner always wins over the app and turns the automatic choice off for that process; leave it empty for the automatic one. The app keeps 14 days and at most 2 GiB by default; change `RETENTION_PERIOD` or `MAX_DISK_SPACE_BYTES` in the app's settings. The Home card of the app says when nothing from Automaton arrives.

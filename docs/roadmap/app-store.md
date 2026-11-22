@@ -43,7 +43,7 @@ Implemented in #460: the updater compares the effective Compose configuration an
 
 ### 6. Store setting — API and Studio
 
-Implemented: `Store.Settings` (`public` default, `disabled`), `GET/PUT api/admin/settings/store`, public `GET api/public/store/status`; marketplace and creator public endpoints return 404 when disabled; toggle on **Admin → Marketplace Apps**; the store shows a turned-off page. The marketing site redirects `/apps*` and `/creators/*` to the store (nginx 301 plus client-side), deployed manually after production runs the store release.
+Implemented: `Store.Settings` (`public` default, `disabled`), `GET/PUT api/admin/settings/store`, public `GET api/public/store/status`; marketplace and creator public endpoints return 404 when disabled; the toggle is API-only (`PUT api/admin/settings/store`) since the Marketplace Apps page was removed (#843); the store shows a turned-off page. The marketing site redirects `/apps*` and `/creators/*` to the store (nginx 301 plus client-side), deployed manually after production runs the store release.
 
 - Installation setting `StoreMode` (`Public` default, `Disabled`), persisted with existing installation settings.
 - `PublicMarketplaceController` returns 404 for catalog endpoints when disabled; expose a small status endpoint the store can read.
@@ -58,7 +58,7 @@ Implemented: `Store.Settings` (`public` default, `disabled`), `GET/PUT api/admin
 
 ### 8. Documentation
 
-- Single source of truth in `docs/prod/install-automaton.md`; README and `src/automaton-vue/docs/install-server.md` summarize and link.
+- Single source of truth in `src/automaton-vue/docs/install-server.md`; README and `src/automaton-vue/docs/install-server.md` summarize and link.
 - DNS table: `api` (CLI, Runner broker, API), `studio` (administration), `store` (public app store), `apps`/`*.apps` (deployed apps). Port 5671 explained as the Runner broker everywhere.
 - Mention the store in "What you get", the started-services lists and updater text; document listing in the store as separate from deploying (link `publish.md`).
 - Short architecture overview near the top of the README: CLI → API/Studio → Runners → apps; store reads the API.

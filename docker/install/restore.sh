@@ -2,10 +2,12 @@
 # Restore an Automaton server from a backup made by backup.sh.
 #
 #   restore.sh automaton-YYYYMMDDTHHMMSSZ
+#   restore.sh automaton-YYYYMMDDTHHMMSSZ --app <app id or Compose project>
 #
-# Replaces the whole database and the API/Worker Data Protection keys with the backup.
+# Replaces the whole database, the API/Worker Data Protection keys and the app data with the backup.
 # Everything written after that backup is lost. A safety backup of the current state is
 # taken first. API, Worker, Studio and the app store are stopped during the restore.
+# With --app only that one app's data is restored (the database and the other apps are untouched).
 set -euo pipefail
 umask 077
 
@@ -14,18 +16,23 @@ name=''
 archive=''
 key=''
 confirm=''
+app=''
 while (($#)); do
     case "$1" in
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --confirm) confirm="${2:?Missing domain}"; shift 2 ;;
         --archive) archive="${2:?Missing archive file}"; shift 2 ;;
+        --app) app="${2:?Missing app id or Compose project}"; shift 2 ;;
         --key) key="${2:?Missing age identity file}"; shift 2 ;;
-        --help) sed -n '2,8p' "$0"; exit 0 ;;
+        --help) sed -n '2,10p' "$0"; exit 0 ;;
         -*) echo "Unknown option: $1" >&2; exit 2 ;;
         *) name="$1"; shift ;;
     esac
 done
 [[ $EUID -eq 0 ]] || { echo 'Run as root (sudo).' >&2; exit 1; }
+# Held for the whole restore so the watchdog does not start the stopped containers on a half-restored database.
+exec 8>"${AUTOMATON_LOCK_FILE:-/run/lock/automaton-install.lock}"
+flock -n 8 || { echo 'Another installation, update or restore is running.' >&2; exit 1; }
 [[ -z "$archive" || -z "$name" ]] || { echo 'Choose either a backup name or --archive, not both.' >&2; exit 2; }
 backup_root="$install_dir/backups/nightly"
 install -d -m 0700 "$install_dir/backups"
@@ -87,6 +94,43 @@ fi
 [[ -f "$backup/database.dump" ]] || { echo 'This is not a PostgreSQL backup (no database.dump); nothing was restored.' >&2; exit 1; }
 (cd "$backup" && sha256sum -c --quiet SHA256SUMS) || { echo 'The backup failed its checksum verification; it was not restored.' >&2; exit 1; }
 
+# app-data:begin
+# restore_app_data <only this app id/project, or empty for all> <helper image> <backup directory>
+restore_app_data() {
+    local only="$1" helper="$2" backup="$3" manifest="$3/app-data/manifest.tsv" kind key volume sub file label found=0 ids
+    [[ -f "$manifest" ]] || { echo 'This backup has no app data (it was taken before app data was included).'; return 0; }
+    while IFS=$'\t' read -r kind key volume sub file; do
+        [[ -z "$only" || "$key" == "$only" ]] || continue
+        # The manifest comes from a backup that may have been carried in from elsewhere: accept only the shapes backup.sh writes.
+        [[ "$kind" =~ ^(web|compose)$ && "$volume" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ && "$key" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ \
+            && "$file" =~ ^[0-9]+\.tar\.gz$ && "$sub" =~ ^(\.|workspace/data/[0-9a-f-]{36}|[a-zA-Z0-9][a-zA-Z0-9_.-]*)$ ]] \
+            || { echo 'The backup has an invalid app data entry; nothing was restored for it.' >&2; return 1; }
+        found=1
+        if ! docker volume inspect "$volume" >/dev/null 2>&1; then
+            if [[ "$kind" == compose ]]; then
+                docker volume create --label "com.docker.compose.project=$key" --label "com.docker.compose.volume=$sub" "$volume" >/dev/null
+                sub=.
+            else
+                echo "Skipping app $key: volume $volume does not exist on this host (install the Runner first)." >&2
+                continue
+            fi
+        fi
+        if [[ "$kind" == web ]]; then label="com.automaton.app-id=$key"; else label="com.docker.compose.project=$key"; fi
+        mapfile -t ids < <(docker ps -q --filter "label=$label")
+        if ((${#ids[@]})); then docker stop "${ids[@]}" >/dev/null; fi
+        echo "Restoring data of $kind app $key ($volume)..."
+        gzip -dc "$backup/app-data/$file" | docker run --rm -i --user 0:0 --entrypoint sh -v "$volume:/v" "$helper" \
+            -ec 'd="/v/$1"; mkdir -p "$d"; find "$d" -mindepth 1 -delete; tar -xpf - -C "$d"' _ "$sub"
+        if ((${#ids[@]})); then docker start "${ids[@]}" >/dev/null; fi
+    done < "$manifest"
+    if [[ -n "$only" ]] && ((found == 0)); then
+        echo "This backup has no data for $only. It has:" >&2
+        cut -f2 "$manifest" | sort -u >&2
+        return 1
+    fi
+}
+# app-data:end
+
 config_dir=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" | cut -d= -f2-)
 domain=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["domain"])' "${config_dir:-/etc/automaton}/installation.json")
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
@@ -95,7 +139,11 @@ compose=(docker compose --project-directory "$install_dir" --env-file "$install_
 backup_version=$(cat "$backup/version" 2>/dev/null || echo unknown)
 current_version=$(cat "$install_dir/version" 2>/dev/null || echo unknown)
 echo "Restoring $name (server $backup_version) on $domain (server $current_version)."
-echo 'This replaces the database and Data Protection keys. Everything written after the backup is lost.'
+if [[ -n "$app" ]]; then
+    echo "This replaces the data of $app only. Everything that app wrote after the backup is lost."
+else
+    echo 'This replaces the database, Data Protection keys and app data. Everything written after the backup is lost.'
+fi
 if [[ "$backup_version" != "$current_version" ]]; then
     echo "Warning: the backup was taken on $backup_version. The API applies newer database migrations on start; restoring onto an older server version is not supported." >&2
 fi
@@ -105,8 +153,18 @@ if [[ -z "$confirm" ]]; then
 fi
 [[ "$confirm" == "$domain" ]] || { echo 'Confirmation did not match; nothing was changed.' >&2; exit 1; }
 
+if [[ -n "$app" ]]; then
+    [[ -f "$backup/app-data/manifest.tsv" ]] && cut -f2 "$backup/app-data/manifest.tsv" | grep -Fxq -- "$app" \
+        || { echo "This backup has no data for $app. Nothing was changed." >&2; exit 1; }
+fi
 echo 'Taking a safety backup of the current state...'
 bash "$install_dir/backup.sh" --install-dir "$install_dir" --keep 1000
+
+if [[ -n "$app" ]]; then
+    restore_app_data "$app" "$(docker inspect --format '{{.Config.Image}}' "$("${compose[@]}" ps -aq api)")" "$backup"
+    echo "Restored the data of $app from $name. The pre-restore state is kept as the newest backup in $backup_root."
+    exit 0
+fi
 
 applications=(api worker studio store)
 existing=$("${compose[@]}" config --services)
@@ -132,10 +190,12 @@ restore_keys() {
     volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/data-protection-keys"}}{{.Name}}{{end}}{{end}}' "$container")
     [[ -n "$volume" ]] || { echo "No Data Protection key volume on $container." >&2; return 1; }
     gzip -dc "$archive" | docker run --rm -i --user 0:0 --entrypoint sh -v "$volume:/keys" "$helper" \
-        -ec 'find /keys -mindepth 1 -delete; tar -xf - -C /keys; chown -R --reference=/keys /keys'
+        -ec 'o=$(stat -c %u:%g /keys); find /keys -mindepth 1 -delete; tar -xf - -C /keys; chown -R "$o" /keys'
 }
 restore_keys "$api" "$backup/api-keys.tar.gz"
 restore_keys "$worker" "$backup/worker-keys.tar.gz"
+
+restore_app_data '' "$(docker inspect --format '{{.Config.Image}}' "$api")" "$backup"
 
 echo "Starting ${services[*]}..."
 "${compose[@]}" up -d --wait --wait-timeout 600 "${services[@]}"

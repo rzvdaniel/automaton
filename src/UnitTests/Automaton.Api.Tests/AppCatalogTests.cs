@@ -46,6 +46,56 @@ public sealed class AppCatalogTests
     }
 
     [Test]
+    public async Task PinnedCommit_ReadsTheCachedPin_UnlessAFreshReadIsAsked()
+    {
+        await using var db = CreateDb();
+        var catalog = CatalogJson;
+        var handler = new FakeHandler(_ => Respond(catalog, null));
+        var service = CreateService(db, handler);
+        await service.GetAsync(Guid.NewGuid(), refresh: false, default);
+        var newer = "fedcba9876543210fedcba9876543210fedcba98";
+        catalog = CatalogJson.Replace(Commit, newer);
+
+        var cached = await service.PinnedCommitAsync("owner/apps", "maintenance/backup", default);
+        var fresh = await service.PinnedCommitAsync("owner/apps", "maintenance/backup", default, refresh: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cached, Is.EqualTo(Commit));
+            Assert.That(fresh, Is.EqualTo(newer));
+        });
+    }
+
+    [Test]
+    public async Task IsPublicCatalogAppAsync_IsTrueOnlyForARepoAndFolderTheCatalogLists()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(CatalogJson, null)));
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await service.IsPublicCatalogAppAsync("Owner/Apps", "maintenance/backup", default), Is.True);
+            Assert.That(await service.IsPublicCatalogAppAsync("someone/else", "maintenance/backup", default), Is.False);
+            Assert.That(await service.IsPublicCatalogAppAsync("owner/apps", "other", default), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task Refresh_ReadsTheSourceAtMostOncePerMinimumGap()
+    {
+        await using var db = CreateDb();
+        var reads = 0;
+        var handler = new FakeHandler(_ => { reads++; return Respond(CatalogJson, null); });
+        var service = new AppCatalogService(db, new FakeFactory(handler), Config(null, "60"), NullLogger<AppCatalogService>.Instance, new CatalogSourceStore(db, new FakeProtector()));
+
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+        await service.GetAsync(Guid.NewGuid(), refresh: true, default);
+        await service.PinnedCommitAsync("owner/apps", "maintenance/backup", default, refresh: true);
+
+        Assert.That(reads, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task Get_FiltersAndPagesOnTheServer_AndCountsTheWholeCatalog()
     {
         await using var db = CreateDb();
@@ -77,7 +127,7 @@ public sealed class AppCatalogTests
             Assert.That(otherSource.TotalApps, Is.EqualTo(30));
             Assert.That(installed.Total, Is.EqualTo(0));
             Assert.That(oversize.PageSize, Is.EqualTo(CatalogQuery.MaximumPageSize));
-            Assert.That(first.Categories.Select(c => (c.Value, c.Count)), Is.EqualTo(new[] { ("Maintenance", 10), ("Tools", 20) }));
+            Assert.That(first.Categories!.Select(c => (c.Value, c.Count)), Is.EqualTo(new[] { ("Maintenance", 10), ("Tools", 20) }));
             Assert.That(first.Sources!.Single().Count, Is.EqualTo(30));
         });
     }
@@ -168,6 +218,149 @@ public sealed class AppCatalogTests
             Assert.That(response.Stale, Is.True);
             Assert.That(response.Apps.Single().Name, Is.EqualTo("Backup"));
         });
+    }
+
+    [Test]
+    public async Task PinnedCommit_IsWhatTheCatalogPinsNow_AndNullForAnAppItDoesNotList()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(CatalogJson, null)), version: "0.2.31");
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await service.PinnedCommitAsync("Owner/Apps", "/maintenance/backup/", default), Is.EqualTo("0123456789abcdef0123456789abcdef01234567"));
+            Assert.That(await service.PinnedCommitAsync("owner/apps", "other", default), Is.Null);
+        });
+    }
+
+    private static string PublisherJson(string publisher) => """
+        {"schemaVersion":1,"repo":"owner/apps","apps":[
+          {"id":"backup","name":"Backup","summary":"Copies backups.","category":"Maintenance","folder":"maintenance/backup",
+           "commit":"0123456789abcdef0123456789abcdef01234567","minServerVersion":"0.2.31","permissions":[],"publisher":PUBLISHER}]}
+        """.Replace("PUBLISHER", publisher);
+
+    [Test]
+    public async Task Get_ShowsThePublisher_AndTicksOnlyAutomatonInTheOfficialCatalog()
+    {
+        await using var db = CreateDb();
+        var official = await CreateService(db, new FakeHandler(_ => Respond(PublisherJson("""{"name":"Automaton","logo":"https://example.com/a.svg"}"""), null)), version: "0.2.31")
+            .GetAsync(Guid.NewGuid(), refresh: true, default);
+        await using var db2 = CreateDb();
+        var other = await CreateService(db2, new FakeHandler(_ => Respond(PublisherJson("""{"name":"Acme","logo":"javascript:alert(1)"}"""), null)), version: "0.2.31")
+            .GetAsync(Guid.NewGuid(), refresh: true, default);
+        await using var db3 = CreateDb();
+        var none = await CreateService(db3, new FakeHandler(_ => Respond(CatalogJson, null)), version: "0.2.31")
+            .GetAsync(Guid.NewGuid(), refresh: true, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(official.Apps.Single().Publisher, Is.EqualTo(new CatalogPublisherDto("Automaton", "https://example.com/a.svg", true)));
+            Assert.That(other.Apps.Single().Publisher, Is.EqualTo(new CatalogPublisherDto("Acme", null, false)));
+            Assert.That(none.Apps.Single().Publisher, Is.Null);
+        });
+    }
+
+    [Test]
+    public void PublisherOf_NeverTicksACustomSourceNamedAutomaton()
+    {
+        var app = new AppCatalogService.CatalogApp { Publisher = new AppCatalogService.CatalogPublisher { Name = "Automaton" } };
+        var custom = new CatalogSourceStore.SourceRef("x", "Mine", "me/apps", "main", false, null);
+        Assert.That(AppCatalogService.PublisherOf(app, custom)!.Verified, Is.False);
+    }
+
+    private static string MovedJson(string from = "rzvdaniel/automaton-apps") => """
+        {"schemaVersion":1,"repo":"owner/store","apps":[
+          {"id":"goat","name":"GoatCounter","summary":"Stats.","category":"Analytics","folder":"analytics/goatcounter",
+           "commit":"0123456789abcdef0123456789abcdef01234567","minServerVersion":"0.2.55","permissions":[],
+           "movedFrom":{"repo":"__FROM__","folder":"analytics/goatcounter"}}]}
+        """.Replace("__FROM__", from);
+
+    [Test]
+    public async Task Pinned_FollowsAnAppThatMovedFromTheOfficialCatalog_ToItsNewRepoAndFolder()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(MovedJson(), null)), version: "0.2.55");
+
+        var pinned = await service.PinnedAsync("Rzvdaniel/Automaton-Apps", "analytics/goatcounter/", default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(pinned, Is.EqualTo(new AppCatalogService.PinnedApp("owner/store", "analytics/goatcounter", Commit, "Analytics")));
+            Assert.That(service.PinnedAsync("rzvdaniel/automaton-apps", "other", default).Result, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task Pinned_IgnoresMovedFromThatClaimsAnotherRepoThanTheOfficialOne()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, new FakeHandler(_ => Respond(MovedJson("someone/else"), null)), version: "0.2.55");
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await service.PinnedAsync("someone/else", "analytics/goatcounter", default), Is.Null);
+            Assert.That(await service.PinnedAsync("rzvdaniel/automaton-apps", "analytics/goatcounter", default), Is.Null);
+        });
+    }
+
+    [Test]
+    public void Parse_KeepsMovedFromOnlyForTheOfficialSourceAndTheStore()
+    {
+        var body = MovedJson();
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppCatalogService.Parse(body).Apps.Single().MovedFrom, Is.Not.Null);
+            Assert.That(AppCatalogService.Parse(body, "rzvdaniel/automaton-monster").Apps.Single().MovedFrom, Is.Not.Null);
+            Assert.That(AppCatalogService.Parse(body, "someone/else").Apps.Single().MovedFrom, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task Get_MarksAMovedAppInstalledWhenItWasInstalledFromItsOldRepo()
+    {
+        await using var db = CreateDb();
+        var owner = Guid.NewGuid();
+        var app = new WebApp { Id = Guid.NewGuid(), Name = "GoatCounter", InstalledFromRepo = "rzvdaniel/automaton-apps", InstalledFromFolder = "analytics/goatcounter" };
+        db.WebApps.Add(app);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = app.Id, UserId = owner });
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeHandler(_ => Respond(MovedJson(), null)), version: "0.2.55");
+
+        var response = await service.GetAsync(owner, refresh: true, default);
+
+        Assert.That(response.Apps.Single().InstalledAppId, Is.EqualTo(app.Id));
+    }
+
+    [Test]
+    public async Task Get_MarksAnAppInstalledFromTheOfficialCatalogEvenWhenRepoCaseOrFolderSlashesDiffer()
+    {
+        await using var db = CreateDb();
+        var owner = Guid.NewGuid();
+        var app = new WebApp { Id = Guid.NewGuid(), Name = "Backup", InstalledFromRepo = "Owner/Apps", InstalledFromFolder = "/maintenance/backup/" };
+        db.WebApps.Add(app);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = app.Id, UserId = owner });
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeHandler(_ => Respond(CatalogJson, null)), version: "server-v0.2.30");
+
+        var response = await service.GetAsync(owner, refresh: true, default);
+
+        Assert.That(response.Apps.Single().InstalledAppId, Is.EqualTo(app.Id));
+    }
+
+    [Test]
+    public async Task Get_DoesNotMatchInstalledAppWhenOnlyTheFolderCaseDiffers()
+    {
+        await using var db = CreateDb();
+        var owner = Guid.NewGuid();
+        var app = new WebApp { Id = Guid.NewGuid(), Name = "Backup", InstalledFromRepo = "owner/apps", InstalledFromFolder = "Maintenance/Backup" };
+        db.WebApps.Add(app);
+        db.WebAppUsers.Add(new WebAppUser { WebAppId = app.Id, UserId = owner });
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeHandler(_ => Respond(CatalogJson, null)), version: "server-v0.2.30");
+
+        var response = await service.GetAsync(owner, refresh: true, default);
+
+        Assert.That(response.Apps.Single().InstalledAppId, Is.Null);
     }
 
     [Test]
@@ -287,6 +480,20 @@ public sealed class AppCatalogTests
             Assert.That(model.Application.Settings.Single().Name, Is.EqualTo("S3_BUCKET"));
             Assert.That(model.Commit, Is.EqualTo(Commit));
         });
+    }
+
+    [Test]
+    public async Task GetSource_ReturnsTheDocsReadmeAtTheCommit_OrNullWhenThereIsNone()
+    {
+        var manifest = """{"name":"Hello","summary":"s","application":{}}""";
+        var with = Zip(("apps-" + Commit + "/hello/automaton.json", manifest), ("apps-" + Commit + "/hello/docs/README.md", "# Hello\n\nDoes things."), ("apps-" + Commit + "/README.md", "root"));
+        var without = Zip(("apps-" + Commit + "/hello/automaton.json", manifest), ("apps-" + Commit + "/README.md", "root"));
+
+        var found = await CreateInstaller(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(with) })).GetSourceAsync(new("owner/apps", "hello", Commit), default);
+        var missing = await CreateInstaller(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(without) })).GetSourceAsync(new("owner/apps", "hello", Commit), default);
+
+        Assert.That(found.Readme, Is.EqualTo("# Hello\n\nDoes things."));
+        Assert.That(missing.Readme, Is.Null);
     }
 
     [Test]

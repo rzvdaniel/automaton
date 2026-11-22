@@ -44,6 +44,30 @@ public sealed class DistributedPlatformArchitectureTests
             "Automaton.Api",
             ["Automaton.Runner", "Automaton.Worker", "Automaton.Cli"]);
 
+    [Test]
+    public void RunnerAndCliDoNotDependOnIdentityProject()
+    {
+        AssertForbiddenProjectReferences("Automaton.Runner", ["Automaton.Identity"]);
+        AssertForbiddenProjectReferences("Automaton.Cli", ["Automaton.Identity"]);
+    }
+
+    [Test]
+    public void AiProjectsDoNotDependOnInfrastructureOrIdentityProjects()
+    {
+        string[] forbidden = ["Automaton.Infrastructure", "Automaton.Identity"];
+        AssertForbiddenProjectReferences("Automaton.Ai", forbidden);
+        AssertForbiddenProjectReferences("Automaton.AiGuidance", forbidden);
+        AssertForbiddenProjectReferences("Automaton.Mcp", forbidden);
+    }
+
+    [Test]
+    public void IdentityOnlyDependsOnCoreAndInfrastructureProjects()
+    {
+        var allowed = new[] { "Automaton.Core", "Automaton.Infrastructure" };
+        var unexpected = GetProjectReferences("Automaton.Identity").Except(allowed).ToArray();
+        Assert.That(unexpected, Is.Empty, "Automaton.Identity may only reference Core and Infrastructure.");
+    }
+
     private static void AssertProjectReferencesExactly(string projectName, IReadOnlyCollection<string> expected)
     {
         var actual = GetProjectReferences(projectName);
@@ -78,7 +102,7 @@ public sealed class DistributedPlatformArchitectureTests
 
         var actual = XDocument.Load(projectPath)
             .Descendants("ProjectReference")
-            .Select(reference => Path.GetFileNameWithoutExtension(reference.Attribute("Include")?.Value))
+            .Select(reference => Path.GetFileNameWithoutExtension(reference.Attribute("Include")?.Value?.Replace('\\', '/')))
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();

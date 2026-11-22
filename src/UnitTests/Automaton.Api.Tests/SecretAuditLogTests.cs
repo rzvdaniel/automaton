@@ -108,6 +108,21 @@ public sealed class SecretAuditLogTests
             "retention applies only to secret audit entries");
     }
 
+    [Test]
+    public async Task HistoryShowsTheDisplayNameAndNeverTheEmail()
+    {
+        var (db, service, developer, appId) = Create();
+        await service.SetAsync(appId, developer, AppSecretScopes.Project, "STRIPE_KEY", Value1, null, None);
+        db.AuditEvents.Single(entry => entry.UserId == developer).UserName = "dev@example.test";
+        db.Users.Add(new ApplicationUser { Id = developer, UserName = "dev@example.test", Email = "dev@example.test", PublicUsername = "dev", DisplayName = "Dana Dev" });
+        await db.SaveChangesAsync();
+        Assert.That((await service.HistoryAsync(appId, developer, AppSecretScopes.Project, None)).Single().UserName, Is.EqualTo("Dana Dev"));
+
+        db.Users.Single(user => user.Id == developer).DisplayName = "";
+        await db.SaveChangesAsync();
+        Assert.That((await service.HistoryAsync(appId, developer, AppSecretScopes.Project, None)).Single().UserName, Is.EqualTo("dev"));
+    }
+
     private static (ApplicationDbContext Db, AppSecretService Service, Guid Developer, Guid AppId) Create()
     {
         var db = AppAuthorizationTestData.CreateDbContext();

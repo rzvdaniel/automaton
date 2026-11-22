@@ -4,14 +4,16 @@ using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Automaton.Api.Enums;
+using Automaton.Api.Config;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
 public sealed record AppSecretSummary(string Name, int Version, DateTime UpdatedAtUtc, string Scope = AppSecretScopes.App, string? Description = null);
 
 /// <summary>One declared secret: whether it is filled and which scope provides it. Never carries a value.</summary>
-public sealed record AppSecretStatus(string Name, string? Description, string? From, bool Present, string? ProvidedBy, string? Problem);
+public sealed record AppSecretStatus(string Name, string? Description, string? From, bool Present, string? ProvidedBy, string? Problem, bool Optional = false);
 
 /// <summary>Where a secret lives. Every scope is addressed relative to an app.</summary>
 public static class AppSecretScopes
@@ -31,8 +33,18 @@ public sealed class AppSecretService(
     ISecretStore store,
     ISecretProtector protector,
     ResourceAuthorizationService authorization,
-    SecretAuditLog? auditLog = null)
+    SecretAuditLog? auditLog = null,
+    IOptions<PublishedAppsConfig>? publishedApps = null)
 {
+    public const string ApiUrlVariable = "AUTOMATON_API_URL";
+
+    /// <summary>A setting default containing this token gets the app's own public address, for example https://blog.apps.example.com.</summary>
+    public const string AppAddressToken = "{{app.address}}";
+
+    /// <summary>True when a setting default in the contract uses <see cref="AppAddressToken"/>, so the running app must restart when its address changes.</summary>
+    public static bool UsesAppAddress(string? contractJson)
+        => contractJson?.Contains(AppAddressToken, StringComparison.Ordinal) == true;
+
     public const int MaxSecretsPerApp = 50;
     public const int MaxSecretsPerVault = 200;
     public const int MaxValueLength = 16 * 1024;
@@ -118,7 +130,7 @@ public sealed class AppSecretService(
         return declarations.Select(declaration =>
         {
             var (providedBy, problem) = Locate(declaration, vaults, available);
-            return new AppSecretStatus(declaration.Name, declaration.Description, declaration.From, providedBy is not null, providedBy, problem);
+            return new AppSecretStatus(declaration.Name, declaration.Description, declaration.From, providedBy is not null, providedBy, problem, declaration.Optional);
         }).ToList();
     }
 
@@ -193,16 +205,72 @@ public sealed class AppSecretService(
             delivered.Add(new(AppPermissionApproval.CredentialVariable, "permission", null, credential.Permission));
         }
         var contract = await ContractAsync(appId, token);
-        // Settings are saved like app secrets; a declared default applies until the installer sets a value.
-        foreach (var setting in contract.Settings ?? [])
-            if (setting.Default is { Length: > 0 } fallback && !values.ContainsKey(setting.Name))
-                values[setting.Name] = fallback;
+        await ApplySettingsAsync(appId, contract, values, delivered, token);
         // Lets an app keep per-install data apart (for example a storage prefix); AUTOMATON_ names cannot be declared.
         values["AUTOMATON_APP_ID"] = appId.ToString();
         var plain = (contract.Settings ?? []).Select(setting => setting.Name).Append("AUTOMATON_APP_ID").ToList();
+        // The server's public API base URL, so apps that call the API need not guess it.
+        if (publishedApps?.Value.ApiBaseUrl is { Length: > 0 } apiUrl)
+        {
+            values[ApiUrlVariable] = apiUrl.TrimEnd('/');
+            plain.Add(ApiUrlVariable);
+        }
         var wanted = (contract.Secrets ?? []).Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
         if (wanted.Count > 0) await AddVaultSecretsAsync(vaults, wanted, values, delivered, token);
         return (values, delivered, plain);
+    }
+
+    /// <summary>
+    /// A value saved in the settings table wins over an older override in the secret store, which wins over the
+    /// declared default. Names declared as secrets are never taken from the settings table.
+    /// </summary>
+    private async Task ApplySettingsAsync(Guid appId, ApplicationContract contract, Dictionary<string, string> values,
+        List<SecretDelivery> delivered, CancellationToken token)
+    {
+        var declaredSecrets = (contract.Secrets ?? []).Select(secret => secret.Name).ToHashSet(StringComparer.Ordinal);
+        var settingNames = (contract.Settings ?? []).Select(setting => setting.Name).Where(name => !declaredSecrets.Contains(name)).ToList();
+        var chosen = await db.AppSettingValues.Where(setting => setting.AppId == appId && settingNames.Contains(setting.Name))
+            .Select(setting => new { setting.Name, setting.Value }).ToListAsync(token);
+        foreach (var setting in chosen)
+        {
+            values[setting.Name] = setting.Value;
+            delivered.RemoveAll(entry => entry.Name == setting.Name && entry.Scope == AppSecretScopes.App);
+        }
+        string? address = null;
+        foreach (var setting in contract.Settings ?? [])
+            if (setting.Default is { Length: > 0 } fallback && !values.ContainsKey(setting.Name))
+            {
+                if (fallback.Contains(AppAddressToken, StringComparison.Ordinal))
+                {
+                    address ??= await AppAddressAsync(appId, token);
+                    if (address is null) continue;
+                    fallback = fallback.Replace(AppAddressToken, address, StringComparison.Ordinal);
+                }
+                values[setting.Name] = fallback;
+            }
+    }
+
+    /// <summary>
+    /// The app's public address without a trailing slash: its primary verified own domain, else its slug on the apps
+    /// domain, else its private address on the apps domain (the one every app has before it is public), so an app that
+    /// needs its address to start can start straight after install. Null only when the server has no apps domain.
+    /// </summary>
+    private async Task<string?> AppAddressAsync(Guid appId, CancellationToken token)
+    {
+        var baseUrl = publishedApps?.Value.PublicBaseUrl;
+        var scheme = Uri.TryCreate(baseUrl, UriKind.Absolute, out var parsed) ? parsed.Scheme : "https";
+        var primary = await db.AppCustomDomains
+            .Where(domain => domain.WebAppId == appId && domain.IsPrimary && domain.LiveAt != null)
+            .Select(domain => domain.Host).FirstOrDefaultAsync(token);
+        if (primary is not null) return $"https://{primary}";
+        if (publishedApps is null) return null;
+        var slug = await db.WebApps.Where(app => app.Id == appId).Select(app => app.PublicUrl).FirstOrDefaultAsync(token);
+        var appsDomain = publishedApps.Value.PublicBaseUrlHost;
+        var host = string.IsNullOrWhiteSpace(slug)
+            ? PublishedAppHostNames.BuildPrivateAppHost(appId, appsDomain)
+            : PublishedAppHostNames.BuildPublishedAppHost(slug, appsDomain);
+        var port = parsed is { IsDefaultPort: false } ? $":{parsed.Port}" : string.Empty;
+        return $"{scheme}://{host}{port}";
     }
 
     private async Task AddVaultSecretsAsync(AppVaults vaults, List<ApplicationSecretDeclaration> wanted,
@@ -321,6 +389,13 @@ public sealed class AppSecretService(
         return result;
     }
 
+    /// <summary>Current values of the app's own secret-store entries with these names (older plain-setting overrides), for moving them to the settings store.</summary>
+    internal async Task<Dictionary<string, string>> ReadAppOverridesAsync(Guid appId, HashSet<string> names, CancellationToken token)
+    {
+        var vaults = await VaultsAsync(appId, token);
+        return (await CurrentAsync(vaults.App, names, token)).ToDictionary(secret => secret.Name, secret => protector.Unprotect(secret.ProtectedValue), StringComparer.Ordinal);
+    }
+
     private sealed record CurrentSecret(string Name, string ProtectedValue, int Version);
 
     /// <summary>The current, unrevoked, unexpired version of each secret of an owner, optionally by name.</summary>
@@ -337,7 +412,7 @@ public sealed class AppSecretService(
         return current.Select(secret => new CurrentSecret(secret.Name, secret.ProtectedValue, secret.Version)).ToList();
     }
 
-    private async Task<ApplicationContract> ContractAsync(Guid appId, CancellationToken token)
+    internal async Task<ApplicationContract> ContractAsync(Guid appId, CancellationToken token)
     {
         var json = await db.WebApps.Where(app => app.Id == appId).Select(app => app.ApplicationContractJson).SingleOrDefaultAsync(token);
         if (string.IsNullOrWhiteSpace(json)) return new();

@@ -99,11 +99,7 @@ public sealed class UserHardDeleteService(
     {
         var blockers = new List<(string Label, int Count)>();
         await AddBlockerAsync(blockers, "apps", db.WebAppUsers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
-        await AddBlockerAsync(blockers, "flows", db.FlowUsers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
         await AddBlockerAsync(blockers, "runners", db.RunnerUsers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
-        await AddBlockerAsync(blockers, "custom steps", db.CustomStepUsers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
-        await AddBlockerAsync(blockers, "schedules", db.ScheduleUsers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
-        await AddBlockerAsync(blockers, "sensitive variables", db.SensitiveVariableUsers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
         await AddBlockerAsync(blockers, "project memberships", db.ProjectMembers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
         await AddBlockerAsync(blockers, "organization memberships", db.OrganizationMembers.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));
         await AddBlockerAsync(blockers, "organization app assignments", db.OrganizationAppAssignments.AsNoTracking().CountAsync(item => item.UserId == userId, cancellationToken));

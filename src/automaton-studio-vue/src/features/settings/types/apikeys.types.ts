@@ -13,9 +13,17 @@ export const ApiKeyScope = {
   FullAccess: 4,
   WebApp: 5,
   Developer: 7,
+  PermissionsAdmin: 8,
 } as const
 
 export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope]
+
+/** The API returns the scope as its name ("Developer"); forms use the number. Accept both. */
+export function normalizeScope(scope: ApiKeyScope | string): ApiKeyScope | undefined {
+  if (typeof scope === 'number') return scope
+  const byName = (ApiKeyScope as Record<string, ApiKeyScope>)[scope]
+  return byName ?? (Object.values(ApiKeyScope) as number[]).find((v) => String(v) === scope) as ApiKeyScope | undefined
+}
 
 export const ApiKeySource = {
   Manual: 1,
@@ -25,6 +33,13 @@ export const ApiKeySource = {
 
 export type ApiKeySource = (typeof ApiKeySource)[keyof typeof ApiKeySource]
 
+/** The API sends the source name (e.g. "CliAuthorization"); accept a number too. */
+export function normalizeSource(source: ApiKeySource | string): ApiKeySource | undefined {
+  if (typeof source === 'number') return source
+  const byName = (ApiKeySource as Record<string, ApiKeySource>)[source]
+  return byName ?? (Object.values(ApiKeySource) as number[]).find((v) => String(v) === source) as ApiKeySource | undefined
+}
+
 /**
  * API Key response from server
  * Matches ApiKeyResponse from ApiKeysController.cs
@@ -33,8 +48,8 @@ export interface ApiKey {
   id: string
   name: string
   keyPrefix: string
-  scope: ApiKeyScope
-  source: ApiKeySource
+  scope: ApiKeyScope | string // the API sends the name, e.g. "Developer"
+  source: ApiKeySource | string // the API sends the name, e.g. "CliAuthorization"
   createdAt: string // ISO date string
   lastUsedAt?: string // ISO date string
   expiresAt?: string // ISO date string
@@ -71,8 +86,8 @@ export interface CreateApiKeyResponse {
 /**
  * Get scope display name
  */
-export function getScopeDisplayName(scope: ApiKeyScope): string {
-  switch (scope) {
+export function getScopeDisplayName(scope: ApiKeyScope | string): string {
+  switch (normalizeScope(scope)) {
     case ApiKeyScope.ReadOnly:
       return 'Read Only'
     case ApiKeyScope.WorkflowExecution:
@@ -85,13 +100,15 @@ export function getScopeDisplayName(scope: ApiKeyScope): string {
       return 'Web App'
     case ApiKeyScope.Developer:
       return 'Developer / CLI'
+    case ApiKeyScope.PermissionsAdmin:
+      return 'Admin: approve app permissions'
     default:
       return 'Unknown'
   }
 }
 
-export function getSourceDisplayName(source: ApiKeySource): string {
-  switch (source) {
+export function getSourceDisplayName(source: ApiKeySource | string): string {
+  switch (normalizeSource(source)) {
     case ApiKeySource.Manual:
       return 'Manual'
     case ApiKeySource.CliAuthorization:
@@ -107,9 +124,9 @@ export function getSourceDisplayName(source: ApiKeySource): string {
  * Get scope color for PrimeVue Tag severity
  */
 export function getScopeSeverity(
-  scope: ApiKeyScope,
+  scope: ApiKeyScope | string,
 ): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
-  switch (scope) {
+  switch (normalizeScope(scope)) {
     case ApiKeyScope.ReadOnly:
       return 'info'
     case ApiKeyScope.WorkflowExecution:
@@ -122,6 +139,8 @@ export function getScopeSeverity(
       return 'warn'
     case ApiKeyScope.Developer:
       return 'success'
+    case ApiKeyScope.PermissionsAdmin:
+      return 'danger'
     default:
       return 'secondary'
   }
@@ -130,14 +149,21 @@ export function getScopeSeverity(
 /**
  * Get usage instructions based on scope
  */
-export function getUsageInstructions(apiKey: string, scope: ApiKeyScope): string {
-  switch (scope) {
+export function getUsageInstructions(apiKey: string, scope: ApiKeyScope | string): string {
+  switch (normalizeScope(scope)) {
     case ApiKeyScope.Developer:
       return `Use this Developer key with the Automaton CLI:
 
 automaton login --key ${apiKey}
 automaton deploy
 automaton publish`
+
+    case ApiKeyScope.PermissionsAdmin:
+      return `Use this admin key only on a machine you control. It can approve and reject app permissions and does nothing else. It expires and stops working if you are no longer a system administrator.
+
+export AUTOMATON_API_KEY="${apiKey}"
+automaton permissions list --pending
+automaton permissions approve <app> <permission>`
 
     case ApiKeyScope.Runner:
     case ApiKeyScope.FullAccess:

@@ -6,15 +6,18 @@ import PrimeVue from 'primevue/config'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import LoginView from './LoginView.vue'
 import CliAuthorizeView from './CliAuthorizeView.vue'
+import ResetPasswordView from './ResetPasswordView.vue'
 
 const mocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
   details: vi.fn(),
   approve: vi.fn(),
   cancel: vi.fn(),
+  resetPassword: vi.fn(),
+  forgotPassword: vi.fn(),
 }))
 vi.mock('@/features/install/services/install.service', () => ({ installService: { getStatus: mocks.getStatus } }))
-vi.mock('../services/auth.service', () => ({ authService: { startGitHubLogin: vi.fn() } }))
+vi.mock('../services/auth.service', () => ({ authService: { startGitHubLogin: vi.fn(), resetPassword: mocks.resetPassword, forgotPassword: mocks.forgotPassword } }))
 vi.mock('../composables/useAuth', () => ({ useAuth: () => ({
   login: vi.fn(), isLoading: ref(false), error: ref(null), clearError: vi.fn(),
 }) }))
@@ -89,8 +92,53 @@ describe('agent approval page', () => {
     expect(mocks.cancel).toHaveBeenCalledWith('r1', 'ABCD-1234')
   })
 
+  it('names the admin key, the machine, the code and the expiry for a permissions-admin request', async () => {
+    mocks.details.mockResolvedValue({
+      deviceName: 'e2e-laptop', remoteIp: '10.0.0.1', createdAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2026-01-01T00:05:00Z', status: 'pending', scope: 'PermissionsAdmin',
+    })
+    const { wrapper } = await mountAt(CliAuthorizeView, '/cli/authorize?requestId=r1&code=ABCD-1234')
+    const text = wrapper.text()
+    expect(text).toContain('admin key for app permissions')
+    expect(text).toContain('e2e-laptop')
+    expect(text).toContain('Admin: approve app permissions (30 days)')
+    expect(text).toContain('Request expires')
+    expect(text).toContain('must match your terminal')
+    expect(wrapper.findAll('.cli-code-char').map((c) => c.text()).join('')).toBe('ABCD1234')
+  })
+
   it('says so when the link has no code', async () => {
     const { wrapper } = await mountAt(CliAuthorizeView, '/cli/authorize')
     expect(wrapper.text()).toContain('This authorization link is incomplete. Restart automaton login.')
+  })
+})
+
+describe('reset password page', () => {
+  afterEach(() => vi.clearAllMocks())
+
+  async function submitWith(code: string) {
+    mocks.resetPassword.mockRejectedValue({ response: { status: 400, data: { code } } })
+    mocks.forgotPassword.mockResolvedValue(undefined)
+    const { wrapper } = await mountAt(ResetPasswordView, '/reset-password?email=a%40b.com&code=xyz')
+    await wrapper.find('#password').setValue('Abcdef1')
+    await wrapper.find('#confirmPassword').setValue('Abcdef1')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    return wrapper
+  }
+
+  it('says a used link was used and offers a new one', async () => {
+    const wrapper = await submitWith('reset_link_used')
+    expect(wrapper.text()).toContain('This link was already used')
+    expect((wrapper.find('#resendEmail').element as HTMLInputElement).value).toBe('a@b.com')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.forgotPassword).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.com' }))
+    expect(wrapper.text()).toContain("If an account with that email exists, we've sent a new reset link.")
+  })
+
+  it('says an old link has expired', async () => {
+    const wrapper = await submitWith('reset_link_expired')
+    expect(wrapper.text()).toContain('This link has expired')
   })
 })

@@ -82,8 +82,6 @@ public class AppVersionService
 
         dataContext.AppVersions.Add(appVersion);
 
-        await AddLinkedStepSnapshotsAsync(appVersion.Id, appId);
-
         await dataContext.SaveChangesAsync();
         await TryPruneVersionSnapshotsAsync(ownerId, appId);
 
@@ -104,37 +102,6 @@ public class AppVersionService
         }
     }
 
-    private async Task AddLinkedStepSnapshotsAsync(Guid appVersionId, Guid appId)
-    {
-        var linkedSteps = await dataContext.WebAppSteps
-            .Where(was => was.WebAppId == appId)
-            .Include(was => was.CustomStep)
-            .Select(was => was.CustomStep)
-            .ToListAsync();
-
-        foreach (var step in linkedSteps)
-        {
-            var definition = JsonSerializer.Deserialize<CustomStepDefinition>(step.Definition)
-                ?? new CustomStepDefinition();
-            var variablesSnapshot = JsonSerializer.Serialize(new
-            {
-                inputVariables = definition.CodeInputVariables ?? new List<Core.Models.StepVariable>(),
-                outputVariables = definition.CodeOutputVariables ?? new List<Core.Models.StepVariable>()
-            });
-            dataContext.AppVersionSteps.Add(new AppVersionStep
-            {
-                Id = Guid.NewGuid(),
-                AppVersionId = appVersionId,
-                StepId = step.Id,
-                StepName = step.Name,
-                Action = AppVersionStepAction.Linked,
-                Language = definition.Language,
-                CodeSnapshot = definition.Code ?? string.Empty,
-                VariablesSnapshot = variablesSnapshot
-            });
-        }
-    }
-
     /// <summary>
     /// Generate a human-readable summary of version changes.
     /// Includes trigger type and overview of file/step changes.
@@ -145,18 +112,7 @@ public class AppVersionService
         {
             var summaryParts = new List<string>();
 
-            // Get the previous version to track step changes
-            var prevVersionNumber = versionNumber - 1;
-            var currentVersion = await dataContext.AppVersions
-                .Include(v => v.Steps)
-                .FirstOrDefaultAsync(v => v.AppId == appId && v.VersionNumber == versionNumber);
-
-            var prevVersion = await dataContext.AppVersions
-                .Include(v => v.Steps)
-                .FirstOrDefaultAsync(v => v.AppId == appId && v.VersionNumber == prevVersionNumber);
-
             AppendFileChangeSummary(summaryParts, filesChangeSummary);
-            AppendStepChangeSummary(summaryParts, currentVersion?.Steps, prevVersion?.Steps);
 
             // Fallback if no changes detected
             if (!summaryParts.Any())
@@ -203,20 +159,6 @@ public class AppVersionService
         if (added > 0) summaryParts.Add($"{added} added");
         if (modified > 0) summaryParts.Add($"{modified} modified");
         if (deleted > 0) summaryParts.Add($"{deleted} removed");
-    }
-
-    private static void AppendStepChangeSummary(
-        List<string> summaryParts,
-        ICollection<AppVersionStep>? currentSteps,
-        ICollection<AppVersionStep>? previousSteps)
-    {
-        var current = currentSteps ?? Array.Empty<AppVersionStep>();
-        var previous = previousSteps ?? Array.Empty<AppVersionStep>();
-        var addedCount = current.Count(step => previous.All(previousStep => previousStep.StepId != step.StepId));
-        var removedCount = previous.Count(step => current.All(currentStep => currentStep.StepId != step.StepId));
-
-        if (addedCount > 0) summaryParts.Add($"{addedCount} step(s) added");
-        if (removedCount > 0) summaryParts.Add($"{removedCount} step(s) removed");
     }
 
     /// <summary>

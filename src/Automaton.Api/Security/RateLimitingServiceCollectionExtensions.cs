@@ -42,6 +42,25 @@ public static class RateLimitingServiceCollectionExtensions
     private static PartitionedRateLimiter<HttpContext> CreateGlobalLimiter(RateLimitingOptions options)
         => PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         {
+            // An app's own scripts, styles and images get their own, larger bucket so loading one page cannot
+            // use up the visitor's general allowance. Everything else, including the API, keeps the normal limits.
+            if (IsAppStaticAssetRequest(httpContext.Request))
+            {
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, "global:app-assets"),
+                    _ => CreatePolicyOptions(options.AppStaticAssets));
+            }
+
+            // A Runner's own calls (result polling, status, health) carry an API key that authentication has already accepted, and come from the proxy's address,
+            // the same address every anonymous visitor shares. They get their own bucket so a busy Runner is not refused
+            // because of other traffic, and cannot use up the visitors' allowance.
+            if (IsRunnerApiRequest(httpContext.Request) && RateLimitedApiKeys.Recognise(httpContext) is { } runnerKey)
+            {
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    "global:runner-api:" + runnerKey,
+                    _ => CreatePolicyOptions(options.RunnerApi));
+            }
+
             var identity = httpContext.User.Identity;
             if (identity?.IsAuthenticated == true)
             {
@@ -54,6 +73,33 @@ public static class RateLimitingServiceCollectionExtensions
                 GetRemoteIpPartitionKey(httpContext, "global:anonymous"),
                 _ => CreatePolicyOptions(options.GlobalAnonymous));
         });
+
+    private static readonly string[] RunnerApiPrefixes =
+        ["/api/host-container-executions", "/api/runner-executions", "/api/server/health"];
+
+    /// <summary>A call to a Runner endpoint that presents an API key. Only keys authentication has accepted get the bucket.</summary>
+    internal static bool IsRunnerApiRequest(HttpRequest request)
+        => request.Headers.ContainsKey("X-API-Key")
+            && RunnerApiPrefixes.Any(prefix => request.Path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase));
+
+    private static readonly HashSet<string> StaticAssetExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".js", ".mjs", ".css", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
+        ".woff", ".woff2", ".ttf", ".otf", ".wasm", ".webmanifest"
+    };
+
+    /// <summary>A GET or HEAD for a static file through an app's runtime tunnel (an app address, never the platform API).</summary>
+    internal static bool IsAppStaticAssetRequest(HttpRequest request)
+    {
+        // A private app's request first passes the proxy's sign-in check (/internal/runtime/auth, which only answers with the
+        // proxy's key). The proxy may not pass the original URI on, so every such check counts here, apart from the API.
+        var path = request.Path;
+        var target = path.Value ?? string.Empty;
+        if (path.StartsWithSegments("/internal/runtime/auth", StringComparison.Ordinal)) return true;
+        return (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+            && path.StartsWithSegments("/runtime-tunnel/apps", StringComparison.Ordinal)
+            && StaticAssetExtensions.Contains(Path.GetExtension(target));
+    }
 
     private static ValueTask WriteRateLimitRejectionAsync(
         OnRejectedContext context,
@@ -78,6 +124,7 @@ public static class RateLimitingServiceCollectionExtensions
     private static void AddApplicationPolicies(RateLimiterOptions options, RateLimitingOptions configuredOptions)
     {
         AddRemoteIpPolicy(options, RateLimitPolicyNames.ApiKeyValidation, configuredOptions.ApiKeyValidation);
+        AddRemoteIpPolicy(options, RateLimitPolicyNames.ActionWebhookCall, configuredOptions.ActionWebhookCall);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.PublicAppControllerExecution, configuredOptions.PublicAppControllerExecution);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.PublicAppFlowExecution, configuredOptions.PublicAppFlowExecution);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.PublicAppStepExecution, configuredOptions.PublicAppStepExecution);

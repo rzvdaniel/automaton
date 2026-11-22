@@ -6,7 +6,17 @@ namespace Automaton.Api.Entities;
 public sealed class AppPermissionApproval
 {
     public const string BackupsRead = "backups:read";
+    public const string BackupsRun = "backups:run";
+    public const string ServerRestart = "server:restart";
+    public const string ServerUpdateOs = "server:update-os";
     public const string ServerRead = "server:read";
+    public const string AppsReadStatus = "apps:read-status";
+    public const string SecurityRead = "security:read";
+    public const string SecurityManage = "security:manage";
+    public const string LogsReceive = "logs:receive";
+    public const string NotifyEmail = "notify:email";
+    public const string ServerCleanup = "server:cleanup";
+    public const string RunnerMaintain = "runner:maintain";
     public const string CredentialVariable = "APP_AUTOMATON_API_KEY";
 
     [Key]

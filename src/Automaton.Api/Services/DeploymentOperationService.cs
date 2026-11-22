@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using Automaton.Api.Enums;
 using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -193,6 +195,124 @@ public sealed class DeploymentOperationService(
             if (current is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed)
                 DeploymentPackageStore.TryDelete(operation.PackagePath);
         }
+    }
+
+    /// <summary>Longest an operation may stay Pending/Running without a Runner result.</summary>
+    internal static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(30);
+
+    /// <summary>Fails operations past the timeout and releases their targets. Returns how many.</summary>
+    internal async Task<int> FailTimedOutOperationsAsync(CancellationToken cancellationToken)
+    {
+        var cutoff = DateTime.UtcNow - OperationTimeout;
+        var stuck = await dataContext.DeploymentOperations
+            .AsNoTracking()
+            .Where(operation =>
+                (operation.Status == DeploymentOperationStatuses.Pending ||
+                 operation.Status == DeploymentOperationStatuses.Running) &&
+                (operation.StartedAtUtc ?? operation.CreatedAtUtc) <= cutoff)
+            .ToListAsync(cancellationToken);
+        var failed = 0;
+        foreach (var operation in stuck)
+            if (await FailAsync(operation, "The deployment timed out before the Runner finished it.", cancellationToken))
+                failed++;
+        return failed;
+    }
+
+    /// <summary>Lets an app owner cancel the app's active deployment (optionally one target).</summary>
+    public async Task<int> CancelActiveAsync(
+        Guid appId, Guid ownerId, string? targetSlug, CancellationToken cancellationToken)
+    {
+        if (!await authorizationService.CanUpdateAppAsync(appId, ownerId, cancellationToken))
+            throw new KeyNotFoundException("App not found or you do not have permission to cancel its deployment.");
+        return await CancelActiveCoreAsync(appId, targetSlug, cancellationToken);
+    }
+
+    internal async Task<int> CancelActiveCoreAsync(Guid appId, string? targetSlug, CancellationToken cancellationToken)
+    {
+        var slug = string.IsNullOrWhiteSpace(targetSlug) ? null : targetSlug.Trim();
+        var matchesTarget = await TargetFilterAsync(appId, slug, cancellationToken);
+        var active = await dataContext.DeploymentOperations
+            .AsNoTracking()
+            .Where(operation => operation.WebAppId == appId)
+            .Where(matchesTarget)
+            .Where(operation =>
+                (operation.Status == DeploymentOperationStatuses.Pending ||
+                 operation.Status == DeploymentOperationStatuses.Running))
+            .ToListAsync(cancellationToken);
+        var cancelled = 0;
+        foreach (var operation in active)
+            if (await FailAsync(operation, "The deployment was cancelled by the app owner.", cancellationToken))
+                cancelled++;
+        return cancelled;
+    }
+
+    // CLI-started operations carry no TargetSlug (they deploy to the default target), so a slug filter
+    // also matches the target's active operation and, for the default target, operations without a slug.
+    private async Task<Expression<Func<DeploymentOperation, bool>>> TargetFilterAsync(
+        Guid appId, string? slug, CancellationToken cancellationToken)
+    {
+        if (slug == null) return operation => true;
+        var lowered = slug.ToLowerInvariant();
+        var target = await dataContext.AppDeploymentTargets.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.WebAppId == appId && item.Slug == lowered, cancellationToken);
+        var activeId = target?.ActiveDeploymentOperationId;
+        var isDefault = target?.IsDefault == true;
+        return operation => operation.TargetSlug == slug || operation.Id == activeId ||
+            (isDefault && (operation.TargetSlug == null || operation.TargetSlug == ""));
+    }
+
+    private async Task<bool> FailAsync(DeploymentOperation snapshot, string message, CancellationToken cancellationToken)
+    {
+        var resultJson = JsonSerializer.Serialize(new DeployPackageResponse
+        {
+            Success = false,
+            State = DeploymentOperationStatuses.Failed,
+            Message = message
+        }, JsonOptions);
+        var operation = snapshot;
+        // Only flip the row while it is still Pending/Running, so a result that just landed is not overwritten.
+        if (dataContext.Database.IsRelational())
+        {
+            var changed = await dataContext.DeploymentOperations
+                .Where(item => item.Id == snapshot.Id &&
+                    (item.Status == DeploymentOperationStatuses.Pending ||
+                     item.Status == DeploymentOperationStatuses.Running))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.Status, DeploymentOperationStatuses.Failed)
+                    .SetProperty(item => item.CompletedAtUtc, DateTime.UtcNow)
+                    .SetProperty(item => item.LeaseExpiresAtUtc, (DateTime?)null)
+                    .SetProperty(item => item.ErrorMessage, message)
+                    .SetProperty(item => item.ResultJson, resultJson), cancellationToken);
+            if (changed != 1) return false;
+        }
+        else
+        {
+            var tracked = await dataContext.DeploymentOperations
+                .SingleOrDefaultAsync(item => item.Id == snapshot.Id, cancellationToken);
+            if (tracked is null ||
+                tracked.Status is not (DeploymentOperationStatuses.Pending or DeploymentOperationStatuses.Running))
+                return false;
+            tracked.Status = DeploymentOperationStatuses.Failed;
+            tracked.CompletedAtUtc = DateTime.UtcNow;
+            tracked.LeaseExpiresAtUtc = null;
+            tracked.ErrorMessage = message;
+            tracked.ResultJson = resultJson;
+        }
+        var targets = await dataContext.AppDeploymentTargets
+            .Where(target => target.WebAppId == operation.WebAppId &&
+                target.Status == DeploymentTargetStatus.Deploying &&
+                target.ActiveDeploymentOperationId == operation.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var target in targets)
+        {
+            target.Status = DeploymentTargetStatus.Failed;
+            target.ActiveDeploymentOperationId = null;
+            target.ActiveDeploymentExecutionAttemptId = null;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        await dataContext.SaveChangesAsync(cancellationToken);
+        DeploymentPackageStore.TryDelete(operation.PackagePath);
+        return true;
     }
 
     internal async Task<List<Guid>> GetDispatchableOwnedOperationIdsAsync(
@@ -401,6 +521,7 @@ public sealed class DeploymentOperationService(
         CancellationToken cancellationToken)
     {
         var status = success ? DeploymentOperationStatuses.Succeeded : DeploymentOperationStatuses.Failed;
+        error = DeploymentOperation.FitErrorMessage(error);
         var resultJson = JsonSerializer.Serialize(result, JsonOptions);
         if (dataContext.Database.IsRelational())
         {

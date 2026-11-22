@@ -4,18 +4,28 @@ Automaton CLI is the .NET global tool for creating, validating, deploying, and p
 
 ## Install
 
+Without .NET, download the standalone binary (Linux, macOS, Windows x64):
+
+```bash
+curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh
+```
+
+PowerShell: `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`
+
+With the .NET 10 SDK:
+
 ```bash
 dotnet tool install --global Automaton.Cli
 ```
 
 ## Common commands
 
+To install a Runner, see [Add a Runner](https://automaton.monster/docs/deploy-runner). All commands: [Automaton CLI reference](https://automaton.monster/docs/automaton-cli).
+
 ```bash
 automaton login
 automaton login --local
 automaton login --device
-# Install a Runner on Ubuntu with Docker running (add --yes for automation)
-automaton runners install --name main --ssh user@host
 automaton profiles
 automaton new "My App"
 automaton pull

@@ -49,17 +49,28 @@ services:
   api:
     <<: *app
     image: ${API_IMAGE:?}
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      # The setup token lives in this root-only file; the API replaces its content when first-admin setup completes.
+      Bootstrap__TokenFile: /app/setup-token
     volumes:
       - ${CONFIG_DIR:?}/appsettings.Production.json:/app/appsettings.Production.json:ro
+      - ${CONFIG_DIR:?}/secrets/setup-token:/app/setup-token
       - api-data:/app/AppData
       - api-keys:/app/data-protection-keys
       - ${CONFIG_DIR:?}/dynamic:/app/AppData/traefik-dynamic
       - ${CONFIG_DIR:?}/status:/app/installation-status:ro
       - ${BACKUP_DIR:?}/nightly:/app/installation-backups:ro
       - /var/lib/automaton/update/requests:/app/update-requests
+      - /var/lib/automaton/backup/requests:/app/backup-requests
       - /var/lib/automaton/update/status:/app/update-status:ro
+      - /var/lib/automaton/restart/requests:/app/restart-requests
+      - /var/lib/automaton/restart/status:/app/restart-status:ro
+      - /var/lib/automaton/os-update/requests:/app/os-update-requests
+      - /var/lib/automaton/os-update/status:/app/os-update-status:ro
     healthcheck:
-      test: [CMD, curl, -fsS, http://127.0.0.1:8080/health]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '"]
       interval: 10s
       timeout: 5s
       retries: 60

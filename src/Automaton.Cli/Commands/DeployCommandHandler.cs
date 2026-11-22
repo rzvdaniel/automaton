@@ -20,11 +20,13 @@ internal static class DeployCommandHandler
         Option<bool> publishOption,
         Option<bool> openOption,
         Option<bool> nonInteractiveOption,
-        Option<string?> environmentOption)
+        Option<string?> environmentOption,
+        Option<bool>? resumeOption = null)
     {
         var arguments = ReadArguments(
             context, targetArgument, runnerOption, cleanOption, directoryOption, jsonOption,
             verboseOption, publishOption, openOption, nonInteractiveOption, environmentOption);
+        if (resumeOption is not null) arguments = arguments with { Resume = context.ParseResult.GetValueForOption(resumeOption) };
         var nonInteractive = CliInteraction.IsNonInteractive(arguments.NonInteractive, arguments.AsJson);
         try
         {
@@ -97,7 +99,8 @@ internal static class DeployCommandHandler
         => new(
             config,
             message => DeployCommand.WriteProgress(message, arguments.AsJson, nonInteractive),
-            check => DeployCommand.WriteCheck(check, arguments.AsJson, nonInteractive));
+            check => DeployCommand.WriteCheck(check, arguments.AsJson, nonInteractive))
+        { ResumeAfterDeploy = arguments.Resume };
 
     private static bool HasInvalidLocalProject(
         DeployService deployService, string cwd, DeployArguments arguments, bool nonInteractive)
@@ -352,7 +355,8 @@ internal static class DeployCommandHandler
         bool Publish,
         bool Open,
         bool NonInteractive,
-        string? EnvironmentName);
+        string? EnvironmentName,
+        bool Resume = false);
 
     private sealed record DeploymentPlan(
         string Directory,

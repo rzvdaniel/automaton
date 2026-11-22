@@ -13,10 +13,9 @@ public sealed class AppDeletionService(
     BackendRouteConfigService? routeConfigService = null)
 {
     public async Task DeleteResourcesAsync(
-        Guid appId, WebApp app, Guid ownerId, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
+        Guid appId, WebApp app, Guid ownerId, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false,
+        List<string>? skippedHostCleanup = null)
     {
-        if (abandonOfflineRuntimes && !recoverInterrupted)
-            throw new ArgumentException("Abandoning offline runtimes requires interrupted-deletion recovery.");
         await using var executor = await AppDeletionExecutionLock.AcquireAsync(dataContext, appId);
         IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims = null;
         Guid? appClaimId = null;
@@ -26,9 +25,6 @@ public sealed class AppDeletionService(
         try
         {
             await dataContext.Entry(app).ReloadAsync();
-            if (abandonOfflineRuntimes && !app.DeletionClaimId.HasValue)
-                throw new AppDeploymentTargetConflictException(
-                    "Offline runtime abandonment is available only for an interrupted deletion.");
             resuming = recoverInterrupted && app.DeletionClaimId.HasValue;
             appClaimId = resuming
                 ? await appClaims.RecoverAsync(executor)
@@ -48,7 +44,7 @@ public sealed class AppDeletionService(
                     .ClaimAndCleanupAppRuntimesAsync(appId, recoverInterrupted: resuming,
                         abandonOfflineRuntimes: abandonOfflineRuntimes,
                         assertDeletionOwner: ct => appClaims.AssertOwnedAsync(executor, appClaimId.Value, ct),
-                        deletionClaimId: appClaimId.Value);
+                        deletionClaimId: appClaimId.Value, skippedHostCleanup: skippedHostCleanup);
             }
 
             await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
@@ -57,6 +53,8 @@ public sealed class AppDeletionService(
             await AppSecretService.RemoveAllForAppAsync(dataContext, appId, CancellationToken.None);
             dataContext.ActionSchedules.RemoveRange(await dataContext.ActionSchedules
                 .Where(schedule => schedule.ApplicationId == appId).ToListAsync());
+            dataContext.ActionWebhooks.RemoveRange(await dataContext.ActionWebhooks
+                .Where(hook => hook.ApplicationId == appId).ToListAsync());
             dataContext.WebApps.Remove(app);
             await dataContext.SaveChangesAsync();
         }

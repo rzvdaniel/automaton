@@ -3,6 +3,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 // Import feature routes
 import { authRoutes } from '@/features/auth/routes'
+import { homeRoutes } from '@/features/home/routes'
 import { appsRoutes } from '@/features/apps/routes'
 import { runnersRoutes } from '@/features/runners/routes'
 import { peopleRoutes } from '@/features/people/routes'
@@ -30,8 +31,8 @@ const router = createRouter({
       meta: { requiresAuth: false, layout: 'none' },
     },
 
-    // Apps is the start page
-    { path: '/', redirect: { name: 'apps' } },
+    // Home is the start page
+    { path: '/', redirect: { name: 'home' } },
 
     // Auth
     ...authRoutes,
@@ -40,6 +41,7 @@ const router = createRouter({
     ...installRoutes,
 
     // Features
+    ...homeRoutes,
     ...appsRoutes,
     ...runnersRoutes,
     ...peopleRoutes,

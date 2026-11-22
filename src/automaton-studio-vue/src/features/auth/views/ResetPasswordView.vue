@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthCard from '../components/AuthCard.vue'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import InputText from 'primevue/inputtext'
+import CloudflareTurnstile from '@/shared/components/CloudflareTurnstile.vue'
 import { authService } from '../services/auth.service'
 import type { ResetPasswordFormErrors } from '../types/auth.types'
 
@@ -27,6 +29,22 @@ const isLoading = ref(false)
 const error = ref<string | null>(null)
 const success = ref(false)
 const invalidLink = ref(false)
+// Set when the server says the link was already used or has expired; the page then offers a new one.
+const linkProblem = ref<'used' | 'expired' | 'invalid' | null>(null)
+const resendEmail = ref('')
+const resendError = ref<string | null>(null)
+const resendLoading = ref(false)
+const resendSent = ref(false)
+const turnstileToken = ref('')
+const turnstileRef = ref<InstanceType<typeof CloudflareTurnstile> | null>(null)
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const turnstileEnabled = import.meta.env.VITE_TURNSTILE_ENABLED === 'true' && !!turnstileSiteKey
+
+const linkProblemMessage = computed(() => {
+  if (linkProblem.value === 'used') return 'This link was already used'
+  if (linkProblem.value === 'expired') return 'This link has expired'
+  return 'This link is no longer valid'
+})
 
 onMounted(() => {
   // Extract email and code from query params
@@ -37,6 +55,7 @@ onMounted(() => {
   if (typeof queryEmail === 'string' && typeof queryCode === 'string') {
     email.value = queryEmail
     code.value = queryCode
+    resendEmail.value = queryEmail
     isCreatingPassword.value = queryCreate === 'true' // Check if creating new password
   } else {
     invalidLink.value = true
@@ -91,8 +110,12 @@ async function handleSubmit() {
     })
     success.value = true
   } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { message?: string }; status?: number } }
-    if (axiosError.response?.status === 400) {
+    const axiosError = err as { response?: { data?: { message?: string; code?: string }; status?: number } }
+    const code = axiosError.response?.data?.code
+    if (axiosError.response?.status === 400 && code?.startsWith('reset_link_')) {
+      const reason = code.slice('reset_link_'.length)
+      linkProblem.value = reason === 'used' || reason === 'expired' ? reason : 'invalid'
+    } else if (axiosError.response?.status === 400) {
       error.value = 'Invalid or expired reset link. Please request a new one.'
     } else if (axiosError.response?.data?.message) {
       error.value = axiosError.response.data.message
@@ -101,6 +124,37 @@ async function handleSubmit() {
     }
   } finally {
     isLoading.value = false
+  }
+}
+
+// Ask for a new link. The answer is the same whether or not the address has an account.
+async function handleResend() {
+  resendError.value = null
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resendEmail.value)) {
+    resendError.value = 'Please enter a valid email address'
+    return
+  }
+  if (turnstileEnabled && !turnstileToken.value) {
+    resendError.value = 'Please complete the verification challenge'
+    return
+  }
+  resendLoading.value = true
+  try {
+    await authService.forgotPassword({ email: resendEmail.value, turnstileToken: turnstileToken.value || undefined })
+    resendSent.value = true
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { message?: string }; status?: number } }
+    if (axiosError.response?.status === 400 && axiosError.response.data?.message) {
+      resendError.value = axiosError.response.data.message
+      turnstileRef.value?.reset()
+      turnstileToken.value = ''
+    } else if (!axiosError.response || (axiosError.response.status ?? 0) >= 500) {
+      resendError.value = 'We could not send the email right now. Please try again in a moment.'
+    } else {
+      resendSent.value = true
+    }
+  } finally {
+    resendLoading.value = false
   }
 }
 
@@ -122,8 +176,8 @@ function clearError() {
 
 <template>
   <AuthCard
-    :title="success ? 'Password set successfully' : isCreatingPassword ? 'Create your password' : 'Set new password'"
-    :lead="success ? 'Your password has been updated' : isCreatingPassword ? 'Set up a password for your account' : 'Create a new password for your account'"
+    :title="linkProblem ? linkProblemMessage : success ? 'Password set successfully' : isCreatingPassword ? 'Create your password' : 'Set new password'"
+    :lead="linkProblem ? 'Request a new reset link' : success ? 'Your password has been updated' : isCreatingPassword ? 'Set up a password for your account' : 'Create a new password for your account'"
   >
     <template v-if="invalidLink">
       <Message severity="error" :closable="false" class="mb-4">
@@ -133,6 +187,40 @@ function clearError() {
         <router-link to="/forgot-password"><Button label="Request New Link" class="auth-primary" /></router-link>
         <router-link to="/login"><Button label="Back to Sign In" class="auth-outline" /></router-link>
       </div>
+    </template>
+
+    <template v-else-if="linkProblem">
+      <template v-if="resendSent">
+        <Message severity="success" :closable="false" class="mb-4">
+          If an account with that email exists, we've sent a new reset link.
+        </Message>
+        <router-link to="/login"><Button label="Back to Sign In" class="auth-outline" /></router-link>
+      </template>
+      <template v-else>
+        <Message severity="error" :closable="false" class="mb-4">
+          {{ linkProblemMessage }}. Enter your email and we'll send you a new one.
+        </Message>
+        <form class="auth-form" @submit.prevent="handleResend">
+          <div class="auth-field">
+            <label for="resendEmail">Email Address</label>
+            <InputText id="resendEmail" v-model="resendEmail" type="email" placeholder="you@example.com" :disabled="resendLoading" />
+            <small v-if="resendError" class="text-red-500">{{ resendError }}</small>
+          </div>
+          <div v-if="turnstileEnabled" class="auth-field">
+            <CloudflareTurnstile
+              ref="turnstileRef"
+              :site-key="turnstileSiteKey"
+              @verified="(token: string) => (turnstileToken = token)"
+              @expired="turnstileToken = ''"
+              @error="turnstileToken = ''"
+            />
+          </div>
+          <Button type="submit" label="Send New Link" class="auth-primary" :loading="resendLoading" :disabled="resendLoading" />
+          <div class="auth-center">
+            <router-link to="/login" class="auth-link"><i class="pi pi-arrow-left mr-1"></i>Back to Sign In</router-link>
+          </div>
+        </form>
+      </template>
     </template>
 
     <template v-else-if="success">

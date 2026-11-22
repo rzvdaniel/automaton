@@ -416,6 +416,11 @@ public class AppDeploymentTargetManagementServiceTests
         public List<CleanupAppDeploymentTargetRequest> Requests { get; } = [];
         public bool FailStorageCleanup { get; set; }
         public Func<Task>? BeforeSend { get; set; }
+        public bool RunnerStopsAnswering { get; set; }
+        public Task<T> SendBoundedAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
+            => RunnerStopsAnswering
+                ? throw new RunnerNotRespondingException("no answer")
+                : SendAsync<T>(runnerId, kind, payload, token);
         public async Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         {
             if (!successful) throw new InvalidOperationException("Runner cleanup failed.");

@@ -201,7 +201,7 @@ Do not use status color as permanent structural decoration.
 
 Avoid:
 
-- green left borders for normal/success cards
+- green anywhere (see "Status colours and history")
 - orange left borders for warning cards
 - red structural borders for error cards
 - tinted whole-card backgrounds unless an existing Studio pattern uses them intentionally
@@ -214,6 +214,28 @@ Status belongs in:
 - concise status text
 
 not in the basic structural frame of the card.
+
+---
+
+# Status colours and history (owner, 2026-11-21)
+
+The Studio Home language, for Studio and every own app:
+
+| State | Look |
+|---|---|
+| Normal (passed, ok, running fine) | quiet: ink or grey, a dark bar like Home's meters. **No green.** |
+| Needs attention (failed, needs you, waiting for approval) | the accent orange: orange pill with words, orange bar |
+| In progress | orange outline, not a fill |
+| No data yet | the light line colour |
+| Destructive (delete, data loss) | the only place for red |
+
+- Status is always a pill or bar **with words**, never colour alone.
+- **History belongs to its item.** Runs, checks or deployments of one plan, site or job sit under that item, newest
+  first (the last 10, then "Show older"). Never one list that mixes items. The last 10 also show as small bars in the
+  item's row; clicking a bar opens that run.
+- Details open in place (expandable rows), not in a side panel, so several can be open at once.
+- References: the Studio Home mosaic (`https://claude.ai/artifact/K7rrcK35wWQoimNfPazJvH`) and the Gauntlet page
+  (`https://claude.ai/artifact/6CNziUipLBEQVRWSxuMWBx`), both private; their rules are the ones above.
 
 ---
 
@@ -717,6 +739,17 @@ When uncertain:
 # Browser check before a Studio PR is ready
 
 Look at every page the change touches in a real browser before asking for review: light and dark themes and phone
-width (390 px, no horizontal scroll). Use `agent-browser` on the test server (`AGENTS.md`), or build this branch
+width (390 px, no horizontal scroll). Use `agent-browser` on the test server (see "Browser automation" below), or build this branch
 against the test API when the change is not deployed yet. Attach the screenshots to the PR. After the release, the
 Studio smoke checks (`src/automaton-studio-vue/smoke/README.md`) cover the main pages.
+
+## Browser automation
+
+Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
+
+Core workflow:
+
+1. `agent-browser open <url>` - Navigate to page
+2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
+3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
+4. Re-snapshot after page changes

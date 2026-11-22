@@ -317,13 +317,25 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh restore.sh update-from-request.sh configure.py explain_certificate_failure.py acme_responder.py check_dns.py; do
+for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh os-update-from-request.sh fail2ban.sh watchdog.py configure.py explain_certificate_failure.py acme_responder.py check_dns.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
+if ! $configure_only && [[ -d "$bundle_dir/fail2ban" ]]; then
+    { rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle_dir/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"; } \
+        || echo 'Warning: the fail2ban files could not be copied.' >&2
+fi
 # Updates requested from Studio and the CLI: root-only directories and a systemd path unit. The API container mounts them.
 if [[ -f "$install_dir/update-from-request.sh" ]] && ! $configure_only; then
     bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
         || { echo "Updates from Studio could not be enabled; nothing was changed. Fix it, then rerun: sudo bash $install_dir/update-from-request.sh --install-units" >&2; exit 1; }
+fi
+if [[ -f "$install_dir/restart-from-request.sh" ]] && ! $configure_only; then
+    bash "$install_dir/restart-from-request.sh" --install-units --install-dir "$install_dir" \
+        || echo "Warning: restarting the server from Studio could not be enabled. Run: sudo bash $install_dir/restart-from-request.sh --install-units" >&2
+fi
+if [[ -f "$install_dir/os-update-from-request.sh" ]] && ! $configure_only; then
+    bash "$install_dir/os-update-from-request.sh" --install-units --install-dir "$install_dir" \
+        || echo "Warning: installing OS updates from Studio could not be enabled. Run: sudo bash $install_dir/os-update-from-request.sh --install-units" >&2
 fi
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.
@@ -340,20 +352,49 @@ if $configure_only; then
 fi
 "${compose[@]}" pull
 certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+traefik_before=$("${compose[@]}" ps -q traefik 2>/dev/null || true)
 "${compose[@]}" up -d --wait --wait-timeout 600
+# On a rerun Traefik keeps running and does not retry a refused certificate (for example after Let's Encrypt's limit lifted).
+# A Traefik that `up` just recreated retries by itself, so only restart one that kept running.
+if [[ -n "$traefik_before" && "$traefik_before" == "$("${compose[@]}" ps -q traefik 2>/dev/null)" ]] \
+    && ! { curl --silent --retry 2 --retry-delay 5 --retry-all-errors --max-time 15 --output /dev/null "https://api.$domain/health" \
+        && curl --silent --retry 2 --retry-delay 5 --retry-all-errors --max-time 15 --output /dev/null "https://studio.$domain/"; } 2>/dev/null; then
+    echo 'HTTPS is not answering yet; restarting Traefik so it requests the certificates again.'
+    "${compose[@]}" restart traefik
+    certificate_attempt_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+fi
 # Validate actual public HTTPS/API routing as well as container health.
 verify_https
-if $quiet; then
+# Once the first administrator exists the file holds a new value that only root should use: never print it.
+setup_complete=$(curl --silent --max-time 15 "https://api.$domain/api/install/status" 2>/dev/null \
+    | python3 -c 'import json,sys; print("yes" if json.load(sys.stdin).get("installationComplete") else "no")' 2>/dev/null || echo unknown)
+if [[ "$setup_complete" == yes ]]; then
+    printf '\nHTTPS certificates are ready. The first administrator already exists, so no setup link is printed. Create a one-time password link with: sudo automaton server password-link --email <admin email>\n'
+elif [[ "$setup_complete" == unknown ]] || $quiet; then
     printf '\nHTTPS certificates are ready. The setup link is not printed (--quiet). Open https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
 else
     setup_token=$(tr -d '\r\n' < "$config_dir/secrets/setup-token")
     printf '\nHTTPS certificates are ready. Open the first-administrator setup link:\nhttps://studio.%s/install#token=%s\n' "$domain" "$setup_token"
     printf 'For an older release that cannot open the link, visit https://studio.%s/install and read the token with sudo cat %s/secrets/setup-token.\n' "$domain" "$config_dir"
 fi
-printf 'After the first administrator and Runner connect, Server Console, Website Monitor and Heartbeat will appear in Apps from the official catalog. They remain unpublished and need separate permission approval. To opt out before connecting a Runner, set Catalog.InstallEssentialsOnFirstRunner to false in %s/appsettings.Production.json and restart the API. Remove an unwanted app from its Settings > Danger Zone.\n' "$config_dir"
+printf 'After the first administrator and Runner connect, Server Console (called Server Keeper in Studio) is installed from the official catalog and started, with its permissions approved; Home says so. Website Monitor, Heartbeat and the other apps are not installed; install them from the catalog when you need them. To opt out before connecting a Runner, set Catalog.InstallEssentialsOnFirstRunner to false in %s/appsettings.Production.json and restart the API. Remove an unwanted app from its Settings > Danger Zone.\n' "$config_dir"
 # Nightly database and key backups are on by default; take the first one now.
 if [[ -f "$install_dir/backup.sh" ]]; then
-    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && bash "$install_dir/backup.sh" --install-dir "$install_dir" \
+    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && AUTOMATON_SHOW_BACKUP_KEY=1 bash "$install_dir/backup.sh" --install-dir "$install_dir" \
         || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
+fi
+if [[ -f "$install_dir/cleanup.sh" ]]; then
+    bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --remove-timer \
+        || echo "Warning: the old host cleanup timer could not be removed. Run: sudo bash $install_dir/cleanup.sh --remove-timer" >&2
+fi
+# Scanners and password guessers are banned at the firewall by default (best effort: the install is complete without it).
+if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
+    bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \
+        || echo "Warning: fail2ban could not be set up. Run: sudo bash $install_dir/fail2ban.sh" >&2
+fi
+# Alerts when the containers, the data or the backup are missing (best effort: the install is complete without it).
+if [[ -f "$install_dir/watchdog.py" ]]; then
+    python3 "$install_dir/watchdog.py" --install-units --install-dir "$install_dir" \
+        || echo "Warning: the watchdog could not be enabled. Run: sudo python3 $install_dir/watchdog.py --install-units" >&2
 fi
 printf 'Backups: nightly database and key backups are kept in %s/backups/nightly. Also enable your provider'"'"'s server backups (snapshots) and copy %s off-host.\n' "$install_dir" "$config_dir"

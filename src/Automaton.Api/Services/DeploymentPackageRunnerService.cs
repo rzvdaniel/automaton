@@ -32,6 +32,8 @@ public sealed class DeploymentPackageRunnerService(
         if (packageApplication.Runtime.Command is not null || packageApplication.Build.Command is not null)
             RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(runner);
 
+        RunnerProtocolCompatibilityPolicy.EnsureSupportsPermissions(runner, packageApplication.Permissions);
+
         var operationId = CreateOperationId(deploymentOperationId, executionAttemptId, runner.Id);
         var isMachineManagement = RunnerApplicationProfiles.Normalize(runner.ApplicationProfile)
             == RunnerApplicationProfiles.MachineManagement;

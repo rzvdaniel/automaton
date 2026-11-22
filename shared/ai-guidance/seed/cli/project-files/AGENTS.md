@@ -19,8 +19,9 @@ output. Follow the image-selection guidance in the generated skill; preserve the
 user's chosen technology and verify dependencies before choosing a minimal image.
 
 Keep the contract accurate when build, runtime, health, storage, or execution
-behavior changes. Keep durable data in the configured data directory and keep
-secrets out of source-controlled files.
+behavior changes. Keep durable data under `AUTOMATON_APP_DATA_DIR`, the data
+directory Automaton supplies to every runtime; build output and other paths are
+replaced on every deploy. Keep secrets out of source-controlled files.
 
 If `automaton.json` is missing and the user wants a new remote app, run
 `automaton new "<name>"`. If the user has an existing remote app, run
@@ -31,6 +32,10 @@ After implementing the app, run `automaton validate` and fix every error. Run
 `Succeeded` before claiming completion. Verify the app's main behavior through
 its real entry point, then report the observed result as proof. A successful
 deployment status or reachable URL alone is not proof that the app works.
+
+Ask the user for what only they know (app name, whether to publish, which
+Runner when there are several). Never ask for or paste passwords, tokens or API
+keys.
 
 If deployment fails, inspect the reported operation and correct the source or
 contract before retrying. Do not claim a successful deploy from a local build.

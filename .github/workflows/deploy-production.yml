@@ -1,0 +1,166 @@
+name: Deploy production
+
+# Manual only. The `production` environment needs the owner's approval, only accepts runs from main, and holds the
+# SSH settings as environment secrets. Setup: docs/maintainers/deploy-from-github.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release to deploy, for example 0.2.103
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # Runs before the environment approval, so the run page shows the AI verdict and the report to read first.
+  # Red is a warning only; it never blocks the deploy.
+  report:
+    name: Release report ${{ inputs.version }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Show the verdict
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 1; }
+          url="https://github.com/$GITHUB_REPOSITORY/releases/tag/server-v$VERSION"
+          body=$(gh release view "server-v$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null || true)
+          section=$(printf '%s\n' "$body" | sed -n '/^## AI check/,/^## Automaton Server/p' | sed '$d')
+          verdict=$(printf '%s\n' "$section" | grep -m1 -E '^Verdict: (Green|Yellow|Red)$' | sed 's/^Verdict: //' || true)
+          {
+            echo "### Release $VERSION: AI check ${verdict:-unavailable}"
+            echo
+            if [[ "$verdict" == Red ]]; then echo "**Red: read the report before approving.** This is a warning; it does not block the deploy."; echo; fi
+            printf '%s\n' "$section"
+            echo "[Full release report]($url)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy ${{ inputs.version }}
+    needs: report
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Check the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 1; }
+          echo "Deploying $VERSION, approved by the environment reviewer, started by $GITHUB_ACTOR."
+
+      - name: Update production
+        env:
+          VERSION: ${{ inputs.version }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$(mktemp -d)"
+          trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$PROD_SSH_KEY" > "$dir/key"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          # update.sh takes the release tag as --version server-vX.Y.Z.
+          ssh -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v$VERSION"
+
+      # The website is not part of the server bundle. The root-owned host script resolves the tag to a commit, checks
+      # that it is on main and builds the website from that exact commit with its own compose file. Nothing from the
+      # tag is executed, and /opt/automaton is never touched.
+      - name: Update the website
+        env:
+          VERSION: ${{ inputs.version }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$(mktemp -d)"
+          trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$PROD_SSH_KEY" > "$dir/key"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+          # The host downloads the tag's source from GitHub itself; nothing from this runner is executed there.
+          ssh -n -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "sudo /usr/local/bin/automaton-deploy-website $VERSION"
+
+      - name: Check the public routes
+        run: |
+          set -euo pipefail
+          for url in https://api.automaton.monster/health https://studio.automaton.monster https://store.automaton.monster https://automaton.monster; do
+            ok=false
+            for attempt in 1 2 3 4 5 6; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || true)"
+              if [[ "$code" == 200 ]]; then ok=true; break; fi
+              sleep 10
+            done
+            echo "$url -> $code"
+            [[ "$ok" == true ]] || exit 1
+          done
+
+      # Starts Gauntlet's Smoke run against the new deploy. Never fails the deploy; the nightly schedule stays.
+      - name: Start the Smoke run
+        env:
+          VERSION: ${{ inputs.version }}
+          HOOK_URL: ${{ secrets.GAUNTLET_SMOKE_URL }}
+          HOOK_SECRET: ${{ secrets.GAUNTLET_SMOKE_SECRET }}
+        run: |
+          # The secret goes to curl on standard input, never in its arguments, and is masked in logs. Only the status is printed.
+          # A missing secret or a refused call never fails this workflow: Gauntlet's own schedules stay as the safety net.
+          if [[ -z "$HOOK_URL" || -z "$HOOK_SECRET" ]]; then echo "No Smoke webhook configured; skipping."; exit 0; fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 0; }
+          code=$(printf 'header = "Authorization: Bearer %s"\n' "$HOOK_SECRET" | curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            --config - -X POST -H 'Content-Type: application/json' --data "{\"version\":\"$VERSION\"}" "$HOOK_URL" || true)
+          echo "Smoke webhook answered ${code:-no answer} (202 = run started)."
+
+  # Always runs, even when the deploy failed or was never approved. Opens an issue assigned to the repository owner,
+  # so GitHub sends the owner an email or push notification (no extra service or secret). A failure here never
+  # changes the deploy result.
+  notice:
+    name: Notify the owner
+    needs: [report, deploy]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Open the deploy notice
+        env:
+          VERSION: ${{ inputs.version }}
+          REPORT_RESULT: ${{ needs.report.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "server-v$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq .body > release-notes.md 2>/dev/null || : > release-notes.md
+          python3 .agents/tools/deploy-notice.py "$VERSION" release-notes.md --deploy "$DEPLOY_RESULT" --report "$REPORT_RESULT" --run-url "$RUN_URL" > notice.md
+          title="$(head -n1 notice.md)"
+          tail -n +3 notice.md > notice-body.md
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file notice-body.md --assignee "$OWNER"
+          cat notice.md >> "$GITHUB_STEP_SUMMARY"

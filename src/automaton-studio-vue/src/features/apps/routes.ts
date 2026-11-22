@@ -25,6 +25,8 @@ export const appsRoutes: RouteRecordRaw[] = [
   },
   // The Catalog tab used to be called Install apps.
   { path: '/apps/install', redirect: { name: 'apps-catalog' } },
+  // So does the menu name typed or bookmarked on its own.
+  { path: '/catalog', redirect: { name: 'apps-catalog' } },
   {
     path: '/apps/install-source',
     name: 'app-install-source',

@@ -196,6 +196,7 @@ public class DeploymentTargetServiceTests
             DeploymentTargetService.SelectOnlyAvailableRunnerId(runners));
 
         Assert.That(exception!.Message, Does.Contain("no online Machine Management Runner"));
+        Assert.That(exception.Message, Does.Contain("project runners add"));
     }
 
     private static JsonElement Runners(params object[] runners)

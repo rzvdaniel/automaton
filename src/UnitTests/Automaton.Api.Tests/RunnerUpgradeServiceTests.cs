@@ -48,6 +48,14 @@ public sealed class RunnerUpgradeServiceTests
     }
 
     [Test]
+    public async Task ATrustedCallerIsNotCheckedAgainstTheSignedInUser()
+    {
+        var (service, fake, runner, _) = SetUp(owner: false);
+        Assert.That((await service.StartAsync(runner, default, trusted: true)).State, Is.EqualTo(RunnerUpgradeStates.InProgress));
+        Assert.That(fake.Kind, Is.EqualTo("upgrade-runner"));
+    }
+
+    [Test]
     public async Task AStrangerCannotStartOrReadAnUpgrade()
     {
         var (service, fake, runner, _) = SetUp(owner: false);

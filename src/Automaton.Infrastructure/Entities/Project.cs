@@ -60,9 +60,7 @@ public class Project
     // Navigation properties
     public virtual ICollection<ProjectMember> Members { get; set; } = new List<ProjectMember>();
     public virtual ICollection<ProjectApp> ProjectApps { get; set; } = new List<ProjectApp>();
-    public virtual ICollection<ProjectFlow> ProjectFlows { get; set; } = new List<ProjectFlow>();
     public virtual ICollection<ProjectRunner> ProjectRunners { get; set; } = new List<ProjectRunner>();
-    public virtual ICollection<ProjectCustomStep> ProjectCustomSteps { get; set; } = new List<ProjectCustomStep>();
     public virtual ICollection<ProjectApiKey> ProjectApiKeys { get; set; } = new List<ProjectApiKey>();
     public virtual ICollection<ProjectAiApiKey> ProjectAiApiKeys { get; set; } = new List<ProjectAiApiKey>();
 }

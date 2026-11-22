@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHead from '@/shared/components/PageHead.vue'
 import { ref, onMounted, watch, computed } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
@@ -18,6 +19,7 @@ import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
 import CliSteps from '../components/CliSteps.vue'
 import SetupChecks from '@/features/install/components/SetupChecks.vue'
+import EmailNotConfiguredNotice from '@/features/install/components/EmailNotConfiguredNotice.vue'
 import SmtpSettingsForm from '@/features/install/components/SmtpSettingsForm.vue'
 const {
   theme: themePreference,
@@ -102,7 +104,7 @@ async function saveAccountSettings() {
         return
       }
 
-      if (!/^[a-zA-Z0-9_\-]+$/.test(publicUsername.value)) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(publicUsername.value)) {
         accountError.value = 'Public username can only contain letters, numbers, hyphens, and underscores'
         return
       }
@@ -288,16 +290,13 @@ const passwordLoading = computed(() => passwordSaving.value)
 </script>
 
 <template>
-  <div class="settings-view">
-    <div class="mb-4">
-      <h1 class="text-3xl font-bold m-0">Settings</h1>
-      <p class="text-color-secondary mt-1 mb-0">Your account, your agents and keys<template v-if="isSysAdmin">, and this server</template></p>
-    </div>
+  <div class="settings-view studio-page">
+    <PageHead title="Settings" :line="isSysAdmin ? 'Your account, your agents and keys, and this server.' : 'Your account, your agents and keys.'" />
 
-    <nav class="section-links text-sm mb-4" aria-label="Sections">
-      <a href="#account">Account</a>
-      <a href="#agents">Agents and keys</a>
-      <a v-if="isSysAdmin" href="#server">Server settings</a>
+    <nav class="section-links mb-4" aria-label="Sections">
+      <a href="#account" class="chip">Account</a>
+      <a href="#agents" class="chip">Agents and keys</a>
+      <a v-if="isSysAdmin" href="#server" class="chip">Server settings</a>
     </nav>
 
     <div class="flex flex-column gap-4">
@@ -490,6 +489,7 @@ const passwordLoading = computed(() => passwordSaving.value)
               <RouterLink to="/server">Server</RouterLink>.
             </p>
           </div>
+          <EmailNotConfiguredNotice />
           <Card><template #title>Configuration status</template><template #content><SetupChecks /></template></Card>
           <Card><template #title>Outgoing email</template><template #content><SmtpSettingsForm /></template></Card>
         </section>
@@ -501,7 +501,7 @@ const passwordLoading = computed(() => passwordSaving.value)
       header="Change Password"
       :modal="true"
       :closable="!passwordLoading"
-      :style="{ width: '400px' }"
+      :style="{ width: '400px', maxWidth: '95vw' }"
     >
       <template v-if="passwordSuccess">
         <Message severity="success" :closable="false">
@@ -603,8 +603,4 @@ const passwordLoading = computed(() => passwordSaving.value)
   margin: 0 auto;
 }
 
-.section-links {
-  display: flex;
-  gap: 1rem;
-}
 </style>

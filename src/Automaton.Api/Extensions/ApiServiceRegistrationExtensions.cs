@@ -1,4 +1,4 @@
-using Automaton.Core.Scripting;
+using Automaton.Core.Logs;
 using Automaton.Ai.Extensions;
 using Automaton.AiGuidance;
 using Automaton.Mcp.Client.Extensions;
@@ -58,6 +58,7 @@ internal static class AutomatonApiServiceRegistration
     {
         var configurationService = new ConfigurationService(applicationBuilder.Configuration);
         services.AddAutomatonInfrastructure(applicationBuilder.Configuration);
+        services.AddAutomatonLogForwarding();
         services.AddApiHostingServices(applicationBuilder, configurationService);
         services.AddApiFeatureServices(applicationBuilder, configurationService, corsOrigins);
         return services;
@@ -258,6 +259,14 @@ internal static class ApiAuthorizationRegistration
                 .RequireAssertion(context => context.User.FindFirst("api_key_scope")?.Value
                     is null or nameof(Automaton.Core.Enums.ApiKeyScope.Developer)));
 
+            // The admin-scoped CLI key: a system administrator's login, or a PermissionsAdmin key of one. A key of any
+            // other scope carries the admin role too, so the scope is checked here.
+            options.AddPolicy(PermissionsAdminKey.PolicyName, policy => policy
+                .AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+                .RequireAuthenticatedUser()
+                .RequireRole(UserRole.SystemAdministrator)
+                .RequireAssertion(context => PermissionsAdminKey.IsAllowed(context.User)));
+
             options.AddPolicy(CatalogSourcesAccess.PolicyName, policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
                     .RequireAuthenticatedUser()
@@ -278,8 +287,26 @@ internal static class ApiAuthorizationRegistration
 
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.BackupsReadPolicy, AppPermissionApproval.BackupsRead);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.BackupsRunPolicy, AppPermissionApproval.BackupsRun);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.ServerRestartPolicy, AppPermissionApproval.ServerRestart);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.ServerUpdateOsPolicy, AppPermissionApproval.ServerUpdateOs);
             AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.ServerReadPolicy, AppPermissionApproval.ServerRead);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.SecurityReadPolicy, AppPermissionApproval.SecurityRead);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.SecurityManagePolicy, AppPermissionApproval.SecurityManage);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.AppsReadStatusPolicy, AppPermissionApproval.AppsReadStatus);
+            AppPermissionAuthenticationOptions.AddPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.ServerCleanupPolicy, AppPermissionApproval.ServerCleanup);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.RunnerMaintainPolicy, AppPermissionApproval.RunnerMaintain);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.NotifyEmailPolicy, AppPermissionApproval.NotifyEmail);
 
             // Project-based authorization policies
             options.AddPolicy("ProjectAdmin", policy =>
@@ -318,12 +345,21 @@ internal static class ApiMessagingRegistration
         services.AddScoped<ISecretStore, SecretStore>();
         services.AddScoped<SecretAuditLog>();
         services.AddScoped<AppSecretService>();
+        services.AddScoped<AppSettingValueService>();
         services.AddScoped<IAppRuntimeRestarter, AppRuntimeRestarter>();
         services.AddScoped<AppPermissionService>();
+        services.AddScoped<ServerConsoleProvisioningService>();
+        services.AddScoped<NotifyEmailService>();
         services.AddScoped<AdminAppDirectoryService>();
         services.AddScoped<AdminUserProvisioningService>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
-        services.AddHostedService<SecretGrantCleanupService>();
+        services.AddSupervisedHostedService<SecretGrantCleanupService>();
+        services.AddScoped<ServerMaintenanceHistory>();
+        services.AddSupervisedHostedService<ServerMaintenanceHistoryRecorder>();
+        services.AddScoped<Automaton.Api.ServerCleanup.ServerCleanupService>();
+        services.AddScoped<Automaton.Api.ServerCleanup.RunnerMaintenanceService>();
+        services.AddScoped<Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands, Automaton.Api.ServerCleanup.RunnerMaintenanceCommands>();
+        services.AddSupervisedHostedService<Automaton.Api.ServerCleanup.ServerCleanupScheduler>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
         services.AddCap(options =>
         {
@@ -431,6 +467,7 @@ internal static class ApiLoggingRegistration
                 context.Configuration["Logging:File:Path"] ?? "/app/logs",
                 context.Configuration.GetValue<int?>("Logging:File:RetainedFileCountLimit") ?? 14,
                 context.Configuration.GetValue<long?>("Logging:File:FileSizeLimitBytes") ?? 10 * 1024 * 1024);
+            logConfig.AddOtlpIfConfigured(context.Configuration, "automaton-api");
         });
         return services;
     }
@@ -506,13 +543,14 @@ internal static class ApiAppCatalogRegistration
 {
     internal static IServiceCollection AddApiAppCatalogServices(this IServiceCollection services)
     {
-        services.AddScoped<CustomStepsService>();
-        services.AddScoped<CustomStepRunnerExecutionService>();
         services.AddScoped<AppForkingService>();
         services.AddScoped<CatalogSourceStore>();
         services.AddScoped<AppCatalogService>();
         services.AddScoped<AppCatalogInstallService>();
-        services.AddHostedService<EssentialCatalogBootstrapService>();
+        services.AddScoped<AppCatalogBackfillService>();
+        services.AddScoped<AppCatalogUpdateService>();
+        services.AddSupervisedHostedService<EssentialCatalogBootstrapService>();
+        services.AddSupervisedHostedService<SetupTokenRotationService>();
         services.AddScoped<AppMutationService>();
         services.AddScoped<AppMutationAuditService>();
         services.AddScoped<AppDeletionService>();
@@ -520,6 +558,13 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppQueryService>();
         services.AddScoped<AppPublicationService>();
         services.AddScoped<AppSharingService>();
+        services.AddSingleton<ICustomDomainResolver, DnsCustomDomainResolver>();
+        services.AddSingleton<ICustomDomainLiveProbe, HttpsCustomDomainLiveProbe>();
+        services.AddScoped<CustomDomainService>();
+        services.AddScoped<IAppRuntimeCommandQueue, RunnerExecutionAppCommandQueue>();
+        services.AddScoped<AppPauseService>();
+        services.AddScoped<Home.HomeCardScheduleService>();
+        services.AddScoped<AppRestartService>();
         services.AddScoped<MachineStaticAppPublicationService>();
         services.AddScoped<RunnerRemovalService>();
         services.AddScoped<RunnerUpgradeService>();
@@ -542,9 +587,12 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<PublicMarketplaceCreatorAppsQuery>();
         services.AddScoped<PublicMarketplaceCatalogQuery>();
         services.AddScoped<WebAppStarService>();
-        services.AddScoped<AppStepsService>();
-        services.AddScoped<AppsStepExecutionService>();
-        services.AddSingleton<TunnelRequestRegistry>();
+        services.AddScoped<Automaton.Api.Home.HomeService>();
+        services.AddScoped<Automaton.Api.Home.HomeNeedsYouService>();
+        services.AddScoped<Automaton.Api.Notifications.NotificationService>();
+        services.AddSingleton<RunnerTunnelRegistry>();
+        services.AddHttpForwarder();
+        services.AddSingleton<RunnerGatewayRegistry>();
         services.AddSingleton<TunnelLongLivedLimiter>();
         return services;
     }
@@ -564,9 +612,11 @@ internal static class ApiAppExecutionRegistration
             .Validate(options => options.MaximumConcurrentOperations > 0, "Deployment dispatch concurrency must be positive.")
             .ValidateOnStart();
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
+        services.AddSingleton<RuntimeTunnelTargetCache>();
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
-        services.AddScoped<RuntimeTunnelWebSocketService>();
+        services.AddScoped<ITunnelProber>(provider => provider.GetRequiredService<RuntimeTunnelService>());
+        services.AddScoped<AppFramingProbe>();
         services.AddScoped<RuntimeFileProxyService>();
         services.AddScoped<ApplicationDeploymentService>();
         services.AddScoped<DeploymentPackageFinalizationService>();
@@ -575,24 +625,25 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<HostContainerExecutionOperationService>();
         services.AddScoped<HostContainerRelayService>();
         services.AddScoped<HostContainerRelayStateResolver>();
-        services.AddScoped<ConnectedFlowArtifactService>();
-        services.AddScoped<IManagedApplicationArtifactCommands, ManagedApplicationArtifactGateway>();
         services.AddScoped<DeploymentOperationService>();
         services.AddScoped<StoredSourceDeploymentService>();
         services.AddSingleton<DeploymentOperationDispatcher>();
+        // Safety net: a faulted background service is logged by the host and never stops the API.
+        services.Configure<HostOptions>(o => o.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
         services.AddHostedService(sp => sp.GetRequiredService<DeploymentOperationDispatcher>());
         services.AddScoped<AppActionExecutionService>();
         services.AddScoped<AppActionRunnerGateway>();
         services.AddScoped<IAppActionExecutionGateway>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<IRunnerActionCommands>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<ActionScheduleService>();
+        services.AddScoped<ActionWebhookService>();
         services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
         services.AddScoped<ScheduledActionExecutionHandler>();
-        services.AddHostedService<AppModuleExecutionReconciliationService>();
-        services.AddHostedService<ManagedRuntimeRouteReconciliationService>();
+        services.AddSupervisedHostedService<AppModuleExecutionReconciliationService>();
+        services.AddSupervisedHostedService<ManagedRuntimeRouteReconciliationService>();
+        services.AddSupervisedHostedService<CustomDomainLiveCheckService>();
         services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
         services.AddScoped(typeof(UserImpersonationServiceFactory<>));
-        services.AddScoped<FlowsService>();
         return services;
     }
 }
@@ -610,19 +661,20 @@ internal static class ApiRunnerRegistration
         services.AddMemoryCache();
         services.AddScoped<Automaton.Api.ServerHealth.HostHealthReportService>();
         services.AddScoped<Automaton.Api.ServerHealth.ServerHealthService>();
+        services.AddScoped<Automaton.Api.ServerHealth.Fail2BanReadService>();
+        services.AddScoped<Automaton.Api.ServerHealth.Fail2BanManageService>();
+        services.AddScoped<Automaton.Api.Services.AppStatusReadService>();
+        services.AddScoped<Automaton.Api.ServerHealth.AppDiskUsageService>();
         services.AddSingleton<Automaton.Api.ServerHealth.LatestReleaseClient>();
         services.AddSingleton<Automaton.Api.ServerHealth.CertificateExpiryProbe>();
         services.Configure<MachineContainerResourceOptions>(applicationBuilder.Configuration.GetSection(MachineContainerResourceOptions.SectionName));
         services.AddScoped<SelfHostedRunnerInstallationService>();
         services.AddScoped<SelfHostedRunnerEnrollmentExchangeService>();
         services.AddScoped<HostedRunnerBrokerProvisioner>();
-        services.AddScoped<FlowExecutionHistoryService>();
-        services.AddScoped<FlowExecutionLogService>();
         services.AddScoped<RecentActivityService>();
         services.AddScoped<AccountRegistrationService>();
         services.AddScoped<IAuditEventService, AuditEventService>();
         services.AddScoped<AuditEventService>();
-        services.AddScoped<DashboardStatsService>();
         services.AddScoped<UserContextService>();
         services.AddScoped<AdminAuthorizationService>();
         services.AddScoped<AppFileStorageService>();
@@ -633,6 +685,7 @@ internal static class ApiRunnerRegistration
         services.AddScoped<AppVersionService>();
         services.AddSingleton<PrivateAppLaunchService>();
         services.AddSingleton<RuntimeCookieService>();
+        services.AddSingleton<ViewerTokenService>();
         services.AddScoped<BackendRouteConfigService>();
         services.AddScoped<ManagedRunnerBootstrapService>();
         return services;
@@ -670,7 +723,6 @@ internal static class ApiAccountRegistration
         services.AddScoped<ConfirmedEmailGuardService>();
         services.AddScoped<AuthTokenService>();
         services.AddTransient<RoleManagerService>();
-        services.AddTransient<ScheduleService>();
         return services;
     }
 }
@@ -681,31 +733,28 @@ internal static class ApiOperationsRegistration
     {
         services.AddScoped<ApiKeyService>();
         services.AddScoped<AiApiKeyService>();
-        services.AddScoped<AdminAiProviderCreationService>();
         services.AddScoped<AiProviderMetadataService>();
         services.AddScoped<AiConversationProviderResolver>();
         services.AddScoped<AiConversationHistoryPersistenceService>();
-        services.AddScoped<IAiGuidanceRuntimeService, AiGuidanceRuntimeService>();
-        services.AddScoped<IAutomatonGuidanceRuntimeProvider, AiGuidanceRuntimeService>();
-        services.AddScoped<AdminAiGuidanceService>();
-        services.AddScoped<AdminDocumentationService>();
+        services.AddSingleton<AiGuidanceRuntimeService>();
+        services.AddSingleton<IAiGuidanceRuntimeService>(sp => sp.GetRequiredService<AiGuidanceRuntimeService>());
+        services.AddSingleton<IAutomatonGuidanceRuntimeProvider>(sp => sp.GetRequiredService<AiGuidanceRuntimeService>());
         services.AddScoped<RunnerAuditService>();
         services.AddScoped<RunnerRegistrationService>();
         services.AddScoped<RunnerDeletionService>();
+        services.AddScoped<OfflineRunnerDeletionService>();
         services.AddScoped<RunnerDeletionPolicy>();
         services.AddScoped<RunnerConnectionSessionService>();
         services.AddScoped<RunnerQueryService>();
-        services.AddScoped<RunnerFlowExecutionService>();
-        services.AddScoped<RunnerExecutionAdmissionService>();
         services.AddScoped<RunnerExecutionIdentityService>();
         services.AddScoped<RunnerExecutionRevocationService>();
         services.AddScoped<RunnerExecutionOperationService>();
         services.AddScoped<RunnerExecutionArtifactService>();
         services.AddScoped<RunnerFileTransferGateway>();
         services.AddScoped<IRunnerFileTransferGateway>(provider => provider.GetRequiredService<RunnerFileTransferGateway>());
-        services.AddScoped<RunnerExecutionDispatchService>();
         services.AddScoped<RunnerExecutionCommandPublisher>();
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
+        services.AddTransient<RunnerExecutionResultReadyCapSubscriber>();
         services.AddScoped<RunnerConnectionLifecycleService>();
         services.AddScoped<AdminSubscriptionPlanOperationsService>();
         return services;
@@ -734,8 +783,6 @@ internal static class ApiMcpToolRegistration
 {
     internal static IServiceCollection AddApiMcpToolServices(this IServiceCollection services)
     {
-        // MCP Tool Provider for step AI conversations
-        services.AddScoped<StepMcpToolProvider>();
         services.AddSingleton<Automaton.Mcp.Tools.IUiAutomationActionAckService,
                              Automaton.Mcp.Tools.UiAutomationActionAckService>();
         // File IO tool group — wired to app-scoped file system
@@ -796,7 +843,6 @@ internal static class ApiProjectRegistration
         services.AddScoped<ProjectCredentialResourceService>();
         services.AddScoped<InvitationTokenService>();
         services.AddScoped<ResourceAuthorizationService>();
-        services.AddScoped<SensitiveVariableService>();
         services.AddScoped<UserSettingsService>();
         services.AddScoped<IOrganizationService, OrganizationService>();
         services.AddScoped<OrganizationAiPolicySettingsService>();
@@ -831,9 +877,6 @@ internal static class ApiFoundationRegistration
         services.AddFluentValidationAutoValidation();
         services.AddValidatorsFromAssemblyContaining<Program>();
 
-        services.AddScripting();
-        services.AddAutomatonSteps();
-        services.AddAutomatonCore();
         return services;
     }
 }

@@ -83,8 +83,20 @@ public sealed partial class AppCatalogInstallService(
             Repo = source.Repo,
             Folder = source.Folder,
             Commit = source.Commit,
-            Application = manifest.Application
+            Application = manifest.Application,
+            Readme = await ReadReadmeAsync(package, source, cancellationToken)
         };
+    }
+
+    private const int MaxReadmeBytes = 256 * 1024;
+
+    /// <summary>docs/README.md from the app's folder; null when missing or larger than 256 KB.</summary>
+    internal static async Task<string?> ReadReadmeAsync(ZipArchive package, GitAppSource source, CancellationToken cancellationToken)
+    {
+        var file = AppFiles(package, source).FirstOrDefault(item => item.Path == "docs/README.md");
+        if (file.Entry is null || file.Entry.Length > MaxReadmeBytes) return null;
+        using var reader = new StreamReader(file.Entry.Open());
+        return await reader.ReadToEndAsync(cancellationToken);
     }
 
     public async Task<AppModel> InstallAsync(CatalogInstallRequest request, CancellationToken cancellationToken)
@@ -95,14 +107,15 @@ public sealed partial class AppCatalogInstallService(
         var name = string.IsNullOrWhiteSpace(request.Name) ? manifest.Name : request.Name.Trim();
         if (name.Length > 200) name = name[..200];
 
+        var category = (await catalog.PinnedAsync(source.Repo, source.Folder, cancellationToken))?.Category;
         var id = Guid.NewGuid();
         var now = DateTime.UtcNow;
         var entity = new WebApp
         {
             Id = id,
             Name = name,
-            Summary = manifest.Summary,
-            Description = manifest.Description,
+            Summary = manifest.Summary ?? string.Empty,
+            Description = manifest.Description ?? string.Empty,
             Definition = "{}",
             ApplicationContractJson = ApplicationContractSerialization.Serialize(manifest.Application),
             Version = 1,
@@ -111,16 +124,17 @@ public sealed partial class AppCatalogInstallService(
             InstalledFromRepo = source.Repo,
             InstalledFromFolder = source.Folder,
             InstalledFromCommit = source.Commit,
+            Category = string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
             Created = now,
             Updated = now
         };
         dbContext.WebApps.Add(entity);
         dbContext.WebAppUsers.Add(new WebAppUser { WebAppId = id, UserId = UserId });
-        if (request.RunnerId.HasValue)
-        {
-            try { await runnerAssignmentPolicy.AssignAsync(entity, request.RunnerId.Value, UserId); }
-            catch (InvalidOperationException exception) { throw new ArgumentException(exception.Message, nameof(request), exception); }
-        }
+        // No Runner named: use the default one, as Studio does, and refuse rather than leave an app that cannot run.
+        var runnerId = request.RunnerId ?? await runnerAssignmentPolicy.FindDefaultRunnerIdAsync(UserId, cancellationToken)
+            ?? throw new ArgumentException("No online Runner is available to run this app. Connect a Runner first, or name one with a Runner id. Nothing was installed.", nameof(request));
+        try { await runnerAssignmentPolicy.AssignAsync(entity, runnerId, UserId); }
+        catch (InvalidOperationException exception) { throw new ArgumentException(exception.Message, nameof(request), exception); }
         await dbContext.SaveChangesAsync(cancellationToken);
 
         try
@@ -171,7 +185,7 @@ public sealed partial class AppCatalogInstallService(
 
     public static GitAppSource Validate(string repo, string? folder, string commit) => Validated(repo, folder, commit);
 
-    private async Task<ZipArchive> DownloadAsync(GitAppSource source, CancellationToken cancellationToken)
+    internal async Task<ZipArchive> DownloadAsync(GitAppSource source, CancellationToken cancellationToken)
     {
         using var client = Client();
         // A private source's token is used only for an app its own catalog lists at exactly this folder and commit.
@@ -207,7 +221,7 @@ public sealed partial class AppCatalogInstallService(
     }
 
     /// <summary>The files of the app, with the archive's top-level folder and the app folder removed.</summary>
-    private static IEnumerable<(ZipArchiveEntry Entry, string Path)> AppFiles(ZipArchive package, GitAppSource source)
+    internal static IEnumerable<(ZipArchiveEntry Entry, string Path)> AppFiles(ZipArchive package, GitAppSource source)
     {
         var prefix = source.Folder.Length == 0 ? "" : source.Folder + "/";
         foreach (var entry in package.Entries)
@@ -223,7 +237,7 @@ public sealed partial class AppCatalogInstallService(
         }
     }
 
-    private static Manifest ReadManifest(ZipArchive package, GitAppSource source)
+    internal static Manifest ReadManifest(ZipArchive package, GitAppSource source)
     {
         var file = AppFiles(package, source).FirstOrDefault(item => item.Path == "automaton.json");
         if (file.Entry is null)
@@ -257,7 +271,13 @@ public sealed partial class AppCatalogInstallService(
             metadata.RuntimeSource = AppRuntimeSources.Studio;
         });
 
-        var root = Path.GetFullPath(fileStorageService.GetAppSourceDirectoryPath(UserId, appId));
+        await ExtractAsync(package, source, fileStorageService.GetAppSourceDirectoryPath(UserId, appId), cancellationToken);
+    }
+
+    /// <summary>Writes the app's files into the folder; files already there that the archive does not have are left alone.</summary>
+    internal static async Task ExtractAsync(ZipArchive package, GitAppSource source, string directory, CancellationToken cancellationToken)
+    {
+        var root = Path.GetFullPath(directory);
         foreach (var (entry, relative) in AppFiles(package, source))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -281,5 +301,5 @@ public sealed partial class AppCatalogInstallService(
 
     private string Base(string key, string fallback) => (configuration[key] is { Length: > 0 } value ? value : fallback).TrimEnd('/');
 
-    private sealed record Manifest(string Name, string? Summary, string? Description, ApplicationContract Application);
+    internal sealed record Manifest(string Name, string? Summary, string? Description, ApplicationContract Application);
 }

@@ -1,5 +1,5 @@
 const PAGE_TITLES: Record<string, string> = {
-  'app-editor': 'App Operations',
+  'app-editor': 'Apps',
   runners: 'Server',
   apikeys: 'Settings',
   settings: 'Settings',

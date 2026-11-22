@@ -113,4 +113,18 @@ public sealed class AppDeploymentController(
             appId, userContextService.GetUserId(), operationId, cancellationToken);
         return result is null ? NotFound() : Ok(result);
     }
+
+    [HttpPost("api/apps/{appId:guid}/deploy/cancel")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult> CancelDeployment(
+        Guid appId, [FromQuery] string? targetSlug, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var cancelled = await deploymentOperationService.CancelActiveAsync(
+                appId, userContextService.GetUserId(), targetSlug, cancellationToken);
+            return cancelled == 0 ? NotFound(new { error = "No active deployment to cancel." }) : Ok(new { cancelled });
+        }
+        catch (KeyNotFoundException) { return NotFound(); }
+    }
 }

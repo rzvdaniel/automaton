@@ -37,6 +37,29 @@ public sealed class PublicMarketplaceVisibilityTests
     }
 
     [Test]
+    public async Task GetAppDetails_HidesCatalogOriginWhenNoPublicCatalogListsTheApp()
+    {
+        await using var db = CreateDbContext();
+        var installed = CreatePrivateMediaPreview();
+        installed.InstalledFromRepo = "rzvdaniel/automaton-apps";
+        installed.InstalledFromFolder = "wallpapers/harbour";
+        installed.InstalledFromCommit = "abc123";
+        var deployed = CreatePrivateMediaPreview();
+        db.WebApps.AddRange(installed, deployed);
+        await db.SaveChangesAsync();
+        var controller = CreateController(db);
+
+        var a = (await controller.GetAppDetails(installed.Id)).Result as OkObjectResult;
+        var b = (await controller.GetAppDetails(deployed.Id)).Result as OkObjectResult;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That((a?.Value as MarketplaceAppDetailsDto)?.CatalogOrigin, Is.Null);
+            Assert.That((b?.Value as MarketplaceAppDetailsDto)?.CatalogOrigin, Is.Null);
+        });
+    }
+
+    [Test]
     public async Task TrackAppLaunch_PrivateMediaPreviewReturnsNotFound()
     {
         await using var db = CreateDbContext();

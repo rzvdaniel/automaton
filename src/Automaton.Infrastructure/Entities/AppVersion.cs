@@ -24,5 +24,4 @@ public class AppVersion
     [ForeignKey(nameof(CreatedBy))]
     public virtual ApplicationUser? CreatedByUser { get; set; }
     
-    public virtual ICollection<AppVersionStep> Steps { get; set; } = new List<AppVersionStep>();
 }

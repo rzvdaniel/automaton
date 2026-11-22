@@ -8,7 +8,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
     RunnerDeploymentService runtime,
     MachineStaticSitePublisher? staticSites = null,
     MachineApplicationStorageCleanup? storageCleanup = null,
-    RunnerSelfUpgradeService? selfUpgrade = null)
+    RunnerSelfUpgradeService? selfUpgrade = null,
+    HostCleanupService? hostCleanup = null)
 {
     public async Task<RunnerExecutionResult> ExecuteAsync(AppActionCommand command, CancellationToken token)
     {
@@ -25,15 +26,34 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "read-result" => execution.ReadResult(command.Read<ReadAppModuleExecutionArtifactRequest>()),
             "prepare-module" => await deployment.PrepareModuleAsync(command.Read<PrepareAppActionModuleRequest>(), token),
             "restart-runtime" => await RestartAsync(command.Read<RestartAppRuntimeRequest>(), token),
+            "pause-runtime" => await PauseAsync(command.Read<PauseAppRuntimeRequest>(), token),
+            "resume-runtime" => await ResumeAsync(command.Read<ResumeAppRuntimeRequest>(), token),
             "cleanup-target" or "cleanup-target-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = false }),
             "cleanup-app" or "cleanup-app-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = true }),
             "upgrade-runner" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable."))
                 .StartAsync(command.Read<UpgradeRunnerRequest>(), token),
             "upgrade-status" => await (selfUpgrade ?? throw new InvalidOperationException("Runner self-upgrade is unavailable.")).StatusAsync(token),
+            "host-cleanup" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
+                .RunAsync(command.Read<HostCleanupRequest>(), token),
+            "app-logs" => await ReadAppLogsAsync(command.Read<ReadAppLogsRequest>(), token),
+            "os-update" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable.")).OsUpdateAsync(token),
+            "reboot" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable.")).RebootAsync(token),
+            "fail2ban-unban" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable."))
+                .Fail2BanUnbanAsync(command.Read<Fail2BanAddressRequest>(), token),
+            "fail2ban-allowlist" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable."))
+                .Fail2BanAllowlistAsync(command.Read<Fail2BanAddressRequest>(), token),
+            "disk-report" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
+                .DiskReportAsync(token),
             _ => throw new InvalidDataException("Unknown App Action command.")
         };
         return new() { Outcome = "Succeeded", Started = started, Finished = DateTime.UtcNow,
             ActionResult = JsonSerializer.SerializeToElement(response) };
+    }
+    private async Task<ReadAppLogsResult> ReadAppLogsAsync(ReadAppLogsRequest request, CancellationToken token)
+    {
+        if (request.Lines is < 1 or > 200) throw new InvalidDataException("Lines must be from 1 to 200.");
+        var text = await runtime.ReadRuntimeLogsAsync(request.AppId, request.DeploymentTargetId, request.Lines, token);
+        return new(request.AppId, request.DeploymentTargetId, text is not null, text ?? "");
     }
     private AppActionModulesResponse ListModules(AppActionModuleRequest request)
         => deployment.ListModules(request.AppId, request.DeploymentTargetId);
@@ -45,7 +65,17 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
         => deployment.DeleteVersion(request.AppId, request.DeploymentTargetId, request.ActionKey, request.Version);
     private async Task<RestartAppRuntimeResult> RestartAsync(RestartAppRuntimeRequest request, CancellationToken token)
         => new(request.AppId, request.DeploymentTargetId,
-            await runtime.RestartRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
+            await runtime.RestartRuntimeAsync(request.AppId, request.DeploymentTargetId, token)
+                ? true : throw new InvalidOperationException(
+                    "The app is not running on this Runner, so there was nothing to restart. Deploy it again."));
+    private async Task<PauseResumeAppRuntimeResult> PauseAsync(PauseAppRuntimeRequest request, CancellationToken token)
+        => new(request.AppId, request.DeploymentTargetId,
+            await runtime.PauseRuntimeAsync(request.AppId, request.DeploymentTargetId, token));
+    private async Task<PauseResumeAppRuntimeResult> ResumeAsync(ResumeAppRuntimeRequest request, CancellationToken token)
+        => new(request.AppId, request.DeploymentTargetId,
+            await runtime.ResumeRuntimeAsync(request.AppId, request.DeploymentTargetId, token)
+                ? true : throw new InvalidOperationException(
+                    "The app is not paused on this Runner, so it was not started. Restart or deploy it again."));
     private async Task<CleanupAppDeploymentTargetResult> CleanupAsync(CleanupAppDeploymentTargetRequest request)
     {
         if (request.DeleteApplicationStorage && storageCleanup is null)

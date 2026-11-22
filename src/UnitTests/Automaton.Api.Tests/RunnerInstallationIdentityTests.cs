@@ -44,6 +44,6 @@ public sealed class RunnerInstallationIdentityTests
     private static RunnerService CreateService(ApplicationDbContext db, Guid owner)
     {
         var user = AppAuthorizationTestData.CreateUserContextService(owner);
-        return new(db, user, new ResourceAuthorizationService(db, user), null!, null!, null!, null!, null!);
+        return new(db, user, new ResourceAuthorizationService(db, user), null!, null!, null!, null!);
     }
 }

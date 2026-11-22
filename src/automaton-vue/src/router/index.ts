@@ -1,17 +1,16 @@
-import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
+import type { RouteLocationNormalized, RouteRecordRaw } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
-import { applySeo, type SeoMeta } from '@/seo/useSeo'
+import { seoTags, type SeoMeta } from '@/seo/useSeo'
 import { publicAppConfig } from '@/config/publicAppConfig'
 
 // The public app store moved to its own site with the same paths (it maps /apps to /).
 function redirectToStore(to: RouteLocationNormalized) {
+  if (typeof window === 'undefined') return false
   window.location.replace(new URL(to.fullPath, publicAppConfig.storeUrl).toString())
   return false
 }
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
+export const routes: RouteRecordRaw[] = [
     {
       path: '/',
       name: 'home',
@@ -65,26 +64,25 @@ const router = createRouter({
       component: () => import('@/views/NotFoundView.vue'),
       meta: { seo: { title: 'Page not found', noindex: true } },
     },
-  ],
-  scrollBehavior(to) {
-    if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
-    }
-    return { top: 0 }
-  },
-})
+]
 
-router.afterEach((to) => {
+export function scrollBehavior(to: RouteLocationNormalized) {
+  if (to.hash) {
+    return { el: to.hash, behavior: 'smooth' as const }
+  }
+  return { top: 0 }
+}
+
+export function seoFor(to: RouteLocationNormalized): SeoMeta {
   const seo = to.meta?.seo as Partial<SeoMeta> | undefined
-
-  applySeo({
+  return {
     title: seo?.title ?? 'The home for every app your AI builds',
     description:
       seo?.description ??
       'Automaton is an open-source, self-hosted platform for all the apps your AI builds: sign-in, sharing, an app store, catalogs, secrets, backups and safe updates on servers you own.',
     path: to.path,
     noindex: seo?.noindex,
-  })
-})
+  }
+}
 
-export default router
+export { seoTags }

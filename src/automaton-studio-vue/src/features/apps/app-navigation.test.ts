@@ -1,43 +1,47 @@
 import { describe, expect, it } from 'vitest'
 import {
-  APP_SUB_VIEWS,
-  APP_TABS,
+  appTabs,
   DEFAULT_APP_VIEW,
   resolveAppView,
-  resolveAppViewFromQuery,
-  tabForView,
   withoutAuthoringQuery,
 } from './app-navigation'
 
 describe('app page navigation', () => {
-  it('opens on Overview and has four tabs', () => {
+  it('opens on Overview; a read-only person sees Overview and Activity', () => {
     expect(DEFAULT_APP_VIEW).toBe('overview')
-    expect(APP_TABS.map((tab) => tab.label)).toEqual(['Overview', 'Settings & secrets', 'Activity', 'Advanced'])
+    expect(appTabs().map((tab) => tab.label)).toEqual(['Overview', 'Activity'])
   })
 
-  it('keeps every earlier destination reachable inside a tab', () => {
-    const views = new Set<string>(APP_TABS.map((tab) => tab.view))
-    for (const subViews of Object.values(APP_SUB_VIEWS)) subViews?.forEach((item) => views.add(item.key))
-    for (const key of ['overview', 'deployments', 'runtime', 'logs', 'actions', 'settings']) {
-      expect(views.has(key)).toBe(true)
-    }
-    expect(tabForView('logs')).toBe('activity')
-    expect(tabForView('deployments')).toBe('activity')
-    expect(tabForView('runtime')).toBe('advanced')
+  it('shows each tab only where it applies', () => {
+    const labels = (options: Parameters<typeof appTabs>[0]) => appTabs(options).map((tab) => tab.label)
+    expect(labels({ canManage: true, isPublishable: true, hasSecrets: true, hasActions: true, isAdmin: true }))
+      .toEqual(['Overview', 'Activity', 'Actions', 'Docs', 'Source', 'Secrets', 'Domain', 'Store listing', 'Settings', 'Admin'])
+    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Domain', 'Store listing', 'Settings'])
+    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Settings'])
+    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Admin'])
+  })
+
+  it('badges the Admin tab with the waiting permission requests, only when there are some', () => {
+    const admin = (waitingPermissions: number) => appTabs({ isAdmin: true, waitingPermissions }).find((tab) => tab.key === 'admin')
+    expect(admin(2)?.badge).toBe(2)
+    expect(admin(0)?.badge).toBeUndefined()
+    expect(appTabs({ canManage: true, waitingPermissions: 1 }).some((tab) => tab.badge)).toBe(false)
+  })
+
+  it('keeps every earlier ?view= link working', () => {
+    for (const view of ['logs', 'deployments']) expect(resolveAppView(view)).toBe('activity')
+    for (const view of ['runtime', 'targets', 'contract']) expect(resolveAppView(view)).toBe('overview')
+    expect(resolveAppView('more')).toBe('settings')
+    for (const view of ['actions', 'source', 'secrets', 'domain', 'store', 'settings', 'admin']) expect(resolveAppView(view)).toBe(view)
   })
 
   it('falls back to Overview for removed authoring views and unknown values', () => {
-    expect(resolveAppView('runtime')).toBe('runtime')
     expect(resolveAppView('build')).toBe('overview')
     expect(resolveAppView('files')).toBe('overview')
     expect(resolveAppView('snapshots')).toBe('overview')
+    expect(resolveAppView('publishing')).toBe('overview')
     expect(resolveAppView('unknown')).toBe('overview')
-  })
-
-  it('maps old settings deep links to their new place', () => {
-    expect(resolveAppViewFromQuery({ view: 'settings', settings: 'targets' })).toBe('targets')
-    expect(resolveAppViewFromQuery({ view: 'settings', settings: 'permissions' })).toBe('settings')
-    expect(resolveAppViewFromQuery({ view: 'publishing' })).toBe('overview')
+    expect(resolveAppView(undefined)).toBe('overview')
   })
 
   it('removes prompt and authoring-view deep links without dropping operational context', () => {

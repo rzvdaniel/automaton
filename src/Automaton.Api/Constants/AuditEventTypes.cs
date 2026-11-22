@@ -9,6 +9,9 @@ public static class AuditEventTypes
     public const string AppPermissionApproved = "AppPermissionApproved";
     public const string AppPermissionRejected = "AppPermissionRejected";
     public const string AppPermissionRevoked = "AppPermissionRevoked";
+    public const string AppEmailSent = "AppEmailSent";
+    public const string AppEmailRefused = "AppEmailRefused";
+    public const string NotifyRecipientsChanged = "NotifyRecipientsChanged";
     public const string ApiKeyDeleted = "ApiKeyDeleted";
     public const string ApiKeyAssignedToProject = "ApiKeyAssignedToProject";
     public const string ApiKeyUnassignedFromProject = "ApiKeyUnassignedFromProject";
@@ -19,6 +22,8 @@ public static class AuditEventTypes
     public const string AppVisibilityChanged = "AppVisibilityChanged";
     public const string AppPublished = "AppPublished";
     public const string AppSharingChanged = "AppSharingChanged";
+    public const string AppPaused = "AppPaused";
+    public const string AppResumed = "AppResumed";
     public const string AppUnpublished = "AppUnpublished";
     public const string AppSlugChanged = "AppSlugChanged";
     public const string AppForked = "AppForked";
@@ -31,6 +36,12 @@ public static class AuditEventTypes
     public const string ActionScheduleEnabled = "ActionScheduleEnabled";
     public const string ActionScheduleDisabled = "ActionScheduleDisabled";
     public const string ActionScheduleDeleted = "ActionScheduleDeleted";
+    public const string ActionWebhookCreated = "ActionWebhookCreated";
+    public const string ActionWebhookEnabled = "ActionWebhookEnabled";
+    public const string ActionWebhookDisabled = "ActionWebhookDisabled";
+    public const string ActionWebhookSecretRotated = "ActionWebhookSecretRotated";
+    public const string ActionWebhookDeleted = "ActionWebhookDeleted";
+    public const string ActionWebhookCalled = "ActionWebhookCalled";
     public const string RunnerAssignedToApp = "RunnerAssignedToApp";
     public const string RunnerUnassignedFromApp = "RunnerUnassignedFromApp";
     public const string RunnerCreated = "RunnerCreated";
@@ -82,4 +93,9 @@ public static class AuditEventTypes
     public const string AiGuidanceResetToDefault = "AiGuidanceResetToDefault";
     public const string AiGuidanceDeleted = "AiGuidanceDeleted";
     public const string ServerUpdateRequested = "ServerUpdateRequested";
+    public const string ServerBackupRequested = "ServerBackupRequested";
+    public const string ServerRestartRequested = "ServerRestartRequested";
+    public const string ServerOsUpdateRequested = "ServerOsUpdateRequested";
+    public const string RetentionChanged = "RetentionChanged";
+    public const string OneTimeLinkCreated = "OneTimeLinkCreated";
 }

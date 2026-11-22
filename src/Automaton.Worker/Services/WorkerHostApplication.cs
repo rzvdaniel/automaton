@@ -1,3 +1,4 @@
+using Automaton.Core.Logs;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Identity;
@@ -24,7 +25,7 @@ internal static class WorkerHostApplication
         await builder.Build().RunAsync();
     }
 
-    private static void ConfigureLogging(HostApplicationBuilder builder)
+    internal static void ConfigureLogging(HostApplicationBuilder builder)
     {
         builder.Services.AddSerilog((_, config) =>
         {
@@ -56,6 +57,8 @@ internal static class WorkerHostApplication
                 restrictedToMinimumLevel: LogEventLevel.Information,
                 shared: true,
                 outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}");
+
+            logConfig.AddOtlpIfConfigured(builder.Configuration, "automaton-worker");
         });
     }
 
@@ -63,6 +66,7 @@ internal static class WorkerHostApplication
     {
         var services = builder.Services;
         services.AddAutomatonInfrastructure(builder.Configuration);
+        services.AddAutomatonLogForwarding();
         services.AddAutomatonWorkerIdentity();
         ConfigureDataProtection(builder);
         services.AddSingleton<IEventPublisher, CapEventPublisher>();
@@ -75,6 +79,7 @@ internal static class WorkerHostApplication
         services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
         services.AddHostedService<CliAuthorizationCleanupService>();
         services.AddHostedService<RetiredStorageScheduleCleanup>();
+        services.AddHostedService<RetentionPruneService>();
         services.AddHostedService<ActionSchedulePollingService>();
     }
 

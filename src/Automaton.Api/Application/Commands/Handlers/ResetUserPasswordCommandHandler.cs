@@ -1,8 +1,11 @@
-﻿using Automaton.Api.Models;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace Automaton.Api.Application.Commands.Handlers
@@ -13,10 +16,15 @@ namespace Automaton.Api.Application.Commands.Handlers
         private ConfigurationService ConfigurationService { get; set; }
         private IEmailService EmailService { get; set; }
         private ILogger<ResetUserPasswordCommandHandler> Logger { get; set; }
+        private IDataProtectionProvider DataProtection { get; set; }
+        private DataProtectionTokenProviderOptions TokenOptions { get; set; }
 
         public ResetUserPasswordCommandHandler(UsersService userManager, ConfigurationService configurationService, 
-            IEmailService emailService, ILogger<ResetUserPasswordCommandHandler> logger)
+            IEmailService emailService, ILogger<ResetUserPasswordCommandHandler> logger,
+            IDataProtectionProvider dataProtection, IOptions<DataProtectionTokenProviderOptions> tokenOptions)
         {
+            DataProtection = dataProtection;
+            TokenOptions = tokenOptions.Value;
             UserManagerService = userManager;
             ConfigurationService = configurationService;
             EmailService = emailService;
@@ -27,16 +35,23 @@ namespace Automaton.Api.Application.Commands.Handlers
         {
             try
             {
-                var user = await UserManagerService.GetUserByEmailOrUserName(command.Email);
+                var user = await UserManagerService.FindByEmailOrUserName(command.Email);
 
-                if (user is null)
+                // An unknown email gets the same answer as a bad link, so the response never reveals accounts.
+                var decoded = TryDecode(command.Code, out var decodedCode);
+                if (user is null || !decoded)
                 {
-                    return;
+                    throw new InvalidResetLinkException(ClassifyLink(decodedCode));
                 }
 
-                var decodedCode = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(command.Code));
-
-                await UserManagerService.ResetPasswordAsync(user.Id, decodedCode, command.Password);
+                try
+                {
+                    await UserManagerService.ResetPasswordAsync(user.Id, decodedCode, command.Password);
+                }
+                catch (InvalidResetLinkException)
+                {
+                    throw new InvalidResetLinkException(ClassifyLink(decodedCode));
+                }
                 await UserManagerService.RevokeAllRefreshTokensAsync(user.Id, cancellationToken);
 
                 var userDetails = new EmailData
@@ -57,7 +72,20 @@ namespace Automaton.Api.Application.Commands.Handlers
                     }
                 };
 
-                await EmailService.Send(userDetails, CancellationToken.None);
+                // The password is already changed; a confirmation that cannot be sent (no email configured, SMTP down)
+                // must not turn the reset into an error.
+                try
+                {
+                    await EmailService.Send(userDetails, CancellationToken.None);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Logger.LogWarning(ex, "The password was reset but the confirmation email was not sent (is email configured?).");
+                }
+            }
+            catch (Exception ex) when (ex is InvalidResetLinkException or PasswordChangeRejectedException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -65,5 +93,22 @@ namespace Automaton.Api.Application.Commands.Handlers
                 throw;
             }       
         }
+
+        private static bool TryDecode(string code, out string decoded)
+        {
+            try
+            {
+                decoded = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
+                return true;
+            }
+            catch (FormatException)
+            {
+                decoded = string.Empty;
+                return false;
+            }
+        }
+
+        private string ClassifyLink(string code) =>
+            ResetLinkClassifier.Classify(DataProtection, TokenOptions, code, DateTimeOffset.UtcNow);
     }
 }

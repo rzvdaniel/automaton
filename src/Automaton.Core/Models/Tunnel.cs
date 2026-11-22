@@ -1,83 +1,5 @@
 namespace Automaton.Core.Models;
 
-public class TunnelRequest
-{
-    public string RequestId { get; set; } = string.Empty;
-    public string Method { get; set; } = "POST";
-    public string Path { get; set; } = string.Empty;
-    public Dictionary<string, string> Headers { get; set; } = [];
-    public string? Body { get; set; }
-
-    /// <summary>
-    /// Optional multi-value headers used by browser runtime proxy requests.
-    /// The legacy <see cref="Headers"/> property remains for controller calls.
-    /// </summary>
-    public Dictionary<string, string[]> HeaderValues { get; set; } = [];
-
-    /// <summary>
-    /// Optional binary request body. SignalR serializes this as base64.
-    /// </summary>
-    public byte[]? BodyBytes { get; set; }
-
-    /// <summary>
-    /// Selects a fixed runner-local destination. Empty means the legacy FastAPI controller tunnel.
-    /// </summary>
-    public string? Destination { get; set; }
-
-    public Guid? RuntimeAppId { get; set; }
-    public Guid? RuntimeDeploymentTargetId { get; set; }
-
-    /// <summary>
-    /// Relative path and query for the fixed runtime gateway. The Runner reconstructs
-    /// the complete gateway path from the trusted App and target identifiers.
-    /// </summary>
-    public string? RuntimePath { get; set; }
-
-    /// <summary>Marks a WebSocket upgrade: the Runner opens a socket to the app instead of an HTTP request.</summary>
-    public bool WebSocket { get; set; }
-
-    public string[] WebSocketSubProtocols { get; set; } = [];
-}
-
-public class TunnelResponse
-{
-    public string RequestId { get; set; } = string.Empty;
-    public int StatusCode { get; set; }
-    public Dictionary<string, string> Headers { get; set; } = [];
-    public string? Body { get; set; }
-    public Dictionary<string, string[]> HeaderValues { get; set; } = [];
-    public byte[]? BodyBytes { get; set; }
-    public string? Error { get; set; }
-
-    /// <summary>
-    /// True when this response only carries status and headers: the body follows as chunks
-    /// (<c>TunnelResponseChunk</c>) so Server-Sent Events and large downloads are not buffered.
-    /// </summary>
-    public bool Streaming { get; set; }
-
-    /// <summary>Milliseconds the Runner spent waiting for the app's response headers. Lets the API log tunnel overhead.</summary>
-    public long UpstreamMs { get; set; }
-
-    /// <summary>API side only (never serialized): the body chunks of a streaming response.</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
-    [Newtonsoft.Json.JsonIgnore]
-    public TunnelBodyStream? BodyStream { get; set; }
-}
-
-/// <summary>API side reader for the chunks of one streaming tunnel response, with flow control back to the Runner.</summary>
-public sealed class TunnelBodyStream(
-    System.Threading.Channels.ChannelReader<byte[]> reader,
-    Func<Task> acknowledgeAsync,
-    Func<Task> cancelAsync,
-    IDisposable? lease = null) : IDisposable
-{
-    public void Dispose() => lease?.Dispose();
-
-    public System.Threading.Channels.ChannelReader<byte[]> Reader { get; } = reader;
-    public Func<Task> AcknowledgeAsync { get; } = acknowledgeAsync;
-    public Func<Task> CancelAsync { get; } = cancelAsync;
-}
-
 /// <summary>One WebSocket message fragment relayed between the browser, the API and the Runner.</summary>
 public class TunnelWebSocketFrame
 {
@@ -106,15 +28,13 @@ public static class TunnelDestinations
 }
 
 /// <summary>
-/// Parsed body returned by the FastAPI controller endpoint.
+/// Headers the API sets on every request it sends through a Runner tunnel. The Runner trusts them (the tunnel is
+/// authenticated) and rebuilds the local destination from them; the API removes any copy a browser sent.
 /// </summary>
-public class TunnelControllerResponse
+public static class TunnelHeaders
 {
-    public bool Success { get; set; }
-    public System.Text.Json.JsonElement? Data { get; set; }
-    public string? Error { get; set; }
-    /// <summary>
-    /// Captured stdout/stderr from print() calls in the controller action.
-    /// </summary>
-    public string? Output { get; set; }
+    public const string Destination = "X-Automaton-Tunnel-Destination";
+    public const string AppId = "X-Automaton-Tunnel-App";
+    public const string TargetId = "X-Automaton-Tunnel-Target";
+    public static readonly string[] All = [Destination, AppId, TargetId];
 }

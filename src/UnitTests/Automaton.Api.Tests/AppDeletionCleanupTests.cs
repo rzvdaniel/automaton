@@ -70,6 +70,25 @@ public sealed class AppDeletionCleanupTests
     }
 
     [Test]
+    public async Task AppDeletion_WhoseRunnerWasDeleted_RemovesTheAppWithoutRunnerCleanup()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        var runner = fixture.AddRunner(online: false);
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(t => t.WebAppId == fixture.App.Id);
+        target.ExecutionRunnerId = runner.Id;
+        target.Status = DeploymentTargetStatus.Running;
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.Runners.Remove(await fixture.Db.Runners.SingleAsync(r => r.Id == runner.Id));
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.ChangeTracker.Clear();
+
+        await DeleteAppAsync(fixture, false);
+
+        Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.False);
+        Assert.That(fixture.Commands.Requests, Is.Empty);
+    }
+
+    [Test]
     public async Task WholeAppCleanup_OfflineAssignedRunnerPreventsStorageDeletionEvenWithoutRuntime()
     {
         await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
@@ -82,6 +101,24 @@ public sealed class AppDeletionCleanupTests
         Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.True);
     }
 
+    [Test]
+    public async Task WholeAppCleanup_RunnerThatLooksOnlineButDoesNotAnswer_FailsFastAndKeepsTheApp()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        var runner = fixture.AddRunner(online: true);
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(t => t.WebAppId == fixture.App.Id);
+        target.ExecutionRunnerId = runner.Id;
+        await fixture.Db.SaveChangesAsync();
+        fixture.Commands.RunnerStopsAnswering = true;
+
+        var error = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(() => fixture.Service.ClaimAndCleanupAppRuntimesAsync(fixture.App.Id));
+
+        Assert.That(error!.Message, Does.Contain("did not answer"));
+        Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.True);
+        var saved = await fixture.Db.AppDeploymentTargets.AsNoTracking().SingleAsync(t => t.Id == target.Id);
+        Assert.That(saved.CleanupPending, Is.True);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task InterruptedDeletion_AbandonsOnlyOfflineRunnerAfterOperatorVerification(bool online)
@@ -90,6 +127,24 @@ public sealed class AppDeletionCleanupTests
         await fixture.DeleteAsync(recover: true, abandonOfflineRuntimes: true);
         Assert.That(await fixture.Context.Db.WebApps.AnyAsync(a => a.Id == fixture.Context.App.Id), Is.False);
         Assert.That(fixture.Context.Commands.Requests.Count, Is.EqualTo(online ? 2 : 0));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task FreshDeletion_AbandonsOnlyOfflineRunnerAndListsSkippedCleanup(bool online)
+    {
+        await using var fixture = await AppDeletionRecoveryFixture.CreateAsync(online);
+        var app = await fixture.Context.Db.WebApps.SingleAsync(a => a.Id == fixture.Context.App.Id);
+        app.DeletionClaimId = null;
+        (await fixture.Context.Db.AppDeploymentTargets.SingleAsync(t => t.WebAppId == app.Id)).Status = DeploymentTargetStatus.Running;
+        await fixture.Context.Db.SaveChangesAsync();
+        var skipped = new List<string>();
+
+        await fixture.DeleteAsync(recover: false, abandonOfflineRuntimes: true, skippedHostCleanup: skipped);
+
+        Assert.That(await fixture.Context.Db.WebApps.AnyAsync(a => a.Id == app.Id), Is.False);
+        Assert.That(fixture.Context.Commands.Requests.Count, Is.EqualTo(online ? 2 : 0));
+        Assert.That(skipped, online ? Is.Empty : Has.Count.EqualTo(1).And.Some.Contain("containers and data may remain"));
     }
 
     [Test]

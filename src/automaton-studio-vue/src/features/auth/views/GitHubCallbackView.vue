@@ -70,7 +70,7 @@ onMounted(async () => {
     const redirect = readRedirectTarget()
     window.history.replaceState({}, document.title, route.path)
     await router.replace(redirect)
-  } catch (error) {
+  } catch {
     void authStore.logout()
     errorMessage.value = 'We couldn’t complete sign-in with GitHub. Please try again.'
   }

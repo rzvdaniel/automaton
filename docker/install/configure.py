@@ -6,6 +6,7 @@ import getpass
 import json
 import os
 from pathlib import Path
+import ipaddress
 import re
 import secrets
 import tempfile
@@ -61,7 +62,12 @@ def certificates_resolvers(tls_mode, email):
         acme['dnsChallenge'] = {'provider': 'httpreq', 'propagation': {'disableChecks': True}}
     else:
         acme['dnsChallenge'] = {'provider': 'cloudflare'}
-    return {resolver_for(tls_mode): {'acme': acme}}
+    resolvers = {resolver_for(tls_mode): {'acme': acme}}
+    if tls_mode != 'http':
+        # An app's own domain is not ours to change DNS for, so it gets HTTP-01.
+        resolvers['letsencrypt'] = {'acme': {'email': email, 'storage': '/certificates/acme.json',
+                                             'httpChallenge': {'entryPoint': 'web'}}}
+    return resolvers
 
 
 def wildcard_store(tls_mode, domain):
@@ -132,6 +138,86 @@ def ensure_store(root):
         'routers': {'store': store_router(domain, resolver)},
         'services': {'store': {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}}},
     }}))
+
+
+def ensure_custom_domain_resolver(root):
+    """Give a Cloudflare-mode installation the HTTP-01 'letsencrypt' resolver that custom domains need.
+    Returns 'changed', 'unchanged', or 'skipped' (traefik.yml was adopted or hand-edited; nothing is touched)."""
+    state = json.loads((root / 'installation.json').read_text())
+    if state.get('tls_mode') != 'cloudflare':
+        return 'unchanged'  # http mode already has it
+    traefik_path = root / 'traefik.yml'
+    settings_path = root / 'appsettings.Production.json'
+    try:
+        traefik = json.loads(traefik_path.read_text())
+        resolvers = traefik['certificatesResolvers']
+        settings = json.loads(settings_path.read_text())
+        if not isinstance(resolvers, dict) or not isinstance(settings, dict):
+            raise ValueError
+    except (OSError, ValueError, KeyError):
+        return 'skipped'
+    changed = False
+    if 'letsencrypt' not in resolvers:
+        resolvers['letsencrypt'] = {'acme': {'email': state['email'], 'storage': '/certificates/acme.json',
+                                             'httpChallenge': {'entryPoint': 'web'}}}
+        replace_text(traefik_path, json.dumps(traefik))
+        changed = True
+    published = settings.setdefault('PublishedApps', {})
+    if published.get('CustomDomainCertificateResolver') != 'letsencrypt':
+        published['CustomDomainCertificateResolver'] = 'letsencrypt'
+        replace_json(settings_path, settings)
+        changed = True
+    return 'changed' if changed else 'unchanged'
+
+
+ACCESS_LOG = {'filePath': '/certificates/logs/access.log', 'format': 'json',
+              'fields': {'defaultMode': 'keep', 'headers': {'defaultMode': 'drop'}}}
+
+
+def ensure_access_log(root):
+    """Write Traefik's JSON access log (no headers) into the certificates volume, where the fail2ban jails read it.
+    Returns 'changed', 'unchanged', or 'skipped' (traefik.yml was adopted or hand-edited; nothing is touched)."""
+    traefik_path = root / 'traefik.yml'
+    try:
+        traefik = json.loads(traefik_path.read_text())
+        if not isinstance(traefik, dict):
+            raise ValueError
+    except (OSError, ValueError):
+        return 'skipped'
+    if 'accessLog' in traefik:
+        return 'unchanged'
+    traefik['accessLog'] = ACCESS_LOG
+    replace_text(traefik_path, json.dumps(traefik))
+    return 'changed'
+
+
+def ensure_runner_broker_host(root):
+    """Hand remote Runners the server's public hostname (with its certificate) instead of a private address.
+    Only IP literals, single-label names and an empty host in an existing section are replaced; a hand-set public hostname is kept.
+    InfrastructureRunnerRabbitMq (the local Runner) is not touched. Returns 'changed', 'unchanged' or 'skipped'."""
+    state = json.loads((root / 'installation.json').read_text())
+    settings_path = root / 'appsettings.Production.json'
+    try:
+        settings = json.loads(settings_path.read_text())
+        if not isinstance(settings, dict):
+            raise ValueError
+    except (OSError, ValueError):
+        return 'skipped'
+    api = f"api.{state['domain']}"
+    broker = settings.get('HostedRunnerRabbitMq')
+    if not isinstance(broker, dict):
+        return 'unchanged'  # no Runner broker configured: nothing to migrate
+    host = str(broker.get('Host') or '').strip()
+    try:
+        ipaddress.ip_address(host.strip('[]'))
+        private = True
+    except ValueError:
+        private = '.' not in host
+    if not private:
+        return 'unchanged'
+    settings['HostedRunnerRabbitMq'] = dict(broker, Host=api, Port=5671, TlsEnabled=True, TlsServerName=api)
+    replace_json(settings_path, settings)
+    return 'changed'
 
 
 def update_runner_image(root, previous, current):
@@ -232,6 +318,7 @@ def switch_tls(root, tls_mode, token_file=None):
     settings_path = root / 'appsettings.Production.json'
     settings = json.loads(settings_path.read_text())
     settings.setdefault('PublishedApps', {})['CertificateResolver'] = resolver
+    settings['PublishedApps']['CustomDomainCertificateResolver'] = 'letsencrypt'
     updates[settings_path] = json.dumps(settings, indent=2)
     updates[token_path] = token
     updates[state_path] = json.dumps(dict(state, tls_mode=tls_mode), indent=2)
@@ -274,7 +361,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         required = ['postgres-password', 'rabbitmq-password', 'setup-token',
                     'signing-key.json', 'hmac-key', 'ai-encryption-key', 'runtime-proxy-key', 'cloudflare-token']
         if (root / 'secrets' / 'mysql-password').is_file():
-            raise ValueError('This installation runs on MySQL; this release uses PostgreSQL. Nothing was changed. Migrate the data first with migrate-to-postgresql.sh (docs/prod/migrate-to-postgresql.md, issue #587).')
+            raise ValueError('This installation runs on MySQL; this release uses PostgreSQL. Nothing was changed. Migrate the data first with migrate-to-postgresql.sh (src/automaton-vue/docs/update-server.md#move-a-mysql-server-to-postgresql, issue #587).')
         if not (root / 'installation.json').exists() or any(not (root / 'secrets' / name).is_file() for name in required):
             raise ValueError('Existing installation credentials are incomplete. Restore the configuration backup; keys will not be regenerated.')
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -313,7 +400,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         'HostedRunners': {'Enabled': False, 'ServerUrl': api, 'DockerImage': runner_image},
         'Catalog': {'InstallEssentialsOnFirstRunner': True},
         'PublishedApps': dict(ApiBaseUrl=api, PublicBaseUrl=apps, RootPath='/app/AppData/published-apps',
-                              RuntimeProxyAuthKey=secret(root, 'runtime-proxy-key'), TraefikDynamicConfigRoot='/app/AppData/traefik-dynamic', RuntimeTunnelServiceName='api', CertificateResolver=resolver),
+                              RuntimeProxyAuthKey=secret(root, 'runtime-proxy-key'), TraefikDynamicConfigRoot='/app/AppData/traefik-dynamic', RuntimeTunnelServiceName='api', CertificateResolver=resolver, CustomDomainCertificateResolver='letsencrypt'),
         'DataProtection': {'KeysPath': '/app/data-protection-keys'},
         'Logging': {'File': {'RetainedFileCountLimit': 14, 'FileSizeLimitBytes': 10485760}},
         'EmailConfig': {'EmailHost': '', 'EmailAccount': '', 'EmailPassword': ''},
@@ -333,7 +420,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
                         'websecure': {'address': ':443'}, 'broker': {'address': ':5671'}},
         'ping': {}, 'providers': {'file': {'directory': '/etc/traefik/dynamic', 'watch': True}},
         'certificatesResolvers': certificates_resolvers(tls_mode, email),
-        'api': {'dashboard': False},
+        'api': {'dashboard': False}, 'accessLog': ACCESS_LOG,
     }
     write_new(root / 'traefik.yml', json.dumps(traefik))
     edge = {'http': {'routers': {}, 'services': {
@@ -364,6 +451,12 @@ if __name__ == '__main__':
                         help='Add the app store to an existing installation without changing credentials.')
     parser.add_argument('--ensure-studio-paths', action='store_true',
                         help='Route Studio pages whose path starts with "api" to Studio on an existing installation.')
+    parser.add_argument('--ensure-custom-domain-resolver', action='store_true',
+                        help='Add the HTTP-01 resolver for custom domains to an existing Cloudflare-mode installation.')
+    parser.add_argument('--ensure-access-log', action='store_true',
+                        help='Turn on the Traefik JSON access log that the fail2ban jails read, on an existing installation.')
+    parser.add_argument('--ensure-runner-broker-host', action='store_true',
+                        help='Give remote Runners the public API hostname as broker address if a private address is set.')
     parser.add_argument('--tls-mode', choices=['http', 'cloudflare', 'delegated'], default='http')
     parser.add_argument('--switch-tls', action='store_true',
                         help='Switch an existing installation to --tls-mode; domain, email and credentials are unchanged.')
@@ -386,6 +479,31 @@ if __name__ == '__main__':
                 print('New Runners will use the Runner image from this release.')
             else:
                 print('Keeping the custom Runner image configured in HostedRunners.DockerImage.')
+        elif args.ensure_custom_domain_resolver:
+            if not (args.config_dir / 'installation.json').is_file():
+                raise ValueError('No existing installation configuration was found.')
+            result = ensure_custom_domain_resolver(args.config_dir)
+            print({'changed': 'Added the custom-domain certificate resolver.',
+                   'unchanged': 'Custom-domain certificate resolver already present.',
+                   'skipped': 'traefik.yml or appsettings.Production.json was not generated by the installer; '
+                              'skipped. Add a letsencrypt HTTP-01 resolver by hand for custom domains.'}[result])
+            print('RESULT=' + result)
+        elif args.ensure_access_log:
+            if not (args.config_dir / 'installation.json').is_file():
+                raise ValueError('No existing installation configuration was found.')
+            result = ensure_access_log(args.config_dir)
+            print({'changed': 'Turned on the Traefik access log.',
+                   'unchanged': 'Traefik access log already configured.',
+                   'skipped': 'traefik.yml was not generated by the installer; skipped. fail2ban needs a JSON access log at /certificates/logs/access.log.'}[result])
+            print('RESULT=' + result)
+        elif args.ensure_runner_broker_host:
+            if not (args.config_dir / 'installation.json').is_file():
+                raise ValueError('No existing installation configuration was found.')
+            result = ensure_runner_broker_host(args.config_dir)
+            print({'changed': 'Remote Runners now get the public broker address.',
+                   'unchanged': 'Remote Runner broker address already public.',
+                   'skipped': 'appsettings.Production.json was not generated by the installer; skipped.'}[result])
+            print('RESULT=' + result)
         elif args.ensure_studio_paths:
             if not (args.config_dir / 'installation.json').is_file():
                 raise ValueError('No existing installation configuration was found.')

@@ -11,15 +11,16 @@ internal static class HostContainerRuntimeEndpoint
         JsonElement root,
         string id,
         bool running,
-        Dictionary<string, string> labels)
+        Dictionary<string, string> labels,
+        bool restarting = false)
     {
         var address = GetPrivateRuntimeHostAddress();
         var portBinding = ReadRequestedPortBinding(root, address);
         var hostPort = ReadEffectiveHostPort(root, portBinding.BindingName, address);
-        if (running && !hostPort.HasValue) throw new JsonException("Running container has no effective publication.");
+        if (running && !restarting && !hostPort.HasValue) throw new JsonException("Running container has no effective publication.");
         return new HostContainerExecutionResponse
         {
-            Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels,
+            Success = true, Exists = true, Running = running, Restarting = restarting, ContainerId = id, Labels = labels,
             ContainerPort = portBinding.ContainerPort, HostPort = hostPort, HostAddress = hostPort.HasValue ? address : null
         };
     }

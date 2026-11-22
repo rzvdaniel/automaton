@@ -16,32 +16,18 @@ public sealed class RunnerExecutionProcessorTests
     public async Task LostCallbackAndRunnerRestartReplayCompletedWorkWithoutExecutingAgain()
     {
         var executor = new Executor(); var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);
-        var first = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
-        var replay = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        var first = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(), CancellationToken.None);
+        var replay = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(), CancellationToken.None);
         Assert.That(executor.Calls, Is.EqualTo(1)); Assert.That(replay.Output, Is.EqualTo(first.Output));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void MachineManagementRunnerRejectsRawWorkflowAndCustomStepPayloads(bool customStep)
+    [Test]
+    public void RunnerRejectsRequestsWithoutExactlyOnePayload()
     {
-        var previousProfile = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE");
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", RunnerApplicationProfiles.MachineManagement);
-        try
-        {
-            using var services = new ServiceCollection().BuildServiceProvider();
-            using var executor = new RunnerExecutionExecutor(services);
-            var request = customStep
-                ? new RunnerExecutionRequest(null, new() { Id = Guid.NewGuid(), Code = "print('unsafe')", Language = "python" })
-                : new RunnerExecutionRequest(Guid.NewGuid(), null);
-
-            Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
-                await executor.ExecuteAsync(request, CancellationToken.None));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", previousProfile);
-        }
+        using var services = new ServiceCollection().BuildServiceProvider();
+        using var executor = new RunnerExecutionExecutor(services);
+        Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await executor.ExecuteAsync(new RunnerExecutionRequest(), CancellationToken.None));
     }
 
     [Test]
@@ -50,7 +36,7 @@ public sealed class RunnerExecutionProcessorTests
         var journal = new RunnerExecutionJournal(directory); var id = Guid.NewGuid();
         using (journal.Lock(id)) journal.Accept(id);
         var executor = new Executor();
-        var result = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        var result = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(), CancellationToken.None);
         Assert.That(result.Outcome, Is.EqualTo("Lost")); Assert.That(executor.Calls, Is.Zero);
         Assert.That((await journal.ReadAsync(id, CancellationToken.None))!.Outcome, Is.EqualTo("Lost"));
     }
@@ -62,10 +48,10 @@ public sealed class RunnerExecutionProcessorTests
         var journal = new RunnerExecutionJournal(directory); var id = Guid.NewGuid(); var executor = new Executor();
         var processor = new RunnerExecutionProcessor(journal, executor);
         Directory.CreateDirectory(Path.Combine(directory, $"{id:N}.json.tmp"));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => processor.ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => processor.ProcessAsync(id, new(), CancellationToken.None));
         Directory.Delete(Path.Combine(directory, $"{id:N}.json.tmp"));
         var replay = cancel ? await processor.CancelAsync(id, CancellationToken.None)
-            : await processor.ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+            : await processor.ProcessAsync(id, new(), CancellationToken.None);
         Assert.That(replay.Outcome, Is.EqualTo("Succeeded")); Assert.That(executor.Calls, Is.EqualTo(1));
     }
 
@@ -82,7 +68,7 @@ public sealed class RunnerExecutionProcessorTests
     {
         var executor = new Executor { Cancel = true }; var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
-        var result = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(Guid.NewGuid(), null), cancellation.Token);
+        var result = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(), cancellation.Token);
         Assert.That(result.Outcome, Is.EqualTo("Cancelled"));
         Assert.That((await journal.ReadAsync(id, CancellationToken.None))!.Outcome, Is.EqualTo("Cancelled"));
     }
@@ -104,9 +90,9 @@ public sealed class RunnerExecutionProcessorTests
     {
         var executor = new Executor(); var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);
         var processor = new RunnerExecutionProcessor(journal, executor);
-        await processor.ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        await processor.ProcessAsync(id, new(), CancellationToken.None);
         processor.Forget(id);
-        var stale = await processor.ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        var stale = await processor.ProcessAsync(id, new(), CancellationToken.None);
         Assert.That(stale.Outcome, Is.EqualTo("Lost")); Assert.That(executor.Calls, Is.EqualTo(1));
     }
     [Test]
@@ -118,7 +104,7 @@ public sealed class RunnerExecutionProcessorTests
         processor.Forget(id);
         Assert.That(await journal.ReadAsync(id, CancellationToken.None), Is.Null);
         var restarted = new RunnerExecutionProcessor(new(directory), executor);
-        var stale = await restarted.ProcessAsync(id, new(null, null, AppActionCommand.Create("execute", new { })), CancellationToken.None);
+        var stale = await restarted.ProcessAsync(id, new( AppActionCommand.Create("execute", new { })), CancellationToken.None);
         Assert.That(stale.Outcome, Is.EqualTo("Cancelled"));
         Assert.That(executor.Calls, Is.Zero);
     }
@@ -126,7 +112,7 @@ public sealed class RunnerExecutionProcessorTests
     public async Task ConfirmedCleanupDoesNotDeleteAConcurrentJournalWritersFiles()
     {
         var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);
-        await new RunnerExecutionProcessor(journal, new Executor()).ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        await new RunnerExecutionProcessor(journal, new Executor()).ProcessAsync(id, new(), CancellationToken.None);
         using (journal.Lock(id))
         {
             journal.Forget(id);
@@ -149,7 +135,7 @@ public sealed class RunnerExecutionProcessorTests
     }
 
     private static RunnerExecutionRequest CreateActionRequest(Guid id)
-        => new(null, null, AppActionCommand.Create("execute", new ExecuteAppActionModuleRequest
+        => new( AppActionCommand.Create("execute", new ExecuteAppActionModuleRequest
         {
             ExecutionId = id,
             Input = System.Text.Json.JsonSerializer.SerializeToElement(new { })

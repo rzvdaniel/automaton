@@ -14,6 +14,5 @@ internal static class ManagedRunnerEnrollmentFixture
             host.Services.GetRequiredService<ApiKeyAuthenticationService>(),
             host.Services.GetRequiredService<HubService>(),
             enrollmentClient,
-            host.Services.GetRequiredService<ScriptEngineSettingsReporter>(),
             host.Services.GetRequiredService<RunnerWorkspaceService>());
 }

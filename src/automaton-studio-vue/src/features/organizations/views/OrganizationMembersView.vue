@@ -65,7 +65,7 @@ onMounted(async () => {
       })
       router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
     }
-  } catch (error) {
+  } catch {
     // Error handled by service
   }
 })
@@ -75,7 +75,7 @@ async function loadMembers() {
   try {
     loading.value = true
     members.value = await organizationsService.getMembers(organizationId.value)
-  } catch (error) {
+  } catch {
     // Error is handled by the service
   } finally {
     loading.value = false
@@ -166,7 +166,7 @@ function handleRemoveMember(userId: string, userName: string, isOwner: boolean) 
       try {
         await organizationsService.removeMember(organizationId.value, userId)
         await loadMembers()
-      } catch (error) {
+      } catch {
         // Error toast is already shown by service
       }
     },

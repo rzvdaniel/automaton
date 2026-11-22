@@ -1,6 +1,7 @@
 using Automaton.Core.Models;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Authentication;
 using System.Net.Sockets;
 using System.Text;
@@ -73,6 +74,32 @@ public class AutomatonApiClient : IDisposable
     {
         using var resp = await _http.DeleteAsync($"api/apps/{Uri.EscapeDataString(appId)}", ct);
         await EnsureSuccessAsync(resp);
+    }
+
+    /// <summary>Administrator: deletes an app whose Runner is offline for good; returns the host cleanup that was skipped.</summary>
+    public async Task<IReadOnlyList<string>> DeleteAppAbandoningOfflineRuntimesAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{Uri.EscapeDataString(appId)}?abandonOfflineRuntimes=true", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadSkippedHostCleanupAsync(resp, ct);
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadSkippedHostCleanupAsync(HttpResponseMessage resp, CancellationToken ct)
+    {
+        var body = await ReadJsonAsync(resp, ct);
+        return body.TryGetProperty("skippedHostCleanup", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().Select(item => item.GetString() ?? "").ToList()
+            : [];
+    }
+
+    /// <summary>Pauses (POST /api/apps/{id}/pause) or resumes (POST /api/apps/{id}/resume) an app.</summary>
+    public async Task<JsonElement> SetAppPausedAsync(string appId, bool paused, CancellationToken ct = default, string? reason = null)
+    {
+        using var resp = await _http.PostAsync(
+            $"api/apps/{Uri.EscapeDataString(appId)}/{(paused ? "pause" : "resume")}",
+            paused && !string.IsNullOrWhiteSpace(reason) ? JsonContent.Create(new { reason }) : null, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
     }
 
     public async Task<JsonElement> GetAppByIdOrSlugAsync(string identifier, CancellationToken ct = default)
@@ -185,6 +212,19 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> ListNotificationsAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/notifications", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task AcknowledgeNotificationAsync(string key, CancellationToken ct = default)
+    {
+        using var resp = await _http.PutAsync($"api/notifications/{Uri.EscapeDataString(key)}/acknowledgement", null, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     internal async Task<IReadOnlyList<AppInventoryItem>> ListAppInventoryAsync(CancellationToken ct = default)
         => (await ListAppsAsync(ct)).Deserialize<AppInventoryItem[]>(JsonOptions) ?? [];
 
@@ -210,17 +250,72 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(response);
     }
 
-    /// <summary>The API's /health status ("ok") and, on servers that report it, the release (server-vX.Y.Z).</summary>
+    internal async Task<ServerBackupStatus> GetServerBackupsAsync(CancellationToken ct = default)
+    {
+        using var response = await _http.GetAsync("api/install/backups", ct);
+        await EnsureSuccessAsync(response);
+        return (await ReadJsonAsync(response, ct)).Deserialize<ServerBackupStatus>(JsonOptions)
+            ?? throw new InvalidOperationException("Server backup response was empty.");
+    }
+
+    internal async Task StartServerBackupAsync(CancellationToken ct = default)
+    {
+        using var response = await PostJsonAsync("api/install/backups", "{}", ct);
+        await EnsureSuccessAsync(response);
+    }
+
+    /// <summary>Asks the server for a one-time password link for an administrator; the setup token is the proof of root on the server.</summary>
+    internal async Task<(string Url, DateTimeOffset ExpiresAt)> CreatePasswordLinkAsync(string email, string setupToken, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/install/password-link")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new { email }, JsonOptions), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Add("X-Automaton-Setup-Token", setupToken);
+        using var response = await _http.SendAsync(request, ct);
+        await EnsureSuccessAsync(response);
+        var body = await ReadJsonAsync(response, ct);
+        return (body.GetProperty("url").GetString() ?? throw new InvalidOperationException("The server returned no link."),
+            body.GetProperty("expiresAt").GetDateTimeOffset());
+    }
+
+    /// <summary>
+    /// The API's /health status ("ok") and the release (server-vX.Y.Z). Current servers keep the release out of the
+    /// anonymous /health, so it comes from the signed-in version endpoint; null when that is not available.
+    /// </summary>
     internal async Task<(string Status, string? Version)> GetHealthReportAsync(CancellationToken ct = default)
+    {
+        var (status, version) = await GetHealthStatusAsync(ct);
+        return (status, version ?? await TryGetServerVersionAsync(ct));
+    }
+
+    internal async Task<string> GetHealthAsync(CancellationToken ct = default) => (await GetHealthStatusAsync(ct)).Status;
+
+    private async Task<(string Status, string? Version)> GetHealthStatusAsync(CancellationToken ct)
     {
         using var response = await _http.GetAsync("health", ct);
         await EnsureSuccessAsync(response);
         return ParseHealth(await response.Content.ReadAsStringAsync(ct));
     }
 
-    internal async Task<string> GetHealthAsync(CancellationToken ct = default) => (await GetHealthReportAsync(ct)).Status;
+    private async Task<string?> TryGetServerVersionAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var response = await _http.GetAsync("api/install/version", ct);
+            if (!response.IsSuccessStatusCode) return null;
+            var body = await ReadJsonAsync(response, ct);
+            var version = body.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()?.Trim() : null;
+            if (string.IsNullOrEmpty(version)) return null;
+            return version.StartsWith("server-v", StringComparison.Ordinal) ? version : "server-v" + version;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
 
-    /// <summary>Older servers answer a plain "ok"; newer ones answer {"status":"ok","version":"server-vX.Y.Z"}.</summary>
+    /// <summary>Older servers answer a plain "ok" or also carry the version: {"status":"ok","version":"server-vX.Y.Z"}.</summary>
     internal static (string Status, string? Version) ParseHealth(string body)
     {
         body = body.Trim();
@@ -245,6 +340,34 @@ public class AutomatonApiClient : IDisposable
         using var resp = await PostJsonAsync($"api/apps/{appId}/actions/{Uri.EscapeDataString(actionKey)}/executions", payload, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> ListActionWebhooksAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/action-webhooks", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> CreateActionWebhookAsync(string appId, string actionKey, string name, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { actionKey, name }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/action-webhooks", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> RotateActionWebhookAsync(string appId, Guid webhookId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/apps/{appId}/action-webhooks/{webhookId}/rotate", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task DeleteActionWebhookAsync(string appId, Guid webhookId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{appId}/action-webhooks/{webhookId}", ct);
+        await EnsureSuccessAsync(resp);
     }
 
     public async Task<JsonElement> GetAppActionExecutionAsync(string appId, Guid executionId, CancellationToken ct = default)
@@ -306,6 +429,16 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    /// <summary>Saves a plain app setting where Studio can show its value (not the write-only secret store).</summary>
+    public async Task<JsonElement> SetSettingValueAsync(string appId, string name, string value, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { value }, JsonOptions);
+        using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/apps/{appId}/setting-values/{Uri.EscapeDataString(name)}", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     /// <summary>Deletes a secret; false when it did not exist.</summary>
     public async Task<bool> DeleteSecretAsync(string appId, string scope, string name, CancellationToken ct = default)
     {
@@ -323,7 +456,40 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    /// <summary>Who can open the app: audience (me, people, server, internet) and the chosen people.</summary>
+    /// <summary>Apps with permissions waiting for an administrator (needs an admin-scoped key or an administrator login).</summary>
+    public async Task<JsonElement> GetPendingPermissionsAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/admin/app-permissions/pending", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Approves or rejects one app permission as an administrator.</summary>
+    public async Task<JsonElement> SetAppPermissionApprovalAsync(string appId, string permission, bool approved, CancellationToken ct = default)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new { approved }, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/permissions/{Uri.EscapeDataString(permission)}", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>The machines an app may maintain (runner:maintain) as an administrator sees them.</summary>
+    public async Task<JsonElement> GetRunnerPermissionsAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> SetRunnerPermissionApprovalAsync(string appId, string runnerId, bool approved, CancellationToken ct = default)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new { approved }, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions/{Uri.EscapeDataString(runnerId)}", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Who can open the app: audience (me, people, team, server, internet) and the chosen people.</summary>
     public async Task<JsonElement> GetSharingAsync(string appId, CancellationToken ct = default)
     {
         using var resp = await _http.GetAsync($"api/apps/{appId}/sharing", ct);
@@ -331,9 +497,10 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    public async Task<JsonElement> SetSharingAsync(string appId, string audience, string? publicUrl, CancellationToken ct = default)
+    public async Task<JsonElement> SetSharingAsync(
+        string appId, string audience, string? publicUrl, string? teamId = null, bool? listed = null, CancellationToken ct = default)
     {
-        var content = new StringContent(JsonSerializer.Serialize(new { audience, publicUrl }, JsonOptions), Encoding.UTF8, "application/json");
+        var content = new StringContent(JsonSerializer.Serialize(new { audience, publicUrl, teamId, listed }, JsonOptions), Encoding.UTF8, "application/json");
         using var resp = await _http.PutAsync($"api/apps/{appId}/sharing", content, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
@@ -378,9 +545,9 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    public async Task<CliAuthorizationResponse> CreateCliAuthorizationRequestAsync(string deviceName, CancellationToken ct = default)
+    public async Task<CliAuthorizationResponse> CreateCliAuthorizationRequestAsync(string deviceName, CancellationToken ct = default, string? scope = null)
     {
-        var payload = JsonSerializer.Serialize(new { deviceName }, JsonOptions);
+        var payload = JsonSerializer.Serialize(new { deviceName, scope }, JsonOptions);
         using var resp = await PostJsonAsync("api/cli-auth/requests", payload, ct);
         await EnsureSuccessAsync(resp);
         var json = await ReadJsonAsync(resp, ct);
@@ -675,13 +842,14 @@ public class AutomatonApiClient : IDisposable
     // ── Catalog (installing apps) ─────────────────────────────────────────────
 
     /// <summary>One page of the catalog as the signed-in user sees it.</summary>
-    public async Task<JsonElement> GetCatalogPageAsync(string? search, string? category, string? source, bool installed, int page, CancellationToken ct = default)
+    public async Task<JsonElement> GetCatalogPageAsync(string? search, string? category, string? source, bool installed, int page, CancellationToken ct = default, bool refresh = false)
     {
         var query = new List<string> { $"page={page}", "pageSize=100" };
         if (!string.IsNullOrWhiteSpace(search)) query.Add("q=" + Uri.EscapeDataString(search));
         if (!string.IsNullOrWhiteSpace(category)) query.Add("category=" + Uri.EscapeDataString(category));
         if (!string.IsNullOrWhiteSpace(source)) query.Add("source=" + Uri.EscapeDataString(source));
         if (installed) query.Add("installed=true");
+        if (refresh) query.Add("refresh=true");
         using var resp = await _http.GetAsync("api/catalog?" + string.Join('&', query), ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
@@ -711,6 +879,59 @@ public class AutomatonApiClient : IDisposable
         if (wait) return await WaitForDeploymentResultAsync(appId, resp, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Whether the catalog pins a newer commit than the app was installed from, and what would change.</summary>
+    public async Task<JsonElement> GetCatalogUpdateAsync(string appId, CancellationToken ct = default, bool refresh = false)
+    {
+        using var resp = await _http.GetAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update" + (refresh ? "?refresh=true" : ""), ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Replaces the app's files with the catalog's newer commit and redeploys; with wait, returns the finished result.</summary>
+    public async Task<JsonElement> UpdateCatalogAppAsync(string appId, bool confirmEdited, bool wait, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update", JsonSerializer.Serialize(new { confirmEdited }, JsonOptions), ct);
+        if (wait) return await WaitForDeploymentResultAsync(appId, resp, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<List<JsonElement>> ListActionSchedulesAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/action-schedules", ct);
+        await EnsureSuccessAsync(resp);
+        var list = await ReadJsonAsync(resp, ct);
+        return list.ValueKind == JsonValueKind.Array ? list.EnumerateArray().Select(item => item.Clone()).ToList() : [];
+    }
+
+    public async Task<JsonElement> CreateActionScheduleAsync(object schedule, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync("api/action-schedules", JsonSerializer.Serialize(schedule, JsonOptions), ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> UpdateActionScheduleAsync(Guid id, object schedule, CancellationToken ct = default)
+    {
+        using var resp = await _http.PutAsync($"api/action-schedules/{id}",
+            new StringContent(JsonSerializer.Serialize(schedule, JsonOptions), System.Text.Encoding.UTF8, "application/json"), ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> SetActionScheduleEnabledAsync(Guid id, bool enabled, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/action-schedules/{id}/{(enabled ? "enable" : "disable")}", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task DeleteActionScheduleAsync(Guid id, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/action-schedules/{id}", ct);
+        await EnsureSuccessAsync(resp);
     }
 
     // ── Projects ──────────────────────────────────────────────────────────────
@@ -812,6 +1033,14 @@ public class AutomatonApiClient : IDisposable
         using var resp = await _http.GetAsync($"api/runners/{Uri.EscapeDataString(runnerId)}/upgrade", ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Administrator: deletes an offline Runner and its apps without host cleanup; returns what was skipped.</summary>
+    public async Task<IReadOnlyList<string>> DeleteOfflineRunnerAsync(string runnerId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/runners/{Uri.EscapeDataString(runnerId)}?abandonOffline=true", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadSkippedHostCleanupAsync(resp, ct);
     }
 
     public async Task DeleteRunnerAsync(string runnerId, CancellationToken ct = default)

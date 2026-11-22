@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Home;
 using Automaton.Api.Models;
 using Automaton.Api.Constants;
 using Automaton.Api.Services.Interfaces;
@@ -28,7 +29,8 @@ public sealed class ActionScheduleService
     public async Task<IReadOnlyList<ActionSchedule>> ListAsync(Guid userId, bool administrator, CancellationToken ct)
     {
         var query = db.ActionSchedules.AsNoTracking();
-        if (!administrator) query = query.Where(x => x.OwnerType == ActionScheduleOwnerTypes.User && x.OwnerUserId == userId);
+        if (!administrator) query = query.Where(x => x.OwnerType == ActionScheduleOwnerTypes.User && x.OwnerUserId == userId
+            && (x.SystemIdentity == null || !x.SystemIdentity.StartsWith(HomeCardSchedules.IdentityPrefix)));
         return await query.OrderBy(x => x.Name).ToListAsync(ct);
     }
 
@@ -44,7 +46,8 @@ public sealed class ActionScheduleService
             throw new InvalidOperationException("Legacy System Application schedules are retired.");
         var capability = await GetCapabilityAsync(userId, administrator: false, ct);
         if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
-        if (await db.ActionSchedules.CountAsync(x => x.OwnerType == ActionScheduleOwnerTypes.User && x.OwnerUserId == userId, ct) >= capability.MaximumSchedules)
+        if (await db.ActionSchedules.CountAsync(x => x.OwnerType == ActionScheduleOwnerTypes.User && x.OwnerUserId == userId
+                && (x.SystemIdentity == null || !x.SystemIdentity.StartsWith(HomeCardSchedules.IdentityPrefix)), ct) >= capability.MaximumSchedules)
             throw new InvalidOperationException($"This plan allows at most {capability.MaximumSchedules} schedules.");
 
         var schedule = new ActionSchedule
@@ -82,6 +85,7 @@ public sealed class ActionScheduleService
         var schedule = await FindAuthorizedAsync(id, userId, administrator, ct);
         if (enabled)
         {
+            await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
             var validationUserId = schedule.OwnerUserId ?? userId;
             var capability = await GetCapabilityAsync(validationUserId, administrator: false, ct);
             if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
@@ -91,6 +95,8 @@ public sealed class ActionScheduleService
         }
         else
         {
+            // Turned off by hand: resuming a paused app must not turn it back on.
+            schedule.PausedByApp = false;
             schedule.NextRunAtUtc = null;
             await db.ActionScheduleOccurrences
                 .Where(x => x.ScheduleId == schedule.Id
@@ -116,8 +122,19 @@ public sealed class ActionScheduleService
         await AuditAsync(schedule, AuditEventTypes.ActionScheduleDeleted, "delete", "Action schedule deleted", ct);
     }
 
+    private async Task EnsureAppNotPausedAsync(Guid applicationId, CancellationToken ct)
+    {
+        if (await db.WebApps.AnyAsync(app => app.Id == applicationId && app.IsPaused, ct))
+            throw new InvalidOperationException("The app is paused. Resume it to turn its schedules on.");
+    }
+
     public async Task ValidateForDispatchAsync(ActionSchedule schedule, CancellationToken ct)
     {
+        await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
+        // The platform's own home-card schedule is not one of the owner's plan schedules; it needs no plan check.
+        if (HomeCardSchedules.IsPlatformSchedule(schedule) && schedule.OwnerType == ActionScheduleOwnerTypes.User
+            && schedule.ActionKey == AppHomeCardLimits.ActionKey && schedule.ExecutionScope == ActionExecutionScopes.AppRunner)
+            return;
         if (schedule.OwnerType == ActionScheduleOwnerTypes.System
             || schedule.ApplicationId == InfrastructureAppTrust.PlatformAppId)
             throw new InvalidOperationException("Legacy System Application schedules are retired.");
@@ -143,7 +160,11 @@ public sealed class ActionScheduleService
         schedule.ExecutionScope = request.ExecutionScope;
         ActionSchedulePolicy.ApplyTimingFields(schedule, request);
         schedule.TimeZone = request.TimeZone;
+        var wasEnabled = schedule.Enabled;
         schedule.Enabled = request.Enabled;
+        if (schedule.Enabled) await EnsureAppNotPausedAsync(schedule.ApplicationId, ct);
+        // Only turning it off by hand clears what pausing remembered; other saves keep it.
+        if (wasEnabled && !request.Enabled) schedule.PausedByApp = false;
         schedule.ConcurrencyPolicy = request.ConcurrencyPolicy;
         schedule.MisfirePolicy = request.MisfirePolicy;
         schedule.InputJson = inputJson;
@@ -206,6 +227,8 @@ public sealed class ActionScheduleService
     private async Task<ActionSchedule> FindAuthorizedAsync(Guid id, Guid userId, bool administrator, CancellationToken ct)
     {
         var schedule = await db.ActionSchedules.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new KeyNotFoundException("Schedule not found.");
+        if (HomeCardSchedules.IsPlatformSchedule(schedule))
+            throw new KeyNotFoundException("Schedule not found.");
         if (!administrator && (schedule.OwnerType != ActionScheduleOwnerTypes.User || schedule.OwnerUserId != userId))
             throw new UnauthorizedAccessException("You cannot manage this schedule.");
         return schedule;

@@ -62,7 +62,7 @@ public sealed class RunnerRuntimeContainerManagerTests
         var manager = new RunnerRuntimeContainerManager(workspace, new RunnerRuntimeRegistry(), fake,
             NullLogger<RunnerRuntimeContainerManager>.Instance, secrets);
         await manager.StartAsync(CancellationToken.None);
-        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing runs yet.");
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True, "No container record (static site or action-only app): nothing to restart.");
 
         await manager.ApplyAsync(appId, targetId, Contract(19021));
         var first = await ReadMetadataAsync(workspace, appId, targetId);
@@ -84,6 +84,100 @@ public sealed class RunnerRuntimeContainerManagerTests
             Assert.That(metadata.ArtifactRoot, Is.Not.EqualTo(first.ArtifactRoot));
             Assert.That(File.ReadAllText(Path.Combine(metadata.ArtifactRoot!, "lib", "app.txt")), Is.EqualTo("deployed"));
             Assert.That(Directory.Exists(first.ArtifactRoot), Is.False, "The old copy is removed with the old container.");
+        });
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task RestartRecoversARuntimeLeftStartingByAnInterruptedStart()
+    {
+        var fake = new FakeContainerRuntime();
+        var (manager, workspace, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19041));
+        var metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        metadata.State = RuntimeReadinessState.Starting;
+        metadata.ContainerId = null;
+        await WriteMetadataAsync(workspace, metadata);
+
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That((await ReadMetadataAsync(workspace, appId, targetId)).State, Is.EqualTo(RuntimeReadinessState.Ready));
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True, "Resume of a running app is success.");
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task ResumeAndRestartOfAnAppWithNoContainerAreNotAFailure_ButAContainerThatCannotStartIs()
+    {
+        var fake = new FakeContainerRuntime();
+        var (manager, workspace, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+
+        // Static site: the Runner has no runtime record at all.
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.False);
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+
+        // Action-only app: a stopped record with no image, container or Compose file.
+        await manager.ApplyAsync(appId, targetId, Contract(19042));
+        var metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        metadata.ContainerId = null;
+        metadata.ContainerName = null;
+        metadata.Runtime = null;
+        metadata.ComposeJson = null;
+        metadata.State = RuntimeReadinessState.Stopped;
+        await WriteMetadataAsync(workspace, metadata);
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+
+        // A container app whose runtime is Failed still reports that nothing was started.
+        await manager.ApplyAsync(appId, targetId, Contract(19043));
+        metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        metadata.State = RuntimeReadinessState.Failed;
+        await WriteMetadataAsync(workspace, metadata);
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.False);
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.False);
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task PauseStopsTheContainerKeepsItsFilesAndIsNotRestartedWithTheRunner_ResumeStartsItAgain()
+    {
+        var fake = new FakeContainerRuntime();
+        var (manager, workspace, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing runs yet.");
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True, "No container record: nothing to start.");
+        await manager.ApplyAsync(appId, targetId, Contract(19031));
+        var running = await ReadMetadataAsync(workspace, appId, targetId);
+        await File.WriteAllTextAsync(Path.Combine(running.ArtifactRoot!, "app.txt"), "deployed");
+
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.True);
+        var paused = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(paused.State, Is.EqualTo(RuntimeReadinessState.Paused));
+            Assert.That(fake.StoppedContainers, Does.Contain("container-1"));
+            Assert.That(File.ReadAllText(Path.Combine(paused.ArtifactRoot!, "app.txt")), Is.EqualTo("deployed"));
+        });
+        Assert.That(await manager.PauseAsync(appId, targetId, CancellationToken.None), Is.False, "Pausing again changes nothing.");
+
+        // A Runner restart must leave a paused app stopped.
+        var startsBefore = fake.StartCalls;
+        var restarted = new RunnerRuntimeContainerManager(workspace, new RunnerRuntimeRegistry(), fake,
+            NullLogger<RunnerRuntimeContainerManager>.Instance);
+        await restarted.StartAsync(CancellationToken.None);
+        Assert.That(fake.StartCalls, Is.EqualTo(startsBefore));
+        await restarted.StopAsync(CancellationToken.None);
+
+        Assert.That(await manager.ResumeAsync(appId, targetId, CancellationToken.None), Is.True);
+        var resumed = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(resumed.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(resumed.ContainerId, Is.EqualTo("container-2"));
+            Assert.That(fake.StartCalls, Is.EqualTo(startsBefore + 1));
+            Assert.That(File.ReadAllText(Path.Combine(resumed.ArtifactRoot!, "app.txt")), Is.EqualTo("deployed"));
         });
         await manager.StopAsync(CancellationToken.None);
     }
@@ -110,6 +204,72 @@ public sealed class RunnerRuntimeContainerManagerTests
         Assert.That(metadata.ContainerId, Is.EqualTo("container-1"));
         Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
         await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task FailedRestartKeepsThePreviousContainerAndShowsTheAppFailing_UntilARestartWorks()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19051));
+        Assert.That(IsFailed(registry, appId, targetId), Is.False);
+        fake.StartReady = false;
+
+        Assert.ThrowsAsync<TimeoutException>(async () => await manager.RestartAsync(appId, targetId, CancellationToken.None));
+        Assert.That(IsFailed(registry, appId, targetId), Is.True, "Studio must not keep showing a healthy app after a failed restart.");
+
+        fake.StartReady = true;
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.True);
+        Assert.That(IsFailed(registry, appId, targetId), Is.False);
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task CrashingAppDeployFailureIncludesTheLastOutputLines()
+    {
+        var fake = new FakeContainerRuntime { StartReady = false, Logs = "starting\nKeyError: DATA_DIR is not set\n" };
+        var (manager, _, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+
+        var failure = Assert.ThrowsAsync<TimeoutException>(async () =>
+            await manager.ApplyAsync(appId, targetId, Contract(19021)));
+
+        Assert.That(failure!.Message, Does.Contain("did not become ready"));
+        Assert.That(failure.Message, Does.Contain("KeyError: DATA_DIR is not set"));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public void RedactValuesHidesSecretsInOutput()
+    {
+        var redacted = RunnerRuntimeContainerManager.RedactValues("db=hunter2 ok", ["hunter2", ""]);
+        Assert.That(redacted, Is.EqualTo("db=[REDACTED] ok"));
+    }
+
+    [Test]
+    public async Task CrashingAppWithoutOutputKeepsTheOriginalMessage()
+    {
+        var fake = new FakeContainerRuntime { StartReady = false };
+        var (manager, _, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+
+        var failure = Assert.ThrowsAsync<TimeoutException>(async () =>
+            await manager.ApplyAsync(appId, targetId, Contract(19022)));
+
+        Assert.That(failure!.Message, Does.Not.Contain("Last output"));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public void LastLinesKeepsOnlyTheTail()
+    {
+        var logs = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"line{i}"));
+        var tail = RunnerRuntimeContainerManager.LastLines(logs, 2, 2000).Split(Environment.NewLine);
+        Assert.That(tail, Is.EqualTo(new[] { "line29", "line30" }));
+        Assert.That(RunnerRuntimeContainerManager.LastLines(" ", 2, 2000), Is.Empty);
     }
 
     [Test]
@@ -518,6 +678,69 @@ public sealed class RunnerRuntimeContainerManagerTests
         await manager.StopAsync(CancellationToken.None);
     }
 
+    private static bool IsFailed(RunnerRuntimeRegistry registry, Guid appId, Guid targetId)
+        => registry.StateReports().Single(r => r.AppId == appId && r.DeploymentTargetId == targetId).Failed;
+
+    [Test]
+    public async Task ProbeMarksRisingRestartCountFailedAndUnchangedCountRecovered()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        manager.ProbeInterval = TimeSpan.Zero;
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19061));
+
+        fake.RestartCount = 3;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.False, "First sample has nothing to compare with.");
+
+        fake.RestartCount = 4;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.True, "A rising count while running is a slow crash loop.");
+
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.False, "Same count and running again: recovered.");
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task ProbeMarksRestartingStateFailedEvenOnFirstSample()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        manager.ProbeInterval = TimeSpan.Zero;
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19062));
+
+        fake.Restarting = true;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(IsFailed(registry, appId, targetId), Is.True);
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task ProbeForgetsRestartCountsOfRemovedRuntimes()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var manager = CreateManager(fake, registry);
+        manager.ProbeInterval = TimeSpan.Zero;
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19063));
+        fake.RestartCount = 5;
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+
+        Assert.That(manager.ProbedRestartCountEntries, Is.EqualTo(1));
+        await manager.StopAsync(appId, targetId);
+        await manager.ProbeRestartingAsync(CancellationToken.None);
+        Assert.That(manager.ProbedRestartCountEntries, Is.Zero);
+    }
+
     private (RunnerRuntimeContainerManager Manager, RunnerWorkspaceService Workspace, Guid AppId, Guid TargetId) CreateManager(FakeContainerRuntime fake)
     {
         var workspace = new RunnerWorkspaceService();
@@ -663,6 +886,8 @@ public sealed class RunnerRuntimeContainerManagerTests
             return Task.FromResult(string.Empty);
         }
 
+        public Task StopAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task StopAndRemoveAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
         {
             Scopes.Add(scope);
@@ -701,7 +926,10 @@ public sealed class RunnerRuntimeContainerManagerTests
         public DockerApplicationContainerRequest? LastRequest { get; private set; }
         public List<string> StoppedContainers { get; } = [];
         public Exception? InspectFailure { get; set; }
+        public int RestartCount { get; set; }
+        public bool Restarting { get; set; }
         public Exception? GetLogsFailure { get; set; }
+        public string Logs { get; set; } = string.Empty;
         public Exception? StopFailure { get; set; }
 
         public Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default)
@@ -783,13 +1011,13 @@ public sealed class RunnerRuntimeContainerManagerTests
                 labels["com.automaton.deployment-target-id"] = identity.TargetId.ToString();
                 labels["com.automaton.runtime-kind"] = "generic";
             }
-            return new DockerContainerIdentity(containerIdOrName, exists, exists && Running[containerIdOrName], labels);
+            return new DockerContainerIdentity(containerIdOrName, exists, exists && Running[containerIdOrName], labels, Restarting: Restarting, RestartCount: RestartCount);
         }
 
         public Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
         {
             if (GetLogsFailure is not null) throw GetLogsFailure;
-            return Task.FromResult(string.Empty);
+            return Task.FromResult(Logs);
         }
     }
 }

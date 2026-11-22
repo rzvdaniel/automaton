@@ -10,12 +10,15 @@ public sealed class AppActionRunnerGateway(
     RunnerExecutionOperationService operations, UserContextService userContext, IOptions<HostedRunnerOptions> options)
     : IRunnerActionCommands, IAppActionExecutionGateway
 {
-    /// <summary>Sends a command and waits for the Runner's answer without a limit; used for long operations such as cleanup.</summary>
+    /// <summary>Sends a command and waits for the Runner's answer without a limit; used for long operations such as upgrades.</summary>
     public Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         => SendAsync<T>(runnerId, kind, payload, limit: null, token);
 
+    public Task<T> SendBoundedAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
+        => SendQuickAsync<T>(runnerId, kind, payload, token);
+
     // A Runner that stopped recently still looks online for a while, so read commands wait only a bounded time
-    // instead of holding the caller's request open. Commands that change something (restore, delete, cleanup) keep
+    // instead of holding the caller's request open. Commands that change something (restore, delete) keep
     // waiting: a timeout would report a failure for work the Runner may still complete.
     private Task<T> SendQuickAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         => SendAsync<T>(runnerId, kind, payload, TimeSpan.FromSeconds(Math.Max(1, options.Value.ActionCommandTimeoutSeconds)), token);
@@ -23,7 +26,7 @@ public sealed class AppActionRunnerGateway(
     private async Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, TimeSpan? limit, CancellationToken token)
     {
         var id = await operations.QueueAsync(runnerId, userContext.GetUserId(),
-            new(null, null, AppActionCommand.Create(kind, payload)), token);
+            new( AppActionCommand.Create(kind, payload)), token);
         using var timer = CancellationTokenSource.CreateLinkedTokenSource(token);
         if (limit is { } wait) timer.CancelAfter(wait);
         RunnerExecutionResult result;
@@ -45,7 +48,7 @@ public sealed class AppActionRunnerGateway(
         Guid runnerId, Guid requestedByUserId, Guid operationId,
         ExecuteAppActionModuleRequest request, CancellationToken token)
         => operations.QueueAsync(runnerId, requestedByUserId,
-            new(null, null, AppActionCommand.Create("execute", request)), token, operationId);
+            new( AppActionCommand.Create("execute", request)), token, operationId);
 
     public Task<AppActionModulesResponse> ListModulesAsync(Guid runnerId, Guid appId, Guid targetId, string key, CancellationToken token)
         => SendQuickAsync<AppActionModulesResponse>(runnerId, "list-modules", new AppActionModuleRequest(appId, targetId, key), token);

@@ -59,11 +59,16 @@ internal static partial class RunnerUpgradeCommand
               echo 'The Runner container has unexpected mounts; reinstall it from Studio instead.' >&2
               exit 1
             fi
+            old_env=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container")
+            runtime_host_address=$(printf '%s\n' "$old_env" | sed -n 's|^AUTOMATON_RUNTIME_HOST_ADDRESS=||p')
+            gateway_secret=$(printf '%s\n' "$old_env" | sed -n 's|^AUTOMATON_GATEWAY_SECRET=||p')
+            gateway_port=$(printf '%s\n' "$old_env" | sed -n 's|^AUTOMATON_RUNTIME_GATEWAY_URL=http://.*:\([0-9][0-9]*\)$|\1|p')
+            {{{RunnerGatewayShell.Setup}}}
             umask 077
             env_file=$(mktemp)
             trap 'rm -f "$env_file"' EXIT
             docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" \
-              | grep '^AUTOMATON_' | grep -Ev '^AUTOMATON_RUNNER_(IMAGE|IMAGE_DIGEST|NAME)=' > "$env_file"
+              | grep '^AUTOMATON_' | grep -Ev '^(AUTOMATON_RUNNER_(IMAGE|IMAGE_DIGEST|NAME)|AUTOMATON_GATEWAY_SECRET|AUTOMATON_RUNTIME_GATEWAY_URL)=' > "$env_file"
             printf 'AUTOMATON_RUNNER_IMAGE=%s\nAUTOMATON_RUNNER_IMAGE_DIGEST=%s\n' "$resolved" "$resolved" >> "$env_file"
             printf '%s\n' {{{nameLine}}} >> "$env_file"
             previous="$container-previous"
@@ -72,7 +77,7 @@ internal static partial class RunnerUpgradeCommand
             docker rename "$container" "$previous"
             # $groups is intentionally split into separate --group-add arguments.
             connected=false
-            if docker run -d --name "$container" --restart unless-stopped --network "$network" $groups \
+            if docker run -d --name "$container" --restart unless-stopped --network "$network" $groups $gateway_args \
                 --env-file "$env_file" -v "$config:/app/config" -v "$workspace:/automaton/storage" \
                 -v /var/run/docker.sock:/var/run/docker.sock "$resolved" >/dev/null; then
               echo 'Waiting for the Runner to connect to Automaton...'

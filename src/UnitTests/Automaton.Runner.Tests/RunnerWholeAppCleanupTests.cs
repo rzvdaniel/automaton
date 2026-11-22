@@ -49,6 +49,89 @@ public sealed class RunnerWholeAppCleanupTests
         Assert.That(await File.ReadAllTextAsync(marker), Is.EqualTo("preserve"));
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task WholeAppCleanup_WhenTheRunnerCannotDelete_EmptiesTheAppDirectoriesWithTheHelperAndRetries(bool helperWorks)
+    {
+        if (OperatingSystem.IsWindows() || Environment.UserName == "root") Assert.Ignore("Needs a non-root Unix user.");
+        var workspace = new RunnerWorkspaceService();
+        var service = new RunnerDeploymentService(workspace, new CleanupProcessManager(), new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var data = workspace.GetAppDataDirectory(appId);
+        Directory.CreateDirectory(data);
+        var parent = Path.GetDirectoryName(data)!;
+        File.SetUnixFileMode(parent, UnixFileMode.UserRead | UnixFileMode.UserExecute); // the directory cannot be removed
+        var purged = new List<string>();
+        var cleanup = new MachineApplicationStorageCleanup((args, _) =>
+        {
+            if (args[1] != "run") return Task.FromResult(new InfrastructureCommandResponse { Success = true });
+            purged.Add(args.First(a => a.StartsWith("type=bind,source=")));
+            if (helperWorks) File.SetUnixFileMode(parent, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            return Task.FromResult(new InfrastructureCommandResponse { Success = helperWorks, Error = "no such image" });
+        });
+        try
+        {
+            if (helperWorks)
+            {
+                await service.CleanupApplicationAsync(appId, Guid.NewGuid(), cleanup);
+                Assert.That(Directory.Exists(data), Is.False);
+            }
+            else
+            {
+                var error = Assert.ThrowsAsync<InvalidOperationException>(() => service.CleanupApplicationAsync(appId, Guid.NewGuid(), cleanup));
+                Assert.That(error!.Message, Does.Contain("preserved for retry").And.Contain("no such image").And.Contain("First error"));
+                Assert.That(error.InnerException, Is.InstanceOf<IOException>().Or.InstanceOf<UnauthorizedAccessException>());
+                Assert.That(Directory.Exists(data), Is.True);
+            }
+            Assert.That(purged.Any(p => p.Contains(appId.ToString())), Is.True);
+        }
+        finally { File.SetUnixFileMode(parent, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute); }
+    }
+
+    [Test]
+    public async Task EmptyDirectory_RunsAnIsolatedHelperAndReportsFailure()
+    {
+        IReadOnlyList<string>? seen = null;
+        var cleanup = new MachineApplicationStorageCleanup((args, _) =>
+        {
+            seen = args;
+            return Task.FromResult(new InfrastructureCommandResponse { Success = args.Contains("find") });
+        }, "helper:image");
+        await cleanup.EmptyDirectoryAsync(Path.Combine(root, "data"));
+        Assert.That(seen, Does.Contain("none").And.Contain("--cap-drop").And.Contain("helper:image"));
+        Assert.That(seen!.Contains("/purge"), Is.True);
+        Assert.That(string.Join(' ', seen!), Does.Contain("--user 0").And.Contain("find /purge -mindepth 1 -delete"));
+        var failing = new MachineApplicationStorageCleanup((_, _) => Task.FromResult(new InfrastructureCommandResponse { Success = false }));
+        Assert.ThrowsAsync<InvalidOperationException>(() => failing.EmptyDirectoryAsync(root));
+    }
+
+    [Test]
+    public async Task EmptyDirectory_OnAContainerizedRunnerMountsItsOwnWorkspaceVolume_AndOnlyEmptiesThePathUnderIt()
+    {
+        var calls = new List<IReadOnlyList<string>>();
+        var cleanup = new MachineApplicationStorageCleanup((args, _) =>
+        {
+            calls.Add(args);
+            return Task.FromResult(new InfrastructureCommandResponse
+            {
+                Success = true,
+                Output = args[1] == "inspect"
+                    ? """[{"Type":"bind","Name":"","Destination":"/var/run/docker.sock"},{"Type":"volume","Name":"ws-volume","Destination":"/automaton/storage"}]"""
+                    : ""
+            });
+        }, "helper:image", useWorkspaceVolume: true, ownContainer: "runner-container");
+
+        await cleanup.EmptyDirectoryAsync("/automaton/storage/workspace/data/app-1");
+
+        Assert.That(calls[0], Is.EqualTo(new[] { "docker", "inspect", "--format", "{{json .Mounts}}", "runner-container" }));
+        var run = string.Join(' ', calls[1]);
+        Assert.That(run, Does.Contain("type=volume,source=ws-volume,target=/purge,volume-subpath=workspace/data/app-1").And.Contain("--user 0")
+            .And.Contain("find /purge -mindepth 1 -delete").And.Contain("--network none"));
+        Assert.ThrowsAsync<InvalidOperationException>(() => cleanup.EmptyDirectoryAsync("/etc"));
+        Assert.ThrowsAsync<InvalidOperationException>(() => cleanup.EmptyDirectoryAsync("/automaton/storage/workspace/../../etc"));
+        Assert.That(calls.Count(call => call.Contains("find")), Is.EqualTo(1));
+    }
+
     private static MachineApplicationStorageCleanup CreateStorageCleanup(bool fail)
         => new((_, _) => Task.FromResult(new InfrastructureCommandResponse { Success = !fail }));
 

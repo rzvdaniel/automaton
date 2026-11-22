@@ -17,13 +17,14 @@ public sealed class HostedRunnerBrokerProvisionerTests
 
         await provisioner.RevokeAsync(runnerId, CancellationToken.None);
 
-        Assert.That(handler.Requests, Has.Count.EqualTo(5));
+        Assert.That(handler.Requests, Has.Count.EqualTo(6));
         Assert.That(handler.Requests[0].Path, Does.Contain($"execution-runner-{runnerId:N}"));
         Assert.That(handler.Requests[1].Path, Does.Contain(RunnerExecutionCommandPublisher.QueueName(runnerId)));
         Assert.That(handler.Requests[2].Path, Does.Contain(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId)));
-        Assert.That(handler.Requests[3].Method, Is.EqualTo(HttpMethod.Delete));
-        Assert.That(handler.Requests[3].Path, Does.Contain($"hosted-runner-{runnerId:N}"));
-        Assert.That(handler.Requests[4].Path, Does.Contain(HostedRunnerBrokerProvisioner.LegacyDeploymentQueueName(runnerId)));
+        Assert.That(handler.Requests[3].Path, Does.Contain(RunnerExecutionCommandPublisher.ResultQueueName(runnerId)));
+        Assert.That(handler.Requests[4].Method, Is.EqualTo(HttpMethod.Delete));
+        Assert.That(handler.Requests[4].Path, Does.Contain($"hosted-runner-{runnerId:N}"));
+        Assert.That(handler.Requests[5].Path, Does.Contain(HostedRunnerBrokerProvisioner.LegacyDeploymentQueueName(runnerId)));
     }
 
     [Test]
@@ -38,13 +39,22 @@ public sealed class HostedRunnerBrokerProvisionerTests
         Assert.That(result.TlsServerName, Is.EqualTo("broker-tls.example"));
         Assert.That(result.ManagementQueueName, Is.EqualTo(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId)));
         Assert.That(handler.Requests[1].Path, Does.Contain(result.ManagementQueueName));
-        using var permissions = JsonDocument.Parse(handler.Requests[3].Body);
+        Assert.That(result.ResultQueueName, Is.EqualTo(RunnerExecutionCommandPublisher.ResultQueueName(runnerId)));
+        Assert.That(handler.Requests[2].Path, Does.Contain(result.ResultQueueName));
+        // The result queue expires messages and is bounded, so an older Runner that never reads it cannot fill the broker.
+        using var resultQueue = JsonDocument.Parse(handler.Requests[2].Body);
+        Assert.That(resultQueue.RootElement.GetProperty("durable").GetBoolean(), Is.True);
+        Assert.That(resultQueue.RootElement.GetProperty("arguments").GetProperty("x-message-ttl").GetInt32(), Is.GreaterThan(0));
+        Assert.That(resultQueue.RootElement.GetProperty("arguments").GetProperty("x-max-length").GetInt32(), Is.GreaterThan(0));
+        using var permissions = JsonDocument.Parse(handler.Requests[4].Body);
         Assert.That(permissions.RootElement.GetProperty("configure").GetString(), Is.Empty);
         Assert.That(permissions.RootElement.GetProperty("write").GetString(), Is.Empty);
         var read = permissions.RootElement.GetProperty("read").GetString()!;
         Assert.That(System.Text.RegularExpressions.Regex.IsMatch(result.QueueName, read), Is.True);
         Assert.That(System.Text.RegularExpressions.Regex.IsMatch(result.ManagementQueueName!, read), Is.True);
+        Assert.That(System.Text.RegularExpressions.Regex.IsMatch(result.ResultQueueName!, read), Is.True);
         Assert.That(System.Text.RegularExpressions.Regex.IsMatch(RunnerExecutionCommandPublisher.ManagementQueueName(Guid.NewGuid()), read), Is.False);
+        Assert.That(System.Text.RegularExpressions.Regex.IsMatch(RunnerExecutionCommandPublisher.ResultQueueName(Guid.NewGuid()), read), Is.False);
     }
 
     [Test]

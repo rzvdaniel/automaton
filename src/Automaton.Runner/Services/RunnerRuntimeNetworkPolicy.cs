@@ -22,14 +22,26 @@ internal sealed class RunnerRuntimeNetworkPolicy
     public async Task WaitForReadinessAsync(
         int port,
         ApplicationHealthSpec health,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task<bool>>? isStillRunning = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(health.StartupTimeoutSeconds));
         using var client = health.Path is null ? null : new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+        var nextAliveCheck = DateTime.UtcNow.AddSeconds(2);
         while (!timeout.IsCancellationRequested)
         {
             if (await IsReadyAsync(port, health.Path, client, timeout.Token, cancellationToken)) return;
+            // A container that already exited will never answer: fail now with its exit, not after the whole startup timeout.
+            if (isStillRunning is not null && DateTime.UtcNow >= nextAliveCheck)
+            {
+                nextAliveCheck = DateTime.UtcNow.AddSeconds(2);
+                bool alive;
+                try { alive = await isStillRunning(timeout.Token); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { break; }
+                catch (Exception) when (!cancellationToken.IsCancellationRequested) { alive = true; } // an unanswered check is not an exit
+                if (!alive) throw new InvalidOperationException("The app container exited before it became ready.");
+            }
             if (!await DelayBeforeReadinessRetryAsync(timeout.Token, cancellationToken)) break;
         }
         throw new TimeoutException($"Runtime container did not become ready on {runtimeHostAddress}:{port}.");

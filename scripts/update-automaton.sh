@@ -11,20 +11,30 @@ bundle_archive=''
 bundle_checksum=''
 keep_backups=3
 allow_downgrade=false
+custom_options=false
 while (($#)); do
     case "$1" in
         --version) version="${2:?Missing release version}"; shift 2 ;;
-        --bundle) bundle_archive="${2:?Missing release bundle}"; shift 2 ;;
-        --checksum) bundle_checksum="${2:?Missing checksum}"; shift 2 ;;
-        --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
-        --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
-        --backup-dir) backup_root="${2:?Missing backup directory}"; shift 2 ;;
-        --keep-backups) keep_backups="${2:?Missing number of backups to keep}"; shift 2 ;;
-        --allow-downgrade) allow_downgrade=true; shift ;;
+        --bundle) custom_options=true; bundle_archive="${2:?Missing release bundle}"; shift 2 ;;
+        --checksum) custom_options=true; bundle_checksum="${2:?Missing checksum}"; shift 2 ;;
+        --install-dir) custom_options=true; install_dir="${2:?Missing installation directory}"; shift 2 ;;
+        --config-dir) custom_options=true; config_dir="${2:?Missing configuration directory}"; shift 2 ;;
+        --backup-dir) custom_options=true; backup_root="${2:?Missing backup directory}"; shift 2 ;;
+        --keep-backups) custom_options=true; keep_backups="${2:?Missing number of backups to keep}"; shift 2 ;;
+        --allow-downgrade) custom_options=true; allow_downgrade=true; shift ;;
         --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH] [--keep-backups N] [--allow-downgrade]'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; echo 'After a successful update, keeps the newest N update backups (default 3) and removes the previous release application images.'; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
+# A limited account (for example the production deploy user) may hold a sudo rule for this script. Through sudo it may
+# only use the forms the update flow uses (no options, --version): paths, offline bundles and --allow-downgrade are for
+# a root shell or an administrator whose sudo rights are unrestricted (`sudo -l` lists `ALL`). The updater's own re-run
+# from the verified bundle is exempt; sudo strips that variable from a limited account's environment.
+if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root && -z "${AUTOMATON_UPDATER_FROM_BUNDLE:-}" ]] && $custom_options; then
+    if ! /usr/bin/sudo -n -l -U "$SUDO_USER" 2>/dev/null | grep -Eq '^[[:space:]]*\([^)]*\)[[:space:]]+((NO)?PASSWD:|SETENV:|NOSETENV:)*[[:space:]]*ALL[[:space:]]*$'; then
+        echo 'Run the updater with --bundle, --checksum, --install-dir, --config-dir, --backup-dir, --keep-backups or --allow-downgrade from a root shell or an administrator account, not through sudo from a limited account.' >&2; exit 1
+    fi
+fi
 [[ $EUID == 0 ]] || { echo 'Run the updater with sudo.' >&2; exit 1; }
 [[ -n "$version" || -z "$bundle_archive" ]] || { echo 'Specify --version when using an offline bundle.' >&2; exit 1; }
 [[ -z "$version" || "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify --version server-vX.Y.Z.' >&2; exit 1; }
@@ -116,12 +126,17 @@ fi
 # previous updater predates backups get them by running update.sh again. Failures only warn.
 ensure_backups() {
     local script
-    for script in backup.sh restore.sh; do
+    for script in backup.sh cleanup.sh restore.sh; do
         if [[ -f "$bundle/$script" ]]; then install -m 0700 "$bundle/$script" "$install_dir/$script"; fi
     done
+    # The nightly cleanup runs in the Runner now: remove the old host timer. Failures only warn.
+    if [[ -f "$install_dir/cleanup.sh" ]]; then
+        bash "$install_dir/cleanup.sh" --install-dir "$install_dir" --remove-timer \
+            || echo "Warning: the old host cleanup timer could not be removed. Run: sudo bash $install_dir/cleanup.sh --remove-timer" >&2
+    fi
     [[ -f "$install_dir/backup.sh" ]] || return 0
     if bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer \
-        && { [[ -s "$config_dir/secrets/backup-key" && -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then
+        && { [[ -s "$config_dir/backup-recipient" && -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then
         return 0
     fi
     echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
@@ -133,18 +148,83 @@ ensure_update_trigger() {
     [[ -f "$install_dir/update-from-request.sh" ]] || return 0
     bash "$install_dir/update-from-request.sh" --install-units --install-dir "$install_dir" \
         || { echo "Updates from Studio could not be enabled; nothing was changed. Fix it, then rerun: sudo bash $install_dir/update-from-request.sh --install-units" >&2; exit 1; }
+    # Restarting the server and installing OS updates from Studio use the same pattern. Failures only warn: updates do not depend on them.
+    local name
+    for name in restart os-update; do
+        if [[ -f "$bundle/$name-from-request.sh" ]]; then install -m 0700 "$bundle/$name-from-request.sh" "$install_dir/$name-from-request.sh"; fi
+        [[ -f "$install_dir/$name-from-request.sh" ]] || continue
+        bash "$install_dir/$name-from-request.sh" --install-units --install-dir "$install_dir" \
+            || echo "Warning: $name from Studio could not be enabled. Run: sudo bash $install_dir/$name-from-request.sh --install-units" >&2
+    done
+}
+# automaton.monster only: the "Deploy production" website step needs a root-owned script, compose file and sudoers line,
+# and the deploy key's forced command must allow it. They come from this checksum-verified bundle, never from a download.
+# Only a host with a website-green compose container gets them; self-hosted servers are not changed. Failures only warn.
+# AUTOMATON_UPDATE_TEST lets the script tests use a temporary root and passwd file.
+website_host_root=''
+website_passwd=/etc/passwd
+if [[ -n "${AUTOMATON_UPDATE_TEST:-}" ]]; then website_host_root=${AUTOMATON_HOST_ROOT:-}; website_passwd=${AUTOMATON_PASSWD_FILE:-/etc/passwd}; fi
+put_root_file() {  # source destination mode: replace atomically unless it is already identical, root-owned, with that mode
+    local source=$1 destination=$2 mode=$3
+    if [[ ! -L "$destination" ]] && cmp -s "$source" "$destination" && [[ "$(stat -c '%a %U:%G' "$destination")" == "$mode root:root" ]]; then return 0; fi
+    install -o root -g root -m "$mode" "$source" "$destination.new" && mv -f "$destination.new" "$destination" || { rm -f "$destination.new"; return 1; }
+    echo "Installed $destination"
+}
+website_deploy_user() {  # the one account whose authorized_keys has a key locked to the deploy forced command
+    local name home uid matches=()
+    while IFS=: read -r name _ uid _ _ home _; do
+        [[ "$uid" =~ ^[0-9]+$ && "$uid" != 0 && "$name" =~ ^[a-z_][a-z0-9_-]*$ && -f "$home/.ssh/authorized_keys" ]] || continue
+        if grep -Eq '^[^#]*command="/usr/local/bin/automaton-deploy"' "$home/.ssh/authorized_keys"; then matches+=("$name"); fi
+    done < "$website_passwd"
+    [[ ${#matches[@]} == 1 ]] || return 1
+    printf '%s\n' "${matches[0]}"
+}
+install_website_deploy() {
+    local files="$bundle/production-host" bin="$website_host_root/usr/local/bin" lib="$website_host_root/usr/local/lib/automaton"
+    local sudoers_dir="$website_host_root/etc/sudoers.d" user
+    [[ -f "$files/automaton-deploy-website" && -f "$files/docker-compose.website.yml" ]] || return 0
+    [[ -n "$(docker ps -aq --filter label=com.docker.compose.service=website-green)" ]] || return 0
+    install -d -o root -g root -m 755 "$bin" "$lib" || return 1
+    [[ -d "$sudoers_dir" ]] || install -d -o root -g root -m 750 "$sudoers_dir" || return 1  # an existing directory keeps its mode
+    put_root_file "$files/automaton-deploy-website" "$bin/automaton-deploy-website" 755 || return 1
+    put_root_file "$files/docker-compose.website.yml" "$lib/docker-compose.website.yml" 644 || return 1
+    if ! user=$(website_deploy_user); then
+        echo 'No single account has an authorized_keys line locked to /usr/local/bin/automaton-deploy; the sudoers line for the website deploy was not installed.' >&2
+        return 1
+    fi
+    # No argument wildcard (sudo-rs rejects it): the script and the forced command both check the version themselves.
+    printf '%s ALL=(root) NOPASSWD: /usr/local/bin/automaton-deploy-website\n' "$user" > "$working/sudoers"
+    if ! visudo -cf "$working/sudoers" >/dev/null; then
+        echo 'The sudoers line for the website deploy did not validate; it was not installed.' >&2
+        return 1
+    fi
+    put_root_file "$working/sudoers" "$sudoers_dir/automaton-deploy-website" 440 || return 1
+    [[ -f "$bin/automaton-deploy" && ! -L "$bin/automaton-deploy" ]] || return 0
+    cat > "$working/automaton-deploy" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/bin/bash\ /opt/automaton-server/update\.sh\ --version\ server-v[0-9]+\.[0-9]+\.[0-9]+$ \
+  || "${SSH_ORIGINAL_COMMAND:-}" =~ ^sudo\ /usr/local/bin/automaton-deploy-website\ [0-9]+\.[0-9]+\.[0-9]+$ ]] \
+  || { echo "refused"; exit 1; }
+exec $SSH_ORIGINAL_COMMAND
+SCRIPT
+    put_root_file "$working/automaton-deploy" "$bin/automaton-deploy" 755
+}
+ensure_website_deploy() {
+    install_website_deploy || echo 'Warning: the website deploy step could not be set up on this host. Fix it, then rerun the update.' >&2
 }
 # Releases run on PostgreSQL. An installation that still runs MySQL must not be switched silently:
 # its data has to be migrated first, and the old backup and restore scripts stay in place until then.
 if grep -q '^MYSQL_IMAGE=' "$install_dir/release.env"; then
     echo 'This installation still runs on MySQL; this release uses PostgreSQL.' >&2
-    echo 'Nothing was changed. Migrate the data to PostgreSQL first with migrate-to-postgresql.sh (docs/prod/migrate-to-postgresql.md, issue #587), then update.' >&2
+    echo 'Nothing was changed. Migrate the data to PostgreSQL first with migrate-to-postgresql.sh (src/automaton-vue/docs/update-server.md#move-a-mysql-server-to-postgresql, issue #587), then update.' >&2
     exit 1
 fi
 if cmp -s "$bundle/release.env" "$install_dir/release.env"; then
     echo 'This release is already installed.'
     ensure_backups
     ensure_update_trigger
+    ensure_website_deploy
     exit 0
 fi
 if [[ -f "$install_dir/version" ]]; then
@@ -206,6 +286,10 @@ application_services=()
 for service in $new_release_services; do
     [[ " postgres rabbitmq traefik " == *" $service "* ]] || application_services+=("$service")
 done
+old_application_services=()
+for service in $old_release_services; do
+    [[ " postgres rabbitmq traefik " == *" $service "* ]] || old_application_services+=("$service")
+done
 for service in $old_release_services; do
     container=$("${old_compose[@]}" ps -q "$service")
     [[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || { echo "$service is not running; repair the installation before updating." >&2; exit 1; }
@@ -237,7 +321,23 @@ fi
 disk_path=$backup_root
 while [[ ! -d "$disk_path" ]]; do disk_path=$(dirname -- "$disk_path"); done
 available_kb=$(df -Pk "$disk_path" | awk 'NR==2 {print $4}')
-(( available_kb >= 10485760 )) || { echo 'At least 10 GiB free disk space is required before updating.' >&2; exit 1; }
+if (( available_kb < 10485760 )); then
+    # Short on space: free what Docker can rebuild or pull again (unused images, build cache) and check again.
+    # Never volumes, images of existing containers or the backups. Unused images go too, including rollback ones (pull them again).
+    echo 'Less than 10 GiB free: removing unused Docker images and build cache.'
+    docker image prune -a -f >/dev/null 2>&1 || echo 'Warning: could not remove unused images.' >&2
+    docker builder prune -f >/dev/null 2>&1 || echo 'Warning: could not remove build cache.' >&2
+    after_kb=$(df -Pk "$disk_path" | awk 'NR==2 {print $4}')
+    echo "Freed $(( (after_kb - available_kb) / 1024 )) MiB; $(( after_kb / 1048576 )) GiB free now."
+    available_kb=$after_kb
+fi
+if (( available_kb < 10485760 )); then
+    echo 'At least 10 GiB free disk space is required before updating, even after removing unused Docker images and build cache.' >&2
+    echo 'What uses the disk:' >&2
+    docker system df >&2 || true
+    echo "Backups in $backup_root: $(du -sh "$backup_root" 2>/dev/null | cut -f1)" >&2
+    exit 1
+fi
 
 domain=$(python3 - "$config_dir/installation.json" <<'PY'
 import json, sys
@@ -260,6 +360,9 @@ worker_container=$("${old_compose[@]}" ps -q worker)
 docker cp "$api_container:/app/data-protection-keys/." - | gzip > "$backup/api-keys.tar.gz"
 docker cp "$worker_container:/app/data-protection-keys/." - | gzip > "$backup/worker-keys.tar.gz"
 docker cp "$api_container:/app/AppData/." - | gzip > "$backup/api-data.tar.gz"
+# Applied EF migrations before the update; a different count afterwards means a migration ran and the database must be restored on rollback.
+migration_count() { "$@" exec -T postgres psql -U automaton -d automaton -tAc 'SELECT count(*) FROM "__EFMigrationsHistory"' < /dev/null 2>/dev/null | tr -d '[:space:]' || true; }
+migrations_before=$(migration_count "${old_compose[@]}")
 "${old_compose[@]}" exec -T postgres pg_dump -U automaton -d automaton --format=custom --compress=6 < /dev/null > "$backup/database.dump"
 "${old_compose[@]}" exec -T postgres pg_restore --list < "$backup/database.dump" > /dev/null || { echo 'Database backup did not complete.' >&2; exit 1; }
 for archive in config api-keys worker-keys api-data; do tar -tzf "$backup/$archive.tar.gz" >/dev/null; done
@@ -281,9 +384,32 @@ if ! python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-studio-p
     echo "Studio route configuration failed; services were not changed. Fix the reported configuration file, or restore it from $backup/config.tar.gz, then rerun the update." >&2
     exit 1
 fi
+echo 'Adding the custom-domain certificate resolver if missing.'
+if ! resolver_output=$(python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-custom-domain-resolver); then
+    echo "Custom-domain resolver configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
+    exit 1
+fi
+printf '%s\n' "$resolver_output" | grep -v '^RESULT=' || true
+restart_traefik=false
+if [[ "$resolver_output" == *'RESULT=changed'* ]]; then restart_traefik=true; fi
+echo 'Turning on the Traefik access log for fail2ban if missing.'
+if ! access_log_output=$(python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-access-log); then
+    echo "Access log configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
+    exit 1
+fi
+printf '%s\n' "$access_log_output" | grep -v '^RESULT=' || true
+if [[ "$access_log_output" == *'RESULT=changed'* ]]; then restart_traefik=true; fi
+echo 'Giving remote Runners the public broker address if a private one is set.'
+if ! broker_output=$(python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-runner-broker-host); then
+    echo "Runner broker configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
+    exit 1
+fi
+printf '%s\n' "$broker_output" | grep -v '^RESULT=' || true
 old_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
 new_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$bundle/release.env" | cut -d= -f2-)
 recreate=()
+[[ "$restart_traefik" == true || "$broker_output" == *'RESULT=changed'* ]] && restart_traefik=true
+[[ "$restart_traefik" != true ]] || recreate=(--force-recreate)  # API reads the settings file only at startup.
 if [[ "$old_runner_image" != "$new_runner_image" ]]; then
     [[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }
     # Only new Runner installations use this image; running Runners are not changed.
@@ -297,16 +423,47 @@ ensure_update_trigger
 echo 'Backup verified. Pulling release images.'
 "${new_compose[@]}" pull "${application_services[@]}"
 echo "Updating ${application_services[*]}."
+public_checks_pass() {
+    curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]' \
+        && api_health=$(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://api.$domain/health") \
+        && printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' \
+        && curl --fail --silent --show-error "https://studio.$domain/" >/dev/null
+}
+# A failed update goes back to the previous release by itself: reinstall its (still local) images and, when a migration ran,
+# restore the pre-update database from the backup. The installed manifest, version and scripts are only replaced after success.
+rollback() {
+    echo "Update failed: $1. Rolling back to ${current_version:-the previous release}." >&2
+    local migrations_after restored=no
+    migrations_after=$(migration_count "${new_compose[@]}")
+    if [[ "$migrations_after" != "$migrations_before" || -z "$migrations_after" ]]; then
+        echo 'A migration may have run: restoring the database from the pre-update backup.' >&2
+        "${new_compose[@]}" stop "${application_services[@]}" >&2 || true
+        # pg_restore --clean would leave tables, sequences and types the new migration created, so the next update would fail
+        # on them for good. Restore into an empty schema, all or nothing.
+        if "${old_compose[@]}" exec -T postgres psql -U automaton -d automaton -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >&2 \
+            && "${old_compose[@]}" exec -T postgres pg_restore --single-transaction --exit-on-error --no-owner -U automaton -d automaton < "$backup/database.dump" >&2; then
+            restored=yes
+        else
+            echo "Database restore failed. Recovery backup: $backup. Assess the database before retrying." >&2
+        fi
+    fi
+    if "${old_compose[@]}" up -d --wait --wait-timeout 600 --force-recreate "${old_application_services[@]}" >&2 \
+        && { [[ "$restart_traefik" != true ]] || "${old_compose[@]}" restart traefik >&2; } && public_checks_pass; then
+        echo "Rolled back: the server answers on ${current_version:-the previous release}. Database restored: $restored. Recovery backup: $backup" >&2
+    else
+        echo "Rollback did not restore a healthy server. Recovery backup: $backup. Assess the services before retrying." >&2
+    fi
+    exit 1
+}
 if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${application_services[@]}"; then
-    echo "Update did not reach healthy state. Previous manifest and recovery backup remain at $backup. Do not retry until the database and running services are assessed." >&2
-    exit 1
+    rollback 'services did not become healthy'
 fi
-if ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]' \
-    || ! api_health=$(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://api.$domain/health") \
-    || ! printf '%s' "$api_health" | python3 -c 'import json,sys; t=sys.stdin.read().strip(); assert t == "ok" or json.loads(t)["status"] == "ok"' \
-    || ! curl --fail --silent --show-error "https://studio.$domain/" >/dev/null; then
-    echo "Public route validation failed. Previous manifest and recovery backup remain at $backup. Assess the services before recovery." >&2
-    exit 1
+if [[ "$restart_traefik" == true ]]; then
+    echo 'Restarting Traefik to load the new certificate resolver.'
+    "${new_compose[@]}" restart traefik || rollback 'Traefik did not restart'
+fi
+if ! public_checks_pass; then
+    rollback 'public route validation failed'
 fi
 if [[ " ${application_services[*]} " == *' store '* ]] && ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://store.$domain/" >/dev/null; then
     printf 'Warning: the app store did not answer at https://store.%s/. Point a DNS record for store.%s to this server, then restart Traefik so it requests the certificate; the rest of the update is complete.\n' "$domain" "$domain" >&2
@@ -316,11 +473,26 @@ install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
 install -m 0644 "$bundle/version" "$install_dir/version"
 install -m 0700 "$bundle/update.sh" "$install_dir/update.sh"
 install -m 0700 "$bundle/install.sh" "$install_dir/install.sh"
-for tool in configure.py explain_certificate_failure.py acme_responder.py check_dns.py; do
+for tool in configure.py explain_certificate_failure.py acme_responder.py check_dns.py fail2ban.sh watchdog.py; do
     [[ ! -f "$bundle/$tool" ]] || install -m 0700 "$bundle/$tool" "$install_dir/$tool"
 done
+if [[ -d "$bundle/fail2ban" ]]; then
+    { rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"; } \
+        || echo 'Warning: the fail2ban files could not be copied.' >&2
+fi
 echo "Updated to $version. Recovery backup: $backup"
 ensure_backups
+ensure_website_deploy
+# Scanners and password guessers are banned at the firewall by default; the update is complete without it.
+if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
+    bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \
+        || echo "Warning: fail2ban could not be set up. Run: sudo bash $install_dir/fail2ban.sh" >&2
+fi
+# Alerts when the containers, the data or the backup are missing; the update is complete without it.
+if [[ -f "$install_dir/watchdog.py" ]]; then
+    python3 "$install_dir/watchdog.py" --install-units --install-dir "$install_dir" \
+        || echo "Warning: the watchdog could not be enabled. Run: sudo python3 $install_dir/watchdog.py --install-units" >&2
+fi
 # Housekeeping runs only after success; a failure here never affects the completed update.
 # Only directories this updater created (server-v<version>-<UTC time>-<random>) are rotated.
 mapfile -t old_backups < <(find "$backup_root" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended \

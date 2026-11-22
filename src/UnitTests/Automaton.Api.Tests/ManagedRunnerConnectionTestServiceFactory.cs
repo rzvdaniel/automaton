@@ -43,7 +43,6 @@ internal static class ManagedRunnerConnectionTestServiceFactory
             new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext, RunnerExecutionTestServices.Revocation(db)),
             sessionService,
             queryService,
-            new RunnerFlowExecutionService(null!),
             new RunnerConnectionLifecycleService(
                 db, authorization, new ApiInstanceIdentityService(), sessionService));
     }

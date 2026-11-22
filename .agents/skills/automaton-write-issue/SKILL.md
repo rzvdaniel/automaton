@@ -15,6 +15,9 @@ What should be true, in plain words: "An app owner can delete their app after lo
 
 ## Body
 
+The section names are those of the issue forms in `.github/ISSUE_TEMPLATE/` (`feature.yml`, `bug.yml`), the one source;
+`.agents/tools/issue-check.py` labels an issue `needs-shape` when a required one is missing. Related is optional.
+
 For a bug:
 
 ```markdown
@@ -33,6 +36,9 @@ What should happen instead.
 
 **Done when**
 What will be checked on the test server (and, if it shows there, on production).
+
+**Related**
+Optional: issues, PRs and files by path.
 ```
 
 For a feature:
@@ -45,10 +51,21 @@ As a <role>, I want <capability>, so that <benefit>.
 A concrete case: who does what, and what they see.
 
 **Suggestion**
-The simplest approach you see, and what is out of scope.
+- The simplest approach you see, one idea per bullet.
+- A table when there are options (see Formatting):
+
+  | Mode | What happens |
+  |---|---|
+  | Off | nothing |
+  | **Notify** (default) | "0.2.174 available", with the release notes |
+
+- Out of scope: what this issue will not do.
 
 **Done when**
 What will be checked on the test server, as a real user would do it.
+
+**Related**
+Optional: issues, PRs and files by path.
 ```
 
 "Done when" names an end-to-end check, not "tests pass". If only a unit test can cover it (for example it needs a
@@ -56,16 +73,21 @@ fresh server), say so; the issue then gets `verified-partial` until someone runs
 
 Keep it short. Link related issues and PRs by number. No credentials, hostnames from secrets, or customer data.
 
+## Formatting
+
+So issues read well for people and agents alike:
+
+- A **table** for options, modes, settings, permissions or a before/after: one row per item, a short "What happens" column.
+- A **Mermaid** diagram (`flowchart` or `sequenceDiagram` in a `mermaid` code block) only when a flow has 3+ steps or 3+
+  parts talking to each other, under about 10 nodes. GitHub renders it; agents read the text.
+- Numbered lists for steps, bullets for everything else; one idea per bullet.
+- Code blocks for commands, errors, config and file paths. Quote error text exactly.
+- Bold only the key term at the start of a bullet, or the default choice.
+- No ASCII-art boxes, images of text or emoji. Plain words; name things the way the UI names them.
+
 ## Board
 
-Issues about the app catalog and its ecosystem (parent #729) live on their own board, https://github.com/users/rzvdaniel/projects/2 (Status and Priority only, no Plan): use `gh project item-add 2` and make the issue a sub-issue of #729. Launch work (articles, demo, video, accounts, launch checks; label `launch`, parent #560) lives on the Public launch board, https://github.com/users/rzvdaniel/projects/3 (Status, Priority and Who: Owner or Claude). Ideas and explorations that are not planned work (label `research`) go on the Research board, https://github.com/users/rzvdaniel/projects/5, and move to the roadmap board when decided. Security audit findings have their own board, https://github.com/users/rzvdaniel/projects/4. Everything else goes on the roadmap board below.
-
-Add the issue to the roadmap board and set the fields:
-
-```sh
-gh project item-add 1 --owner rzvdaniel --url <issue-url>
-```
-
-Then set Status (Todo, or In Progress if you start now), Priority (P1 next, P2 soon, P3 later) and Plan when one fits,
-with `gh project item-edit`. If it belongs under a parent issue, add it as a sub-issue
-(`gh api -X POST repos/rzvdaniel/automaton/issues/<parent>/sub_issues -F sub_issue_id=<issue id>`).
+If you maintain the project boards, put the issue on the right board with its fields and parent issue, as
+`.agents/environment.md` describes (boards, fields, parents per kind of work). Contributors without board access skip this: the
+maintainers place the issue. Add a sub-issue with
+`gh api -X POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<issue id>`.

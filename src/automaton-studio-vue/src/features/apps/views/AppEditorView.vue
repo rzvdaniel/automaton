@@ -1,37 +1,42 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import Button from 'primevue/button'
+import Menu from 'primevue/menu'
 import ProgressSpinner from 'primevue/progressspinner'
-import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
-import ActionSchedulingPanel from '../components/ActionSchedulingPanel.vue'
-import AppDeploymentTargets from '../components/AppDeploymentTargets.vue'
-import AppMadeOf from '../components/AppMadeOf.vue'
+import AppActions from '../components/AppActions.vue'
+import AppActivity from '../components/AppActivity.vue'
+import AppSourceTab from '../components/AppSourceTab.vue'
+import AppDocsTab from '../components/AppDocsTab.vue'
+import AppAdminTab from '@/features/admin/components/AppAdminTab.vue'
+import AppDomainTab from '../components/AppDomainTab.vue'
+import AppSecrets from '../components/AppSecrets.vue'
+import AppStoreListing from '../components/AppStoreListing.vue'
 import AppMark from '../components/AppMark.vue'
-import AppOperationsOverview from '../components/AppOperationsOverview.vue'
-import AppRuntimeOperations from '../components/AppRuntimeOperations.vue'
-import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
-import AppSettings from '../components/AppSettings.vue'
+import PinToHomeButton from '@/features/home/components/PinToHomeButton.vue'
+import { useHomeStore } from '@/features/home/stores/home.store'
+import AppOverview from '../components/AppOverview.vue'
+import AppSettingsPage from '../components/AppSettingsPage.vue'
 import ShareDialog from '../components/ShareDialog.vue'
 import {
-  APP_SUB_VIEWS,
-  APP_TABS,
+  appTabs,
   resolveAppViewFromQuery,
-  tabForView,
   withoutAuthoringQuery,
   type AppViewKey,
 } from '../app-navigation'
-import { appsService } from '../services/apps.service'
+import { actionSchedulesService, type ActionModule, type ActionSchedule } from '../services/action-schedules.service'
+import { appsService, type AppActionExecution } from '../services/apps.service'
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { AppDeploymentTarget } from '../types/apps.types'
-import type { RuntimeLogConnectionState } from '../types/console.types'
+import type { AppDeploymentTarget, AppSharing } from '../types/apps.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
-import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
-import { isActionOnlyApp } from '../utils/app-operational-summary'
-import { getPublishingConsistencyIssue } from '../utils/publishing-state'
-import { resolveViewingTarget } from '../utils/viewing-target'
+import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl, withFirstPage } from '../utils/public-app-url'
+import { accessLabel, appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
+import { useDeleteApp } from '../utils/use-delete-app'
+import { adminAppsService, type AdminAppPermissionStatus } from '@/features/admin/services/adminAppsService'
+import { notifyWaitingChanged } from '@/features/admin/composables/waitingApprovals'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const route = useRoute()
@@ -40,75 +45,145 @@ const toast = useToast()
 const editorStore = useAppEditorStore()
 
 const appId = computed(() => String(route.params.id ?? ''))
-const publishingStateLabel = computed(() => editorStore.currentApp && getPublishingConsistencyIssue(editorStore.currentApp)
-  ? 'Needs review'
-  : editorStore.isPublished ? 'Published' : 'Unpublished')
-const activeView = ref<AppViewKey>(resolveAppViewFromQuery(route.query))
-const activeTab = computed(() => tabForView(activeView.value))
-const subViews = computed(() => APP_SUB_VIEWS[activeTab.value] ?? [])
+// Admin → Apps links here with ?view=admin (an approval link may say ?tab=admin).
+const activeView = ref<AppViewKey>(route.query.tab === 'admin' ? 'admin' : resolveAppViewFromQuery(route.query))
+const roles = useAuthStore().user?.roles ?? []
+const isAdministrator = roles.includes('SysAdmin') || roles.includes('Admin')
+// Only system administrators approve permissions (the endpoint is SysAdmin-only).
+const canApprove = roles.includes('SysAdmin')
+const waitingPermissions = ref<string[]>([])
+const approvingPermission = ref(false)
+async function loadWaitingPermissions() {
+  if (!canApprove || !appId.value) return
+  try {
+    const items: AdminAppPermissionStatus[] = await adminAppsService.getPermissions(appId.value)
+    waitingPermissions.value = items.filter((item) => item.status === 'Pending').map((item) => item.permission)
+  } catch {
+    waitingPermissions.value = []
+  }
+}
+async function decidePermission(permission: string, approved: boolean) {
+  approvingPermission.value = true
+  try {
+    await adminAppsService.setPermission(appId.value, permission, approved)
+    toast.add({ severity: 'success', summary: approved ? 'Permission approved' : 'Permission rejected', life: 2500 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Permission update failed', life: 3000 })
+  } finally {
+    approvingPermission.value = false
+    await permissionsChanged()
+  }
+}
+async function permissionsChanged() {
+  await loadWaitingPermissions()
+  notifyWaitingChanged()
+  permissionsVersion.value++
+}
+const permissionsVersion = ref(0)
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
-const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
-const selectedLogTargetId = ref<string | null>(null)
-const runtimeLogConnectionState = ref<RuntimeLogConnectionState>(backendRuntimeLogClient.connectionState)
-const isRuntimeLogSubscribed = ref(false)
-const runtimeLogSubscriptionFailed = ref(false)
-const targetsRevision = ref(0)
+const executions = ref<AppActionExecution[]>([])
+const schedules = ref<ActionSchedule[]>([])
+const actions = ref<ActionModule[]>([])
+const sharing = ref<AppSharing | null>(null)
 const showShareDialog = ref(false)
-const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
-const publicAppUrl = computed(() => {
-  const app = editorStore.currentApp
-  return app?.isPublished && app.canLaunchPublicly && app.publicUrl ? getPublishedAppUrl(app.publicUrl) : ''
+const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const moreMenu = ref<InstanceType<typeof Menu> | null>(null)
+const savedSecretCount = ref(0)
+const starting = ref(false)
+const activityRefresh = ref(0)
+let poll: ReturnType<typeof setInterval> | null = null
+let unsubscribeBackendRuntimeLogs: (() => void) | null = null
+
+const app = computed(() => editorStore.currentApp)
+const canManage = computed(() => app.value?.canUpdate !== false)
+const hasSecrets = computed(() => (app.value?.application?.secrets?.length ?? 0) > 0 || savedSecretCount.value > 0)
+const tabs = computed(() => appTabs({
+  hasActions: actions.value.length > 0,
+  hasSecrets: hasSecrets.value,
+  canManage: canManage.value,
+  isPublishable: kind.value !== 'tool',
+  isAdmin: isAdministrator,
+  waitingPermissions: waitingPermissions.value.length,
+}))
+/** The tab shown: a link to a tab this app or person does not have shows Overview. */
+const shownView = computed<AppViewKey>(() => tabs.value.some((tab) => tab.key === activeView.value) ? activeView.value : 'overview')
+const { askDelete } = useDeleteApp(() => app.value!)
+const moreItems = computed(() => [
+  ...(canManage.value ? [{ label: 'Delete app…', icon: 'pi pi-trash', class: 'menu-danger', command: askDelete }] : []),
+])
+const isPublicApp = computed(() => sharing.value?.audience === 'internet')
+const publicHost = computed(() => (app.value?.publicUrl ? new URL(getPublishedAppUrl(app.value.publicUrl)).host : ''))
+const kind = computed(() => (app.value ? appKindOf(app.value) : 'web'))
+const liveTarget = computed(() => getLiveTarget(deploymentTargets.value))
+const lastRun = computed(() => [...executions.value].sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0] ?? null)
+const health = computed(() => getAppHealth(editorStore.applicationState, lastRun.value))
+
+/** The public address, once the app is published. */
+// Mirrors the server's "open to the internet": published, no sign-in and a public runtime
+// (the single-app API does not return canLaunchPublicly, which is why it is not used here).
+const isOpenToInternet = computed(() =>
+  !!app.value?.isPublished && !app.value.requiresAuthentication && app.value.runtimeVisibility !== 'private')
+const publicAppUrl = computed(() => kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed && isOpenToInternet.value && app.value?.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : '')
+/** The sign-in address: opens for the owner and the people it is shared with. */
+const privateAppUrl = computed(() =>
+  app.value && kind.value !== 'tool' && liveTarget.value?.genericRuntimeDeployed ? getDeployedAppUrl(app.value.id) : '')
+/** The address of the app itself (an API's base URL); empty until it is live. */
+const address = computed(() => (kind.value === 'tool' ? '' : publicAppUrl.value || privateAppUrl.value))
+const openAppUrl = computed(() => withFirstPage(publicAppUrl.value, app.value) || (privateAppUrl.value ? getStudioApplicationUrl(app.value!.id) : ''))
+const access = computed(() => kind.value === 'tool' || !sharing.value ? '' : accessLabel(sharing.value.audience))
+const apiReferenceUrl = computed(() => {
+  const path = app.value?.application?.openApi
+  return address.value && path ? new URL(path, address.value).toString() : ''
 })
-const openAppUrl = computed(() => {
-  const app = editorStore.currentApp
-  if (!app || isActionOnlyApp(app)) return ''
-  if (publicAppUrl.value) return publicAppUrl.value
-  return getLiveTarget(deploymentTargets.value)?.genericRuntimeDeployed ? getStudioApplicationUrl(app.id) : ''
-})
-const addressText = computed(() => {
-  const app = editorStore.currentApp
-  if (!app || isActionOnlyApp(app)) return 'Runs when started, no web address'
-  const url = publicAppUrl.value || (openAppUrl.value ? getDeployedAppUrl(app.id) : '')
-  return url ? new URL(url).host : 'Not live yet'
-})
+const runMenu = computed(() => actions.value.map((action) => ({
+  label: action.name || action.key,
+  command: () => void runNow(action.key),
+})))
+const liveOutputAvailable = computed(() => kind.value !== 'tool' && editorStore.applicationState.status === 'running')
+const runtimeLogs = computed(() => editorStore.consoleEntries.filter((entry) =>
+  entry.type === 'runtime-log' && entry.deploymentTargetId === liveTarget.value?.id))
 
 function openApp() {
   if (openAppUrl.value) window.open(openAppUrl.value, '_blank', 'noopener')
 }
 
-function handleMadeOfSelect(key: 'settings' | 'advanced') {
-  handleNavigation(key === 'advanced' ? 'runtime' : key)
+async function copyAddress() {
+  try {
+    await navigator.clipboard.writeText(address.value)
+    toast.add({ severity: 'success', summary: 'Address copied', life: 2000 })
+  } catch {
+    toast.add({ severity: 'warn', summary: 'Copy this address', detail: address.value, life: 6000 })
+  }
 }
-let unsubscribeBackendRuntimeLogs: (() => void) | null = null
-let unsubscribeBackendRuntimeLogState: (() => void) | null = null
 
-watch(activeView, (view) => {
-  if (view === 'logs') void nextTick(() => runtimeLogsRef.value?.loadLogs())
-})
+// Another app's page reuses this view, so reload the waiting requests whenever the app changes.
+watch(appId, () => { waitingPermissions.value = []; void loadWaitingPermissions() }, { immediate: true })
 
-watch(() => route.query.target, () => {
-  if (deploymentTargets.value.length > 0) void selectViewingTargetFromRoute()
-})
-
+const homeStore = useHomeStore()
 onMounted(async () => {
+  void homeStore.ensureLoaded()
   // ?share=1 (and the old ?view=publishing) open the Share dialog.
   const wantsShare = route.query.share === '1' || route.query.view === 'publishing'
   await router.replace({ query: withoutAuthoringQuery(route.query) })
 
   unsubscribeBackendRuntimeLogs = backendRuntimeLogClient.onLog((event) => {
     if (event.appId !== appId.value) return
-    if (selectedLogTargetId.value && event.deploymentTargetId !== selectedLogTargetId.value) return
+    if (liveTarget.value && event.deploymentTargetId !== liveTarget.value.id) return
     editorStore.addBackendRuntimeLogEntry(event)
-  })
-  unsubscribeBackendRuntimeLogState = backendRuntimeLogClient.onConnectionStateChange((state) => {
-    runtimeLogConnectionState.value = state
   })
 
   window.addEventListener('message', handleApplicationMessage)
 
   try {
     await editorStore.loadApp(appId.value)
-    handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
+    // An administrator opening someone else's app may not list its targets; the page still opens.
+    await handleTargetsChanged(await appsService.listDeploymentTargets(appId.value).catch((error: unknown) => {
+      if (isAdministrator) return []
+      throw error
+    }))
+    void loadWhatItDoes()
+    void loadSharing()
+    void loadSecretCount()
     if (wantsShare) showShareDialog.value = true
   } catch (error: unknown) {
     toast.add({
@@ -126,11 +201,65 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('message', handleApplicationMessage)
   document.querySelector('.app-main')?.classList.remove('app-main--fullscreen')
+  if (poll) clearInterval(poll)
   void backendRuntimeLogClient.unsubscribe(appId.value)
   unsubscribeBackendRuntimeLogs?.()
-  unsubscribeBackendRuntimeLogState?.()
   editorStore.reset()
 })
+
+watch(executions, (runs) => {
+  const active = runs.some((run) => isActiveRun(run.status))
+  if (active && !poll) poll = setInterval(() => void refreshExecutions(), 3000)
+  if (!active && poll) {
+    clearInterval(poll)
+    poll = null
+  }
+})
+
+async function refreshExecutions() {
+  try {
+    executions.value = await appsService.listActionExecutions(appId.value)
+    if (activeView.value === 'activity') activityRefresh.value++
+  } catch {
+    // Keep the list we have; the next poll tries again.
+  }
+}
+
+/** Actions, their schedules and runs: what Overview and the header button need. */
+async function loadWhatItDoes() {
+  if (!app.value) return
+  const id = app.value.id
+  const [runs, list, allSchedules] = await Promise.allSettled([
+    appsService.listActionExecutions(id),
+    kind.value === 'site' ? Promise.resolve([] as ActionModule[]) : actionSchedulesService.listActions(id),
+    actionSchedulesService.listSchedules(),
+  ])
+  if (app.value?.id !== id) return
+  executions.value = runs.status === 'fulfilled' ? runs.value : []
+  actions.value = list.status === 'fulfilled' ? list.value : []
+  schedules.value = allSchedules.status === 'fulfilled' ? allSchedules.value.filter((item) => item.applicationId === id) : []
+}
+
+async function runNow(actionKey?: string) {
+  const key = actionKey ?? actions.value[0]?.key
+  if (!key) return
+  starting.value = true
+  try {
+    await appsService.runAction(appId.value, key, {})
+    toast.add({ severity: 'success', summary: `Started ${key}`, life: 2500 })
+    await refreshExecutions()
+    handleNavigation('activity')
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'It could not be started', detail: error instanceof Error ? error.message : undefined, life: 5000 })
+  } finally {
+    starting.value = false
+  }
+}
+
+function toggleRunMenu(event: Event) {
+  if (actions.value.length > 1) actionMenu.value?.toggle(event)
+  else void runNow()
+}
 
 function handleApplicationMessage(event: MessageEvent) {
   if (event.data?.type === 'requestToken') void handleTokenRequest(event)
@@ -183,210 +312,195 @@ function handleNavigation(view: AppViewKey) {
 }
 
 async function refreshTargets() {
-  handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
+  await handleTargetsChanged(await appsService.listDeploymentTargets(appId.value))
 }
 
-function handleTargetsChanged(targets: AppDeploymentTarget[]) {
+async function handleTargetsChanged(targets: AppDeploymentTarget[]) {
   deploymentTargets.value = targets
-  const liveTarget = getLiveTarget(targets)
-  editorStore.setDefaultTarget(liveTarget)
-  void selectViewingTargetFromRoute()
-}
-
-async function selectViewingTargetFromRoute() {
-  const requestedSlug = typeof route.query.target === 'string' ? route.query.target : ''
-  const { target, usedFallback } = resolveViewingTarget(deploymentTargets.value, requestedSlug)
-  if (target) await selectViewingTarget(target, usedFallback)
-}
-
-async function selectViewingTarget(target: AppDeploymentTarget, replaceRoute = false) {
-  selectedViewingTarget.value = target
-  selectedLogTargetId.value = target.id
-  isRuntimeLogSubscribed.value = false
-  runtimeLogSubscriptionFailed.value = false
-
-  if (replaceRoute || route.query.target !== target.slug) {
-    await router.replace({ query: { ...route.query, target: target.slug } })
+  const live = getLiveTarget(targets)
+  editorStore.setDefaultTarget(live)
+  if (!live?.runner) {
+    await backendRuntimeLogClient.unsubscribe(appId.value).catch(() => undefined)
+    return
   }
-
   try {
-    if (target.runner) {
-      await backendRuntimeLogClient.subscribe(target.appId, target.id)
-      isRuntimeLogSubscribed.value = backendRuntimeLogClient.isSubscribedTo(target.appId, target.id)
-    } else {
-      await backendRuntimeLogClient.unsubscribe(target.appId)
-    }
+    await backendRuntimeLogClient.subscribe(live.appId, live.id)
   } catch {
-    runtimeLogSubscriptionFailed.value = true
-    toast.add({
-      severity: 'warn',
-      summary: 'Live logs unavailable',
-      detail: 'The runtime selection changed, but log streaming could not be updated.',
-      life: 4000,
-    })
+    // Live output is optional; the rest of the page works without it.
   }
 }
 
-function handleSelectViewingTarget(target: AppDeploymentTarget) {
-  void selectViewingTarget(target)
+async function loadSecretCount() {
+  try {
+    const settingNames = (app.value?.application?.settings ?? []).map((item) => item.name)
+    savedSecretCount.value = (await appsService.listSecrets(appId.value)).filter((secret) => !settingNames.includes(secret.name)).length
+  } catch {
+    savedSecretCount.value = 0
+  }
 }
 
-async function handleViewTargetLogs(target: AppDeploymentTarget) {
-  await selectViewingTarget(target)
-  activeView.value = 'logs'
+/** The Share dialog links to the Domain and Store listing tabs. */
+function openFromShare(tab: 'domain' | 'store') {
+  showShareDialog.value = false
+  handleNavigation(tab)
+}
+
+async function loadSharing() {
+  try {
+    sharing.value = await appsService.getSharing(appId.value)
+  } catch {
+    sharing.value = null
+  }
 }
 
 async function handleSharingChanged() {
-  // Publishing state (and the Open app address) follows who can open the app.
+  void loadSharing()
+  // The address people open the app at follows who can open the app.
   await editorStore.refreshApp(appId.value)
 }
 </script>
 
 <template>
-  <div class="app-operations-view">
+  <div class="app-page">
     <div v-if="editorStore.isLoading" class="state-container">
       <ProgressSpinner />
       <p>Loading app...</p>
     </div>
 
-    <template v-else-if="editorStore.currentApp">
-      <header class="operations-header">
-        <div class="app-identity">
-          <Button icon="pi pi-arrow-left" aria-label="Back to apps" text rounded @click="router.push('/apps')" />
-          <AppMark :id="editorStore.currentApp.id" :name="editorStore.currentApp.name" :image-url="editorStore.currentApp.thumbnailUrl" :size="44" />
-          <div class="app-identity-text">
-            <h1>{{ editorStore.currentApp.name }}</h1>
-            <p v-if="editorStore.currentApp.summary" class="app-summary">{{ editorStore.currentApp.summary }}</p>
-            <div class="header-status">
-              <span class="app-address" data-testid="app-address">{{ addressText }}</span>
-              <Tag :value="editorStore.applicationState.label" :severity="editorStore.applicationState.severity" />
-              <Tag v-if="publishingStateLabel === 'Needs review'" value="Needs review" severity="warn" />
+    <template v-else-if="app">
+      <main class="page">
+        <nav class="crumb" aria-label="Breadcrumb"><RouterLink to="/apps">Apps</RouterLink> / {{ app.name }}</nav>
+        <header class="head">
+          <AppMark :id="app.id" :name="app.name" :image-url="app.thumbnailUrl" :size="52" />
+          <div class="head-text">
+            <div class="title-line">
+              <h1>{{ app.name }}</h1>
+              <span class="pill" :class="`pill--${health}`" data-testid="app-health">{{ health }}</span>
+              <button v-if="access && app.canUpdate !== false" type="button" class="pill pill--access" title="Change who can open it" data-testid="app-access" @click="showShareDialog = true">{{ access }}</button>
+              <span v-else-if="access" class="pill pill--access" data-testid="app-access">{{ access }}</span>
             </div>
+            <p v-if="app.summary" class="summary">{{ app.summary }}</p>
           </div>
+          <div class="head-actions">
+            <PinToHomeButton :app-id="app.id" :app-name="app.name" />
+            <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" icon="pi pi-share-alt" outlined data-testid="share-app" @click="showShareDialog = true" />
+            <template v-if="kind === 'tool'">
+              <Button
+                label="Run now"
+                v-if="app.canUpdate !== false"
+                icon="pi pi-play"
+                :loading="starting"
+                :disabled="actions.length === 0"
+                :title="actions.length === 0 ? 'No action is available. Deploy the app and bring its Runner online.' : undefined"
+                data-testid="run-now"
+                @click="toggleRunMenu"
+              />
+              <Menu ref="actionMenu" :model="runMenu" popup />
+            </template>
+            <template v-else-if="kind === 'api'">
+              <Button v-if="apiReferenceUrl" as="a" :href="apiReferenceUrl" target="_blank" rel="noopener noreferrer" label="API reference" severity="secondary" outlined />
+              <Button label="Copy address" icon="pi pi-copy" :disabled="!address" data-testid="copy-address" @click="copyAddress" />
+            </template>
+            <Button v-else-if="openAppUrl" label="Open app" icon="pi pi-external-link" data-testid="open-app" @click="openApp" />
+            <Button icon="pi pi-ellipsis-h" severity="secondary" outlined aria-label="More actions" aria-haspopup="true" data-testid="more-actions" @click="moreMenu?.toggle($event)" />
+            <Menu ref="moreMenu" :model="moreItems" popup />
+          </div>
+        </header>
+
+        <div class="tabs" role="tablist" aria-label="App sections">
+          <button
+            v-for="tab in tabs"
+            :key="tab.key"
+            type="button"
+            role="tab"
+            class="tab"
+            :class="{ on: activeView === tab.key }"
+            :aria-selected="activeView === tab.key"
+            @click="handleNavigation(tab.key)"
+          >{{ tab.label }}<span v-if="tab.badge" class="tab-badge" :aria-label="`${tab.badge} waiting for approval`" data-testid="admin-tab-badge">{{ tab.badge }}</span></button>
         </div>
-        <div class="header-actions">
-          <Button label="Share" icon="pi pi-share-alt" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
-          <Button v-if="openAppUrl" label="Open app" icon="pi pi-external-link" data-testid="open-app" @click="openApp" />
-        </div>
-      </header>
 
-      <nav class="app-tabs" aria-label="App page">
-        <button
-          v-for="tab in APP_TABS"
-          :key="tab.key"
-          type="button"
-          class="app-tab"
-          :class="{ active: activeTab === tab.key }"
-          :aria-current="activeTab === tab.key ? 'page' : undefined"
-          @click="handleNavigation(tab.view)"
-        >{{ tab.label }}</button>
-      </nav>
-
-      <nav v-if="subViews.length > 0" class="app-sub-tabs" aria-label="Sections">
-        <button
-          v-for="item in subViews"
-          :key="item.key"
-          type="button"
-          class="app-sub-tab"
-          :class="{ active: activeView === item.key }"
-          @click="handleNavigation(item.key)"
-        >{{ item.label }}</button>
-      </nav>
-
-      <div class="operations-shell">
-        <main class="operations-content">
-          <div v-if="activeView === 'overview'" class="overview-stack">
-            <AppMadeOf :app="editorStore.currentApp" @select="handleMadeOfSelect" />
-            <AppOperationsOverview
-              :app="editorStore.currentApp"
-              :targets="deploymentTargets"
-              :application-state="editorStore.applicationState"
-              @navigate="handleNavigation"
-              @share="showShareDialog = true"
-            />
-          </div>
-
-          <AppSettings
-            v-else-if="activeView === 'settings'"
-            key="settings-tab"
-            :sections="['basic', 'secrets', 'permissions']"
-            :targets-revision="targetsRevision"
-            class="settings-pane"
-          />
-
-          <AppRuntimeLogs
-            v-else-if="activeView === 'logs'"
-            ref="runtimeLogsRef"
-            :app-id="appId"
-            :app-name="editorStore.currentApp.name"
-            :targets="deploymentTargets"
-            :selected-target="selectedViewingTarget"
-            :live-logs="editorStore.consoleEntries"
-            :connection-state="runtimeLogConnectionState"
-            :is-stream-subscribed="isRuntimeLogSubscribed"
-            :stream-error="runtimeLogSubscriptionFailed"
-            @select-target="handleSelectViewingTarget"
-            @navigate="handleNavigation"
-          />
-
-          <AppDeploymentTargets
-            v-else-if="activeView === 'deployments'"
-            :app-id="appId"
-            :project-id="editorStore.currentApp.projectId"
-            :refresh-revision="targetsRevision"
-            :show-deploy-action="false"
-            class="padded-pane"
-            @view-logs="handleViewTargetLogs"
-            @targets-changed="handleTargetsChanged"
-          />
-
-          <ActionSchedulingPanel
-            v-else-if="activeView === 'actions'"
-            :key="appId"
-            :app-id="appId"
-          />
-
-          <AppRuntimeOperations
-            v-else-if="activeView === 'runtime'"
-            :app="editorStore.currentApp"
-            :targets="deploymentTargets"
-            :selected-target="selectedViewingTarget"
-            @select-target="handleSelectViewingTarget"
-            @navigate="handleNavigation"
-            @deployed="refreshTargets"
-          />
-
-          <AppSettings
-            v-else-if="activeView === 'targets'"
-            key="targets-tab"
-            :sections="['targets']"
-            :targets-revision="targetsRevision"
-            class="settings-pane"
-            @view-target-logs="handleViewTargetLogs"
-            @targets-changed="handleTargetsChanged"
-          />
-
-          <div v-else-if="activeView === 'contract'" class="padded-pane">
-            <h2 class="pane-title">Raw contract</h2>
-            <p class="pane-hint">The stack-neutral contract this app deploys with, as the API stores it.</p>
-            <pre class="contract-json" data-testid="raw-contract">{{ JSON.stringify(editorStore.currentApp.application, null, 2) }}</pre>
-          </div>
-
-          <AppSettings
-            v-else-if="activeView === 'more'"
-            key="more-tab"
-            :sections="['appearance', 'templates', 'connect', 'danger']"
-            :targets-revision="targetsRevision"
-            class="settings-pane"
-          />
-        </main>
-      </div>
+        <AppOverview
+          v-if="shownView === 'overview'"
+          :app="app"
+          :targets="deploymentTargets"
+          :executions="executions"
+          :schedules="schedules"
+          :actions="actions"
+          :address="address"
+          :public-address="publicAppUrl"
+          :private-address="privateAppUrl"
+          :sharing="sharing"
+          :waiting-permissions="waitingPermissions"
+          :permissions-version="permissionsVersion"
+          :deciding="approvingPermission"
+          @decide-permission="decidePermission"
+          @navigate="handleNavigation"
+          @share="showShareDialog = true"
+          @paused-changed="editorStore.refreshApp(appId)"
+          @targets-changed="refreshTargets"
+        />
+        <AppActions
+          v-else-if="shownView === 'actions'"
+          :app-id="app.id"
+          :paused="!!app.isPaused"
+          :can-update="canManage"
+          :actions="actions"
+          :schedules="schedules"
+          :executions="executions"
+          @navigate="handleNavigation"
+          @changed="loadWhatItDoes"
+        />
+        <AppActivity
+          v-else-if="shownView === 'activity'"
+          :app-id="app.id"
+          :executions="executions"
+          :live-output-available="liveOutputAvailable"
+          :live-logs="runtimeLogs"
+          :refresh-key="activityRefresh"
+          :deploy-target="kind === 'tool' ? null : liveTarget"
+          :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
+        />
+        <AppDocsTab v-else-if="shownView === 'docs'" :app-id="app.id" :description="app.description" />
+        <AppSourceTab v-else-if="shownView === 'source'" :app-id="app.id" :definition="app.application" />
+        <AppSecrets
+          v-else-if="shownView === 'secrets'"
+          :app-id="app.id"
+          :declared="app.application?.secrets"
+          :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
+        />
+        <AppDomainTab
+          v-else-if="shownView === 'domain'"
+          :app-id="app.id"
+          :app-name="app.name"
+          :is-public="isPublicApp"
+          :public-host="publicHost"
+          @share="showShareDialog = true"
+        />
+        <AppStoreListing
+          v-else-if="shownView === 'store'"
+          :app="app"
+          :sharing="sharing"
+          @changed="handleSharingChanged"
+          @share="showShareDialog = true"
+        />
+        <AppSettingsPage v-else-if="shownView === 'settings'" :app="app" />
+        <AppAdminTab
+          v-else-if="shownView === 'admin'"
+          :app-id="app.id"
+          :app-name="app.name"
+          :paused="!!app.isPaused"
+          @paused-changed="editorStore.refreshApp(appId)"
+          @permissions-changed="permissionsChanged"
+        />
+      </main>
 
       <ShareDialog
         v-model:visible="showShareDialog"
-        :app-id="editorStore.currentApp.id"
-        :app-name="editorStore.currentApp.name"
+        :app-id="app.id"
+        :app-name="app.name"
         @changed="handleSharingChanged"
+        @open="openFromShare"
       />
     </template>
 
@@ -399,164 +513,98 @@ async function handleSharingChanged() {
 </template>
 
 <style scoped>
-.app-operations-view {
-  display: flex;
-  flex-direction: column;
+.app-page {
   height: calc(100vh - 64px);
-  overflow: hidden;
-  background: var(--p-surface-ground);
-}
-
-.operations-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.8rem 1rem;
-  border-bottom: 1px solid var(--p-surface-border);
-  background: var(--p-surface-card);
-}
-
-.app-identity,
-.header-actions,
-.header-status {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.app-identity h1 {
-  margin: 0 0 0.35rem;
-  font-size: 1.15rem;
-}
-
-.operations-shell {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.operations-content {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.operations-content > :deep(*) {
-  height: 100%;
-}
-
-.operations-content > .overview-stack,
-.operations-content > .settings-pane,
-.operations-content > .padded-pane {
-  box-sizing: border-box;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 1.5rem;
   overflow-y: auto;
+  background: var(--app-bg);
 }
 
-.overview-stack {
+.page {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 18px;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px clamp(16px, 4vw, 48px) 48px;
+  box-sizing: border-box;
 }
 
-.overview-stack > :deep(.operations-overview) {
-  height: auto;
-  padding: 0;
-  overflow: visible;
+.crumb { color: var(--ink-soft); font-size: 13px; }
+.crumb a { color: inherit; text-decoration: none; }
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
 }
 
-.app-identity-text {
+.head-text {
+  flex: 1 1 260px;
   min-width: 0;
 }
 
-.app-identity .app-identity-text h1 {
-  margin: 0;
-}
-
-.app-summary {
-  margin: 0.1rem 0 0.3rem;
-  color: var(--p-text-muted-color);
-  font-size: 0.9rem;
-}
-
-.app-address {
-  color: var(--p-text-muted-color);
-  font-size: 0.85rem;
-  overflow-wrap: anywhere;
-}
-
-.app-tabs,
-.app-sub-tabs {
+.title-line {
   display: flex;
-  gap: 0.25rem;
-  padding: 0 1rem;
-  overflow-x: auto;
-  background: var(--p-surface-card);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
-.app-tabs {
-  border-bottom: 1px solid var(--p-surface-border);
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
 }
 
-.app-sub-tabs {
-  padding-block: 0.6rem;
-  border-bottom: 1px solid var(--p-surface-border);
+.summary {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
 }
 
-.app-tab {
-  padding: 0.7rem 1rem;
-  border: none;
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.pill--healthy { border: 1px solid var(--ok); color: var(--ok); }
+.pill--failing { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
+.pill--access { border: 1px solid var(--line); background: none; color: var(--ink); }
+button.pill--access { cursor: pointer; }
+button.pill--access:hover { background: var(--row-line); }
+.pill--stopped { background: var(--row-line); color: var(--ink-soft); }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: var(--p-text-muted-color);
-  font-size: 0.9rem;
-  white-space: nowrap;
+  color: var(--ink-soft);
+  font: inherit;
   cursor: pointer;
 }
 
-.app-tab.active {
-  border-bottom-color: var(--p-primary-color);
-  color: var(--p-text-color);
+.tab-badge { margin-left: 6px; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--signal); color: var(--on-signal); font-size: 11px; font-weight: 600; line-height: 18px; display: inline-block; text-align: center; }
+.tab.on {
+  border-bottom-color: var(--signal);
+  color: var(--ink);
   font-weight: 600;
-}
-
-.app-sub-tab {
-  padding: 0.35rem 0.8rem;
-  border: 1px solid var(--p-surface-border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--p-text-color);
-  font-size: 0.82rem;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.app-sub-tab.active {
-  background: var(--p-highlight-background);
-  color: var(--p-highlight-color);
-  font-weight: 600;
-}
-
-.pane-title {
-  margin: 0 0 0.25rem;
-  font-size: 1.1rem;
-}
-
-.pane-hint {
-  margin: 0 0 1rem;
-  color: var(--p-text-muted-color);
-}
-
-.contract-json {
-  padding: 1rem;
-  border: 1px solid var(--p-surface-border);
-  border-radius: 0.75rem;
-  background: var(--p-content-background);
-  font-size: 0.8rem;
-  overflow: auto;
 }
 
 .state-container {
@@ -566,22 +614,5 @@ async function handleSharingChanged() {
   flex-direction: column;
   gap: 1rem;
   height: 100%;
-}
-
-@media (max-width: 960px) {
-  .operations-shell {
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 760px) {
-  .operations-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .header-actions {
-    flex-wrap: wrap;
-  }
 }
 </style>

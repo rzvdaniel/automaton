@@ -19,7 +19,7 @@ interface AdminNavItem {
   badge?: () => number
 }
 
-// Permission requests waiting for a system administrator, shown on the Apps entry.
+// Permission requests waiting for a system administrator, shown on the Permission requests entry.
 // Only system administrators can approve, so only they see (and pay for) the count.
 const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 const waitingForApproval = ref(0)
@@ -37,10 +37,16 @@ async function refreshWaiting() {
 
 const navItems: AdminNavItem[] = [
   {
+    label: 'Permission requests',
+    icon: 'pi pi-shield',
+    to: '/admin/permission-requests',
+    badge: () => waitingForApproval.value,
+    routePrefix: '/admin/permission-requests',
+  },
+  {
     label: 'Apps',
     icon: 'pi pi-th-large',
     to: '/admin/apps',
-    badge: () => waitingForApproval.value,
     routePrefix: '/admin/apps',
   },
   {
@@ -63,7 +69,11 @@ const navItems: AdminNavItem[] = [
   },
 ]
 
-const visibleNavItems = navItems
+// Only system administrators can decide requests, so only they see that page.
+const visibleNavItems = computed(() => navItems.filter((item) => item.to !== '/admin/permission-requests' || isSystemAdministrator.value))
+
+// Backups and People have their own place in the main menu, so their pages under /admin show no Administration menu.
+const showAdminMenu = computed(() => !['/admin/backups', '/admin/users'].some((prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`)))
 
 const isActive = (item: AdminNavItem) => {
   return route.path.startsWith(item.routePrefix)
@@ -87,7 +97,7 @@ watch(() => route.path, () => {
 <template>
   <div class="admin-layout">
     <!-- Sidebar -->
-    <div class="admin-sidebar">
+    <div v-if="showAdminMenu" class="admin-sidebar">
       <Card class="h-full">
         <template #content>
           <div class="flex flex-column gap-1">

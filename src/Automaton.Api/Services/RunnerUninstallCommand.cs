@@ -64,8 +64,8 @@ internal static class RunnerUninstallCommand
             if printf '%s\n' "$networks" | grep -Fxq '{{{network}}}'; then
               docker network rm '{{{network}}}'
             fi
+            rm -rf -- '/opt/automaton/self-hosted-runners/{{{installationId}}}'
             echo 'Runner host cleanup completed. Confirm removal in Studio to revoke its credentials.'
-            echo 'The host installation/configuration directory was retained. Remove it manually after confirming credential revocation in Studio.'
             AUTOMATON_RUNNER_UNINSTALL
             """;
     }

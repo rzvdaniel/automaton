@@ -77,10 +77,8 @@ public class ConfigurationService
     }
 
     public string WorkflowHubUrl => appConfig.WorkflowHubUrl;
-    public string FlowsUrl => appConfig.FlowsUrl;
     public string RunnersUrl => appConfig.RunnersUrl;
     public string LogsUrl => appConfig.LogsUrl;
-    public string FlowExecutionUrl => appConfig.FlowExecutionUrl;
 
     // Authentication endpoints
     public string LoginUserUrl => authConfig.LoginUserUrl;

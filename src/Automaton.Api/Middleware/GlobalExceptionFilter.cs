@@ -22,6 +22,20 @@ public class GlobalExceptionFilter : IExceptionFilter
             return;
         }
 
+        if (context.Exception is InvalidResetLinkException resetLink)
+        {
+            context.Result = new BadRequestObjectResult(new { code = "reset_link_" + resetLink.Reason, message = resetLink.Message });
+            context.ExceptionHandled = true;
+            return;
+        }
+
+        if (context.Exception is PasswordChangeRejectedException rejected)
+        {
+            context.Result = new BadRequestObjectResult(new { message = rejected.Message });
+            context.ExceptionHandled = true;
+            return;
+        }
+
         logger.LogError(context.Exception, "An unhandled exception occurred.");
 
         context.Result = new ObjectResult(new { Message = "An unexpected error occurred." })

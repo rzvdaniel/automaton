@@ -13,11 +13,16 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
     IRunnerActionCommands gateway)
 {
     public async Task<bool> CleanupForDeletionAsync(
-        AppDeploymentTarget target, bool abandonOfflineRuntime, CancellationToken cancellationToken)
+        AppDeploymentTarget target, bool abandonOfflineRuntime, CancellationToken cancellationToken,
+        List<string>? skippedHostCleanup = null)
     {
         if (abandonOfflineRuntime && !RunnerPresenceEvaluator.HasRecentHeartbeat(
                 target.ExecutionRunner?.LastHeartbeatAtUtc, DateTime.UtcNow))
+        {
+            skippedHostCleanup?.Add(
+                $"Environment '{target.Name}' on Runner '{target.ExecutionRunner?.Name}': containers and data may remain on that machine.");
             return false;
+        }
 
         await CleanupRuntimeAsync(target, cancellationToken);
         return true;
@@ -45,7 +50,7 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
 
         try
         {
-            var result = await gateway.SendAsync<CleanupAppDeploymentTargetResult>(runner!.Id,
+            var result = await gateway.SendBoundedAsync<CleanupAppDeploymentTargetResult>(runner!.Id,
                 deleteApplicationStorage ? "cleanup-app-resources" : "cleanup-target-resources",
                 new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id, deleteApplicationStorage,
                     UnpublishStaticSite: target.IsDefault || deleteApplicationStorage), cancellationToken);
@@ -60,6 +65,15 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
         catch (AppDeploymentTargetConflictException)
         {
             throw;
+        }
+        catch (RunnerNotRespondingException)
+        {
+            // A Runner that stopped recently still looks online; answer now instead of waiting on it. Giving up
+            // cancels the queued command, so nothing is removed and the owner deletes again once the Runner is back.
+            await RecordCleanupFailureAsync(
+                target,
+                "The Runner did not answer in time and may be offline. Nothing was removed; delete the app again when the Runner is back online.",
+                CancellationToken.None);
         }
         catch (InvalidOperationException exception) when (!string.IsNullOrWhiteSpace(exception.Message))
         {

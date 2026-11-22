@@ -24,4 +24,20 @@ public sealed class AppListActionsOnlyTests
     [TestCase("not json")]
     public void MissingOrUnreadableContract_IsNotActionsOnly(string? json)
         => Assert.That(AppListingService.IsActionsOnly(json), Is.False);
+
+    [Test]
+    public void AppDetail_CarriesActionsOnlyFromTheContract()
+    {
+        var actionsOnly = new Automaton.Api.Entities.WebApp { Definition = "{}", ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract()) };
+        var withRuntime = new Automaton.Api.Entities.WebApp
+        {
+            Definition = "{}",
+            ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract
+            {
+                Runtime = new ApplicationRuntimeSpec { Command = new ApplicationCommandSpec { Executable = "node" } }
+            })
+        };
+        Assert.That(AppsService.MapToModel(actionsOnly).ActionsOnly, Is.True);
+        Assert.That(AppsService.MapToModel(withRuntime).ActionsOnly, Is.False);
+    }
 }

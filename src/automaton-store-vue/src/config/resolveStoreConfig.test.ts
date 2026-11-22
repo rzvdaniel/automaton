@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPublishedAppUrl, resolveStoreConfig } from './resolveStoreConfig'
+import { buildPublishedAppUrl, resolveStoreConfig, serverHostName } from './resolveStoreConfig'
 
 describe('resolveStoreConfig', () => {
   it('uses installer runtime values first', () => {
@@ -76,5 +76,13 @@ describe('buildPublishedAppUrl', () => {
   it('returns nothing without a slug or base', () => {
     expect(buildPublishedAppUrl('https://apps.example.com', ' ', 'https://store.example.com')).toBe('')
     expect(buildPublishedAppUrl('', 'my-app', 'https://store.example.com')).toBe('')
+  })
+})
+
+describe('serverHostName', () => {
+  it('drops the store prefix and tolerates bad input', () => {
+    expect(serverHostName('https://store.automaton.monster')).toBe('automaton.monster')
+    expect(serverHostName('http://localhost:5173')).toBe('localhost')
+    expect(serverHostName('nonsense')).toBe('')
   })
 })

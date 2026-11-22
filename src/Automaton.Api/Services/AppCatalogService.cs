@@ -31,6 +31,9 @@ public sealed class AppCatalogService(
         var enabled = await sources.EnabledAsync(cancellationToken);
         var installed = await InstalledAsync(userId, cancellationToken);
         var version = ParseVersion(configuration["Installation:Version"]);
+        var runnerVersions = await dbContext.Runners
+            .Where(r => r.RunnerUsers.Any(u => u.UserId == userId))
+            .Select(r => r.Version).ToListAsync(cancellationToken);
         var apps = new List<CatalogEntryDto>();
         var problems = new List<string>();
         DateTime? fetchedAt = null;
@@ -53,7 +56,7 @@ public sealed class AppCatalogService(
                 stale = true;
                 problems.Add($"{label}{failure} Showing the list from {entry.FetchedAt:u}.");
             }
-            apps.AddRange(entry.Document.Apps.Select(app => ToDto(app, entry.Document.Repo, installed, version, source)));
+            apps.AddRange(entry.Document.Apps.Select(app => ToDto(app, entry.Document.Repo, installed, version, source, runnerVersions)));
         }
 
         if (loaded == 0 && enabled.Count > 0)
@@ -95,7 +98,7 @@ public sealed class AppCatalogService(
         string? failure = null;
         // A forced refresh still waits out a short pause, so a signed-in user cannot make the server hammer GitHub.
         var age = cached is null ? TimeSpan.MaxValue : DateTime.UtcNow - cached.FetchedAt;
-        if (cached is null || age > FreshFor || (refresh && age > TimeSpan.FromSeconds(configuration.GetValue("Catalog:MinimumRefreshSeconds", 30))))
+        if (cached is null || age > FreshFor || (refresh && age > TimeSpan.FromSeconds(configuration.GetValue("Catalog:MinimumRefreshSeconds", 60))))
         {
             var (updated, error) = await FetchAsync(source, cached, cancellationToken);
             failure = error;
@@ -112,6 +115,91 @@ public sealed class AppCatalogService(
         if (entry is null) return (error ?? "The catalog could not be loaded.", 0);
         if (save) await SaveCacheAsync(source, entry, cancellationToken);
         return (null, entry.Document.Apps.Count);
+    }
+
+    /// <summary>The commit the enabled catalogs pin for an app today, or null when no catalog lists that repository and folder.</summary>
+    public async Task<string?> PinnedCommitAsync(string repo, string? folder, CancellationToken cancellationToken, bool refresh = false) =>
+        (await PinnedAsync(repo, folder, cancellationToken, refresh))?.Commit;
+
+    /// <summary>
+    /// Where an installed app now lives and the commit pinned there. A catalog that lists the exact repository and folder wins
+    /// (the first enabled source, in display order); otherwise an app that moved to another repository is found through its
+    /// <c>movedFrom</c> entry, so apps installed before the move keep getting updates.
+    /// </summary>
+    public async Task<PinnedApp?> PinnedAsync(string repo, string? folder, CancellationToken cancellationToken, bool refresh = false)
+    {
+        var key = InstalledKey(repo, folder);
+        PinnedApp? moved = null;
+        foreach (var source in await sources.EnabledAsync(cancellationToken))
+        {
+            var (entry, _) = await LoadSourceAsync(source, refresh, cancellationToken);
+            if (entry is null) continue;
+            var exact = entry.Document.Apps.FirstOrDefault(item => InstalledKey(entry.Document.Repo, item.Folder) == key);
+            if (exact is not null) return new PinnedApp(entry.Document.Repo, exact.Folder, exact.Commit, exact.Category);
+            var successor = moved is null ? entry.Document.Apps.FirstOrDefault(item => item.MovedFrom is { } from && InstalledKey(from.Repo, from.Folder) == key) : null;
+            if (successor is not null) moved = new PinnedApp(entry.Document.Repo, successor.Folder, successor.Commit, successor.Category);
+        }
+        return moved;
+    }
+
+    /// <summary>True when an enabled public catalog source lists this repository and folder.</summary>
+    public async Task<bool> IsPublicCatalogAppAsync(string repo, string folder, CancellationToken cancellationToken)
+    {
+        var key = InstalledKey(repo, folder);
+        return (await PublicEntriesAsync(cancellationToken)).Any(entry => InstalledKey(entry.Repo, entry.App.Folder) == key);
+    }
+
+    /// <summary>The apps of the enabled public catalog sources (a private source's history cannot be read without its token).</summary>
+    internal async Task<IReadOnlyList<(CatalogSourceStore.SourceRef Source, string Repo, CatalogApp App)>> PublicEntriesAsync(CancellationToken cancellationToken)
+    {
+        var result = new List<(CatalogSourceStore.SourceRef, string, CatalogApp)>();
+        foreach (var source in (await sources.EnabledAsync(cancellationToken)).Where(s => s.Token is null))
+        {
+            var (entry, _) = await LoadSourceAsync(source, false, cancellationToken);
+            if (entry is null) continue;
+            result.AddRange(entry.Document.Apps.Select(app => (source, entry.Document.Repo, app)));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// The commits a public catalog has pinned for a folder over time, newest first (read from the history of its catalog.json,
+    /// at most <paramref name="limit"/> revisions). Empty when GitHub cannot be reached.
+    /// </summary>
+    internal async Task<IReadOnlyList<string>> PinnedHistoryAsync(CatalogSourceStore.SourceRef source, string repo, string folder, int limit, CancellationToken cancellationToken)
+    {
+        var api = (configuration["Catalog:ApiBaseUrl"] is { Length: > 0 } a ? a : "https://api.github.com").TrimEnd('/');
+        var raw = (configuration["Catalog:RawBaseUrl"] is { Length: > 0 } r ? r : "https://raw.githubusercontent.com").TrimEnd('/');
+        var key = InstalledKey(repo, folder);
+        var commits = new List<string>();
+        try
+        {
+            using var client = httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Automaton-Server");
+            using var list = await client.GetAsync($"{api}/repos/{source.Repo}/commits?path=catalog.json&sha={Uri.EscapeDataString(source.Branch)}&per_page={limit}", cancellationToken);
+            if (!list.IsSuccessStatusCode) return commits;
+            using var revisions = JsonDocument.Parse(await list.Content.ReadAsStringAsync(cancellationToken));
+            foreach (var revision in revisions.RootElement.EnumerateArray())
+            {
+                var sha = revision.GetProperty("sha").GetString();
+                if (sha is null) continue;
+                using var file = await client.GetAsync($"{raw}/{source.Repo}/{sha}/catalog.json", cancellationToken);
+                if (!file.IsSuccessStatusCode) continue;
+                var body = await ReadBoundedAsync(file, cancellationToken);
+                CatalogDocument document;
+                try { document = Parse(body, source.Official ? null : source.Repo); }
+                catch (Exception exception) when (exception is InvalidDataException or JsonException) { continue; }
+                var pinned = document.Apps.FirstOrDefault(app => InstalledKey(document.Repo, app.Folder) == key)?.Commit;
+                if (pinned is not null && !commits.Contains(pinned)) commits.Add(pinned);
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or InvalidDataException or JsonException or KeyNotFoundException)
+        {
+            if (cancellationToken.IsCancellationRequested) throw;
+            logger.LogWarning("Catalog history could not be read: {Reason}", exception.Message);
+        }
+        return commits;
     }
 
     /// <summary>The read token of a private source, only for an app that source's catalog lists at exactly that folder and commit.</summary>
@@ -209,8 +297,17 @@ public sealed class AppCatalogService(
             throw new InvalidDataException("The catalog has no repository.");
         // One bad entry must not hide the others.
         document.Apps.RemoveAll(app => !AppCatalogInstallService.IsValidSource(document.Repo, app.Folder, app.Commit));
+        // movedFrom only follows apps that used to be in the official catalog, and only from the official source or the
+        // automaton.monster store: any other custom source could otherwise take over installs the official catalog dropped.
+        var trusted = forcedRepo is null || string.Equals(forcedRepo, CatalogSourceStore.StoreRepo, StringComparison.OrdinalIgnoreCase);
+        foreach (var app in document.Apps.Where(app => app.MovedFrom is not null && (!trusted || !IsValidMovedFrom(app.MovedFrom))))
+            app.MovedFrom = null;
         return document;
     }
+
+    private static bool IsValidMovedFrom(MovedFromRef from) =>
+        string.Equals(from.Repo?.Trim(), CatalogSourceStore.OfficialRepo, StringComparison.OrdinalIgnoreCase)
+        && from.Folder is { Length: > 0 } folder && AppCatalogInstallService.IsValidSource(CatalogSourceStore.OfficialRepo, folder, new string('0', 40));
 
     private async Task<CacheEntry?> LoadCacheAsync(CatalogSourceStore.SourceRef source, CancellationToken cancellationToken)
     {
@@ -261,17 +358,34 @@ public sealed class AppCatalogService(
             .Select(app => new { app.Id, Repo = app.InstalledFromRepo!, Folder = app.InstalledFromFolder ?? "" })
             .ToListAsync(cancellationToken);
         var result = new Dictionary<(string, string), Guid>();
-        foreach (var row in rows) result.TryAdd((row.Repo, row.Folder), row.Id);
+        foreach (var row in rows) result.TryAdd(InstalledKey(row.Repo, row.Folder), row.Id);
         return result;
     }
 
-    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source)
+    /// <summary>GitHub repo names ignore case (folders do not), and a folder may be saved with a stray slash, so installed apps match the catalog on a normalised key.</summary>
+    private static (string Repo, string Folder) InstalledKey(string repo, string? folder) =>
+        (repo.Trim().ToLowerInvariant(), (folder ?? "").Trim().Trim('/'));
+
+    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source, IReadOnlyList<string?>? runnerVersions = null)
     {
         var minimum = ParseVersion(app.MinServerVersion);
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
-        Guid? installedId = installed.TryGetValue((repo, app.Folder), out var id) ? id : null;
+        Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id
+            : app.MovedFrom is { } from && installed.TryGetValue(InstalledKey(from.Repo, from.Folder), out var previous) ? previous : null;
         return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon);
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended, app.RecommendedOrder, PublisherOf(app, source),
+            runnerVersions is { Count: > 0 } && runnerVersions.All(v => RunnerProtocolCompatibilityPolicy.PermissionsBeyondRunner(v, app.Permissions).Count > 0));
+    }
+
+    internal const string AutomatonPublisher = "Automaton";
+
+    internal static CatalogPublisherDto? PublisherOf(CatalogApp app, CatalogSourceStore.SourceRef source)
+    {
+        var name = app.Publisher?.Name?.Trim();
+        if (string.IsNullOrEmpty(name)) return null;
+        var logo = app.Publisher?.Logo?.Trim();
+        var safeLogo = !string.IsNullOrEmpty(logo) && (logo.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || logo.StartsWith("/", StringComparison.Ordinal) && !logo.StartsWith("//", StringComparison.Ordinal)) ? logo : null;
+        return new CatalogPublisherDto(name.Length > 80 ? name[..80] : name, safeLogo, source.Official && string.Equals(name, AutomatonPublisher, StringComparison.Ordinal));
     }
 
     internal static Version? ParseVersion(string? text)
@@ -283,6 +397,21 @@ public sealed class AppCatalogService(
 
     internal sealed record CacheEntry(DateTime FetchedAt, string? ETag, string Body, CatalogDocument Document);
     private sealed record StoredCache(DateTime FetchedAt, string? ETag, string Body);
+
+    /// <summary>The repository and folder an app was installed from before it moved, and where it is pinned now.</summary>
+    public sealed record PinnedApp(string Repo, string Folder, string Commit, string? Category = null);
+
+    internal sealed class CatalogPublisher
+    {
+        public string? Name { get; set; }
+        public string? Logo { get; set; }
+    }
+
+    internal sealed class MovedFromRef
+    {
+        public string Repo { get; set; } = string.Empty;
+        public string Folder { get; set; } = string.Empty;
+    }
 
     internal sealed class CatalogDocument
     {
@@ -303,5 +432,12 @@ public sealed class AppCatalogService(
         public List<string> Permissions { get; set; } = [];
         public List<string> Tags { get; set; } = [];
         public string? Icon { get; set; }
+        public CatalogPublisher? Publisher { get; set; }
+        /// <summary>Set when the app used to live in the official catalog: servers that installed it there update it from here.</summary>
+        public MovedFromRef? MovedFrom { get; set; }
+        /// <summary>Suggested to administrators on Studio Home until installed. Set in the catalog file, not in code.</summary>
+        public bool Recommended { get; set; }
+        /// <summary>Lower comes first among recommended apps; apps without one come last.</summary>
+        public int? RecommendedOrder { get; set; }
     }
 }

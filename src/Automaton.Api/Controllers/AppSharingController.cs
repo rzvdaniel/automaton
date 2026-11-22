@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Automaton.Api.Controllers;
 
-public sealed record SetAppSharingRequest(string Audience, string? PublicUrl);
+public sealed record SetAppSharingRequest(string Audience, string? PublicUrl, Guid? TeamId = null, bool? Listed = null);
 
 public sealed record AddAppSharePersonRequest(string Email);
 
@@ -23,7 +23,7 @@ public class AppSharingController(
     [HttpPut]
     [Authorize(Policy = "AllowApiKey")]
     public Task<IActionResult> Set(Guid id, [FromBody] SetAppSharingRequest request, CancellationToken cancellationToken) =>
-        RunAsync(() => sharingService.SetAudienceAsync(id, request.Audience, request.PublicUrl, cancellationToken));
+        RunAsync(() => sharingService.SetAudienceAsync(id, request.Audience, request.PublicUrl, request.TeamId, request.Listed, cancellationToken));
 
     [HttpPost("people")]
     [Authorize(Policy = "AllowApiKey")]

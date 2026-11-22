@@ -222,12 +222,138 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             if (identity.HostPort is > 0) metadata.EffectivePort = identity.HostPort;
             await metadataStore.WriteAsync(metadata, cancellationToken);
             Register(appId, targetId, identity.Id, metadata.ContainerName, metadata.EffectivePort, metadata.ComposeCandidateId);
+            // Containers made before the restart policy existed get it here, so an upgraded server is covered without a redeploy.
+            if (metadata.ComposeCandidateId is null) await EnableAutoRestartAsync(appId, targetId, identity.Id);
             return;
         }
-        logger.LogWarning("Refusing to adopt container {ContainerId}: it is missing, stopped, or does not have the expected Automaton identity.", metadata.ContainerId);
-        if (!workspace.RuntimeArtifactExists(metadata.ArtifactRoot)) return;
-        await ApplyAsync(appId, targetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata), cancellationToken,
-            metadata.ArtifactRoot, metadata.CandidateId);
+        if (identity.Exists && metadata.ComposeCandidateId is null)
+        {
+            if (!RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId))
+            {
+                // Never remove or replace a container that is not ours to manage.
+                var message = "The container does not have the expected Automaton ownership labels, so it was left alone.";
+                logger.LogWarning("Preserving container {ContainerId} for {AppId}/{TargetId}: {Message}", metadata.ContainerId, appId, targetId, message);
+                registry.MarkFailed(appId, targetId, message);
+                return;
+            }
+            await StartStoppedContainerAsync(metadata, identity, appId, targetId, cancellationToken);
+            return;
+        }
+        logger.LogWarning("Container {ContainerId} is missing; starting the runtime again from its deployed files.", metadata.ContainerId);
+        if (!workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+        {
+            registry.MarkFailed(appId, targetId, "The container and the deployed files are missing.");
+            return;
+        }
+        try
+        {
+            await ApplyAsync(appId, targetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata), cancellationToken,
+                metadata.ArtifactRoot, metadata.CandidateId);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            registry.MarkFailed(appId, targetId, ex.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// An owned container that Docker stopped (a host reboot, `restart: no`) is started again, not recreated:
+    /// recreating needs the stopped container removed, which loses it when the new one cannot start.
+    /// </summary>
+    private async Task StartStoppedContainerAsync(
+        RunnerRuntimeDeploymentMetadata metadata,
+        DockerContainerIdentity identity,
+        Guid appId,
+        Guid targetId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.LogInformation("Starting stopped container {ContainerId} of {AppId}/{TargetId}.", identity.Id, appId, targetId);
+            int? port;
+            if (containers is IScopedApplicationContainerRuntime scoped)
+                port = (await scoped.StartApplicationAsync(new(appId, targetId), identity.Id, cancellationToken)).HostPort;
+            else
+            {
+                await ((IStagedApplicationContainerRuntime)containers).StartApplicationAsync(identity.Id, cancellationToken);
+                port = (await InspectAsync(appId, targetId, identity.Id, cancellationToken)).HostPort ?? metadata.EffectivePort;
+            }
+            if (port is not > 0) throw new InvalidOperationException("The started container has no published port.");
+            // Docker assigns a new host port when a container starts again; the log sink and routes follow it.
+            metadata.EffectivePort = port;
+            await metadataStore.WriteAsync(metadata, cancellationToken);
+            Register(appId, targetId, identity.Id, metadata.ContainerName, port);
+            await EnableAutoRestartAsync(appId, targetId, identity.Id);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            registry.MarkFailed(appId, targetId, $"The runtime could not be started: {ex.Message}");
+            throw;
+        }
+    }
+
+    private const int ProbeBatchSize = 10;
+    internal int ProbedRestartCountEntries { get { lock (gate) return probedRestartCounts.Count; } }
+    internal TimeSpan ProbeInterval { get; set; } = TimeSpan.FromMinutes(2);
+    private DateTimeOffset nextProbe = DateTimeOffset.MinValue;
+    private int probeOffset;
+    private readonly Dictionary<DeploymentRuntimeKey, int> probedRestartCounts = [];
+
+    /// <summary>
+    /// A container Docker keeps restarting (a crash loop) is reported failed, and live again once it stays up.
+    /// Bounded: at most <see cref="ProbeBatchSize"/> containers every <see cref="ProbeInterval"/>, taken in turn, called
+    /// from the heartbeat. Compose runtimes are not probed.
+    /// </summary>
+    public async Task ProbeRestartingAsync(CancellationToken cancellationToken)
+    {
+        ActiveContainer[] batch;
+        lock (gate)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (now < nextProbe) return;
+            nextProbe = now + ProbeInterval;
+            var all = active.Values.Where(item => item.ComposeCandidateId is null).OrderBy(item => item.AppId).ThenBy(item => item.TargetId).ToArray();
+            var live = all.Select(item => new DeploymentRuntimeKey(item.AppId, item.TargetId)).ToHashSet();
+            foreach (var stale in probedRestartCounts.Keys.Where(k => !live.Contains(k)).ToArray()) probedRestartCounts.Remove(stale);
+            if (all.Length == 0) return;
+            probeOffset %= all.Length;
+            batch = all.Skip(probeOffset).Take(ProbeBatchSize).ToArray();
+            probeOffset += batch.Length;
+        }
+        foreach (var item in batch)
+        {
+            try
+            {
+                var identity = await InspectAsync(item.AppId, item.TargetId, item.ContainerId, cancellationToken);
+                if (!identity.Exists) continue;
+                // Docker resets its restart delay once a container ran 10 s, so a slow crash is seen as running: the count catches it.
+                var key = new DeploymentRuntimeKey(item.AppId, item.TargetId);
+                bool countedRestart;
+                lock (gate)
+                {
+                    countedRestart = probedRestartCounts.TryGetValue(key, out var last) && identity.RestartCount > last;
+                    probedRestartCounts[key] = identity.RestartCount;
+                }
+                if (identity.Restarting || countedRestart) registry.MarkFailed(item.AppId, item.TargetId, "The app keeps crashing and Docker keeps restarting it.");
+                else if (identity.Running) registry.MarkRecovered(item.AppId, item.TargetId);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogDebug(ex, "Could not probe container {ContainerId} of {AppId}/{TargetId}.", item.ContainerId, item.AppId, item.TargetId);
+            }
+        }
+    }
+
+    /// <summary>The live container only; best effort, because the Runner start-up reconcile is the backup.</summary>
+    private async Task EnableAutoRestartAsync(Guid appId, Guid targetId, string containerId)
+    {
+        if (containers is not IScopedApplicationContainerRuntime scoped) return;
+        try { await scoped.EnableAutoRestartAsync(new(appId, targetId), containerId, CancellationToken.None); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not set the restart policy of container {ContainerId} of {AppId}/{TargetId}.", containerId, appId, targetId);
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -274,17 +400,100 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
 
     /// <summary>
     /// Replaces the running container with a new one from a copy of the deployed files, using the normal
-    /// start, readiness and promotion path; the old container keeps serving until the new one is ready.
+    /// start, readiness and promotion path; the old container keeps serving until the new one is ready (except for `runtime.update: stop-first`, which stops it first).
     /// The copy gets a fresh candidate identity because brokered hosts name (and reuse) containers by it.
     /// Compose runtimes receive no app secrets, so they are left alone.
     /// </summary>
     public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
     {
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
-        if (metadata is not { State: RuntimeReadinessState.Ready }
-            || metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed }) || string.IsNullOrWhiteSpace(metadata.ContainerId)
-            || metadata.ComposeCandidateId is not null || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+        // A runtime left "starting" by an interrupted start has no container; a restart recovers it.
+        var stuckStarting = metadata is { State: RuntimeReadinessState.Starting } && string.IsNullOrWhiteSpace(metadata.ContainerId);
+        var running = metadata is { State: RuntimeReadinessState.Ready };
+        if (HasNoContainerRuntime(metadata)) return true;
+        if (metadata is null || !(stuckStarting || running)) return false;
+        // A running Compose runtime gets no app secrets and is left alone: that is not a failed restart.
+        if (metadata.ComposeCandidateId is not null && running) return true;
+        if (metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed })
+            || running && string.IsNullOrWhiteSpace(metadata.ContainerId)
+            || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
+        var candidateId = Guid.NewGuid();
+        var artifact = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, deploymentTargetId, candidateId);
+        try
+        {
+            RunnerWorkspaceService.CopyRuntimeArtifact(metadata.ArtifactRoot!, artifact);
+            await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
+                cancellationToken, artifact, candidateId);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            var warnings = new List<string>();
+            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(
+                workspace.GetAppRuntimeCandidateDirectory(appId, deploymentTargetId, candidateId), warnings);
+            // Studio shows the app as failing until a start works again; the previous container keeps serving meanwhile.
+            registry.MarkFailed(appId, deploymentTargetId, $"The restart failed: {error.Message}");
+            throw;
+        }
+        catch
+        {
+            var warnings = new List<string>();
+            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(
+                workspace.GetAppRuntimeCandidateDirectory(appId, deploymentTargetId, candidateId), warnings);
+            throw;
+        }
+        return true;
+    }
+
+    // Shorter values are shown as they are. Short values (a setting such as "20" or "7") are not credentials and would turn every digit of a log line into [REDACTED].
+    private const int LogRedactionMinimumLength = 8;
+
+    /// <summary>Reads the last lines of the running app container's output; null when it has no container.</summary>
+    public async Task<string?> ReadLogsAsync(Guid appId, Guid deploymentTargetId, int lines, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        var id = metadata?.ContainerId;
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        // The app's own secrets never leave the machine in log text, as on a failed start.
+        var secrets = secretSource is null ? null : await secretSource.GetAsync(appId, deploymentTargetId, cancellationToken);
+        var text = RedactValues(await GetLogsAsync(appId, deploymentTargetId, id, cancellationToken), secrets?.Values, LogRedactionMinimumLength);
+        var all = text.Split('\n');
+        return string.Join('\n', all.Length <= lines ? all : all[^lines..]).TrimEnd();
+    }
+
+    /// <summary>
+    /// Stops the app's containers and records the runtime as paused. The deployed files and storage stay, and a
+    /// paused runtime is not started again when the Runner restarts.
+    /// </summary>
+    public async Task<bool> PauseAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        if (metadata is null || metadata.State == RuntimeReadinessState.Paused
+            || !RunnerRuntimeMetadataPolicy.IsOciContainer(metadata) || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+            return false;
+        await StopAsync(appId, deploymentTargetId);
+        var paused = metadataStore.Clone(metadata);
+        paused.Candidate = null;
+        paused.State = RuntimeReadinessState.Paused;
+        paused.ContainerId = null;
+        paused.ContainerName = null;
+        paused.ComposeProjectId = null;
+        paused.ComposeCandidateId = null;
+        paused.EffectivePort = null;
+        await metadataStore.WriteAsync(paused, CancellationToken.None);
+        return true;
+    }
+
+    /// <summary>Starts a paused runtime from the files it was deployed with, through the normal start and readiness path.</summary>
+    public async Task<bool> ResumeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        // Already running (a repeated resume, or one whose answer was lost) is success: the app is up.
+        if (metadata is { State: RuntimeReadinessState.Ready } && !string.IsNullOrWhiteSpace(metadata.ContainerId)) return true;
+        if (HasNoContainerRuntime(metadata)) return true;
+        if (metadata is not { State: RuntimeReadinessState.Paused } || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+            return false;
+        // A fresh candidate identity, like a restart: brokered hosts name (and reuse) containers by it.
         var candidateId = Guid.NewGuid();
         var artifact = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, deploymentTargetId, candidateId);
         try
@@ -302,6 +511,15 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
         return true;
     }
+
+    /// <summary>
+    /// A static site or an action-only app has no container: Pause has nothing to stop (it returns false and the
+    /// app's paused state lives on the API), so Resume and Restart have nothing to start and are not a failure.
+    /// </summary>
+    private static bool HasNoContainerRuntime(RunnerRuntimeDeploymentMetadata? metadata)
+        => metadata is null
+            || metadata.State != RuntimeReadinessState.Paused && string.IsNullOrWhiteSpace(metadata.ContainerId)
+                && string.IsNullOrWhiteSpace(metadata.Runtime?.Image) && string.IsNullOrWhiteSpace(metadata.ComposeJson);
 
     private async Task<RunnerRuntimeDeploymentMetadata?> ReadExistingMetadataAsync(
         string metadataPath,
@@ -420,20 +638,65 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         CancellationToken cancellationToken)
     {
         DockerApplicationContainer? started = null;
+        var previousStopped = false;
         try
         {
             started = await CreateCandidateContainerAsync(attempt, cancellationToken);
+            // A previous container that is already gone (lost in a reboot) counts as stopped: nothing to stop or restart.
+            if (StopsPreviousFirst(attempt, previous)
+                && (await attempt.ScopedRuntime!.InspectAsync(new(attempt.AppId, attempt.TargetId), previous!.ContainerId!, cancellationToken)).Exists)
+            {
+                // The old container holds a lock on the data folder, so it stops before the new one starts.
+                // Flag it first: a stop that fails halfway must still be undone.
+                previousStopped = true;
+                await attempt.ScopedRuntime!.StopAsync(new(attempt.AppId, attempt.TargetId), previous.ContainerId!, cancellationToken);
+            }
             await StartCandidateRuntimeAsync(attempt, started, cancellationToken);
-            await networkPolicy.WaitForReadinessAsync(attempt.EffectivePort, attempt.Contract.Health, cancellationToken);
+            await networkPolicy.WaitForReadinessAsync(attempt.EffectivePort, attempt.Contract.Health, cancellationToken,
+                token => IsRunningAsync(attempt.AppId, attempt.TargetId, started.Id, token));
             if (!await IsRunningAsync(attempt.AppId, attempt.TargetId, started.Id, cancellationToken))
                 throw new InvalidOperationException("The runtime container exited after readiness and before promotion.");
             var warning = await PromoteAsync(attempt.AppId, attempt.TargetId, previous, attempt.Candidate, cancellationToken);
+            if (!RunnerRuntimeMetadataPolicy.HasComposeContract(attempt.Contract))
+                await EnableAutoRestartAsync(attempt.AppId, attempt.TargetId, started.Id);
             return new RuntimeApplyResult { PromotionIrreversible = true, Warning = warning };
         }
         catch (Exception deploymentError)
         {
-            await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError);
+            var output = await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError, previousStopped);
+            if (output.Length > 0)
+            {
+                var message = $"{deploymentError.Message} Last output of the app:{Environment.NewLine}{output}";
+                if (deploymentError is TimeoutException) throw new TimeoutException(message, deploymentError);
+                if (deploymentError is InvalidOperationException) throw new InvalidOperationException(message, deploymentError);
+            }
             throw;
+        }
+    }
+
+    private static bool StopsPreviousFirst(RuntimeApplyAttempt attempt, RunnerRuntimeDeploymentMetadata? previous)
+        => attempt.Contract.Runtime.Update == RuntimeUpdateModes.StopFirst
+            && attempt.ScopedRuntime is not null
+            && !RunnerRuntimeMetadataPolicy.HasComposeContract(attempt.Contract)
+            && previous is { ComposeCandidateId: null } && !string.IsNullOrWhiteSpace(previous.ContainerId);
+
+    /// <summary>Starts the stopped previous version again after a failed stop-first update; returns a note when it cannot.</summary>
+    private async Task<string> RestartStoppedPreviousAsync(RuntimeApplyAttempt attempt, RunnerRuntimeDeploymentMetadata previous)
+    {
+        try
+        {
+            var endpoint = await attempt.ScopedRuntime!.StartApplicationAsync(
+                new(attempt.AppId, attempt.TargetId), previous.ContainerId!, CancellationToken.None);
+            // Docker assigns a new host port when a container starts again.
+            previous.EffectivePort = endpoint.HostPort;
+            Register(attempt.AppId, attempt.TargetId, previous.ContainerId!, previous.ContainerName, endpoint.HostPort);
+            return string.Empty;
+        }
+        catch (Exception restartError)
+        {
+            logger.LogWarning(restartError, "Could not start the previous version of {AppId}/{TargetId} again after a failed update.",
+                attempt.AppId, attempt.TargetId);
+            return $"The previous version could not be started again: {restartError.Message}";
         }
     }
 
@@ -503,13 +766,14 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
     }
 
-    private async Task RestoreFailedCandidateAsync(
+    private async Task<string> RestoreFailedCandidateAsync(
         RuntimeApplyAttempt attempt,
         RunnerRuntimeDeploymentMetadata? previous,
         DockerApplicationContainer? started,
-        Exception deploymentError)
+        Exception deploymentError,
+        bool previousStopped = false)
     {
-        await LogFailedCandidateAsync(attempt, started);
+        var output = await LogFailedCandidateAsync(attempt, started);
         var cleanupWarnings = new List<string>();
         var cleaned = attempt.Candidate.ComposeCandidateId is Guid composeCandidateId
             ? await TryRemoveComposeProjectAsync(composeCandidateId, attempt.AppId, attempt.TargetId,
@@ -518,6 +782,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 started?.Id ?? attempt.Candidate.ContainerName!, attempt.AppId, attempt.TargetId,
                 cleanupWarnings, "failed runtime candidate");
         foreach (var warning in cleanupWarnings) logger.LogWarning("{Warning}", warning);
+        if (previousStopped)
+        {
+            // After the candidate is gone, so a candidate that is still running cannot hold the lock.
+            var note = await RestartStoppedPreviousAsync(attempt, previous!);
+            if (note.Length > 0) output = output.Length > 0 ? $"{output}{Environment.NewLine}{note}" : note;
+        }
         try
         {
             await RestoreMetadataAfterFailureAsync(attempt, previous, cleaned, deploymentError);
@@ -528,20 +798,45 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 "Could not restore managed runtime metadata after deployment failure for {AppId}/{TargetId}.",
                 attempt.AppId, attempt.TargetId);
         }
+        return output;
     }
 
-    private async Task LogFailedCandidateAsync(RuntimeApplyAttempt attempt, DockerApplicationContainer? started)
+    internal static readonly TimeSpan LogCollectionTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>Logs the failed container's output and returns its last lines for the deploy error.</summary>
+    private async Task<string> LogFailedCandidateAsync(RuntimeApplyAttempt attempt, DockerApplicationContainer? started)
     {
-        if (started is null) return;
+        if (started is null) return string.Empty;
         try
         {
-            var logs = await GetLogsAsync(attempt.AppId, attempt.TargetId, started.Id, CancellationToken.None);
+            // Bounded: a Runner that cannot reach Docker must still answer with the error it has.
+            using var logLimit = new CancellationTokenSource(LogCollectionTimeout);
+            var logs = await GetLogsAsync(attempt.AppId, attempt.TargetId, started.Id, logLimit.Token);
             logger.LogWarning("Managed application container {ContainerId} failed before promotion. Logs: {Logs}", started.Id, logs);
+            var secrets = secretSource is null ? null
+                : await secretSource.GetAsync(attempt.AppId, attempt.TargetId, CancellationToken.None);
+            return LastLines(RedactValues(logs, secrets?.Values), 20, 2000);
         }
         catch (Exception cleanupError)
         {
             logger.LogWarning(cleanupError, "Could not collect logs for failed managed runtime container {ContainerId}.", started.Id);
+            return string.Empty;
         }
+    }
+
+    internal static string RedactValues(string logs, IEnumerable<string>? secrets, int minimumLength = 1)
+    {
+        foreach (var secret in secrets ?? [])
+            if (secret.Length >= minimumLength) logs = logs.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
+        return logs;
+    }
+
+    internal static string LastLines(string? logs, int maxLines, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(logs)) return string.Empty;
+        var tail = string.Join(Environment.NewLine,
+            logs.Split('\n').Select(line => line.TrimEnd('\r')).Where(line => line.Length > 0).TakeLast(maxLines));
+        return tail.Length > maxChars ? tail[^maxChars..] : tail;
     }
 
     private async Task RestoreMetadataAfterFailureAsync(
@@ -820,6 +1115,10 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 return;
+            }
+            catch (InvalidOperationException ex) when (ex.Message == BrokeredApplicationContainerRuntime.IdentityRequiredMessage)
+            {
+                logger.LogInformation("Waiting for the Runner to connect to the server before recovering {MetadataPath}.", path);
             }
             catch (Exception ex)
             {

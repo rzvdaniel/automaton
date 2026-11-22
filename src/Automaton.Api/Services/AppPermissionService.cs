@@ -33,7 +33,7 @@ public sealed class AppPermissionService(
     }
 
     public async Task<IReadOnlyList<AppPermissionStatus>> SetApprovalAsync(Guid appId, string permission, bool approved,
-        CancellationToken token)
+        CancellationToken token, string? reason = null)
     {
         if (!ApplicationContractValidator.SupportedPermissions.Contains(permission)) throw new ArgumentException("Unsupported app permission.", nameof(permission));
         var requested = await RequestedAsync(appId, token);
@@ -80,7 +80,7 @@ public sealed class AppPermissionService(
             {
                 Action = action, EntityType = AuditEntityTypes.AppPermission, EntityId = appId, EventType = eventType,
                 Message = $"App permission {permission} was {row.Status.ToLowerInvariant()}",
-                Metadata = new { permission, appId }
+                Metadata = new { permission, appId, reason }
             }, token);
         }
         if (credentialChanged && runtimes is not null) await runtimes.RestartRunningAsync(appId, CancellationToken.None);
@@ -127,7 +127,7 @@ public sealed class AppPermissionService(
 
     /// <summary>The Studio page where a system administrator approves an app's permissions.</summary>
     public static string? ApprovalUrl(string? studioUrl, Guid appId)
-        => string.IsNullOrWhiteSpace(studioUrl) ? null : $"{studioUrl.TrimEnd('/')}/admin/apps/{appId}?tab=permissions";
+        => string.IsNullOrWhiteSpace(studioUrl) ? null : $"{studioUrl.TrimEnd('/')}/apps/{appId}?view=admin";
 
     // A stored contract that no longer reads requests nothing; the next deployment stores a new one.
     internal static string[] RequestedPermissions(string json)

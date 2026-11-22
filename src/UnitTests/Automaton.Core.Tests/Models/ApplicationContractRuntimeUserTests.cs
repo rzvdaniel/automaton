@@ -46,6 +46,28 @@ public sealed class ApplicationContractRuntimeUserTests
         Assert.That(errors, Does.Contain("runtime.user must be a numeric UID or UID:GID"));
     }
 
+    [TestCase(null)]
+    [TestCase("side-by-side")]
+    [TestCase("stop-first")]
+    public void RuntimeUpdateModeIsValidAndSurvivesSerialization(string? update)
+    {
+        var contract = new ApplicationContract { Runtime = new() { Update = update } };
+
+        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+        Assert.That(ApplicationContractSerialization.Deserialize(ApplicationContractSerialization.Serialize(contract)).Runtime.Update,
+            Is.EqualTo(update));
+    }
+
+    [TestCase("")]
+    [TestCase("Stop-First")]
+    [TestCase("kill-first")]
+    public void UnknownRuntimeUpdateModeIsRejected(string update)
+    {
+        var errors = ApplicationContractValidator.Validate(new() { Runtime = new() { Update = update } });
+
+        Assert.That(errors, Does.Contain("runtime.update must be side-by-side or stop-first"));
+    }
+
     [Test]
     public void RequestedAppPermissionSurvivesSerializationAndUnknownPermissionsAreRejected()
     {

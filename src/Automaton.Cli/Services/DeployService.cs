@@ -26,6 +26,23 @@ public sealed class DeployService
     private static readonly TimeSpan ManagedRuntimeTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ManagedRuntimePollInterval = TimeSpan.FromSeconds(3);
 
+    /// <summary>With deploy --resume the app is resumed right after the deploy, so the server's "stays stopped" note is dropped.</summary>
+    internal bool ResumeAfterDeploy { get; init; }
+
+    internal const string PausedNoteStart = "The app is paused, so the new version is deployed but stays stopped.";
+
+    internal static string? RemovePausedNote(string? message)
+    {
+        if (message is null) return null;
+        var index = message.IndexOf(PausedNoteStart, StringComparison.Ordinal);
+        if (index < 0) return message;
+        var rest = message[..index].Trim();
+        return rest.Length == 0 ? null : rest;
+    }
+
+    private DeployRuntimeResult WithoutPausedNote(DeployRuntimeResult deploy)
+        => ResumeAfterDeploy ? deploy with { Message = RemovePausedNote(deploy.Message) } : deploy;
+
     private readonly ConfigService config;
     private readonly Action<string>? progress;
     private readonly Action<DeployCheckResult>? checkReported;
@@ -184,7 +201,7 @@ public sealed class DeployService
             var result = await deployPackageAsync(
                 server!, apiKey!, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
             uploadResult = result.Upload;
-            runtimeResult = result.Deploy;
+            runtimeResult = WithoutPausedNote(result.Deploy);
             ReportDeploymentLogs(runtimeResult.Logs);
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, true, FormatUploadMessage("uploaded", "deploy package", uploadResult)));
         }

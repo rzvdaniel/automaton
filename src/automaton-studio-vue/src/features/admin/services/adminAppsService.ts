@@ -63,6 +63,15 @@ class AdminAppsService {
     await apiClient.put(`/api/admin/apps/${appId}/moderation`, request)
   }
 
+  /** Permission requests waiting for a system administrator (the endpoint is SysAdmin-only). */
+  async waitingCount(): Promise<number> {
+    try {
+      return (await this.listApps({ waiting: true, pageSize: 1 })).waitingForApprovalTotal
+    } catch {
+      return 0
+    }
+  }
+
   async getPermissions(appId: string): Promise<AdminAppPermissionStatus[]> {
     const { data } = await apiClient.get<AdminAppPermissionStatus[]>(`/api/admin/apps/${appId}/permissions`)
     return data
@@ -73,6 +82,24 @@ class AdminAppsService {
       `/api/admin/apps/${appId}/permissions/${encodeURIComponent(permission)}`, { approved })
     return data
   }
+
+  /** Every machine with a Runner and whether the app may run maintenance (runner:maintain) on it. */
+  async getRunnerPermissions(appId: string): Promise<RunnerMaintenancePermission[]> {
+    const { data } = await apiClient.get<RunnerMaintenancePermission[]>(`/api/admin/apps/${appId}/runner-permissions`)
+    return data
+  }
+
+  async setRunnerPermission(appId: string, runnerId: string, approved: boolean): Promise<RunnerMaintenancePermission[]> {
+    const { data } = await apiClient.put<RunnerMaintenancePermission[]>(
+      `/api/admin/apps/${appId}/runner-permissions/${runnerId}`, { approved })
+    return data
+  }
+}
+
+export interface RunnerMaintenancePermission {
+  runnerId: string
+  name: string
+  approved: boolean
 }
 
 export const adminAppsService = new AdminAppsService()

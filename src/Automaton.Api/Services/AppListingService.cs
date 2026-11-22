@@ -21,18 +21,24 @@ internal sealed class AppListingService(
     {
         var now = DateTime.UtcNow;
         var rows = await LoadRowsAsync(projectId, cancellationToken);
-        var items = rows.Select(row => MapRow(row, now)).ToArray();
-        // Only Action-only apps show their last run, so look it up for those apps alone.
+        var items = new AppListItemDto[rows.Count];
+        for (var index = 0; index < rows.Count; index++)
+            items[index] = MapRow(rows[index], now, await authorizationService.CanUpdateAppAsync(rows[index].Id, cancellationToken));
+        // Only Action-only apps show their last and next run, so look them up for those apps alone.
         for (var index = 0; index < items.Length; index++)
         {
             if (!items[index].ActionsOnly) continue;
             var appId = items[index].Id;
             var run = await dataContext.AppModuleExecutions.AsNoTracking()
-                .Where(execution => execution.AppId == appId)
+                .Where(execution => execution.AppId == appId && execution.ModuleKey != Automaton.Core.Models.AppHomeCardLimits.ActionKey)
                 .OrderByDescending(execution => execution.CreatedAtUtc)
                 .Select(execution => new AppListActionRunDto { ModuleKey = execution.ModuleKey, Status = execution.Status, CreatedAtUtc = execution.CreatedAtUtc })
                 .FirstOrDefaultAsync(cancellationToken);
-            items[index] = items[index].WithLastActionRun(run);
+            var nextRun = await dataContext.ActionSchedules.AsNoTracking()
+                .Where(schedule => schedule.ApplicationId == appId && schedule.Enabled && schedule.NextRunAtUtc != null
+                    && (schedule.SystemIdentity == null || !schedule.SystemIdentity.StartsWith(Automaton.Api.Entities.HomeCardScheduleIdentity.Prefix)))
+                .MinAsync(schedule => schedule.NextRunAtUtc, cancellationToken);
+            items[index] = items[index].WithActionRuns(run, nextRun);
         }
 
         return items;
@@ -41,7 +47,7 @@ internal sealed class AppListingService(
     private Task<List<AppListQueryRow>> LoadRowsAsync(
         Guid? projectId,
         CancellationToken cancellationToken)
-        => authorizationService.GetAppsQueryByContext(projectId)
+        => authorizationService.GetListedAppsQuery(projectId)
             .AsNoTracking()
             .Select(app => new AppListQueryRow
             {
@@ -52,6 +58,8 @@ internal sealed class AppListingService(
                 ThumbnailUrl = app.ThumbnailUrl,
                 Tags = app.Tags,
                 IsPublished = app.IsPublished,
+                IsPaused = app.IsPaused,
+                PausedReason = app.IsPaused ? app.PausedReason : null,
                 PublicUrl = app.PublicUrl,
                 Updated = app.Updated,
                 ProjectId = app.ProjectId,
@@ -80,6 +88,11 @@ internal sealed class AppListingService(
                         Status = target.Status,
                         GenericRuntimeDeployed = target.GenericRuntimeDeployed,
                         LastSuccessfulDeploymentAt = target.LastSuccessfulDeploymentAt,
+                        LastDeploymentError = target.Status != DeploymentTargetStatus.Failed ? null : dataContext.DeploymentOperations
+                            .Where(o => o.WebAppId == app.Id && (o.TargetSlug == null || o.TargetSlug == target.Slug))
+                            .OrderByDescending(o => o.CreatedAtUtc)
+                            .Select(o => o.Status == DeploymentOperationStatuses.Failed ? o.ErrorMessage ?? "The deploy failed." : null)
+                            .FirstOrDefault(),
                         IsHostedRunner = target.ExecutionRunnerId.HasValue && dataContext.HostedRunners
                             .Any(hosted => hosted.RunnerId == target.ExecutionRunnerId && hosted.DeletedAt == null),
                         Runner = target.ExecutionRunner == null ? null : new AppListTargetRunnerRow
@@ -93,7 +106,7 @@ internal sealed class AppListingService(
             })
             .ToListAsync(cancellationToken);
 
-    private static AppListItemDto MapRow(AppListQueryRow row, DateTime now)
+    private static AppListItemDto MapRow(AppListQueryRow row, DateTime now, bool canUpdate)
         => new()
         {
             Id = row.Id,
@@ -103,10 +116,13 @@ internal sealed class AppListingService(
             ThumbnailUrl = row.ThumbnailUrl,
             Tags = AppTagNormalizer.Normalize(row.Tags),
             IsPublished = row.IsPublished,
+            IsPaused = row.IsPaused,
+            PausedReason = row.PausedReason,
             PublicUrl = row.PublicUrl,
             CanLaunchPublicly = row.CanLaunchPublicly,
             UpdatedAtUtc = row.Updated,
             CanDelete = !row.ProjectId.HasValue,
+            CanUpdate = canUpdate,
             Runner = row.Runner == null ? null : MapRunner(row.Runner, now),
             LiveEnvironment = row.LiveTarget == null ? null : MapLiveTarget(row.Id, row.LiveTarget, now),
             ActionsOnly = IsActionsOnly(row.ContractJson),
@@ -141,6 +157,7 @@ internal sealed class AppListingService(
                 target.Runner.ConnectionId, target.Runner.LastHeartbeatAtUtc, now) == RunnerStatus.Online,
             GenericRuntimeDeployed = target.GenericRuntimeDeployed,
             LastSuccessfulDeploymentAtUtc = target.LastSuccessfulDeploymentAt?.UtcDateTime,
+            LastDeploymentError = target.LastDeploymentError,
             IsStaticHosting = target.Runner == null && target.GenericRuntimeDeployed,
             RoutePath = PublishedAppHostNames.BuildPrivateTargetPath(appId, Guid.Empty, isDefault: true)
         };
@@ -164,6 +181,8 @@ internal sealed class AppListingService(
         public string? ThumbnailUrl { get; init; }
         public string? Tags { get; init; }
         public bool IsPublished { get; init; }
+        public bool IsPaused { get; init; }
+        public string? PausedReason { get; init; }
         public string? PublicUrl { get; init; }
         public DateTime Updated { get; init; }
         public Guid? ProjectId { get; init; }
@@ -180,6 +199,7 @@ internal sealed class AppListingService(
         public DeploymentTargetStatus Status { get; init; }
         public bool GenericRuntimeDeployed { get; init; }
         public DateTimeOffset? LastSuccessfulDeploymentAt { get; init; }
+        public string? LastDeploymentError { get; init; }
         public bool IsHostedRunner { get; init; }
         public AppListTargetRunnerRow? Runner { get; init; }
     }

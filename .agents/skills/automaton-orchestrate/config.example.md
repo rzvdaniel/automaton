@@ -8,10 +8,11 @@ secrets here: name where each secret lives.
 - Default branch and its protection (who may push directly, who needs a pull request).
 
 ## Agents
-For each agent (a headless Claude on a server, Codex, a Desktop session, subagents):
+For each agent (a headless agent on a server, a Desktop session, subagents):
 - Name, where it runs, which account or plan it uses (and its usage limits).
 - **How to start a task** (exact command), where its log is, how to see whether it is alive and when it last worked.
-- Model and effort settings to use; what kind of work it takes; what it must never touch.
+- Model and effort settings to use; what kind of work it takes (its lane); what it must never touch.
+- How many agents may run at once, and after how many quiet minutes an agent counts as stalled (and the command that watches for it).
 - How tasks are queued behind a running one.
 
 ## Environments
@@ -31,9 +32,21 @@ For each environment (test, production, temporary servers):
 - Pre-approvals from the owner (for example "verified releases go to production without asking") and the things that
   always need a question first.
 
+## Autonomous deploys
+- `autonomous-deploys: off` (default). The owner changes it to `on` to let the orchestrator deploy low-risk verified
+  releases to production without asking. Only the owner switches it; an agent never edits this line.
+
 ## Standing decisions
 A dated list of the owner's rules (process, quality bar, what is never done). Add to it whenever the owner decides something
 that should last.
+
+## Accounts
+Who does what, one line each, for example `<test login>` = test issues, `<owner>` = releases and production deploys. Reviews need no
+accounts here: any agent posts with any login it has that differs from the other review's (pr-review).
+
+## Reviewer accounts
+`merge-gate.py` needs the main review and the security pass from different GitHub logins. Any agent posts with any login
+it has that differs from the other review's (pr-review, Different logins); nothing is fixed here.
 
 ## Local quirks and traps
 Things specific to this project, machine or tooling that cost time (shell wrappers, API limits, setup that must not be

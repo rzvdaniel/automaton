@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppListItem } from '../types/apps.types'
 import AppListView from './AppListView.vue'
 import { useAppsStore } from '../stores/apps.store'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 const push = vi.fn()
+const toastAdd = vi.hoisted(() => vi.fn())
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   useRoute: () => ({ meta: {} }),
@@ -18,28 +22,33 @@ vi.mock('@/features/organizations/services/organizationsService', () => ({
   organizationsService: { getMyAssignedApps: assigned },
 }))
 vi.mock('../services/apps.service', () => ({ appsService: {} }))
+const waitingCount = vi.hoisted(() => vi.fn())
+vi.mock('@/features/admin/services/adminAppsService', () => ({ adminAppsService: { waitingCount } }))
+vi.mock('@/features/home/services/home.service', () => ({ homeService: { get: vi.fn(async () => ({ needsYou: [], pinned: [] })) } }))
 vi.mock('../components/CatalogPanel.vue', () => ({ default: { template: '<div />' } }))
 
 const live = { name: 'Live', status: 'Running', isHostedRunner: false, runnerOnline: true, genericRuntimeDeployed: true, routePath: '/' }
 const item = (over: Partial<AppListItem>): AppListItem => ({
   id: 'x', name: 'X', summary: '', description: '', tags: [], isPublished: true, updatedAtUtc: '2026-01-01T00:00:00Z',
-  canDelete: true, runtime: { genericRuntimeDeployed: true }, liveEnvironment: live, ...over,
+  canDelete: true, canUpdate: true, runtime: { genericRuntimeDeployed: true }, liveEnvironment: live, ...over,
 })
 
-async function mountView(apps: AppListItem[]) {
+async function mountView(apps: AppListItem[], roles: string[] = []) {
   setActivePinia(createPinia())
+  useAuthStore().user = { roles } as never
   const store = useAppsStore()
   store.fetchApps = vi.fn(async () => { store.listApps = apps })
-  const wrapper = mount(AppListView, { global: { plugins: [PrimeVue] } })
+  const wrapper = mount(AppListView, { global: { plugins: [PrimeVue, ToastService] } })
   await flushPromises()
   return wrapper
 }
 
-const rows = (wrapper: Awaited<ReturnType<typeof mountView>>) => wrapper.findAll('.apps-card a').map((row) => row.text())
+const rows = (wrapper: Awaited<ReturnType<typeof mountView>>) => wrapper.findAll('.app-row__main').map((row) => row.text())
 
 describe('AppListView', () => {
   beforeEach(() => {
     push.mockClear()
+    waitingCount.mockReset().mockResolvedValue(2)
     assigned.mockResolvedValue([{ id: 'sh1', name: 'Shared Tool', isPublished: false }])
   })
 
@@ -49,15 +58,19 @@ describe('AppListView', () => {
     item({ id: 'c', name: 'Idle', liveEnvironment: null, runner: null }),
   ]
 
-  it('lists each app as a link to its page with kind, access and state', async () => {
+  it('lists each app as a link to its page with kind once and only the state', async () => {
     const wrapper = await mountView(apps)
     expect(wrapper.find('h1').text()).toBe('Apps')
-    const links = wrapper.findAll('.apps-card a')
-    expect(links.map((link) => link.attributes('href'))).toEqual(['/apps/a', '/apps/b', '/apps/c'])
+    const links = wrapper.findAll('.app-row__main')
+    // A web app opens the app itself; apps with no screen open their Automaton page.
+    expect(links.map((link) => link.attributes('href'))).toEqual([expect.stringContaining('/apps/a/application'), '/apps/b', '/apps/c'])
+    expect(links[0]!.attributes('target')).toBe('_blank')
+    expect(wrapper.findAll('[data-testid="app-settings"]').map((gear) => gear.attributes('href'))).toEqual(['/apps/a'])
     expect(links[0]!.text()).toContain('Web app · Take notes')
-    expect(links[0]!.text()).toContain('private')
+    expect(links[0]!.text()).not.toContain('private')
     expect(links[0]!.text()).toContain('live')
-    expect(links[1]!.text()).toContain('action')
+    expect(links[1]!.text()).toContain('Action')
+    expect(links[1]!.text()).not.toContain('action ')
     expect(links[2]!.text()).toContain('stopped')
     expect(wrapper.text()).toContain('All · 3')
   })
@@ -91,6 +104,39 @@ describe('AppListView', () => {
     expect(row.element.tagName).toBe('BUTTON')
   })
 
+  it('pauses and resumes an app from its row and shows the Paused state', async () => {
+    const wrapper = await mountView([item({ id: 'a', name: 'Notes' }), item({ id: 'p', name: 'Backup', isPaused: true })])
+    const store = useAppsStore()
+    store.setAppPaused = vi.fn(async (): Promise<string[]> => [])
+    const rowsText = wrapper.findAll('.apps-card .app-row').map((row) => row.text())
+    expect(rowsText[0]).toContain('live')
+    expect(rowsText[0]).toContain('Pause')
+    expect(rowsText[1]).toContain('paused')
+    expect(rowsText[1]).toContain('Resume')
+
+    await wrapper.find('button[aria-label="Pause Notes"]').trigger('click')
+    await wrapper.find('button[aria-label="Resume Backup"]').trigger('click')
+
+    expect(store.setAppPaused).toHaveBeenNthCalledWith(1, 'a', true)
+    expect(store.setAppPaused).toHaveBeenNthCalledWith(2, 'p', false)
+  })
+
+  it('shows a warning toast instead of success when pausing returns warnings', async () => {
+    const wrapper = await mountView([item({ id: 'a', name: 'Notes' })])
+    const store = useAppsStore()
+    store.setAppPaused = vi.fn(async () => ['The Runner could not be told to stop the app.'])
+    toastAdd.mockClear()
+    await wrapper.find('button[aria-label="Pause Notes"]').trigger('click')
+    await flushPromises()
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warn', summary: 'Paused with warnings' }))
+    expect(toastAdd).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }))
+  })
+
+  it('hides Pause and Resume when the person cannot update the app', async () => {
+    const wrapper = await mountView([item({ id: 'a', name: 'Notes', canUpdate: false })])
+    expect(wrapper.find('button[aria-label="Pause Notes"]').exists()).toBe(false)
+  })
+
   it('shows a friendly empty state with both buttons when there are no apps', async () => {
     assigned.mockResolvedValue([])
     const wrapper = await mountView([])
@@ -107,5 +153,18 @@ describe('AppListView', () => {
     expect(dialog.props('visible')).toBe(true)
     dialog.vm.$emit('catalog')
     expect(push).toHaveBeenCalledWith({ name: 'apps-catalog' })
+  })
+
+  it('tells a system administrator how many permission requests are waiting', async () => {
+    const wrapper = await mountView([], ['SysAdmin'])
+    const notice = wrapper.find('[data-testid="waiting-notice"]')
+    expect(notice.text()).toContain('2 permission requests are waiting')
+    expect(notice.find('a').attributes('href')).toBe('/admin/apps?waiting=true')
+  })
+
+  it('shows no notice to a plain user', async () => {
+    const wrapper = await mountView([], ['User'])
+    expect(wrapper.find('[data-testid="waiting-notice"]').exists()).toBe(false)
+    expect(waitingCount).not.toHaveBeenCalled()
   })
 })

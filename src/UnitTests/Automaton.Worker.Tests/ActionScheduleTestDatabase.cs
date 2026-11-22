@@ -50,7 +50,7 @@ internal sealed class ActionScheduleTestDatabase : IAsyncDisposable
                 ApplicationId TEXT NOT NULL, ActionKey TEXT NOT NULL, Name TEXT NOT NULL,
                 Description TEXT NULL, ExecutionScope TEXT NOT NULL, ScheduleType TEXT NOT NULL,
                 RunAtUtc TEXT NULL, IntervalSeconds INTEGER NULL, CronExpression TEXT NULL,
-                TimeZone TEXT NOT NULL, Enabled INTEGER NOT NULL, NextRunAtUtc TEXT NULL,
+                TimeZone TEXT NOT NULL, Enabled INTEGER NOT NULL, PausedByApp INTEGER NOT NULL DEFAULT 0, NextRunAtUtc TEXT NULL,
                 LastTriggeredAtUtc TEXT NULL, LastExecutionId TEXT NULL, InputJson TEXT NOT NULL,
                 ConcurrencyPolicy TEXT NOT NULL, MisfirePolicy TEXT NOT NULL,
                 LeaseOwner TEXT NULL, LeaseExpiresAtUtc TEXT NULL, CreatedAtUtc TEXT NOT NULL,
@@ -67,7 +67,7 @@ internal sealed class ActionScheduleTestDatabase : IAsyncDisposable
                 DeploymentHash TEXT NULL, ExitCode INTEGER NULL, ErrorCode TEXT NULL, FailureSummary TEXT NULL,
                 CreatedAtUtc TEXT NOT NULL, StartedAtUtc TEXT NULL, ExecutionDeadlineUtc TEXT NULL,
                 CompletedAtUtc TEXT NULL, LogsAvailableUntilUtc TEXT NULL, ResultAvailableUntilUtc TEXT NULL,
-                CorrelationId TEXT NULL, ResultFingerprint TEXT NULL);
+                CorrelationId TEXT NULL, ResultFingerprint TEXT NULL, TriggerName TEXT NULL);
             CREATE UNIQUE INDEX IX_AppModuleExecutions_ScheduleOccurrenceId ON AppModuleExecutions (ScheduleOccurrenceId);
             """);
 }

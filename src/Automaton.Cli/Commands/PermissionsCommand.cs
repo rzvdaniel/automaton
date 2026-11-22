@@ -18,6 +18,9 @@ public static class PermissionsCommand
         var status = new Command("status", "Show each requested permission's state and the approval link for an administrator") { json };
         status.SetHandler((bool asJson) => HandleStatusAsync(config, asJson), json);
         command.AddCommand(status);
+        command.AddCommand(PermissionsAdminCommands.BuildList(config));
+        command.AddCommand(PermissionsAdminCommands.BuildDecision(config, approve: true));
+        command.AddCommand(PermissionsAdminCommands.BuildDecision(config, approve: false));
         return command;
     }
 

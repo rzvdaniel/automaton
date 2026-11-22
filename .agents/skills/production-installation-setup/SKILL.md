@@ -10,7 +10,7 @@ Use this skill when preparing or reviewing a fresh Automaton production installa
 
 ## Fresh server installer
 
-For a new standalone server, use [the public installation guide](../../../docs/prod/install-automaton.md), `scripts/install-automaton.sh`, and the release bundle under `docker/install/`. The supported target is x86_64 Linux with systemd and public DNS; the installer adds Docker from Docker's apt repository on Ubuntu and Debian, and elsewhere asks the person to install Docker first. The release workflow publishes prebuilt, digest-pinned server images and a checksum-verified bundle. A fresh install stores protected settings outside the checkout in `/etc/automaton`; Studio `/install` requires its generated setup token. Re-running preserves credentials. Existing installations need a reviewed adoption of their credentials, volumes, infrastructure versions and routing; the fresh installer does not migrate them.
+For a new standalone server, use [the public installation guide](../../../src/automaton-vue/docs/install-server.md), `scripts/install-automaton.sh`, and the release bundle under `docker/install/`. The supported target is x86_64 Linux with systemd and public DNS; the installer adds Docker from Docker's apt repository on Ubuntu and Debian, and elsewhere asks the person to install Docker first. The release workflow publishes prebuilt, digest-pinned server images and a checksum-verified bundle. A fresh install stores protected settings outside the checkout in `/etc/automaton`; Studio `/install` requires its generated setup token. Re-running preserves credentials. Existing installations need a reviewed adoption of their credentials, volumes, infrastructure versions and routing; the fresh installer does not migrate them.
 
 ## Find the authoritative settings
 
@@ -18,8 +18,8 @@ Do not use a live server's untracked settings file as the setup template. Read t
 
 - `.env.prod.example` and `docker-compose.prod.yml` for production services, domains, DNS/TLS, the database (MySQL on the existing host), RabbitMQ, runtime proxy authentication, image/network settings and retention.
 - `src/Automaton.Api/appsettings.Production.example.json` for shared API/Worker application settings and optional integrations.
-- `.env.runner.example`, `docker-compose.runner.yml` and `docs/prod/deploying-runner.md` for independently installed Runners.
-- `docs/prod/production-docker-cheat-sheet.md` and `docs/prod/self-hosted-runners.md` for host prerequisites, persistent data and recovery notes.
+- `.env.runner.example` and `docker-compose.runner.yml` for independently installed Runners.
+- `docs/maintainers/production-docker-cheat-sheet.md` and `src/automaton-vue/docs/deploy-runner.md` for host prerequisites, persistent data and recovery notes.
 
 For each setting, identify its consumer and classify it as operator-provided, generated per installation, derived from another setting, or optional. Confirm required versus optional by checking Compose interpolation and application startup validation; do not infer that every example field is mandatory. Keep the checklist synchronized with the example files and consumers.
 
@@ -31,7 +31,7 @@ The current templates cover these groups: `.env.prod.example` holds public domai
 - Generate unique high-entropy passwords and keys for each installation. Do not copy this server's credentials, use example defaults, or rotate encryption/signing/data-protection keys casually; rotation can invalidate tokens, signatures, or encrypted records.
 - Keep live settings out of Git. Installer-managed production mounts `/etc/automaton/appsettings.Production.json` read-only into API and Worker by default. Do not move or rewrite it during an audit; path changes must update the Compose mount and deployment documentation together.
 - Write new settings atomically with restrictive permissions (`umask 077`, owner-readable only). Preserve existing configuration before updates and verify the backup before replacing the live file.
-- Installations take nightly backups by default (`docker/install/backup.sh`, `automaton-backup.timer`, newest 7 in `/opt/automaton-server/backups/nightly`; status in `/etc/automaton/status/backup.json`, read by the API through a read-only mount). `restore.sh` restores a chosen backup on the host. Keep both scripts, the installer, the updater and [backups and restore](../../../docs/prod/install-automaton.md#backups-and-restore) consistent. These on-server backups do not replace provider snapshots or an off-host copy.
+- Installations take nightly backups by default (`docker/install/backup.sh`, `automaton-backup.timer`, newest 7 in `/opt/automaton-server/backups/nightly`; status in `/etc/automaton/status/backup.json`, read by the API through a read-only mount). `restore.sh` restores a chosen backup on the host. Keep both scripts, the installer, the updater and [backups and restore](../../../src/automaton-vue/docs/backup-restore.md) consistent. These on-server backups do not replace provider snapshots or an off-host copy.
 - An ignored or untracked file is not a backup. Keep an encrypted, off-host backup of installation configuration and persistent key material; store the decryption key separately and test restoration. Do not rely on the same server, checkout, or Docker volume as the only copy.
 - Check `git status` and `git check-ignore -v` for runtime configuration and backup suffixes. Ignore rules prevent accidental staging but do not protect files from deletion.
 

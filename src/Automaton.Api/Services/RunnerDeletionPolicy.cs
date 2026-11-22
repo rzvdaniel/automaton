@@ -11,7 +11,7 @@ public sealed class RunnerDeletionPolicy(
     ApplicationDbContext dbContext,
     ResourceAuthorizationService authorizationService)
 {
-    public async Task EnsureCanDeleteAsync(Guid runnerId, CancellationToken cancellationToken)
+    public async Task EnsureCanDeleteAsync(Guid runnerId, CancellationToken cancellationToken, bool abandonOffline = false)
     {
         if (!await authorizationService.CanDeleteRunnerAsync(runnerId, cancellationToken))
         {
@@ -25,6 +25,9 @@ public sealed class RunnerDeletionPolicy(
 
             throw new UnauthorizedAccessException($"You do not have permission to delete runner {runnerId}");
         }
+
+        // An offline Runner's apps are deleted first, and its pending operations are revoked with it.
+        if (abandonOffline) return;
 
         var assignments = await dbContext.AppDeploymentTargets
             .Where(target => target.ExecutionRunnerId == runnerId)

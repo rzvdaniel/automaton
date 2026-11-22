@@ -32,6 +32,13 @@ export default defineConfig({
     },
     sidebar: [
       {
+        text: 'Start here',
+        items: [
+          { text: 'Install with your AI agent', link: '/install-with-ai' },
+          { text: 'Your first app', link: '/getting-started' },
+        ],
+      },
+      {
         text: 'Tasks',
         items: [
           { text: 'Is Automaton for you?', link: '/is-automaton-for-you' },
@@ -39,7 +46,6 @@ export default defineConfig({
           { text: 'Install the server', link: '/install-server' },
           { text: 'Create the first administrator', link: '/first-admin' },
           { text: 'Add a Runner', link: '/deploy-runner' },
-          { text: 'Create your first app', link: '/getting-started' },
           { text: 'Build an Automaton app', link: '/build-an-automaton-app' },
           { text: 'Deploy and publish an app', link: '/deploy' },
           { text: 'Publish your own app catalog', link: '/apps-repository' },

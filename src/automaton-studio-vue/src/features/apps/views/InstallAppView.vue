@@ -13,6 +13,8 @@ import { actionSchedulesService } from '../services/action-schedules.service'
 import { adminAppsService } from '@/features/admin/services/adminAppsService'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { getDeploymentTargetRunnerOptions } from '../utils/deployment-target-runner'
+import { renderMarkdown } from '@/shared/utils/markdown'
+import { describeCron } from '../utils/app-overview'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { InstallManifest, InstallSource } from '../types/apps.types'
 
@@ -42,10 +44,11 @@ const error = ref<string | null>(null)
 
 const manifest = computed<InstallManifest>(() => source.value?.application ?? {})
 const isAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+const readmeHtml = computed(() => (source.value?.readme?.trim() ? renderMarkdown(source.value.readme) : ''))
 const permissions = computed(() => manifest.value.permissions ?? [])
 const missingRequired = computed(() => [
   ...(manifest.value.settings ?? []).filter((item) => item.required && !item.default && !settings[item.name]?.trim()).map((item) => item.name),
-  ...(manifest.value.secrets ?? []).filter((item) => !item.from && !secrets[item.name]).map((item) => item.name),
+  ...(manifest.value.secrets ?? []).filter((item) => !item.from && !item.optional && !secrets[item.name]).map((item) => item.name),
 ])
 
 onMounted(async () => {
@@ -185,7 +188,7 @@ const stepIcon: Record<StepState, string> = {
 const scheduleSummary = computed(() =>
   (manifest.value.schedules ?? [])
     .filter((item) => schedules[item.name])
-    .map((item) => `${item.name} runs ${item.cron ? `on cron ${item.cron}` : `every ${item.intervalSeconds} seconds`}`),
+    .map((item) => `${item.name} runs ${item.cron ? (describeCron(item.cron, item.timeZone) ?? `on cron ${item.cron}`) : `every ${item.intervalSeconds} seconds`}`),
 )
 
 function openInstalledApp() {
@@ -223,6 +226,10 @@ function openInstalledApp() {
         <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
         <div v-if="succeeded" class="flex flex-column gap-2">
           <p class="m-0">{{ name.trim() }} is installed and running on your server.</p>
+          <p v-if="manifest.publicAccess" class="m-0" data-testid="public-access-next">
+            {{ manifest.publicAccess.level === 'required' ? 'To work for outside callers, this app must be public.' : 'To work for outside callers, make this app public.' }}
+            Open the app, choose Change next to "Who can open it", then "Anyone on the internet".
+          </p>
           <ul v-if="scheduleSummary.length" class="m-0">
             <li v-for="line in scheduleSummary" :key="line">{{ line }}.</li>
           </ul>
@@ -254,6 +261,17 @@ function openInstalledApp() {
             <small v-if="!runnerOptions.length" class="text-color-secondary">No Runner is available to you yet; connect one first.</small>
           </div>
 
+          <Message v-if="manifest.publicAccess || manifest.openPaths?.length" severity="info" :closable="false" data-testid="public-access-notice">
+            <p v-if="manifest.publicAccess" class="m-0">
+              <strong>{{ manifest.publicAccess.level === 'required' ? 'Needs public access.' : 'Works best with public access.' }}</strong>
+              {{ manifest.publicAccess.reason }}
+              New apps are private: only you and the people you share them with can open them, so callers without an Automaton sign-in get 401 unless the app is made public. After installing, open the app and choose Change next to "Who can open it", then "Anyone on the internet".
+            </p>
+            <p v-if="manifest.openPaths?.length" class="m-0">
+              These paths already answer without sign-in while the app is private, for outside calls: <code>{{ manifest.openPaths.join(', ') }}</code>. The rest of the app stays private.
+            </p>
+          </Message>
+
           <div class="install-fields">
             <section v-if="manifest.settings?.length" class="flex flex-column gap-2" aria-labelledby="install-settings">
               <h3 id="install-settings" class="m-0">Settings</h3>
@@ -268,7 +286,7 @@ function openInstalledApp() {
               <h3 id="install-secrets" class="m-0">Secrets</h3>
               <small class="text-color-secondary">Stored encrypted and never shown again.</small>
               <div v-for="item in manifest.secrets" :key="item.name" class="flex flex-column gap-1">
-                <label :for="`secret-${item.name}`">{{ item.name }}<span v-if="item.from"> (can come from your {{ item.from.split(':')[0] }} vault)</span></label>
+                <label :for="`secret-${item.name}`">{{ item.name }}<span v-if="item.optional"> (optional)</span><span v-if="item.from"> (can come from your {{ item.from.split(':')[0] }} vault)</span></label>
                 <Password
                   v-model="secrets[item.name]"
                   :input-id="`secret-${item.name}`"
@@ -295,6 +313,11 @@ function openInstalledApp() {
             <small class="text-color-secondary">You get your own copy; you can install the same app more than once.</small>
           </section>
 
+          <section v-if="readmeHtml" class="install-summary flex flex-column gap-2" aria-labelledby="install-readme">
+            <h3 id="install-readme" class="m-0">README</h3>
+            <article class="prose" data-testid="install-readme" v-html="readmeHtml" />
+          </section>
+
           <section v-if="permissions.length" class="install-summary flex flex-column gap-2" aria-labelledby="install-permissions">
             <h3 id="install-permissions" class="m-0">Permissions</h3>
             <ul class="m-0"><li v-for="permission in permissions" :key="permission"><code>{{ permission }}</code></li></ul>
@@ -312,7 +335,7 @@ function openInstalledApp() {
               <label :for="`schedule-${item.name}`">
                 {{ item.name }}
                 <small class="text-color-secondary block">
-                  Runs <code>{{ item.action }}</code> {{ item.cron ? `on cron ${item.cron}` : `every ${item.intervalSeconds} seconds` }}<template v-if="item.description"> · {{ item.description }}</template>
+                  Runs <code>{{ item.action }}</code> {{ item.cron ? (describeCron(item.cron, item.timeZone) ?? `on cron ${item.cron}`) : `every ${item.intervalSeconds} seconds` }}<template v-if="item.description"> · {{ item.description }}</template>
                 </small>
               </label>
             </div>
@@ -337,6 +360,9 @@ function openInstalledApp() {
 </template>
 
 <style scoped>
+.prose :deep(.table-scroll) { overflow-x: auto; max-width: 100%; margin: 12px 0; }
+.prose :deep(table) { border-collapse: collapse; font-size: 14px; }
+.prose :deep(th), .prose :deep(td) { border: 1px solid var(--line); padding: 6px 10px; vertical-align: top; }
 .install-app {
   max-width: 72rem;
 }

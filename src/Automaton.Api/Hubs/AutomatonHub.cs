@@ -29,7 +29,6 @@ public class AutomatonHub : Hub
     private readonly RunnerService runnerService;
     private readonly AppsService appsService;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
-    private readonly TunnelRequestRegistry tunnelRegistry;
     private readonly ILogger<AutomatonHub> logger;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly RunnerExecutionIdentityService runnerIdentity;
@@ -38,7 +37,6 @@ public class AutomatonHub : Hub
         RunnerService runnerService,
         AppsService appsService,
         ApiInstanceIdentityService apiInstanceIdentityService,
-        TunnelRequestRegistry tunnelRegistry,
         ILogger<AutomatonHub> logger,
         IAppDeploymentTargetResolver deploymentTargetResolver,
         RunnerExecutionIdentityService runnerIdentity)
@@ -46,7 +44,6 @@ public class AutomatonHub : Hub
         this.runnerService = runnerService;
         this.appsService = appsService;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
-        this.tunnelRegistry = tunnelRegistry;
         this.logger = logger;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.runnerIdentity = runnerIdentity;
@@ -94,30 +91,6 @@ public class AutomatonHub : Hub
             Context.ConnectionAborted);
 
         await base.OnConnectedAsync();
-    }
-
-    /// <summary>
-    /// Called by the runner to deliver a tunnel response back to the server.
-    /// Resolves the pending TaskCompletionSource by requestId.
-    /// </summary>
-    public Task TunnelResponse(TunnelResponse response)
-    {
-        tunnelRegistry.TryComplete(response);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>Runner → API: one body chunk of a streaming tunnel response. Tells the Runner to stop when nobody reads it.</summary>
-    public async Task TunnelResponseChunk(string requestId, byte[] data, bool final, bool failed)
-    {
-        if (!tunnelRegistry.TryWriteChunk(requestId, data, final, failed) && !final)
-            await Clients.Caller.SendAsync(AutomatonHubMethods.TunnelCancel, requestId);
-    }
-
-    /// <summary>Runner → API: one frame of an open tunnel WebSocket.</summary>
-    public async Task TunnelWebSocketFrame(TunnelWebSocketFrame frame)
-    {
-        if (!tunnelRegistry.TryWriteWebSocketFrame(frame) && frame.Kind != TunnelWebSocketFrameKinds.Close)
-            await Clients.Caller.SendAsync(AutomatonHubMethods.TunnelCancel, frame.RequestId);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -181,6 +154,67 @@ public class AutomatonHub : Hub
         Guid appId,
         Guid deploymentTargetId)
         => $"app-runtime-logs:{appId:D}:{deploymentTargetId:D}";
+
+    /// <summary>
+    /// Runner → API: where the reverse proxy can reach this Runner's runtime gateway, and the secret it must send (#1181).
+    /// The address is probed first; a Runner that is not reachable keeps being served through the tunnel.
+    /// </summary>
+    public async Task ReportRuntimeGateway(string url, string secret)
+    {
+        var runner = GetRunner();
+        var services = Context.GetHttpContext()!.RequestServices;
+        try { await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Rejected runtime gateway report for runner {RunnerId}", runner.Id);
+            Context.Abort();
+            return;
+        }
+
+        var registry = services.GetRequiredService<RunnerGatewayRegistry>();
+        if (await registry.ReportAsync(runner.Id, url, secret, Context.ConnectionAborted))
+        {
+            logger.LogInformation("Runner {RunnerId} reported a reachable runtime gateway; refreshing app routes", runner.Id);
+            await services.GetRequiredService<BackendRouteConfigService>().RefreshAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// Runner → API, with each heartbeat: the app runtimes this Runner hosts. Returns the approved app that receives the
+    /// server's logs (<c>logs:receive</c>) when this Runner hosts it, so the Runner can send its own logs there too.
+    /// </summary>
+    public async Task<LogSinkAssignment?> SyncLogSink(LogSinkRuntimeReport[]? runtimes)
+    {
+        var runner = GetRunner();
+        var services = Context.GetHttpContext()!.RequestServices;
+        try { await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Rejected log sink sync for runner {RunnerId}", runner.Id);
+            Context.Abort();
+            return null;
+        }
+
+        // Only a Runner whose gateway the server probed has a verified host; any other Runner receives nothing.
+        var host = services.GetRequiredService<RunnerGatewayRegistry>().Find(runner.Id)?.Url.Host;
+        return await services.GetRequiredService<LogSinkService>().SyncAsync(runner.Id, host, runtimes, Context.ConnectionAborted);
+    }
+
+    /// <summary>Runner → API: runtimes it could not start (and ones that came back), so Studio shows them down instead of live.</summary>
+    public async Task ReportRuntimeStates(RuntimeStateReport[]? reports)
+    {
+        var runner = GetRunner();
+        var services = Context.GetHttpContext()!.RequestServices;
+        try { await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Rejected runtime state report for runner {RunnerId}", runner.Id);
+            Context.Abort();
+            return;
+        }
+        await services.GetRequiredService<AppDeploymentTargetStateService>()
+            .ApplyRuntimeReportsAsync(runner.Id, reports, Context.ConnectionAborted);
+    }
 
     public async Task Heartbeat()
     {

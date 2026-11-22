@@ -21,11 +21,20 @@ public class WebApp
     public string ApplicationContractJson { get; set; } =
         ApplicationContractSerialization.Serialize(ApplicationContractDefaults.Create());
     
+    /// <summary>The app is paused: its runtime is stopped, its schedules are off and its address answers "paused". Data, secrets and settings are kept.</summary>
+    public bool IsPaused { get; set; }
+    public DateTime? PausedAt { get; set; }
+    /// <summary>Why the app was paused, as the person who paused it wrote it; cleared on resume. Shown to people who can open the app in Studio, never on the public paused page.</summary>
+    public string? PausedReason { get; set; }
+
     // Publishing fields
     public bool IsPublished { get; set; }
 
     /// <summary>Any signed-in person on this server may open the app (not the public internet).</summary>
     public bool SharedWithServer { get; set; }
+
+    /// <summary>Members of this team (project) may open the app after signing in; they cannot manage it.</summary>
+    public Guid? SharedWithProjectId { get; set; }
     public bool IsForkable { get; set; } = false;
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
@@ -123,6 +132,9 @@ public class WebApp
 
     /// <summary>The pinned commit the app's files were fetched at.</summary>
     public string? InstalledFromCommit { get; set; }
+
+    /// <summary>The commit of <see cref="InstalledFromCommit"/> at the last successful deploy: what the app runs now. Null until a deploy succeeds after the install.</summary>
+    public string? DeployedFromCommit { get; set; }
 
     /// <summary>
     /// Total tokens used in AI chat sessions for this app

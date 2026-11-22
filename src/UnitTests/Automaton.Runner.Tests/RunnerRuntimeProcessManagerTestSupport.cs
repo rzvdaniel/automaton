@@ -131,7 +131,7 @@ internal static class RunnerRuntimeProcessManagerTestSupport
             try
             {
                 var metadata = ReadMetadata(metadataPath);
-                if (metadata.Candidate is not null)
+                if (metadata.Candidate?.ProcessId is not null)
                     return metadata;
             }
             catch (Exception ex) when (ex is IOException or JsonException)
@@ -141,7 +141,7 @@ internal static class RunnerRuntimeProcessManagerTestSupport
             await Task.Delay(50);
         }
 
-        Assert.Fail("Replacement candidate did not enter readiness before the timeout.");
+        Assert.Fail("Replacement candidate did not get a process id before the timeout.");
         return null!;
     }
 

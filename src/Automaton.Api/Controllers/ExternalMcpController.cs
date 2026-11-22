@@ -30,6 +30,7 @@ namespace Automaton.Api.Controllers;
 ///   list_files      — List editable app source files
 ///   get_file_tree   — Return the editable source file tree for an app
 ///   list_runners    — List the user's connected runners
+///   list_notifications / acknowledge_notification — The notification feed (same as Studio Home)
 ///
 /// For file writes and deployment use the automaton CLI:
 ///   automaton deploy   — build, upload, and deploy the application

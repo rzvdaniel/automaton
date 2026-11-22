@@ -61,16 +61,18 @@ sudo ./setup-service.sh
 
 ## Production installation and updates
 
-Use `install-automaton.sh` for a fresh standalone server and the installed `update.sh` for subsequent releases. See [the installation guide](../docs/prod/install-automaton.md).
+Use `install-automaton.sh` for a fresh standalone server and the installed `update.sh` for subsequent releases. See [the installation guide](../src/automaton-vue/docs/install-server.md).
 
 ```bash
 sudo bash /opt/automaton-server/update.sh
 sudo bash /opt/automaton-server/install.sh --status
 ```
 
-`host-storage.sh` provides storage inspection and bounded image maintenance. The retired source blue/green deployment helpers have been removed. The separately hosted marketing website is outside the server updater.
+`uninstall-automaton.sh` removes the server install it is pointed at (Docker stays installed): `sudo bash uninstall-automaton.sh [--delete-data --confirm <domain> [--no-final-backup]] [--dry-run]`. It removes only containers of its own Compose project that run from that install directory, and leaves the network and volumes of a project that also runs from another directory, and the host-wide units, jails and state of another install, alone. `--delete-data` needs `--confirm <domain>` (`--yes` does not confirm it) and first saves a final backup and the backup key in `/var/backups/automaton-final-<time>`, unless `--no-final-backup`. A custom `--install-dir`/`--config-dir` is accepted only with Automaton's own markers (compose project `automaton-server` plus `update.sh` or `release.env`; `installation.json` or `secrets/setup-token`). A keep-mode run leaves a root-owned `.automaton-uninstalled` marker in each kept directory; a later run accepts a kept-only directory only with that marker. The script has no test mode: `scripts/tests/uninstall-automaton-test.sh` runs it with two installs inside a throwaway Docker-in-Docker container and never on the host. See [Uninstall](../src/automaton-vue/docs/install-server.md#uninstall).
 
-CLI releases remain independent: run [Pack CLI and Runner](../.github/workflows/nuget.yml) with an explicit version and publish enabled. See [CLI NuGet publishing](../docs/prod/cli-nuget-publishing.md).
+The Runner's nightly cleanup removes unused images; Server Console warns about low disk. The retired source blue/green deployment helpers have been removed. The separately hosted marketing website is outside the server updater.
+
+CLI releases remain independent: run [Pack CLI and Runner](../.github/workflows/nuget.yml) with an explicit version and publish enabled. See [CLI NuGet publishing](../docs/maintainers/cli-nuget-publishing.md).
 
 ---
 

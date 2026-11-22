@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import router from './index'
 
 describe('studio router', () => {
-  it('makes Apps the start page', () => {
+  it('makes Home the start page', () => {
     const resolved = router.resolve('/')
-    expect(resolved.matched.some((record) => record.name === 'apps' || record.redirect)).toBe(true)
+    expect(resolved.matched.some((record) => record.redirect)).toBe(true)
+    expect(router.resolve({ name: 'home' }).path).toBe('/home')
     expect(router.resolve({ name: 'apps' }).path).toBe('/apps')
   })
 
@@ -66,8 +67,22 @@ describe('studio router', () => {
     expect(router.resolve(path).name).toBe(name)
   })
 
+  it.each([
+    ['/catalog', 'apps-catalog'],
+    ['/backups', 'admin-backups'],
+  ])('sends the menu name %s to its page', (path, name) => {
+    const matched = router.resolve(path).matched
+    expect(matched[matched.length - 1]?.redirect).toEqual({ name })
+  })
+
   it.each(['organizations', 'admin-users'])('sends the %s list to the People page', (name) => {
     expect(router.getRoutes().find((route) => route.name === name)?.redirect).toEqual({ name: 'people' })
+  })
+
+  it('sends the old admin app page to the app page Admin tab', () => {
+    const matched = router.resolve('/admin/apps/a1').matched
+    const redirect = matched[matched.length - 1]?.redirect as (to: { params: Record<string, string> }) => unknown
+    expect(redirect({ params: { appId: 'a1' } })).toEqual({ path: '/apps/a1', query: { view: 'admin' } })
   })
 
   it.each(['apikeys', 'downloads', 'admin-installation'])('sends the old %s page to Settings', (name) => {

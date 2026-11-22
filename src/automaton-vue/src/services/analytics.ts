@@ -1,43 +1,40 @@
-import posthog from 'posthog-js'
+// Cookie-free page counts with our self-hosted GoatCounter (stats.apps.automaton.monster).
+// Off in dev and when VITE_GOATCOUNTER_URL is empty.
+const countUrl = import.meta.env.VITE_GOATCOUNTER_URL?.trim() || ''
+const isEnabled = !import.meta.env.DEV && !!countUrl
 
-const posthogKey = import.meta.env.VITE_POSTHOG_KEY?.trim() || ''
-const posthogHost = import.meta.env.VITE_POSTHOG_HOST?.trim() || ''
-const isAnalyticsEnabled =
-  !import.meta.env.DEV &&
-  import.meta.env.VITE_POSTHOG_ENABLED === 'true' &&
-  !!posthogKey &&
-  !!posthogHost
-
-let hasInitialized = false
-
-function safeCall(action: () => void) {
-  try {
-    action()
-  } catch (error) {
-    console.warn('[analytics] PostHog call failed', error)
+type GoatCounter = { count?: (vars: { path: string }) => void; no_onload?: boolean }
+declare global {
+  interface Window {
+    goatcounter?: GoatCounter
   }
 }
 
-function init() {
-  if (!isAnalyticsEnabled || hasInitialized || typeof window === 'undefined') {
-    return
-  }
+let hasInitialized = false
 
-  safeCall(() => {
-    posthog.init(posthogKey, {
-      api_host: posthogHost,
-      capture_pageview: 'history_change',
-      autocapture: false,
-      capture_pageleave: 'if_capture_pageview',
-      persistence: 'localStorage+cookie',
-      loaded: () => {
-        hasInitialized = true
-      },
-    })
-    hasInitialized = true
-  })
+function init() {
+  if (!isEnabled || hasInitialized || typeof window === 'undefined') return
+  hasInitialized = true
+  // Route changes are counted by pageview(), so count.js must not count on load as well.
+  window.goatcounter = { no_onload: true }
+  const script = document.createElement('script')
+  script.async = true
+  script.src = countUrl.replace(/\/count$/, '/count.js')
+  script.dataset.goatcounter = countUrl
+  script.onload = () => pageview(window.location.pathname)
+  document.head.appendChild(script)
+}
+
+function pageview(path: string) {
+  if (!isEnabled) return
+  try {
+    window.goatcounter?.count?.({ path })
+  } catch (error) {
+    console.warn('[analytics] GoatCounter call failed', error)
+  }
 }
 
 export const analytics = {
   init,
+  pageview,
 }

@@ -16,25 +16,10 @@ public sealed class RunnerExecutionOperationService(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector protector = protection.CreateProtector("RunnerExecutionOperation.v1");
 
-    public async Task QueueManagedArtifactsAsync(Guid id, Guid runnerId, Guid ownerId,
-        SynchronizeApplicationManagedArtifactsRequest request, CancellationToken token)
-    {
-        if (await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) return;
-        try { await QueueAsync(runnerId, ownerId, new(null, null, ManagedArtifacts: request), token, id); }
-        catch (DbUpdateException)
-        {
-            // Competing API callbacks may create the same operation. Its committed, pinned request wins.
-            var added = db.ChangeTracker.Entries<RunnerExecutionOperation>()
-                .SingleOrDefault(entry => entry.Entity.Id == id && entry.State == EntityState.Added);
-            if (added is not null) added.State = EntityState.Detached;
-            if (!await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) throw;
-        }
-    }
-
     public async Task QueueFileTransferAsync(Guid id, Guid runnerId, Guid ownerId,
         RunnerFileTransferCommand request, CancellationToken token)
     {
-        var payload = new RunnerExecutionRequest(null, null, FileTransfer: request);
+        var payload = new RunnerExecutionRequest(FileTransfer: request);
         if (await HasFileTransferOperationAsync(id, runnerId, ownerId, request, token)) return;
         try { await QueueAsync(runnerId, ownerId, payload, token, id); }
         catch (DbUpdateException)
@@ -49,7 +34,7 @@ public sealed class RunnerExecutionOperationService(
     public async Task QueueHostContainerAsync(Guid id, Guid runnerId, Guid ownerId,
         HostContainerExecutionRequest request, CancellationToken token)
     {
-        var payload = new RunnerExecutionRequest(null, null, HostContainer: request);
+        var payload = new RunnerExecutionRequest(HostContainer: request);
         if (await HasHostContainerOperationAsync(id, runnerId, ownerId, request, token)) return;
         try { await QueueAsync(runnerId, ownerId, payload, token, id); }
         catch (DbUpdateException)
@@ -103,19 +88,6 @@ public sealed class RunnerExecutionOperationService(
         return true;
     }
 
-    private async Task<bool> HasManagedArtifactsOperationAsync(Guid id, Guid runnerId, Guid ownerId,
-        SynchronizeApplicationManagedArtifactsRequest request, CancellationToken token)
-    {
-        var operation = await db.RunnerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, token);
-        if (operation is null) return false;
-        var pinned = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions);
-        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId
-            || pinned?.ManagedArtifacts?.AppId != request.AppId
-            || pinned.ManagedArtifacts.DeploymentTargetId != request.DeploymentTargetId)
-            throw new UnauthorizedAccessException("Managed artifact operation identity belongs to another assignment.");
-        return true;
-    }
-
     private async Task<bool> HasHostContainerOperationAsync(Guid id, Guid runnerId, Guid ownerId,
         HostContainerExecutionRequest request, CancellationToken token)
     {
@@ -150,15 +122,37 @@ public sealed class RunnerExecutionOperationService(
         return operation.Id;
     }
 
+    /// <summary>
+    /// Queues a request and waits for the Runner's answer. A Runner that reports a failure, or does not answer in time
+    /// (offline, or the app does not become ready), raises <see cref="RuntimeCommandFailedException"/>.
+    /// </summary>
+    public async Task<RunnerExecutionResult> QueueAndWaitAsync(
+        Guid runnerId, Guid actor, RunnerExecutionRequest request, TimeSpan timeout, CancellationToken token)
+    {
+        var id = await QueueAsync(runnerId, actor, request, token);
+        // Only the deadline ends the wait: a caller that disconnects must not cancel the operation midway.
+        using var limit = new CancellationTokenSource(timeout);
+        RunnerExecutionResult result;
+        try { result = await WaitAsync(id, limit.Token); }
+        catch (OperationCanceledException)
+        {
+            throw new RuntimeCommandFailedException(
+                "The Runner did not answer in time, so the app may not be running. It is cancelled if it has not started; try again when the Runner is online.");
+        }
+        if (result.Outcome != "Succeeded")
+            throw new RuntimeCommandFailedException(
+                "The Runner could not start the app: " + (string.IsNullOrWhiteSpace(result.Error) ? result.Outcome : result.Error));
+        return result;
+    }
+
     private static bool IsManagementRequest(RunnerExecutionRequest request)
-        => request.ManagedArtifacts is not null
-            || request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata
+        => request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata
             || request.HostContainer is not null
             // Cleanup and runtime restarts wait for typed Docker work on the management queue.
             // They must leave that queue's single consumer free to run its nested operations.
             || request.Action is not null && request.Action.Kind is not
                 ("execute" or "cleanup-app-resources" or "cleanup-target-resources" or "cleanup-app" or "cleanup-target"
-                or AppRuntimeRestarter.CommandKind);
+                or AppRuntimeRestarter.CommandKind or AppPauseService.PauseCommandKind or AppPauseService.ResumeCommandKind);
 
     public async Task<RunnerExecutionResult> WaitAsync(Guid operationId, CancellationToken token)
     {
@@ -320,11 +314,17 @@ public sealed class RunnerExecutionOperationService(
             if (await PersistResultAsync(operationId, json, ct))
             {
                 await action.ApplyAsync(operationId, projection, ct);
+                // Same transaction as the saved result (CAP outbox): the row is the truth, this only wakes the Runner.
+                if (IsHostContainerOperation(operation))
+                    await events.PublishAsync(new RunnerExecutionResultReadyEvent(operationId, operation.RunnerId), ct);
                 receipt = new("accepted");
             }
         }, token);
         return receipt;
     }
+
+    private bool IsHostContainerOperation(RunnerExecutionOperation operation)
+        => JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions)?.HostContainer is not null;
 
     private void EnsureHostContainerResult(
         RunnerExecutionOperation operation, RunnerExecutionResult result)

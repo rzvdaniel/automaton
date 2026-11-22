@@ -83,7 +83,7 @@ async function loadData() {
     const assignedUsers = await organizationsService.getAppAssignedUsers(props.organizationId, props.appId)
     assignedUserIds.value = new Set(assignedUsers.map((u: any) => u.id))
     
-  } catch (error) {
+  } catch {
     // Error already shown by service
   } finally {
     loading.value = false
@@ -122,7 +122,7 @@ async function handleAssign() {
     emit('assigned')
     isVisible.value = false
     
-  } catch (error) {
+  } catch {
     // Error already shown by service
   } finally {
     saving.value = false
@@ -145,7 +145,7 @@ async function handleUnassign(userId: string, userName: string) {
     await loadData()
     emit('assigned')
     
-  } catch (error) {
+  } catch {
     // Error already shown by service
   }
 }

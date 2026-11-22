@@ -5,6 +5,7 @@ using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Automaton.Api.Home;
 using Automaton.Api.Models;
 
 namespace Automaton.Api.Services;
@@ -14,9 +15,10 @@ public static class AppModuleTriggerTypes
     public const string Manual = AppModuleTriggerKinds.Manual;
     public const string Internal = AppModuleTriggerKinds.Internal;
     public const string Scheduled = AppModuleTriggerKinds.Scheduled;
+    public const string Webhook = AppModuleTriggerKinds.Webhook;
 }
 
-public sealed class AppActionExecutionService
+public class AppActionExecutionService
 {
     private readonly ApplicationDbContext db;
     private readonly AppsService appsService;
@@ -52,19 +54,27 @@ public sealed class AppActionExecutionService
         Guid appId, string actionKey, Guid userId, JsonElement input, Guid occurrenceId, CancellationToken cancellationToken)
         => await ExecuteAsync(appId, actionKey, userId, input, occurrenceId, AppModuleTriggerTypes.Scheduled, cancellationToken);
 
+    /// <summary>Starts an Action for a webhook call. The run is made by the webhook's owner and says which webhook started it.</summary>
+    public virtual async Task<AppModuleExecution> ExecuteWebhookAsync(
+        Guid appId, string actionKey, Guid ownerUserId, JsonElement input, string webhookName, CancellationToken cancellationToken)
+        => await ExecuteAsync(appId, actionKey, ownerUserId, input, null, AppModuleTriggerTypes.Webhook, cancellationToken, webhookName);
+
     private async Task<AppModuleExecution> ExecuteAsync(
-        Guid appId, string actionKey, Guid userId, JsonElement input, Guid? occurrenceId, string triggerType, CancellationToken cancellationToken)
+        Guid appId, string actionKey, Guid userId, JsonElement input, Guid? occurrenceId, string triggerType, CancellationToken cancellationToken,
+        string? triggerName = null)
     {
         if (occurrenceId.HasValue)
         {
             var existing = await db.AppModuleExecutions.SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == occurrenceId, cancellationToken);
             if (existing != null) return existing;
         }
+        if (await db.WebApps.AnyAsync(app => app.Id == appId && app.IsPaused, cancellationToken))
+            throw new AppPausedException("The app is paused, so its Actions cannot run. Resume the app first.");
         AppActionManifestParser.ValidateKey(actionKey);
         var resolved = await ResolveActionTargetAsync(appId, actionKey, userId, cancellationToken);
         return await CreateAndDispatchAsync(
             appId, resolved.Target.Id, actionKey, userId, input, occurrenceId, triggerType,
-            resolved.Runner, resolved.Action, cancellationToken);
+            resolved.Runner, resolved.Action, cancellationToken, triggerName);
     }
 
     private async Task<(Runner Runner, AppDeploymentTarget Target, AppActionModuleInfo Action)> ResolveActionTargetAsync(
@@ -121,7 +131,8 @@ public sealed class AppActionExecutionService
         string triggerType,
         Runner runner,
         AppActionModuleInfo deployedAction,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? triggerName = null)
     {
         if (!RunnerCapabilities.Includes(
                 runner.CapabilitiesJson,
@@ -134,7 +145,7 @@ public sealed class AppActionExecutionService
         {
             Id = Guid.NewGuid(), AppId = appId, DeploymentTargetId = deploymentTargetId,
             ModuleType = AppModuleTypes.Action, ModuleKey = actionKey,
-            RunnerId = runner.Id, TriggerType = triggerType, RequestedByUserId = userId,
+            RunnerId = runner.Id, TriggerType = triggerType, RequestedByUserId = userId, TriggerName = triggerName,
             ScheduleOccurrenceId = occurrenceId,
             Status = AppModuleExecutionStatuses.Dispatching, CreatedAtUtc = now,
             DeploymentHash = deployedAction.ContentHash,
@@ -159,11 +170,14 @@ public sealed class AppActionExecutionService
             request.Secrets = resolved.Values;
             request.PlainValueNames = [.. resolved.PlainNames];
         }
+        if (actionKey == AppHomeCardLimits.ActionKey)
+            request.TimeoutSeconds = machineResources?.HomeCardTimeoutSeconds ?? new MachineContainerResourceOptions().HomeCardTimeoutSeconds;
         if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
         {
             if (machineResources?.IsValid() != true)
                 throw new InvalidOperationException("Machine Action execution is paused because valid bounded container settings are unavailable.");
-            request.ContainerPolicy = machineResources.ToActionContainerPolicy();
+            var homeCard = actionKey == AppHomeCardLimits.ActionKey;
+            request.ContainerPolicy = homeCard ? machineResources.ToHomeCardContainerPolicy() : machineResources.ToActionContainerPolicy();
         }
         await runnerGateway.QueueExecutionAsync(runner.Id, userId ?? Guid.Empty, execution.Id, request, cancellationToken);
         if (resolved is not null)
@@ -283,3 +297,6 @@ public sealed class AppActionExecutionService
     }
 
 }
+
+/// <summary>An Action was run on a paused app.</summary>
+public sealed class AppPausedException(string message) : InvalidOperationException(message);

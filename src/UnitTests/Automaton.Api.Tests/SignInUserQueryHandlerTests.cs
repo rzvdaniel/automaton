@@ -23,7 +23,7 @@ public class SignInUserQueryHandlerTests
 
         var act = async () => await handler.Handle(new SignInUserQuery(4, "missing@example.com", "pw"), CancellationToken.None);
 
-        Assert.That(act, Throws.Exception.With.Message.EqualTo("Invalid credentials."));
+        Assert.That(act, Throws.TypeOf<Automaton.Api.Services.InvalidCredentialsException>().With.Message.EqualTo("Wrong email or password."));
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class SignInUserQueryHandlerTests
 
         var act = async () => await handler.Handle(new SignInUserQuery(4, user.Email!, "pw"), CancellationToken.None);
 
-        Assert.That(act, Throws.Exception.With.Message.EqualTo("Invalid credentials."));
+        Assert.That(act, Throws.TypeOf<Automaton.Api.Services.InvalidCredentialsException>().With.Message.EqualTo("Wrong email or password."));
     }
 
     private static ApplicationUser CreateUser(bool lockoutEnabled)

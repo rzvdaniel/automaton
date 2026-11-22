@@ -1,7 +1,9 @@
+using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Tests;
 
@@ -87,6 +89,22 @@ public sealed class AppSecretServiceTests
             service.ResolveForRuntimeAsync(appId, targetId, Guid.NewGuid(), CancellationToken.None));
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             service.ResolveForRuntimeAsync(Guid.NewGuid(), targetId, runnerId, CancellationToken.None));
+    }
+
+    [Test]
+    public async Task ApiUrlIsDeliveredWithoutTrailingSlashAsPlainValue()
+    {
+        var (_, db, appId, ownerId) = Create();
+        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
+        var service = new AppSecretService(db, new SecretStore(db, protector), protector,
+            new ResourceAuthorizationService(db, AppAuthorizationTestData.CreateUserContextService(ownerId)),
+            publishedApps: Options.Create(new PublishedAppsConfig { ApiBaseUrl = "https://api.example.test/" }));
+
+        var resolved = await service.ResolveForDispatchAsync(appId, CancellationToken.None);
+
+        Assert.That(resolved.Values["AUTOMATON_API_URL"], Is.EqualTo("https://api.example.test"));
+        Assert.That(resolved.PlainNames, Does.Contain("AUTOMATON_API_URL"));
+        Assert.That(resolved.Delivered.Select(item => item.Name), Does.Not.Contain("AUTOMATON_API_URL"));
     }
 
     private static (AppSecretService Service, ApplicationDbContext Db, Guid AppId, Guid OwnerId) Create()

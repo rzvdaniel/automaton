@@ -16,7 +16,7 @@ Rules (anything not decidable is "needs a human", left open, and makes the exit 
 - `verified-partial` / `verification-failed` are never closed, except `verified-partial` named by `--accept N`
   together with `--reason`, which is written into the closing comment.
 - Idempotent: closed issues are not listed, and the `live` label / board Status are only set when missing.
-The production version defaults to https://api.automaton.monster/health (read only).
+The production version is required: anonymous /health no longer reports it.
 """
 import argparse, json, re, subprocess, sys, urllib.request
 
@@ -25,7 +25,7 @@ BOARDS = (1, 2, 3)
 
 
 def gh(*args, stdin=None):
-    done = subprocess.run(["gh", *args], capture_output=True, text=True, input=stdin)
+    done = subprocess.run(["gh", *args], capture_output=True, text=True, encoding="utf-8", input=stdin)
     if done.returncode != 0:
         raise RuntimeError(f"gh {' '.join(args[:3])} failed: {done.stderr.strip()[:200]}")
     return done.stdout
@@ -48,7 +48,11 @@ def references(body, number, main_repo=None, qualified_only=False):
     """True when body says Refs/Part of #N. In another repo (qualified_only) it must name main_repo#N."""
     repo = re.escape(main_repo) if main_repo else r"[\w.-]+/[\w.-]+"
     prefix = rf"(?:{repo})" if qualified_only else rf"(?:{repo})?"
-    return re.search(rf"\b(?:Refs|Part of)\s+{prefix}#{number}\b", body or "", re.I) is not None
+    item = rf"{prefix}#\d+"
+    for run in re.finditer(rf"\b(?:Refs|Part of)\s+{item}(?:\s*(?:,\s*(?:and\s+|&\s*)?|and\s+|&\s*){item})*", body or "", re.I):
+        if re.search(rf"{prefix}#{number}\b", run.group(0), re.I):
+            return True
+    return False
 
 
 def decide(number, labels, prs, ctx):
@@ -96,11 +100,6 @@ def contained(repo, release, sha):
     except RuntimeError:
         return None
     return status in ("behind", "identical")
-
-
-def production_version():
-    with urllib.request.urlopen("https://api.automaton.monster/health", timeout=30) as response:
-        return json.load(response)["version"]
 
 
 def find_prs(number, repos, main_repo):
@@ -162,7 +161,7 @@ def main(argv=None):
     p.add_argument("--apply", action="store_true", help="change things (default is a dry run)")
     p.add_argument("--repo", default="rzvdaniel/automaton")
     p.add_argument("--apps-repo", default="rzvdaniel/automaton-apps")
-    p.add_argument("--version", help="release tag, e.g. server-v0.2.40 (default: production /health)")
+    p.add_argument("--version", required=True, help="release tag live on production, e.g. server-v0.2.40")
     p.add_argument("--website-sha", help="deployed website commit")
     p.add_argument("--published", default="", help="comma-separated issue numbers of published apps")
     p.add_argument("--accept", default="", help="comma-separated verified-partial issue numbers the owner accepted")
@@ -172,7 +171,7 @@ def main(argv=None):
 
     nums = lambda s: {int(x) for x in s.split(",") if x.strip()}
     ctx = {"accept": nums(a.accept), "reason": a.reason.strip(), "published": nums(a.published), "website_sha": a.website_sha}
-    version = a.version or production_version()
+    version = a.version
     only = nums(a.only)
 
     issues = {}

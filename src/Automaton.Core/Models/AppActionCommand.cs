@@ -18,3 +18,30 @@ public sealed record UpgradeRunnerStarted(bool Started);
 
 /// <summary>State of the helper container that upgrades a Runner: none, running, succeeded or failed.</summary>
 public sealed record RunnerUpgradeHelperStatus(string State, string? Log);
+
+/// <summary>Asks a Machine Management Runner to free host disk space: unused Docker images and build cache older than <paramref name="KeepDays"/> days, and archived journal files above <paramref name="JournalLimitMb"/> MB.</summary>
+public sealed record HostCleanupRequest(int KeepDays, int JournalLimitMb);
+
+/// <summary>What a host cleanup freed, in bytes, and a short plain-text summary of each step.</summary>
+public sealed record HostCleanupResult(long BytesFreed, string Summary);
+
+/// <summary>Asks a Machine Management Runner for the last <paramref name="Lines"/> lines of one app's container output.</summary>
+public sealed record ReadAppLogsRequest(Guid AppId, Guid DeploymentTargetId, int Lines);
+
+/// <summary>The recent output of one app's container; <paramref name="Running"/> is false when it has no container.</summary>
+public sealed record ReadAppLogsResult(Guid AppId, Guid DeploymentTargetId, bool Running, string Text);
+
+/// <summary>Docker's own disk figures on one machine: what images, containers, volumes and build cache use, in bytes.</summary>
+public sealed record HostDiskReport(long ImagesBytes, long ContainersBytes, long VolumesBytes, long BuildCacheBytes, long ReclaimableBytes);
+
+/// <summary>What installing the OS security updates on one machine did: whether it succeeded, a short tail of the installer's output and whether the machine now needs a restart.</summary>
+public sealed record HostOsUpdateResult(bool Succeeded, string Summary, bool RestartRequired);
+
+/// <summary>The Runner accepted a restart of the machine; it happens a minute later, so the answer can still be delivered.</summary>
+public sealed record HostRebootResult(bool Scheduled);
+
+/// <summary>One address for a fail2ban unban or allowlist; the Runner accepts only a single IPv4 or IPv6 address.</summary>
+public sealed record Fail2BanAddressRequest(string Ip);
+
+/// <summary>What the Runner did about an address; <c>Jails</c> are the jails it was changed in.</summary>
+public sealed record Fail2BanActionResult(string Ip, IReadOnlyList<string> Jails);

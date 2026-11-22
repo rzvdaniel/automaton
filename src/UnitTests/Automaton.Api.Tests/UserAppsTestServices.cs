@@ -87,7 +87,12 @@ internal static class UserAppsTestServices
         IAuditEventService auditEventService,
         IApplicationEventService applicationEventService)
         => new(dbContext, userContextService, authorizationService, runnerAssignmentPolicy,
-            auditEventService, applicationEventService, null!, null!);
+            auditEventService, applicationEventService,
+            new RecentActivityService(dbContext, userContextService),
+            new BackendRouteConfigService(
+                dbContext, Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Config.PublishedAppsConfig()),
+                new AppAuthorizationTestWebHostEnvironment(Path.GetTempPath()),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<BackendRouteConfigService>.Instance));
 
     private sealed class StubWebHostEnvironment : IWebHostEnvironment
     {

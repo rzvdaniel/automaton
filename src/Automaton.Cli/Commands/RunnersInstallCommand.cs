@@ -121,16 +121,26 @@ public static class RunnersInstallCommand
     // The script runs in a POSIX shell: any CR (Windows Environment.NewLine, CRLF from the server) would break the here-document.
     internal static string ToShellInput(string command) => command.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n') + "\n";
 
-    internal static async Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct)
+    internal static string WindowsSsh => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "OpenSSH", "ssh.exe");
+
+    /// <summary>Prefers the Windows OpenSSH client so the Windows ssh-agent works even from Git Bash.</summary>
+    internal static string ChooseSshBinary(bool isWindows, Func<string, bool> exists) =>
+        isWindows && exists(WindowsSsh) ? WindowsSsh : "ssh";
+
+    internal static Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct)
+        => ExecuteAsync(command, ssh, timeoutSeconds, ct, "Installer");
+
+    internal static async Task ExecuteAsync(string command, string? ssh, int timeoutSeconds, CancellationToken ct, string label)
     {
-        var start = new ProcessStartInfo(ssh is null ? "sudo" : "ssh")
+        var sshBinary = ChooseSshBinary(OperatingSystem.IsWindows(), File.Exists);
+        var start = new ProcessStartInfo(ssh is null ? "sudo" : sshBinary)
         {
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
             UseShellExecute = false
         };
         if (ssh is null) { start.ArgumentList.Add("bash"); start.ArgumentList.Add("-s"); }
         else { start.ArgumentList.Add("-T"); start.ArgumentList.Add("--"); start.ArgumentList.Add(ssh); start.ArgumentList.Add("sudo bash -s"); }
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start installer process.");
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {label.ToLowerInvariant()} process.");
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
@@ -150,7 +160,16 @@ public static class RunnersInstallCommand
                 var token = Regex.Match(command, "AUTOMATON_ENROLLMENT_TOKEN=['\"]?([^'\" ]+)").Groups[1].Value;
                 if (token.Length > 0) output = output.Replace(token, "[redacted]", StringComparison.Ordinal);
                 var lastLines = string.Join('\n', output.Split('\n').TakeLast(8));
-                throw new InvalidOperationException($"Installer exited {process.ExitCode}: {lastLines}");
+                var needsSudoHint = ssh is null && (output.Contains("sudo:", StringComparison.Ordinal)
+                    || output.Contains("a terminal is required", StringComparison.OrdinalIgnoreCase)
+                    || output.Contains("password is required", StringComparison.OrdinalIgnoreCase));
+                var localHint = needsSudoHint
+                    ? "\n--local installs on this machine (it needs sudo here). For a remote server, use --ssh user@host."
+                    : string.Empty;
+                var sshHint = ssh is not null && output.Contains("Permission denied (publickey", StringComparison.OrdinalIgnoreCase)
+                    ? $"\nSSH used {sshBinary}; check that your key is loaded in its ssh-agent (ssh-add) and accepted for {ssh}."
+                    : string.Empty;
+                throw new InvalidOperationException($"{label} exited {process.ExitCode}: {lastLines}{localHint}{sshHint}");
             }
         }
         catch (OperationCanceledException)
@@ -158,7 +177,7 @@ public static class RunnersInstallCommand
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             await process.WaitForExitAsync(CancellationToken.None);
             if (ct.IsCancellationRequested) throw;
-            throw new TimeoutException($"Installer did not finish within {timeoutSeconds} seconds.");
+            throw new TimeoutException($"{label} did not finish within {timeoutSeconds} seconds.");
         }
     }
 

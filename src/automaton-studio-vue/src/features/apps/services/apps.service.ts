@@ -3,6 +3,7 @@
  * Connects to ASP.NET backend apps endpoints
  */
 import apiClient from '@/shared/services/api/axios-instance'
+import { APP_ACTION_TIMEOUT_MS, DROPPED_CALL_POLLS, DROPPED_CALL_POLL_MS, isConnectionDropped } from '../utils/app-action-error'
 import type {
   InstallSource,
   CatalogQuery,
@@ -13,6 +14,7 @@ import type {
   DeploymentOperation,
   AppPermissionsResponse,
   AppSecretSummary,
+  AppSettingValue,
   SecretAuditEntry,
   AppDeploymentTarget,
   App,
@@ -20,15 +22,32 @@ import type {
   AppTagSettings,
   AppScreenshot,
   PublishAppRequest,
+  AppCustomDomains,
   AppSharing,
+  AppPauseState,
+  AppDiskUsage,
+  MyTeam,
   SharingAudience,
   ExportAppResponse,
-  LinkedStepInfo,
   FileNode,
-  CreateAppStepRequest,
   ApplicationContract,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
+
+export type CatalogUpdate = {
+  available: boolean
+  installedCommit: string | null
+  latestCommit: string | null
+  compareUrl: string | null
+  edited: boolean
+  newSecrets: string[]
+  newSettings: string[]
+  newPermissions: string[]
+  deployFailed?: boolean
+  deployError?: string | null
+  runningCommit?: string | null
+  hasPreviousVersion?: boolean
+}
 
 export type DeployAppResult = {
   success: boolean
@@ -42,6 +61,8 @@ export type AppActionExecution = {
   id: string
   appId: string
   moduleKey: string
+  triggerType?: string
+  triggerName?: string
   status: string
   exitCode?: number
   errorCode?: string
@@ -81,6 +102,7 @@ class AppsService {
   private sanitizeArchiveFileName(name: string | undefined, extension: string): string {
     const fallbackBaseName = 'app-export'
     const baseName = (name || '')
+      // eslint-disable-next-line no-control-regex
       .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
       .trim()
 
@@ -132,6 +154,21 @@ class AppsService {
   async listSecrets(appId: string): Promise<AppSecretSummary[]> {
     const { data } = await apiClient.get<AppSecretSummary[]>(`/api/apps/${appId}/secrets`)
     return data
+  }
+
+  /** Values saved as settings, which can be shown again. Declared secrets never appear. */
+  async listSettingValues(appId: string): Promise<AppSettingValue[]> {
+    const { data } = await apiClient.get<AppSettingValue[]>(`/api/apps/${appId}/setting-values`)
+    return data
+  }
+
+  async setSettingValue(appId: string, name: string, value: string): Promise<void> {
+    await apiClient.put(`/api/apps/${appId}/setting-values/${encodeURIComponent(name)}`, { value })
+  }
+
+  /** Back to the declared default; also removes an older override stored as a secret. */
+  async deleteSettingValue(appId: string, name: string): Promise<void> {
+    await apiClient.delete(`/api/apps/${appId}/setting-values/${encodeURIComponent(name)}`)
   }
 
   async setSecret(appId: string, name: string, value: string): Promise<void> {
@@ -210,13 +247,102 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}`)
   }
 
+  /**
+   * Administrator: delete an app whose Runner is offline for good, skipping cleanup on that machine.
+   * DELETE /api/apps/{id}?abandonOfflineRuntimes=true
+   */
+  async deleteAbandoningOfflineRuntimes(id: string): Promise<string[]> {
+    const { data } = await apiClient.delete<{ skippedHostCleanup: string[] }>(`/api/apps/${id}`, {
+      params: { abandonOfflineRuntimes: true },
+    })
+    return data.skippedHostCleanup
+  }
+
+  /**
+   * Pause (stop, schedules off, paused page) or resume an app. POST /api/apps/{id}/pause and /resume
+   * A browser can drop a long request (Chromium aborts every request in flight when the machine's network interfaces change,
+   * which a container start can trigger) while the server carries on; then Studio reads the app until it shows the new state.
+   */
+  async setPaused(id: string, paused: boolean, reason?: string): Promise<AppPauseState> {
+    try {
+      const body = paused && reason?.trim() ? { reason: reason.trim() } : undefined
+      return (await apiClient.post<AppPauseState>(`/api/apps/${id}/${paused ? 'pause' : 'resume'}`, body, { timeout: APP_ACTION_TIMEOUT_MS })).data
+    } catch (failure) {
+      if (!isConnectionDropped(failure)) throw failure
+      for (let attempt = 0; attempt < DROPPED_CALL_POLLS; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, DROPPED_CALL_POLL_MS))
+        const app = await this.get(id).catch(() => null)
+        if (app && !!app.isPaused === paused) return { appId: id, paused, schedulesChanged: 0, warnings: [] }
+      }
+      throw failure
+    }
+  }
+
+  /**
+   * Restart the running app so it loads changed settings and secrets. POST /api/apps/{id}/restart; 409 while paused.
+   * `confirmed` is false when the connection dropped before the answer: the server carries on with the restart.
+   */
+  async restart(id: string): Promise<{ restarted: number, confirmed: boolean }> {
+    try {
+      const { data } = await apiClient.post<{ restarted: number }>(`/api/apps/${id}/restart`, undefined, { timeout: APP_ACTION_TIMEOUT_MS })
+      return { restarted: data.restarted, confirmed: true }
+    } catch (failure) {
+      if (!isConnectionDropped(failure)) throw failure
+      return { restarted: 1, confirmed: false }
+    }
+  }
+
+  /** Disk the app uses, or null until a Runner has measured it. GET /api/apps/{id}/disk (204 while unmeasured). */
+  async getDisk(id: string): Promise<AppDiskUsage | null> {
+    const response = await apiClient.get<AppDiskUsage | ''>(`/api/apps/${id}/disk`)
+    return response.status === 204 || !response.data ? null : response.data
+  }
+
+  /** The app's own domains. GET /api/apps/{id}/domains */
+  async getCustomDomains(id: string): Promise<AppCustomDomains> {
+    return (await apiClient.get<AppCustomDomains>(`/api/apps/${id}/domains`)).data
+  }
+
+  async addCustomDomain(id: string, host: string): Promise<AppCustomDomains> {
+    return (await apiClient.post<AppCustomDomains>(`/api/apps/${id}/domains`, { host })).data
+  }
+
+  /** Checks the domain's DNS; it routes once it points at this server. */
+  async verifyCustomDomain(id: string, domainId: string): Promise<AppCustomDomains> {
+    return (await apiClient.post<AppCustomDomains>(`/api/apps/${id}/domains/${domainId}/verify`)).data
+  }
+
+  async setPrimaryCustomDomain(id: string, domainId: string): Promise<AppCustomDomains> {
+    return (await apiClient.put<AppCustomDomains>(`/api/apps/${id}/domains/${domainId}/primary`)).data
+  }
+
+  async removeCustomDomain(id: string, domainId: string): Promise<AppCustomDomains> {
+    return (await apiClient.delete<AppCustomDomains>(`/api/apps/${id}/domains/${domainId}`)).data
+  }
+
   /** Who can open the app. GET /api/apps/{id}/sharing */
   async getSharing(id: string): Promise<AppSharing> {
     return (await apiClient.get<AppSharing>(`/api/apps/${id}/sharing`)).data
   }
 
-  async setSharing(id: string, audience: SharingAudience, publicUrl?: string): Promise<AppSharing> {
-    return (await apiClient.put<AppSharing>(`/api/apps/${id}/sharing`, { audience, publicUrl })).data
+  async setSharing(
+    id: string,
+    audience: SharingAudience,
+    publicUrl?: string,
+    teamId?: string,
+    listed?: boolean,
+  ): Promise<AppSharing> {
+    return (await apiClient.put<AppSharing>(`/api/apps/${id}/sharing`, { audience, publicUrl, teamId, listed })).data
+  }
+
+  /** The teams the signed-in person can share an app with. GET /api/projects */
+  async listMyTeams(): Promise<MyTeam[]> {
+    return (await apiClient.get<MyTeam[]>('/api/projects')).data ?? []
+  }
+
+  /** How the app appears in the store. PUT /api/apps/{id}/listing; an empty category clears it. */
+  async updateListing(id: string, listing: { summary: string, category: string, tags: string[] }): Promise<void> {
+    await apiClient.put(`/api/apps/${id}/listing`, listing)
   }
 
   async addSharedPerson(id: string, email: string): Promise<AppSharing> {
@@ -301,12 +427,29 @@ class AppsService {
     return data
   }
 
+  /** Whether the catalog pins a newer commit than the one this app was installed from, and what would change. */
+  async getCatalogUpdate(id: string): Promise<CatalogUpdate> {
+    const { data } = await apiClient.get<CatalogUpdate>(`/api/catalog/apps/${id}/update`)
+    return data
+  }
+
+  /** Replaces the app's files with the catalog's newer commit and redeploys it (data, settings, secrets and schedules stay). */
+  async applyCatalogUpdate(id: string, confirmEdited: boolean): Promise<DeploymentOperation> {
+    const { data } = await apiClient.post<DeploymentOperation>(`/api/catalog/apps/${id}/update`, { confirmEdited })
+    return data
+  }
+
   /** Deploys the app from the source the server stores for it; returns the pending operation. */
   async deployStoredSource(id: string, targetSlug?: string): Promise<DeploymentOperation> {
     const { data } = await apiClient.post<DeploymentOperation>(`/api/apps/${id}/deploy`, null, {
       params: targetSlug ? { targetSlug } : undefined,
     })
     return data
+  }
+
+  /** Cancels the app's active deployment; the target becomes Failed so it can be redeployed or deleted. */
+  async cancelDeployment(id: string, targetSlug?: string): Promise<void> {
+    await apiClient.post(`/api/apps/${id}/deploy/cancel`, null, { params: targetSlug ? { targetSlug } : undefined })
   }
 
   async getDeploymentOperation(id: string, operationId: string): Promise<DeploymentOperation> {
@@ -405,6 +548,12 @@ class AppsService {
 
   async deleteActionVersion(id: string, actionKey: string, version: string): Promise<void> {
     await apiClient.delete(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/versions/${encodeURIComponent(version)}`)
+  }
+
+  /** False when the app's own headers forbid showing it inside Studio's frame. */
+  async canBeFramed(id: string): Promise<boolean> {
+    const { data } = await apiClient.get<{ canBeFramed: boolean }>(`/api/apps/${id}/embeddable`)
+    return data.canBeFramed
   }
 
   async createRuntimeLaunch(id: string): Promise<{ runtimeToken: string; runtimeUrl: string }> {
@@ -549,21 +698,30 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}/screenshots/${screenshotId}`)
   }
 
-  /**
-   * Get linked steps for an app
-   * GET /api/apps/{id}/steps
-   */
-  async getLinkedSteps(id: string): Promise<LinkedStepInfo[]> {
-    const { data } = await apiClient.get<LinkedStepInfo[]>(`/api/apps/${id}/steps`)
-    return data
+  /** Puts the screenshots in this order. PUT /api/apps/{id}/screenshots/order */
+  async reorderScreenshots(id: string, ids: string[]): Promise<void> {
+    await apiClient.put(`/api/apps/${id}/screenshots/order`, { ids })
   }
 
-  /**
-   * Get available steps that can be linked to an app
-   * GET /api/apps/{id}/steps/available
-   */
-  async getAvailableSteps(id: string): Promise<LinkedStepInfo[]> {
-    const { data } = await apiClient.get<LinkedStepInfo[]>(`/api/apps/${id}/steps/available`)
+
+
+  /** The stored files of an app, read-only (app managers and administrators). */
+  async getSourceFileTree(appId: string): Promise<FileNode[]> {
+    const { data } = await apiClient.get<{ files: string[] }>(`/api/apps/${appId}/source`)
+    return this.buildFileTree(data.files ?? [], { includeMetadata: true })
+  }
+
+  /** The file's text, or null when it is binary or too large to preview. */
+  async readSourceFile(appId: string, path: string): Promise<string | null> {
+    const encoded = path.split('/').map(encodeURIComponent).join('/')
+    const { data } = await apiClient.get<{ content: string; preview?: boolean }>(`/api/apps/${appId}/source/${encoded}`)
+    return data.preview === false ? null : data.content ?? ''
+  }
+
+  /** An image from the app's source as a blob, fetched with the user's sign-in. */
+  async readSourceImage(appId: string, path: string): Promise<Blob> {
+    const encoded = path.split('/').map(encodeURIComponent).join('/')
+    const { data } = await apiClient.get<Blob>(`/api/apps/${appId}/source/${encoded}`, { params: { raw: true }, responseType: 'blob' })
     return data
   }
 
@@ -631,72 +789,10 @@ class AppsService {
     return this.sortFileNodes(root)
   }
 
-  /**
-   * Create a step and link it to the app
-   * POST /api/apps/{appId}/steps/create
-   */
-  async createStepForApp(appId: string, request: CreateAppStepRequest): Promise<LinkedStepInfo> {
-    const { data } = await apiClient.post<LinkedStepInfo>(
-      `/api/apps/${appId}/steps/create`,
-      request,
-    )
-    return data
-  }
 
-  /**
-   * Link an existing step to an app
-   * POST /api/apps/{appId}/steps/{stepId}/link
-   */
-  async linkStep(appId: string, stepId: string): Promise<void> {
-    await apiClient.post(`/api/apps/${appId}/steps/${stepId}/link`)
-  }
 
-  /**
-   * Unlink a step from an app
-   * DELETE /api/apps/{appId}/steps/{stepId}
-   */
-  async unlinkStep(appId: string, stepId: string): Promise<void> {
-    await apiClient.delete(`/api/apps/${appId}/steps/${stepId}`)
-  }
 
-  /**
-   * Get step code for editing
-   * GET /api/customsteps/{stepId}
-   */
-  async getStepCode(stepId: string): Promise<{ code: string; language: string }> {
-    const { data } = await apiClient.get<{ definition: { code: string }; language: string }>(
-      `/api/customsteps/${stepId}`,
-    )
-    return {
-      code: data.definition?.code || '',
-      language: data.language || 'python',
-    }
-  }
 
-  /**
-   * Update step code
-   * PUT /api/customsteps/{stepId}
-   */
-  async updateStepCode(stepId: string, code: string): Promise<void> {
-    // First get the step to preserve other fields
-    const { data: step } = await apiClient.get<{
-      id: string
-      name: string
-      displayName: string
-      description: string
-      language: string
-      definition: { code: string }
-    }>(`/api/customsteps/${stepId}`)
-
-    // Update only the code
-    await apiClient.put(`/api/customsteps/${stepId}`, {
-      ...step,
-      definition: {
-        ...step.definition,
-        code,
-      },
-    })
-  }
 
   /**
    * Generate slug from app name

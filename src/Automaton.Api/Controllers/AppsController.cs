@@ -263,11 +263,10 @@ public class AppsController : BaseController
     {
         if (!HasAppWriteKeyScope()) return KeyScopeDenied();
         if ((recoverInterrupted || abandonOfflineRuntimes) && !User.IsInRole("Admin") && !User.IsInRole("SysAdmin")) return Forbid();
-        if (abandonOfflineRuntimes && !recoverInterrupted)
-            return BadRequest(new { message = "Abandoning offline runtimes requires interrupted-deletion recovery." });
-        await appsService.Remove(id, recoverInterrupted, abandonOfflineRuntimes);
+        var skippedHostCleanup = await appsService.Remove(id, recoverInterrupted, abandonOfflineRuntimes);
 
-        return NoContent();
+        // Say which machine cleanup was skipped, so the administrator can finish it by hand.
+        return abandonOfflineRuntimes ? Ok(new { skippedHostCleanup }) : NoContent();
     }
 
     [HttpPost("{id}/publish")]
@@ -394,6 +393,17 @@ public class AppsController : BaseController
         if (!HasAppWriteKeyScope()) return KeyScopeDenied();
         var result = await appImageManagementService.DeleteScreenshotAsync(id, screenshotId, User.Identity?.Name);
         return ToImageOperationResult(result, "Failed to delete screenshot");
+    }
+
+    public sealed record ReorderScreenshotsRequest(List<Guid> Ids);
+
+    [HttpPut("{id}/screenshots/order")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> ReorderScreenshots(Guid id, [FromBody] ReorderScreenshotsRequest request)
+    {
+        if (!HasAppWriteKeyScope()) return KeyScopeDenied();
+        var result = await appImageManagementService.ReorderScreenshotsAsync(id, request.Ids, User.Identity?.Name);
+        return ToImageOperationResult(result, "Failed to reorder screenshots");
     }
 
     private ObjectResult Forbidden(UnauthorizedAccessException exception)

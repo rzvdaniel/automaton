@@ -39,6 +39,59 @@ public class RunnersInstallCommandTests
         => Assert.That(RunnersInstallCommand.ToShellInput("echo a\n\n"), Is.EqualTo("echo a\n"));
 
     [Test]
+    public void LocalInstallerFailureSaysLocalInstallsOnThisMachineAndSuggestsSsh()
+    {
+        if (OperatingSystem.IsWindows()) Assert.Ignore("Requires a POSIX shell script as a fake sudo.");
+        var directory = Path.Combine(Path.GetTempPath(), "automaton-cli-sudo-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var oldPath = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            var script = Path.Combine(directory, "sudo");
+            File.WriteAllText(script, "#!/bin/sh\ncat > /dev/null\necho 'sudo: a terminal is required to read the password' >&2\nexit 1\n");
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + oldPath);
+            var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await RunnersInstallCommand.ExecuteAsync("echo install", null, 30, CancellationToken.None));
+            Assert.Multiple(() =>
+            {
+                Assert.That(error!.Message, Does.Contain("Installer exited 1"));
+                Assert.That(error.Message, Does.Contain("--local installs on this machine"));
+                Assert.That(error.Message, Does.Contain("--ssh user@host"));
+            });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", oldPath);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void LocalInstallerFailureWithoutSudoProblemOmitsTheSshHint()
+    {
+        if (OperatingSystem.IsWindows()) Assert.Ignore("Requires a POSIX shell script as a fake sudo.");
+        var directory = Path.Combine(Path.GetTempPath(), "automaton-cli-sudo2-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var oldPath = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            var script = Path.Combine(directory, "sudo");
+            File.WriteAllText(script, "#!/bin/sh\ncat > /dev/null\necho 'disk full' >&2\nexit 1\n");
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + oldPath);
+            var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await RunnersInstallCommand.ExecuteAsync("echo install", null, 30, CancellationToken.None));
+            Assert.That(error!.Message, Does.Contain("disk full").And.Not.Contain("--ssh user@host"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", oldPath);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public void SshInstallerReceivesSecretOnlyOnStdinAndRedactsFailure()
     {
         if (OperatingSystem.IsWindows()) Assert.Ignore("Requires a POSIX shell script as a fake ssh.");
@@ -242,6 +295,48 @@ public class RunnersInstallCommandTests
         {
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
                 => Task.FromResult(owner.Respond(request));
+        }
+    }
+
+    [Test]
+    public void ChooseSshBinary_PrefersWindowsOpenSshOnlyOnWindowsWhenPresent()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(RunnersInstallCommand.ChooseSshBinary(true, _ => true), Is.EqualTo(RunnersInstallCommand.WindowsSsh));
+            Assert.That(RunnersInstallCommand.ChooseSshBinary(true, _ => false), Is.EqualTo("ssh"));
+            Assert.That(RunnersInstallCommand.ChooseSshBinary(false, _ => true), Is.EqualTo("ssh"));
+        });
+    }
+
+    [Test]
+    public void WindowsSshComesFromTheSystemFolder()
+    {
+        var expected = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "OpenSSH", "ssh.exe");
+        Assert.That(RunnersInstallCommand.WindowsSsh, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void FailedUninstallOverSshSaysUninstallNotInstaller()
+    {
+        if (OperatingSystem.IsWindows()) Assert.Ignore("Requires a POSIX shell script as a fake ssh.");
+        var directory = Path.Combine(Path.GetTempPath(), "automaton-cli-uninstall-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var oldPath = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            var script = Path.Combine(directory, "ssh");
+            File.WriteAllText(script, "#!/bin/sh\ncat > /dev/null\nexit 3\n");
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + oldPath);
+            var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await RunnersInstallCommand.ExecuteAsync("echo bye", "user@host", 30, CancellationToken.None, "Uninstall"));
+            Assert.That(error!.Message, Does.StartWith("Uninstall exited 3"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", oldPath);
+            Directory.Delete(directory, true);
         }
     }
 }

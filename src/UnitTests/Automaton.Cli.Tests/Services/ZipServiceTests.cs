@@ -116,6 +116,32 @@ public class ZipServiceTests
     }
 
     [Test]
+    public void CreateDeployPackageZip_KeepsAutomatonIgnoreInTheStoredSource_SoARedeployDoesNotDropIt()
+    {
+        var projectRoot = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(projectRoot, "main.ts"), "source");
+        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"), "data/\ntest/\n");
+        Directory.CreateDirectory(Path.Combine(projectRoot, "data"));
+        File.WriteAllText(Path.Combine(projectRoot, "data", "x.db"), "ignored");
+        var application = new ApplicationContract
+        {
+            Build = new ApplicationBuildSpec { Command = new ApplicationCommandSpec { Executable = "b", WorkingDirectory = "." }, OutputDirectory = "dist" },
+            Runtime = new ApplicationRuntimeSpec { Image = "test/runtime:1", Command = new ApplicationCommandSpec { Executable = "s", WorkingDirectory = "." } }
+        };
+
+        using var zipStream = ZipService.CreateDeployPackageZip(projectRoot, Guid.NewGuid().ToString(), application, sourceScopeConfig: null);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(archive.GetEntry("source/.automatonignore"), Is.Not.Null);
+            Assert.That(archive.GetEntry("source/data/x.db"), Is.Null, "the project's own ignore rules still apply");
+            using var reader = new StreamReader(archive.GetEntry("source/.automatonignore")!.Open());
+            Assert.That(reader.ReadToEnd(), Does.Contain("test/"));
+        });
+    }
+
+    [Test]
     public void SaveProjectConfig_WhenIgnoreFileMissing_CreatesAutomatonIgnoreWithDefaults()
     {
         // Arrange

@@ -14,4 +14,5 @@ public sealed record DeploymentTargetInfo(
     bool IsDefault,
     string Status,
     DateTimeOffset? LastDeploymentAt,
-    DeploymentTargetRunnerInfo? Runner);
+    DeploymentTargetRunnerInfo? Runner,
+    string? LastDeploymentError = null);

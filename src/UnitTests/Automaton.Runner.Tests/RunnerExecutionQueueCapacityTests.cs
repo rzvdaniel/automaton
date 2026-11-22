@@ -27,6 +27,72 @@ public sealed class RunnerExecutionQueueCapacityTests
         Assert.That(harness.ActionCalls, Is.EqualTo(5));
     }
 
+    [Test]
+    public async Task ResultQueueHasItsOwnConsumerAndAMessageReachesTheWaitingOperation()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var directory = Path.Combine(Path.GetTempPath(), "automaton-results-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var notifier = new HostContainerResultNotifier();
+            var broker = new Broker();
+            var runner = Guid.NewGuid();
+            var handler = new RunnerExecutionDeliveryHandler(
+                new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), new SaturatedExecutor()),
+                new NoopRequester());
+            var consumer = new RunnerExecutionQueueConsumer(handler, notifier);
+            var connected = notifier.NextConnection();
+            var configuration = new RunnerBrokerConfiguration("unused", 5671, "/", "test", "unused",
+                "execution", true, "unused", "management", "result");
+            var consuming = consumer.ConsumeAsync(broker.Connection(), configuration, CreateApi(), runner, cancellation.Token);
+
+            await connected.WaitAsync(cancellation.Token);
+            var id = Guid.NewGuid();
+            using var waiter = notifier.Register(id);
+            var body = JsonSerializer.SerializeToUtf8Bytes(new RunnerExecutionResultReady(id, runner),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await broker.Queues["result"].Consumer.HandleBasicDeliverAsync("consumer", 1, false, "", "result",
+                new BasicProperties { MessageId = id.ToString("N") }, body, cancellation.Token);
+
+            Assert.That(waiter.Signaled.IsCompleted, Is.True);
+            Assert.That(broker.Queues["result"], Is.Not.SameAs(broker.Queues["execution"]), "own channel and consumer");
+            Assert.That(broker.Queues["result"], Is.Not.SameAs(broker.Queues["management"]));
+            Assert.That(notifier.ResultQueueAvailable, Is.True);
+            await cancellation.CancelAsync();
+            try { await consuming; } catch (OperationCanceledException) { }
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Test]
+    public async Task WithoutAResultQueueTheRunnerFallsBackToReadingResults()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var directory = Path.Combine(Path.GetTempPath(), "automaton-results-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var notifier = new HostContainerResultNotifier();
+            var broker = new Broker();
+            var handler = new RunnerExecutionDeliveryHandler(
+                new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), new SaturatedExecutor()),
+                new NoopRequester());
+            var consumer = new RunnerExecutionQueueConsumer(handler, notifier);
+            var configuration = new RunnerBrokerConfiguration("unused", 5671, "/", "test", "unused",
+                "execution", true, "unused", "management");
+            var consuming = consumer.ConsumeAsync(broker.Connection(), configuration, CreateApi(), Guid.NewGuid(), cancellation.Token);
+            while (!(notifier.ResultQueueAvailable == false)) await Task.Delay(10, cancellation.Token);
+            Assert.That(broker.Queues.ContainsKey("result"), Is.False);
+            await cancellation.CancelAsync();
+            try { await consuming; } catch (OperationCanceledException) { }
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    private sealed class NoopRequester : IRuntimeTunnelReconnectRequester
+    {
+        public void RequestRuntimeTunnelReconnect(string? targetApiInstanceId, string? targetApiColor, string? reason) { }
+    }
+
     private static RunnerExecutionApiClient CreateApi()
         => new(new HttpClient(new Api()) { BaseAddress = new Uri("http://localhost/") });
 
@@ -58,7 +124,7 @@ public sealed class RunnerExecutionQueueCapacityTests
             var id = Guid.Parse(request.RequestUri!.AbsolutePath.Split('/')[3]);
             var kind = Management[id] ? "read-logs" : "execute";
             object body = request.Method == HttpMethod.Get
-                ? new RunnerExecutionAssignment("execute", new(null, null, AppActionCommand.Create(kind, new { })))
+                ? new RunnerExecutionAssignment("execute", new( AppActionCommand.Create(kind, new { })))
                 : new RunnerExecutionReceipt("accepted");
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) });
         }
@@ -114,9 +180,9 @@ public sealed class RunnerExecutionQueueCapacityTests
             Assert.That(executor.ActionCalls, Is.EqualTo(4));
             Assert.That(queued.IsCompleted, Is.False);
             Assert.That(broker.Queues["execution"].Capacity, Is.EqualTo(4));
-            Assert.That(broker.Queues["management"].Capacity, Is.EqualTo(1));
+            Assert.That(broker.Queues["management"].Capacity, Is.EqualTo(4));
             Assert.That(broker.Queues["execution"].DispatchConcurrency, Is.EqualTo(4));
-            Assert.That(broker.Queues["management"].DispatchConcurrency, Is.EqualTo(1));
+            Assert.That(broker.Queues["management"].DispatchConcurrency, Is.EqualTo(4));
         }
 
         public void ReleaseActions() => executor.Finish.TrySetResult();

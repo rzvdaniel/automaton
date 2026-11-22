@@ -1,3 +1,4 @@
+using Automaton.Api.Services;
 using Automaton.Api.Authentication;
 using Automaton.Api.Data;
 using Automaton.Api.Hubs;
@@ -36,20 +37,31 @@ internal static class ApiApplicationPipelineExtensions
         app.UseMiddleware<PasswordChangeRequirement>();
         app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
-        app.MapGet("/health", (IConfiguration configuration) => Results.Json(HealthResponse(configuration["Installation:Version"]))).AllowAnonymous();
+        app.MapGet("/health", () => Results.Json(HealthResponse())).AllowAnonymous();
         app.MapControllers();
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
+        app.MapRunnerTunnel();
+        app.MapApiNotFound();
+        app.MapDotfileNotFound();
         app.MapFallbackToPage("/_Host");
     }
 
-    /// <summary>The /health body: the release tag (server-vX.Y.Z) when the server knows it, nothing else.</summary>
-    internal static object HealthResponse(string? installedVersion)
-    {
-        var version = installedVersion?.Trim();
-        if (string.IsNullOrEmpty(version) || version.Length > 40) return new { status = "ok" };
-        return new { status = "ok", version = version.StartsWith("server-v", StringComparison.Ordinal) ? version : "server-v" + version };
-    }
+    /// <summary>Any unmatched /api request, for every method, answers 404 with a JSON problem body instead of the Studio page.</summary>
+    internal static void MapApiNotFound(this IEndpointRouteBuilder routes) =>
+        routes.MapFallback("/api/{**path}", () =>
+            Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not found", detail: "No API endpoint matches this request."));
+
+    /// <summary>
+    /// Scanner paths such as /.git/config or /.env.bak answer an empty 404 instead of the Studio page. Only unmatched paths
+    /// reach this fallback (it ranks just above the Studio page), and /.well-known stays reachable.
+    /// </summary>
+    internal static void MapDotfileNotFound(this IEndpointRouteBuilder routes) =>
+        routes.MapFallback("{**path:regex(^(.*/)?\\.(?!well-known(/|$)).*$)}", () => Results.StatusCode(StatusCodes.Status404NotFound))
+            .Add(builder => ((RouteEndpointBuilder)builder).Order = int.MaxValue - 1);
+
+    /// <summary>The anonymous /health body: only the status. The release is for signed-in users (GET /api/install/version).</summary>
+    internal static object HealthResponse() => new { status = "ok" };
 }
 
 internal static class ApiCorsMiddleware
@@ -85,7 +97,7 @@ internal static class ApiRequestLoggingMiddleware
             }));
     }
 
-    private static LogEventLevel GetLevel(
+    internal static LogEventLevel GetLevel(
         HttpContext context,
         double elapsed,
         Exception? exception,
@@ -97,7 +109,16 @@ internal static class ApiRequestLoggingMiddleware
             return LogEventLevel.Error;
         }
 
-        if (context.Response.StatusCode >= 400 || elapsed > 1000)
+        var isUpgrade = context.Response.StatusCode == StatusCodes.Status101SwitchingProtocols;
+        var isForwardAuthDenial = context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden
+            && context.Request.Path.StartsWithSegments("/internal/runtime/auth", StringComparison.OrdinalIgnoreCase);
+
+        if (isForwardAuthDenial)
+        {
+            return LogEventLevel.Information;
+        }
+
+        if (context.Response.StatusCode >= 400 || (elapsed > 1000 && !isUpgrade))
         {
             return LogEventLevel.Warning;
         }

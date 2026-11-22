@@ -16,6 +16,8 @@ public sealed partial class CatalogSourceStore(ApplicationDbContext dbContext, I
 {
     public const string OfficialId = "official";
     public const string OfficialRepo = "rzvdaniel/automaton-apps";
+    /// <summary>The automaton.monster store: the one custom source whose <c>movedFrom</c> entries are followed.</summary>
+    public const string StoreRepo = "rzvdaniel/automaton-monster";
     public const string DefaultBranch = "main";
     internal const string SettingKey = "Apps.Catalog.Sources";
     private const int MaximumSources = 20;

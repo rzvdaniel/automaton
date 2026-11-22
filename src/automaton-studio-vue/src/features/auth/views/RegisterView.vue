@@ -149,7 +149,7 @@ function validateForm(): boolean {
   } else if (publicUsername.value.length < 3 || publicUsername.value.length > 32) {
     formErrors.value.publicUsername = 'Public username must be 3-32 characters'
     isValid = false
-  } else if (!/^[a-zA-Z0-9_\-]+$/.test(publicUsername.value)) {
+  } else if (!/^[a-zA-Z0-9_-]+$/.test(publicUsername.value)) {
     formErrors.value.publicUsername = 'Public username can only contain letters, numbers, hyphens, and underscores'
     isValid = false
   } else if (usernameAvailable.value === false) {

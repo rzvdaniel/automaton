@@ -43,7 +43,8 @@ useSiteTheme()
       <a class="btn" :href="publicAppConfig.installUrl">Read the installation guide</a></div>
     <div class="path"><h3>Join an existing server</h3><p>Someone in your team already runs Automaton? Ask the administrator for an invite.</p>
       <ol><li>Accept the invite and sign in to Studio</li><li>Install the CLI for your agent</li><li>Ask your agent to build your first app</li></ol>
-      <RouterLink class="btn" to="/product">What you can do in Studio</RouterLink></div>
+      <RouterLink class="btn" to="/product">What you can do in Studio</RouterLink>
+      <p class="soft" style="margin-top:14px">Want something to install first? <RouterLink to="/catalog">Browse the apps you can install</RouterLink>.</p></div>
   </div>
 </div></section>
 <section class="band"><div class="wrap">

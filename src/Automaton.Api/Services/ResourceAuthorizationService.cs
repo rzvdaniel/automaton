@@ -72,13 +72,22 @@ public class ResourceAuthorizationService
            await IsSharedWithAsync(appId, userId, cancellationToken) ||
            await IsAdministratorAsync(userId, cancellationToken);
 
-    /// <summary>True when the owner shared the app with this person, or with everyone on the server.</summary>
+    /// <summary>True when the owner shared the app with this person, with a team they belong to, or with everyone on the server.</summary>
     public async Task<bool> IsSharedWithAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
         => await dbContext.AppShares.AnyAsync(share => share.WebAppId == appId && share.UserId == userId, cancellationToken) ||
-           await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.SharedWithServer && app.DeletionClaimId == null, cancellationToken);
+           await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.DeletionClaimId == null &&
+               (app.SharedWithServer ||
+                (app.SharedWithProjectId != null && dbContext.ProjectMembers.Any(member =>
+                    member.ProjectId == app.SharedWithProjectId && member.UserId == userId && member.IsActive &&
+                    member.Project!.IsActive))), cancellationToken);
 
     public async Task<bool> AppExistsAsync(Guid appId, CancellationToken cancellationToken = default)
         => await dbContext.WebApps.AnyAsync(app => app.Id == appId && app.DeletionClaimId == null, cancellationToken);
+
+    /// <summary>True only for a system administrator, the role that may change server settings.</summary>
+    public async Task<bool> IsSystemAdministratorAsync(Guid userId, CancellationToken cancellationToken = default)
+        => await dbContext.UserRoles.AnyAsync(membership => membership.UserId == userId &&
+            dbContext.Roles.Any(role => role.Id == membership.RoleId && role.Name == UserRole.SystemAdministrator), cancellationToken);
 
     /// <summary>True for administrators and system administrators, who may open every app on the server.</summary>
     public async Task<bool> IsAdministratorAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -242,218 +251,6 @@ public class ResourceAuthorizationService
 
     #endregion
 
-    #region Flows Authorization
-
-    /// <summary>
-    /// Check if user can access a flow
-    /// </summary>
-    public async Task<bool> CanAccessFlowAsync(Guid flowId, CancellationToken cancellationToken = default)
-    {
-        return await CanAccessFlowAsync(flowId, UserId, cancellationToken);
-    }
-
-    public async Task<bool> CanAccessFlowAsync(Guid flowId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await dbContext.FlowUsers
-            .AnyAsync(u => u.FlowId == flowId && u.UserId == userId, cancellationToken);
-
-        if (hasPersonalAccess)
-        {
-            return true;
-        }
-
-        // Check project membership
-        var hasProjectAccess = await dbContext.ProjectFlows
-            .Where(pf => pf.FlowId == flowId)
-            .Join(
-                dbContext.ProjectMembers,
-                pf => pf.ProjectId,
-                pm => pm.ProjectId,
-                (pf, pm) => new { pf, pm })
-            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive, cancellationToken);
-
-        return hasProjectAccess;
-    }
-
-    /// <summary>
-    /// Check if user can update a flow
-    /// </summary>
-    public async Task<bool> CanUpdateFlowAsync(Guid flowId, CancellationToken cancellationToken = default)
-    {
-        return await CanUpdateFlowAsync(flowId, UserId, cancellationToken);
-    }
-
-    public async Task<bool> CanUpdateFlowAsync(Guid flowId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await dbContext.FlowUsers
-            .AnyAsync(u => u.FlowId == flowId && u.UserId == userId, cancellationToken);
-
-        if (hasPersonalAccess)
-        {
-            return true;
-        }
-
-        // Check project membership with appropriate role
-        var hasProjectAccess = await dbContext.ProjectFlows
-            .Where(pf => pf.FlowId == flowId)
-            .Join(
-                dbContext.ProjectMembers,
-                pf => pf.ProjectId,
-                pm => pm.ProjectId,
-                (pf, pm) => new { pf, pm })
-            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive &&
-                          (x.pm.Role == ProjectRole.ProjectAdmin || x.pm.Role == ProjectRole.Developer),
-                      cancellationToken);
-
-        return hasProjectAccess;
-    }
-
-    /// <summary>
-    /// Check if user can delete a flow
-    /// </summary>
-    public async Task<bool> CanDeleteFlowAsync(Guid flowId, CancellationToken cancellationToken = default)
-    {
-        return await CanDeleteFlowAsync(flowId, UserId, cancellationToken);
-    }
-
-    public async Task<bool> CanDeleteFlowAsync(Guid flowId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await HasPersonalFlowAccessAsync(flowId, userId, cancellationToken);
-
-        if (!hasPersonalAccess)
-        {
-            return false;
-        }
-
-        // Check if flow is part of any project
-        var isPartOfProject = await dbContext.ProjectFlows
-            .AnyAsync(pf => pf.FlowId == flowId, cancellationToken);
-
-        return !isPartOfProject;
-    }
-
-    /// <summary>
-    /// Check if user can execute a flow
-    /// </summary>
-    public async Task<bool> CanExecuteFlowAsync(Guid flowId, CancellationToken cancellationToken = default)
-    {
-        return await CanExecuteFlowAsync(flowId, UserId, cancellationToken);
-    }
-
-    public Task<bool> CanExecuteFlowAsync(Guid flowId, Guid userId, CancellationToken cancellationToken = default)
-        => CanUpdateFlowAsync(flowId, userId, cancellationToken);
-
-    #endregion
-
-    #region Custom Steps Authorization
-
-    /// <summary>
-    /// Check if user can access a custom step
-    /// </summary>
-    public async Task<bool> CanAccessCustomStepAsync(Guid stepId, CancellationToken cancellationToken = default)
-    {
-        return await CanAccessCustomStepAsync(stepId, UserId, cancellationToken);
-    }
-
-    public async Task<bool> CanAccessCustomStepAsync(Guid stepId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await dbContext.CustomStepUsers
-            .AnyAsync(u => u.CustomStepId == stepId && u.UserId == userId, cancellationToken);
-
-        if (hasPersonalAccess)
-        {
-            return true;
-        }
-
-        // Check project membership
-        var hasProjectAccess = await dbContext.ProjectCustomSteps
-            .Where(pcs => pcs.CustomStepId == stepId)
-            .Join(
-                dbContext.ProjectMembers,
-                pcs => pcs.ProjectId,
-                pm => pm.ProjectId,
-                (pcs, pm) => new { pcs, pm })
-            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive, cancellationToken);
-
-        return hasProjectAccess;
-    }
-
-    /// <summary>
-    /// Check if user can update a custom step
-    /// </summary>
-    public async Task<bool> CanUpdateCustomStepAsync(Guid stepId, CancellationToken cancellationToken = default)
-    {
-        return await CanUpdateCustomStepAsync(stepId, UserId, cancellationToken);
-    }
-
-    public async Task<bool> CanUpdateCustomStepAsync(Guid stepId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await dbContext.CustomStepUsers
-            .AnyAsync(u => u.CustomStepId == stepId && u.UserId == userId, cancellationToken);
-
-        if (hasPersonalAccess)
-        {
-            return true;
-        }
-
-        // Check project membership with appropriate role
-        var hasProjectAccess = await dbContext.ProjectCustomSteps
-            .Where(pcs => pcs.CustomStepId == stepId)
-            .Join(
-                dbContext.ProjectMembers,
-                pcs => pcs.ProjectId,
-                pm => pm.ProjectId,
-                (pcs, pm) => new { pcs, pm })
-            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive &&
-                          (x.pm.Role == ProjectRole.ProjectAdmin || x.pm.Role == ProjectRole.Developer),
-                      cancellationToken);
-
-        return hasProjectAccess;
-    }
-
-    /// <summary>
-    /// Check if user can delete a custom step
-    /// </summary>
-    public async Task<bool> CanDeleteCustomStepAsync(Guid stepId, CancellationToken cancellationToken = default)
-    {
-        return await CanDeleteCustomStepAsync(stepId, UserId, cancellationToken);
-    }
-
-    public async Task<bool> CanDeleteCustomStepAsync(Guid stepId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await HasPersonalCustomStepAccessAsync(stepId, userId, cancellationToken);
-
-        if (!hasPersonalAccess)
-        {
-            return false;
-        }
-
-        // Check if step is part of any project
-        var isPartOfProject = await dbContext.ProjectCustomSteps
-            .AnyAsync(pcs => pcs.CustomStepId == stepId, cancellationToken);
-
-        return !isPartOfProject;
-    }
-
-    /// <summary>
-    /// Check if user can execute a custom step
-    /// </summary>
-    public async Task<bool> CanExecuteCustomStepAsync(Guid stepId, CancellationToken cancellationToken = default)
-    {
-        return await CanExecuteCustomStepAsync(stepId, UserId, cancellationToken);
-    }
-
-    public Task<bool> CanExecuteCustomStepAsync(Guid stepId, Guid userId, CancellationToken cancellationToken = default)
-        => CanUpdateCustomStepAsync(stepId, userId, cancellationToken);
-
-    #endregion
-
     #region Runners Authorization
 
     /// <summary>
@@ -529,24 +326,8 @@ public class ResourceAuthorizationService
         return !isPartOfProject;
     }
 
-    /// <summary>
-    /// Whether the current user is linked to the resource as its own user. Delete refusals use these to decide
-    /// who may be told that a project is what blocks the delete.
-    /// </summary>
-    public Task<bool> HasPersonalFlowAccessAsync(Guid flowId, CancellationToken cancellationToken = default)
-        => HasPersonalFlowAccessAsync(flowId, UserId, cancellationToken);
-
-    public Task<bool> HasPersonalCustomStepAccessAsync(Guid stepId, CancellationToken cancellationToken = default)
-        => HasPersonalCustomStepAccessAsync(stepId, UserId, cancellationToken);
-
     public Task<bool> HasPersonalRunnerAccessAsync(Guid runnerId, CancellationToken cancellationToken = default)
         => HasPersonalRunnerAccessAsync(runnerId, UserId, cancellationToken);
-
-    private Task<bool> HasPersonalFlowAccessAsync(Guid flowId, Guid userId, CancellationToken cancellationToken)
-        => dbContext.FlowUsers.AnyAsync(u => u.FlowId == flowId && u.UserId == userId, cancellationToken);
-
-    private Task<bool> HasPersonalCustomStepAccessAsync(Guid stepId, Guid userId, CancellationToken cancellationToken)
-        => dbContext.CustomStepUsers.AnyAsync(u => u.CustomStepId == stepId && u.UserId == userId, cancellationToken);
 
     private Task<bool> HasPersonalRunnerAccessAsync(Guid runnerId, Guid userId, CancellationToken cancellationToken)
         => dbContext.RunnerUsers.AnyAsync(u => u.RunnerId == runnerId && u.UserId == userId, cancellationToken);
@@ -578,56 +359,6 @@ public class ResourceAuthorizationService
             .Where(a => projectAppIds.Contains(a.Id));
 
         return personalApps.Union(projectApps);
-    }
-
-    /// <summary>
-    /// Get IQueryable for flows that the user can access
-    /// </summary>
-    public IQueryable<Flow> GetAccessibleFlowsQuery()
-    {
-        return GetAccessibleFlowsQuery(UserId);
-    }
-
-    public IQueryable<Flow> GetAccessibleFlowsQuery(Guid userId)
-    {
-        // Flows where user is personal owner
-        var personalFlows = dbContext.Flows
-            .Where(f => f.FlowUsers.Any(u => u.UserId == userId));
-
-        // Flows where user is project member
-        var projectFlowIds = dbContext.ProjectFlows
-            .Where(pf => pf.Project != null && pf.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
-            .Select(pf => pf.FlowId);
-
-        var projectFlows = dbContext.Flows
-            .Where(f => projectFlowIds.Contains(f.Id));
-
-        return personalFlows.Union(projectFlows);
-    }
-
-    /// <summary>
-    /// Get IQueryable for custom steps that the user can access
-    /// </summary>
-    public IQueryable<CustomStep> GetAccessibleCustomStepsQuery()
-    {
-        return GetAccessibleCustomStepsQuery(UserId);
-    }
-
-    public IQueryable<CustomStep> GetAccessibleCustomStepsQuery(Guid userId)
-    {
-        // Steps where user is personal owner
-        var personalSteps = dbContext.CustomSteps
-            .Where(cs => cs.CustomStepUsers.Any(u => u.UserId == userId));
-
-        // Steps where user is project member
-        var projectStepIds = dbContext.ProjectCustomSteps
-            .Where(pcs => pcs.Project != null && pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
-            .Select(pcs => pcs.CustomStepId);
-
-        var projectSteps = dbContext.CustomSteps
-            .Where(cs => projectStepIds.Contains(cs.Id));
-
-        return personalSteps.Union(projectSteps);
     }
 
     /// <summary>
@@ -664,6 +395,21 @@ public class ResourceAuthorizationService
         return GetAppsQueryByContext(projectId, UserId);
     }
 
+    /// <summary>
+    /// Apps for the Apps list. In a project this is the project's apps. Without one it is the person's own apps plus
+    /// project apps they may update (their own, or as a project Admin or Developer), so they can manage those from the list.
+    /// </summary>
+    public IQueryable<WebApp> GetListedAppsQuery(Guid? projectId)
+    {
+        if (projectId != null) return GetAppsQueryByContext(projectId, UserId);
+        var userId = UserId;
+        return dbContext.WebApps.Where(a =>
+            a.WebAppUsers.Any(u => u.UserId == userId) ||
+            a.ProjectApps.Any(pa => pa.Project != null && pa.Project.Members.Any(pm =>
+                pm.UserId == userId && pm.IsActive &&
+                (pm.Role == ProjectRole.ProjectAdmin || pm.Role == ProjectRole.Developer))));
+    }
+
     public IQueryable<WebApp> GetAppsQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)
@@ -678,68 +424,6 @@ public class ResourceAuthorizationService
             return dbContext.WebApps
                 .Where(a => a.ProjectApps.Any(pa => pa.ProjectId == projectId && 
                                                      pa.Project != null && pa.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
-        }
-    }
-
-    /// <summary>
-    /// Get IQueryable for flows filtered by project context.
-    /// If projectId is null, returns only personal flows. Otherwise, returns only flows in that project.
-    /// </summary>
-    public IQueryable<Flow> GetFlowsQueryByContext(Guid? projectId)
-    {
-        return GetFlowsQueryByContext(projectId, UserId);
-    }
-
-    public IQueryable<Flow> GetFlowsQueryByContext(Guid? projectId, Guid userId)
-    {
-        if (projectId == null)
-        {
-            // Personal mode - return only personal flows
-            return dbContext.Flows
-                .Where(f => f.FlowUsers.Any(u => u.UserId == userId));
-        }
-        else
-        {
-            // Project mode - return only flows in that project (if user has access)
-            var projectFlowIds = dbContext.ProjectFlows
-                .Where(pcs => pcs.Project != null && pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
-                .Select(pcs => pcs.FlowId);
-
-            var projectFlows = dbContext.Flows
-                .Where(cs => projectFlowIds.Contains(cs.Id));
-
-            return projectFlows;
-        }
-    }
-
-    /// <summary>
-    /// Get IQueryable for custom steps filtered by project context.
-    /// If projectId is null, returns only personal steps. Otherwise, returns only steps in that project.
-    /// </summary>
-    public IQueryable<CustomStep> GetCustomStepsQueryByContext(Guid? projectId)
-    {
-        return GetCustomStepsQueryByContext(projectId, UserId);
-    }
-
-    public IQueryable<CustomStep> GetCustomStepsQueryByContext(Guid? projectId, Guid userId)
-    {
-        if (projectId == null)
-        {
-            // Personal mode - return only personal steps
-            return dbContext.CustomSteps
-                .Where(cs => cs.CustomStepUsers.Any(u => u.UserId == userId));
-        }
-        else
-        {
-            // Project mode - return only steps in that project (if user has access)
-            var projectStepsIds = dbContext.ProjectCustomSteps
-                .Where(pcs => pcs.Project != null && pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
-                .Select(pcs => pcs.CustomStepId);
-
-            var projectSteps = dbContext.CustomSteps
-                .Where(cs => projectStepsIds.Contains(cs.Id));
-
-            return projectSteps;
         }
     }
 

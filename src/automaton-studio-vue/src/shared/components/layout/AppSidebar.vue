@@ -5,7 +5,11 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { adminAppsService } from '@/features/admin/services/adminAppsService'
+import { waitingChanged } from '@/features/admin/composables/waitingApprovals'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
+import { installService } from '@/features/install/services/install.service'
+import { SHOW_PREVIEW_BADGE, previewTitle } from '@/shared/preview'
 import { DOCS_LINK, railItems, roleLabel, type RailItem } from './rail-items'
 
 const router = useRouter()
@@ -20,7 +24,9 @@ const appUserOnly = ref(false)
 watch(loading, (isLoading) => {
   if (!isLoading) appUserOnly.value = isAppUserOnly.value
 })
+const serverVersion = ref<string | null>(null)
 onMounted(async () => {
+  installService.getVersion().then((v) => { serverVersion.value = v }).catch(() => {})
   await loadOrganizations()
   ready.value = true
 })
@@ -35,6 +41,15 @@ const roles = computed(() => authStore.user?.roles ?? [])
 const visible = computed(() => railItems({ roles: roles.value, appUserOnly: appUserOnly.value }))
 const userName = computed(() => authStore.userName || authStore.userEmail || 'User')
 const userRole = computed(() => roleLabel(roles.value, appUserOnly.value))
+
+// Permission requests waiting for approval, only fetched for system administrators.
+const waiting = ref(0)
+async function refreshWaiting() {
+  waiting.value = roles.value.includes('SysAdmin') ? await adminAppsService.waitingCount() : 0
+}
+onMounted(refreshWaiting)
+watch(() => route.path, refreshWaiting)
+watch(waitingChanged, refreshWaiting)
 
 const isActive = (item: RailItem) => item.match(route.path)
 
@@ -69,8 +84,9 @@ const userMenuItems = computed<MenuItem[]>(() => [
   <aside class="app-sidebar" aria-label="Studio">
     <div class="rail">
       <div class="rail-brand">
-        <span class="rail-mark" aria-hidden="true">&gt;_</span>
+        <img class="rail-mark" src="/logo.svg" alt="" aria-hidden="true" />
         <span class="rail-name">Studio</span>
+        <span v-if="SHOW_PREVIEW_BADGE" class="preview-pill" :title="previewTitle(serverVersion)" :aria-label="previewTitle(serverVersion)" role="note">Preview</span>
       </div>
 
       <nav class="rail-nav" aria-label="Main">
@@ -86,6 +102,7 @@ const userMenuItems = computed<MenuItem[]>(() => [
           >
             <i :class="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
+            <span v-if="item.waitingBadge && waiting > 0" class="rail-badge" :aria-label="`${waiting} waiting for approval`">{{ waiting }}</span>
           </a>
         </template>
       </nav>
@@ -140,21 +157,29 @@ const userMenuItems = computed<MenuItem[]>(() => [
 }
 
 .rail-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 2rem;
   height: 2rem;
   border-radius: 8px;
-  background: var(--signal);
-  color: var(--on-signal);
-  font: 500 0.95rem var(--mono);
+  display: block;
 }
 
 .rail-name {
   font: 700 1.15rem var(--display);
   letter-spacing: -0.01em;
   color: var(--rail-ink);
+}
+
+/* Same look as the website pill (src/automaton-vue/src/assets/site-b.css). */
+.preview-pill {
+  font: 700 11px/1 var(--body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--signal) 55%, transparent);
+  background: color-mix(in srgb, var(--signal) 12%, transparent);
+  color: var(--rail-active-ink);
+  cursor: default;
 }
 
 .rail-nav {
@@ -189,6 +214,17 @@ const userMenuItems = computed<MenuItem[]>(() => [
 .rail-user:focus-visible {
   outline: 2px solid var(--signal);
   outline-offset: 2px;
+}
+
+.rail-badge {
+  margin-left: auto;
+  min-width: 1.3rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font: 600 0.75rem var(--mono);
+  text-align: center;
 }
 
 .rail-item i {

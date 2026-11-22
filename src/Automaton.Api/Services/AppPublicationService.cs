@@ -22,7 +22,8 @@ public sealed class AppPublicationService(
     IApplicationEventService applicationEventService,
     RecentActivityService recentActivityService,
     BackendRouteConfigService backendRouteConfigService,
-    MachineStaticAppPublicationService? machineStaticPublication = null)
+    MachineStaticAppPublicationService? machineStaticPublication = null,
+    IAppRuntimeRestarter? runtimes = null)
 {
     private readonly Serilog.ILogger logger = Serilog.Log.ForContext<AppPublicationService>();
     private Guid UserId => userContextService.GetUserId();
@@ -70,6 +71,7 @@ public sealed class AppPublicationService(
         entity.RuntimeVisibility = runtimeVisibility;
         entity.CatalogVisibility = catalogVisibility;
         entity.MarketplacePreviewMode = marketplacePreviewMode;
+        var addressChanged = entity.PublicUrl != publicUrl;
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
         entity.IsForkable = isForkable;
@@ -80,6 +82,9 @@ public sealed class AppPublicationService(
         entity.Updated = DateTime.UtcNow;
 
         await dataContext.SaveChangesAsync(cancellationToken);
+        // A setting that defaults to the app's address gets its value only now, so the running copy must restart.
+        if (addressChanged && runtimes is not null && AppSecretService.UsesAppAddress(entity.ApplicationContractJson))
+            await runtimes.RestartRunningAsync(id, CancellationToken.None);
         await RecordPublishedAppAsync(entity, id, ownerId, publicUrl, requiresAuthentication, isForkable, cancellationToken);
     }
 

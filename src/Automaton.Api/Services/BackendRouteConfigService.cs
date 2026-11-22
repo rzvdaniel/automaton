@@ -12,10 +12,15 @@ public class BackendRouteConfigService
 {
     private const string RouteFileName = "managed-runtime-routes.yml";
 
+    // The service is scoped, so concurrent deploys each have an instance but share one route file and one temporary
+    // file. Refreshes run one at a time, and the later one reads the database after the earlier one has written.
+    private static readonly SemaphoreSlim RefreshLock = new(1, 1);
+
     private readonly ApplicationDbContext dbContext;
     private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly IWebHostEnvironment environment;
     private readonly ILogger<BackendRouteConfigService> logger;
+    private readonly RunnerGatewayRegistry? gateways;
 
     private sealed record RouteTarget(
         Guid AppId,
@@ -24,14 +29,22 @@ public class BackendRouteConfigService
         string RuntimeServiceName,
         string? Slug,
         bool RequiresAuthentication,
-        IReadOnlyList<string> OpenPaths);
+        IReadOnlyList<string> OpenPaths,
+        IReadOnlyList<CustomDomainRoute>? CustomDomains = null,
+        Guid? RunnerId = null,
+        RunnerGateway? Gateway = null);
+
+    // A verified domain of a public app. The primary one (if any) is the app's address; the others redirect to it.
+    private sealed record CustomDomainRoute(Guid Id, string Host, bool IsPrimary);
 
     public BackendRouteConfigService(
         ApplicationDbContext dbContext,
         IOptions<PublishedAppsConfig> publishedAppsConfig,
         IWebHostEnvironment environment,
-        ILogger<BackendRouteConfigService> logger)
+        ILogger<BackendRouteConfigService> logger,
+        RunnerGatewayRegistry? gateways = null)
     {
+        this.gateways = gateways;
         this.dbContext = dbContext;
         this.publishedAppsConfig = publishedAppsConfig.Value;
         this.environment = environment;
@@ -52,9 +65,18 @@ public class BackendRouteConfigService
         var eligibleTargets = CreateEligibleTargets(
             pendingGenericRuntimeTargetId,
             pendingGenericRuntimeDeployed);
-        var routes = await LoadSelfHostedRoutesAsync(eligibleTargets, cancellationToken);
 
-        await WriteRoutesAsync(routes, cancellationToken);
+        await RefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            var routes = await LoadSelfHostedRoutesAsync(eligibleTargets, cancellationToken);
+
+            await WriteRoutesAsync(routes, cancellationToken);
+        }
+        finally
+        {
+            RefreshLock.Release();
+        }
     }
 
     private IQueryable<Automaton.Api.Entities.AppDeploymentTarget> CreateEligibleTargets(
@@ -109,6 +131,8 @@ public class BackendRouteConfigService
                 candidate.Target.WebAppId,
                 candidate.Target.Id,
                 candidate.Target.IsDefault,
+                candidate.Target.ExecutionRunnerId,
+                candidate.Target.WebApp.IsPaused,
                 RequiresAuthentication = candidate.Target.WebApp.RequiresAuthentication,
                 candidate.Target.WebApp.ApplicationContractJson,
                 Slug = candidate.Target.IsDefault &&
@@ -120,20 +144,51 @@ public class BackendRouteConfigService
             })
             .ToListAsync(cancellationToken);
 
+        var domainAppIds = candidates.Where(candidate => candidate.Slug != null).Select(candidate => candidate.WebAppId).Distinct().ToList();
+        var domains = domainAppIds.Count == 0
+            ? []
+            : await dbContext.AppCustomDomains.AsNoTracking()
+                .Where(domain => domainAppIds.Contains(domain.WebAppId) && domain.VerifiedAt != null)
+                .OrderBy(domain => domain.CreatedAt)
+                .Select(domain => new { domain.WebAppId, Route = new CustomDomainRoute(domain.Id, domain.Host, domain.IsPrimary && domain.LiveAt != null) })
+                .ToListAsync(cancellationToken);
+
         return candidates
             .Where(candidate => SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(
                 candidate.Purpose,
                 candidate.ApplicationProfile))
-            .Select(candidate => new RouteTarget(
-                candidate.WebAppId,
-                candidate.Id,
-                candidate.IsDefault,
-                publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
-                candidate.Slug,
-                candidate.RequiresAuthentication,
-                ReadOpenPaths(candidate.ApplicationContractJson)))
+            .Select(candidate =>
+            {
+                var gateway = FindDirectGateway(candidate.ExecutionRunnerId, candidate.IsPaused, candidate.ApplicationContractJson);
+                return new RouteTarget(
+                    candidate.WebAppId,
+                    candidate.Id,
+                    candidate.IsDefault,
+                    gateway is null
+                        ? publishedAppsConfig.RuntimeTunnelServiceName.Trim()
+                        : GatewayName(candidate.ExecutionRunnerId!.Value),
+                    candidate.Slug,
+                    candidate.RequiresAuthentication,
+                    ReadOpenPaths(candidate.ApplicationContractJson),
+                    candidate.Slug is null
+                        ? null
+                        : domains.Where(domain => domain.WebAppId == candidate.WebAppId).Select(domain => domain.Route).ToList(),
+                    candidate.ExecutionRunnerId,
+                    gateway);
+            })
             .ToList();
     }
+
+    // A paused app answers with the tunnel's "paused" page and a static site is served by the Runner's static server,
+    // so both stay on the tunnel; so does any Runner whose gateway the server could not reach.
+    private RunnerGateway? FindDirectGateway(Guid? runnerId, bool isPaused, string contractJson)
+    {
+        if (isPaused || runnerId is not { } id || gateways?.Find(id) is not { } gateway) return null;
+        try { return ApplicationContractSerialization.Deserialize(contractJson).IsStaticSite ? null : gateway; }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or InvalidOperationException) { return null; }
+    }
+
+    private static string GatewayName(Guid runnerId) => $"gateway-{runnerId:N}";
 
     private static IReadOnlyList<string> ReadOpenPaths(string contractJson)
     {
@@ -222,6 +277,7 @@ public class BackendRouteConfigService
 
         AppendRouters(builder, routes);
         AppendMiddlewares(builder, routes);
+        AppendGatewayServices(builder, routes);
 
         return builder.ToString();
     }
@@ -259,14 +315,68 @@ public class BackendRouteConfigService
             var key = $"slug-{route.AppId:N}";
             var host = PublishedAppHostNames.BuildPublishedAppHost(
                 route.Slug!, publishedAppsConfig.PublicBaseUrlHost);
-            AppendRuntimeRouter(builder, route, key, host, "/", 50, route.RequiresAuthentication);
-        }
+            var primary = PrimaryDomain(route);
+            if (primary is null)
+            {
+                AppendRuntimeRouter(builder, route, key, host, "/", 50, route.RequiresAuthentication);
+            }
+            else
+            {
+                AppendRedirectRouter(builder, route, key, host, primary, publishedAppsConfig.CertificateResolver);
+            }
 
+            foreach (var domain in route.CustomDomains ?? [])
+            {
+                var domainKey = $"domain-{domain.Id:N}";
+                if (primary is null || domain.Id == primary.Id)
+                {
+                    // The route reuses the app's public-address rewrite and sign-in middlewares.
+                    AppendRuntimeRouter(builder, route, key, domain.Host, "/", 50, route.RequiresAuthentication,
+                        routerName: domainKey, resolver: CustomDomainResolver());
+                }
+                else
+                {
+                    AppendRedirectRouter(builder, route, domainKey, domain.Host, primary, CustomDomainResolver());
+                }
+            }
+        }
     }
+
+    private static CustomDomainRoute? PrimaryDomain(RouteTarget route)
+        => route.CustomDomains?.FirstOrDefault(domain => domain.IsPrimary);
+
+    private string? CustomDomainResolver()
+        => string.IsNullOrWhiteSpace(publishedAppsConfig.CustomDomainCertificateResolver)
+            ? publishedAppsConfig.CertificateResolver
+            : publishedAppsConfig.CustomDomainCertificateResolver;
+
+    private void AppendRedirectRouter(
+        StringBuilder builder, RouteTarget route, string key, string host, CustomDomainRoute primary, string? resolver)
+    {
+        builder.AppendLine($"    {key}-redirect:");
+        builder.AppendLine("      entryPoints:");
+        builder.AppendLine("        - websecure");
+        builder.AppendLine(TlsLine(resolver));
+        builder.AppendLine($"      rule: \"Host(`{host}`)\"");
+        builder.AppendLine("      priority: 50");
+        builder.AppendLine("      service: \"noop@internal\"");
+        builder.AppendLine($"      middlewares: [\"redirect-{route.AppId:N}\"]");
+    }
+
+    private static string TlsLine(string? resolver)
+        => string.IsNullOrWhiteSpace(resolver)
+            ? "      tls: {}"
+            : $"      tls: {{ certResolver: {System.Text.Json.JsonSerializer.Serialize(resolver)} }}";
 
     private void AppendMiddlewares(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
     {
         builder.AppendLine("  middlewares:");
+        // Routes the proxy does not authenticate (public apps, open paths) still drop any viewer headers the client sent.
+        builder.AppendLine("    viewer-strip:");
+        builder.AppendLine("      headers:");
+        builder.AppendLine("        customRequestHeaders:");
+        builder.AppendLine("          X-Automaton-Viewer-Role: \"\"");
+        builder.AppendLine("          X-Automaton-Viewer-Token: \"\"");
         // The private address always asks for sign-in; the public address only when the app requires it.
         foreach (var route in routes)
         {
@@ -298,8 +408,24 @@ public class BackendRouteConfigService
         {
             var key = $"slug-{route.AppId:N}";
             AppendRuntimeRewrite(builder, route, key, "^/(.*)$");
+            if (PrimaryDomain(route) is { } primary)
+            {
+                builder.AppendLine($"    redirect-{route.AppId:N}:");
+                builder.AppendLine("      redirectRegex:");
+                builder.AppendLine("        regex: \"^https?://[^/]+/(.*)$\"");
+                builder.AppendLine($"        replacement: \"https://{primary.Host}/${{1}}\"");
+                builder.AppendLine("        permanent: false");
+            }
         }
 
+        foreach (var route in routes.Where(route => route.Gateway is not null)
+            .GroupBy(route => route.RuntimeServiceName).Select(group => group.First()))
+        {
+            builder.AppendLine($"    {route.RuntimeServiceName}-secret:");
+            builder.AppendLine("      headers:");
+            builder.AppendLine("        customRequestHeaders:");
+            builder.AppendLine($"          {RunnerGatewayRegistry.SecretHeader}: {System.Text.Json.JsonSerializer.Serialize(route.Gateway!.Secret)}");
+        }
     }
 
     private void AppendRuntimeRouter(
@@ -311,21 +437,22 @@ public class BackendRouteConfigService
         int priority,
         bool authenticated,
         string? pathRule = null,
-        string? rewriteKey = null)
+        string? rewriteKey = null,
+        string? routerName = null,
+        string? resolver = null)
     {
-        builder.AppendLine($"    {key}-runtime:");
+        builder.AppendLine($"    {routerName ?? key}-runtime:");
         builder.AppendLine("      entryPoints:");
         builder.AppendLine("        - websecure");
-        builder.AppendLine(string.IsNullOrWhiteSpace(publishedAppsConfig.CertificateResolver)
-            ? "      tls: {}"
-            : $"      tls: {{ certResolver: {System.Text.Json.JsonSerializer.Serialize(publishedAppsConfig.CertificateResolver)} }}");
+        builder.AppendLine(TlsLine(resolver ?? publishedAppsConfig.CertificateResolver));
         builder.AppendLine($"      rule: \"Host(`{host}`) && {pathRule ?? $"PathPrefix(`{pathPrefix}`)"}\"");
         builder.AppendLine($"      priority: {priority}");
         builder.AppendLine($"      service: \"{route.RuntimeServiceName}\"");
         var rewrite = rewriteKey ?? $"{key}-rewrite";
+        var secret = route.Gateway is null ? string.Empty : $", \"{route.RuntimeServiceName}-secret\"";
         var middlewares = authenticated
-            ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{rewrite}\"]"
-            : $"[\"{rewrite}\"]";
+            ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{rewrite}\"{secret}]"
+            : $"[\"viewer-strip\", \"{rewrite}\"{secret}]";
         builder.AppendLine($"      middlewares: {middlewares}");
     }
 
@@ -336,6 +463,8 @@ public class BackendRouteConfigService
         builder.AppendLine("        customRequestHeaders:");
         builder.AppendLine($"          X-App-Id: \"{route.AppId}\"");
         builder.AppendLine($"          X-Automaton-Runtime-Auth: \"{publishedAppsConfig.RuntimeProxyAuthKey}\"");
+        builder.AppendLine("          X-Automaton-Viewer-Role: \"\"");
+        builder.AppendLine("          X-Automaton-Viewer-Token: \"\"");
         builder.AppendLine($"    {key}-auth:");
         builder.AppendLine("      forwardAuth:");
         builder.AppendLine($"        address: \"{publishedAppsConfig.ApiBaseUrl.TrimEnd('/')}/internal/runtime/auth\"");
@@ -345,6 +474,9 @@ public class BackendRouteConfigService
         builder.AppendLine("          - Accept");
         builder.AppendLine("          - X-App-Id");
         builder.AppendLine("          - X-Automaton-Runtime-Auth");
+        builder.AppendLine("        authResponseHeaders:");
+        builder.AppendLine("          - X-Automaton-Viewer-Role");
+        builder.AppendLine("          - X-Automaton-Viewer-Token");
         builder.AppendLine($"    {key}-auth-strip:");
         builder.AppendLine("      headers:");
         builder.AppendLine("        customRequestHeaders:");
@@ -364,11 +496,32 @@ public class BackendRouteConfigService
         builder.AppendLine($"        replacement: \"{BuildRuntimePath(route, "$1")}\"");
     }
 
+    // One service and one secret-header middleware per Runner that is served directly. The proxy sets the header, so a
+    // browser cannot send it, and the gateway refuses everything else that is not the Runner's own tunnel.
+    private static void AppendGatewayServices(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
+    {
+        var direct = routes.Where(route => route.Gateway is not null)
+            .GroupBy(route => route.RuntimeServiceName).Select(group => group.First()).ToList();
+        if (direct.Count == 0) return;
+
+        builder.AppendLine("  services:");
+        foreach (var route in direct)
+        {
+            builder.AppendLine($"    {route.RuntimeServiceName}:");
+            builder.AppendLine("      loadBalancer:");
+            builder.AppendLine("        passHostHeader: true");
+            builder.AppendLine("        servers:");
+            builder.AppendLine($"          - url: \"{route.Gateway!.Url.ToString().TrimEnd('/')}\"");
+        }
+    }
+
     private static string BuildTargetRoutePrefix(Guid appId, Guid deploymentTargetId)
         => PublishedAppHostNames.BuildPrivateTargetPath(appId, deploymentTargetId, false).TrimEnd('/');
 
     private static string BuildRuntimePath(RouteTarget route, string path)
-        => $"/runtime-tunnel/apps/{route.AppId}/targets/{route.DeploymentTargetId}/{path}";
+        => route.Gateway is not null
+            ? $"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/{path}"
+            : $"/runtime-tunnel/apps/{route.AppId}/targets/{route.DeploymentTargetId}/{path}";
 
     private string ResolveRootPath()
     {

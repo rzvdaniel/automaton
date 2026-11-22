@@ -1,6 +1,6 @@
+using Automaton.Core.Logs;
 using Automaton.Runner.Console.Services;
 using Automaton.Core.Enums;
-using Automaton.Core.Interfaces;
 using Automaton.Core.Models;
 using Automaton.Runner.Console.Models;
 using Microsoft.Extensions.Configuration;
@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.CommandLine;
-using Automaton.Core.Scripting;
 using Automaton.Core.Services;
 using Microsoft.Extensions.Http;
 using static System.Console;
@@ -29,7 +28,7 @@ public class Program
 
     private static readonly Option<bool> verboseOption = new Option<bool>(
         aliases: new[] { "--verbose", "-v" },
-        description: "Enable verbose output (prints Python environment details)",
+        description: "Enable verbose output",
         getDefaultValue: () => false
     );
 
@@ -37,9 +36,7 @@ public class Program
     {
         var configuration = GetConfiguration(args);
 
-        Log.Logger = new LoggerConfiguration()
-            .ReadFrom.Configuration(configuration)
-            .CreateLogger();
+        Log.Logger = CreateLogger(configuration);
 
         try
         {
@@ -52,8 +49,7 @@ public class Program
                 CreateStatusCommand(),
                 CreateServerCommand(),
                 CreateServiceCommand(),
-                CreateCleanupCommand(),
-                CreateExecuteAppFlowCommand()
+                CreateCleanupCommand()
             };
 
             rootCommand.AddGlobalOption(verboseOption);
@@ -244,89 +240,6 @@ public class Program
         return command;
     }
 
-    private static Command CreateExecuteAppFlowCommand()
-    {
-        var appIdOption = new Option<Guid>(
-            name: "--app-id",
-            description: "App ID to execute flow for")
-        {
-            IsRequired = true
-        };
-
-        var flowIdentifierOption = new Option<string>(
-            name: "--flow-identifier",
-            description: "Flow ID or flow name")
-        {
-            IsRequired = true
-        };
-
-        var deploymentTargetIdOption = new Option<Guid>(
-            name: "--deployment-target-id",
-            description: "Deployment target ID to execute flow for")
-        {
-            IsRequired = true
-        };
-
-        var inputsJsonOption = new Option<string>(
-            name: "--inputs-json",
-            description: "JSON object of string inputs")
-        {
-            IsRequired = false
-        };
-
-        var command = new Command("execute-app-flow", "Execute a deployed app flow from local runner workspace")
-        {
-            appIdOption,
-            deploymentTargetIdOption,
-            flowIdentifierOption,
-            inputsJsonOption
-        };
-
-        command.SetHandler(async (
-            Guid appId,
-            Guid deploymentTargetId,
-            string flowIdentifier,
-            string? inputsJson,
-            bool verbose) =>
-        {
-            VerboseOptions.Verbose = verbose;
-            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
-            using var scope = host.Services.CreateScope();
-            var appFlowExecutionService = scope.ServiceProvider.GetRequiredService<AppFlowExecutionService>();
-
-            try
-            {
-                var inputs = string.IsNullOrWhiteSpace(inputsJson)
-                    ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(inputsJson)
-                        ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-                var result = await appFlowExecutionService.ExecuteAsync(
-                    appId,
-                    deploymentTargetId,
-                    flowIdentifier,
-                    inputs);
-                WriteLine(System.Text.Json.JsonSerializer.Serialize(result, jsonSerializerOptions));
-                Environment.ExitCode = 0;
-            }
-            catch (Exception ex)
-            {
-                var error = new AppFlowExecutionResult
-                {
-                    Success = false,
-                    Status = WorkflowStatus.Error.ToString(),
-                    RunnerCount = 1,
-                    ExecutedAt = DateTime.UtcNow,
-                    Message = ex.Message
-                };
-                WriteLine(System.Text.Json.JsonSerializer.Serialize(error, jsonSerializerOptions));
-                Environment.ExitCode = 1;
-            }
-        }, appIdOption, deploymentTargetIdOption, flowIdentifierOption, inputsJsonOption, verboseOption);
-
-        return command;
-    }
-
     private static IConfiguration GetConfiguration(string[] args)
     {
         return new ConfigurationBuilder()
@@ -336,6 +249,12 @@ public class Program
             .AddCommandLine(args)
             .Build();
     }
+
+    internal static Serilog.Core.Logger CreateLogger(IConfiguration configuration)
+        => new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration)
+            .AddOtlpIfConfigured(configuration, "automaton-runner")
+            .CreateLogger();
 
     internal static IHostBuilder CreateHostBuilder(string[] args)
         => RunnerHostBuilder.Create(args);

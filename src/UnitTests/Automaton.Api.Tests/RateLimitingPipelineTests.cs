@@ -46,6 +46,82 @@ public class RateLimitingPipelineTests
     }
 
     [Test]
+    public async Task RunnerApiCalls_WithAnAcceptedKeyHaveTheirOwnBucket_ButAnyOtherKeyValueDoesNot()
+    {
+        using var host = await CreateHostAsync(configureOptions: options =>
+        {
+            options.GlobalAnonymous = new RateLimitPolicyOptions(3, 60);
+            options.RunnerApi = new RateLimitPolicyOptions(50, 60);
+        });
+        var client = host.GetTestClient();
+        Task<HttpResponseMessage> Poll(string key)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/host-container-executions/x/result");
+            request.Headers.Add("X-API-Key", key);
+            return client.SendAsync(request);
+        }
+
+        // A header value nobody accepted keeps the normal limit, so it cannot be used to guess keys faster.
+        var unknown = new List<HttpStatusCode>();
+        for (var i = 0; i < 6; i++) unknown.Add((await Poll("not-a-real-key")).StatusCode);
+        Assert.That(unknown, Has.Some.EqualTo((HttpStatusCode)429));
+
+        // A key that authentication has accepted: a Runner polling many times is not limited at the anonymous limit.
+        RateLimitedApiKeys.Remember(host.Services.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), "runner-key");
+        for (var i = 0; i < 20; i++)
+            Assert.That((await Poll("runner-key")).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"poll {i}");
+    }
+
+    [Test]
+    public async Task AppStaticAssets_DoNotUseUpTheGeneralLimit_ButOtherAppAndApiRequestsStillDo()
+    {
+        using var host = await CreateHostAsync(configureOptions: options =>
+        {
+            options.GlobalAnonymous = new RateLimitPolicyOptions(3, 60);
+            options.AppStaticAssets = new RateLimitPolicyOptions(50, 60);
+        });
+        var client = host.GetTestClient();
+
+        for (var i = 0; i < 20; i++)
+        {
+            var asset = await client.GetAsync($"/runtime-tunnel/apps/a/targets/b/assets/chunk-{i}.js");
+            Assert.That(asset.StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"asset {i}");
+        }
+
+        // The assets did not consume the general allowance: three calls still pass, the fourth is limited.
+        var codes = new List<HttpStatusCode>();
+        for (var i = 0; i < 4; i++) codes.Add((await client.GetAsync("/test-auth/global-anonymous")).StatusCode);
+        Assert.That(codes.Take(3), Has.All.EqualTo(HttpStatusCode.OK));
+        Assert.That(codes[3], Is.EqualTo((HttpStatusCode)429));
+
+        // A data request through the same app, and an asset-looking path on the API, keep the normal limit.
+        var data = new List<HttpStatusCode>();
+        for (var i = 0; i < 5; i++) data.Add((await client.GetAsync("/runtime-tunnel/apps/a/targets/b/api/items")).StatusCode);
+        Assert.That(data, Has.Some.EqualTo((HttpStatusCode)429));
+        var api = await client.GetAsync("/api/something/file.js");
+        Assert.That(api.StatusCode, Is.EqualTo((HttpStatusCode)429));
+    }
+
+    [Test]
+    public async Task ProxySignInChecksForApps_UseTheirOwnBucket_AndDoNotUseUpTheGeneralLimit()
+    {
+        using var host = await CreateHostAsync(configureOptions: options =>
+        {
+            options.GlobalAnonymous = new RateLimitPolicyOptions(3, 60);
+            options.AppStaticAssets = new RateLimitPolicyOptions(50, 60);
+        });
+        var client = host.GetTestClient();
+
+        for (var i = 0; i < 20; i++)
+            Assert.That((await client.GetAsync("/internal/runtime/auth")).StatusCode, Is.Not.EqualTo((HttpStatusCode)429), $"check {i}");
+
+        var general = new List<HttpStatusCode>();
+        for (var i = 0; i < 4; i++) general.Add((await client.GetAsync("/test-auth/global-anonymous")).StatusCode);
+        Assert.That(general.Take(3), Has.All.EqualTo(HttpStatusCode.OK));
+        Assert.That(general[3], Is.EqualTo((HttpStatusCode)429));
+    }
+
+    [Test]
     public async Task GlobalAuthenticatedRateLimiter_Returns429AfterConfiguredLimitPerUser()
     {
         using var host = await CreateHostAsync(configureOptions: options =>

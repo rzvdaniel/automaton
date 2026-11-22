@@ -1,3 +1,4 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Commands;
 using Automaton.Cli.Services;
 using NUnit.Framework;
@@ -117,5 +118,25 @@ public class ConfigPathMessageTests
         var explicitFile = Path.Combine(configDirectory, "other", "shared.json");
         var message = LoginCommand.KeySavedMessage(LoginCommand.StoragePath(new ConfigService(explicitFile), Project, global: true));
         Assert.That(message, Does.Contain(explicitFile));
+    }
+
+    [Test]
+    public void GlobalKeyWithoutAServerOrProfile_HasNowhereToBeSaved_AndWritesNothing()
+    {
+        var previousProfile = Environment.GetEnvironmentVariable("AUTOMATON_PROFILE");
+        Environment.SetEnvironmentVariable("AUTOMATON_PROFILE", null);
+        try
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(config.CanSaveGlobalConfig(new GlobalConfig { ApiKey = "abc" }), Is.False);
+                Assert.That(File.Exists(GlobalFile), Is.False);
+                Assert.That(ConfigCommand.MissingGlobalProfileMessage, Does.Contain("--server").And.Contain("--global"));
+            });
+            config.SaveProfile("main", new GlobalConfig { Server = "https://api.example.test", ApiKey = "k" });
+            Assert.That(config.CanSaveGlobalConfig(new GlobalConfig { ApiKey = "abc" }), Is.True, "the current profile takes the key");
+            Assert.That(config.CanSaveGlobalConfig(new GlobalConfig { Server = "https://api.example.test", ApiKey = "abc" }), Is.True);
+        }
+        finally { Environment.SetEnvironmentVariable("AUTOMATON_PROFILE", previousProfile); }
     }
 }

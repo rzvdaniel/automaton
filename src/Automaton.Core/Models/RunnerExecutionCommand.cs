@@ -13,21 +13,10 @@ public static class RunnerExecutionCommandKinds
 {
     public const string ReconnectRuntimeTunnels = "reconnect-runtime-tunnels";
 }
-public sealed record RunnerExecutionRequest(Guid? FlowId, RunnerCustomStepPayload? Step, AppActionCommand? Action = null,
-    SynchronizeApplicationManagedArtifactsRequest? ManagedArtifacts = null, RunnerFileTransferCommand? FileTransfer = null,
+public sealed record RunnerExecutionRequest(AppActionCommand? Action = null, RunnerFileTransferCommand? FileTransfer = null,
     HostContainerExecutionRequest? HostContainer = null);
 public sealed record RunnerExecutionAssignment(string Disposition, RunnerExecutionRequest? Request);
 public sealed record RunnerExecutionReceipt(string Outcome);
-
-public sealed class RunnerCustomStepPayload
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Code { get; set; } = string.Empty;
-    public string Language { get; set; } = string.Empty;
-    public List<StepVariable>? CodeInputVariables { get; set; }
-    public List<StepVariable>? CodeOutputVariables { get; set; }
-}
 
 public sealed class RunnerExecutionResult
 {
@@ -38,7 +27,6 @@ public sealed class RunnerExecutionResult
     public DateTime Finished { get; set; }
     public string? Output { get; set; }
     public System.Text.Json.JsonElement? ActionResult { get; set; }
-    public SynchronizeApplicationManagedArtifactsResult? ManagedArtifactsResult { get; set; }
     public RunnerFileTransferResult? FileTransferResult { get; set; }
     public HostContainerExecutionResponse? HostContainerResult { get; set; }
     public Dictionary<string, string?> OutputVariables { get; set; } = [];

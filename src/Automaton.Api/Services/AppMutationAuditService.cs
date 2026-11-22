@@ -103,7 +103,8 @@ public sealed class AppMutationAuditService(
         }
     }
 
-    public async Task RecordDeletedAsync(WebApp app, Guid ownerId, bool abandonedOfflineRuntimes = false)
+    public async Task RecordDeletedAsync(WebApp app, Guid ownerId, bool abandonedOfflineRuntimes = false,
+        IReadOnlyList<string>? skippedHostCleanup = null)
     {
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, app.Name, app.Id);
         await auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -112,17 +113,21 @@ public sealed class AppMutationAuditService(
             EntityType = AuditEntityTypes.App,
             EntityId = app.Id,
             EventType = AuditEventTypes.AppDeleted,
-            Message = $"App '{app.Name}' was deleted",
+            Message = abandonedOfflineRuntimes
+                ? $"App '{app.Name}' was deleted without runtime cleanup (Runner offline)"
+                : $"App '{app.Name}' was deleted",
             Outcome = AuditOutcomes.Success,
             ActorUserId = UserId,
             Metadata = new
             {
                 AppId = app.Id,
                 Name = app.Name,
+                Reason = abandonedOfflineRuntimes ? "Runner offline" : null,
                 app.PublicUrl,
                 ExecutionRunnerId = GetDefaultRunnerId(app),
                 OwnerUserId = ownerId,
-                AbandonedOfflineRuntimes = abandonedOfflineRuntimes
+                AbandonedOfflineRuntimes = abandonedOfflineRuntimes,
+                SkippedHostCleanup = skippedHostCleanup ?? []
             }
         });
     }

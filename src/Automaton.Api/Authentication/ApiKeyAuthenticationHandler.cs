@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
@@ -20,6 +21,7 @@ public class ApiKeyAuthenticationSchemeOptions : AuthenticationSchemeOptions
 
 public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationSchemeOptions>
 {
+    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache cache;
     private readonly ApiKeyService apiKeyService;
     private readonly ApplicationDbContext dbContext;
     private readonly UserManager<ApplicationUser> userManager;
@@ -30,8 +32,10 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         UrlEncoder encoder,
         ApiKeyService apiKeyService,
         ApplicationDbContext dbContext,
-        UserManager<ApplicationUser> userManager) : base(options, logger, encoder)
+        UserManager<ApplicationUser> userManager,
+        Microsoft.Extensions.Caching.Memory.IMemoryCache cache) : base(options, logger, encoder)
     {
+        this.cache = cache;
         this.apiKeyService = apiKeyService;
         this.dbContext = dbContext;
         this.userManager = userManager;
@@ -73,6 +77,15 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             return AuthenticateResult.Fail("Invalid API key");
         }
 
+        if (apiKeyEntity.Scope == Automaton.Core.Enums.ApiKeyScope.PermissionsAdmin
+            && (!PermissionsAdminKey.IsAllowedPath(Request.Path.Value ?? string.Empty)
+                || Request.Query.ContainsKey(Options.QueryParameterName)))
+        {
+            Logger.LogWarning("Permissions-admin API key {ApiKeyId} refused outside the app-permission endpoints: {Method} {Path}",
+                apiKeyEntity.Id, Request.Method, Request.Path);
+            return AuthenticateResult.Fail("This API key works only for approving app permissions.");
+        }
+
         var (userId, user) = await LoadApiKeyUserAsync(apiKeyEntity.Id);
         if (userId == Guid.Empty)
         {
@@ -89,7 +102,14 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         Logger.LogDebug("API key authentication succeeded for user {UserId} with scope {Scope} on request {Method} {Path}",
             userId, apiKeyEntity.Scope, Request.Method, Request.Path);
 
-        return await CreateAuthenticationResultAsync(apiKeyEntity, userId, user);
+        var result = await CreateAuthenticationResultAsync(apiKeyEntity, userId, user);
+        if (result.Succeeded)
+        {
+            // Lets the rate limiter, which runs before authentication, recognise a key that has been checked.
+            Automaton.Api.Security.RateLimitedApiKeys.Remember(cache, apiKey);
+        }
+
+        return result;
     }
 
     private async Task<(Guid UserId, ApplicationUser? User)> LoadApiKeyUserAsync(Guid apiKeyId)
@@ -121,7 +141,16 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             claims.Add(new Claim(ClaimTypes.Email, email));
         }
 
-        AddRoleClaims(claims, await userManager.GetRolesAsync(user));
+        var roles = await userManager.GetRolesAsync(user);
+        if (apiKeyEntity.Scope == Automaton.Core.Enums.ApiKeyScope.PermissionsAdmin)
+        {
+            // The key keeps working only while its owner is still a system administrator, and carries no other role.
+            if (!PermissionsAdminKey.IsAdministrator(roles) || await userManager.IsLockedOutAsync(user))
+                return AuthenticateResult.Fail("The owner of this API key is no longer a system administrator, or is locked out.");
+            roles = [UserRole.SystemAdministrator];
+        }
+
+        AddRoleClaims(claims, roles);
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);

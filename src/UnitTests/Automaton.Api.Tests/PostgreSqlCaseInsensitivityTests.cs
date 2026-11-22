@@ -187,12 +187,10 @@ public sealed class PostgreSqlCaseInsensitivityTests
     }
 
     [Test]
-    public async Task FlowStepAndProviderNames_AreFoundWithAnyCase()
+    public async Task ProviderAndRunnerNames_AreFoundWithAnyCase()
     {
         var name = Unique("Nightly-Report");
         await using var db = database.Open();
-        db.Flows.Add(new Flow { Id = Guid.NewGuid(), Name = name, Created = DateTime.UtcNow, Updated = DateTime.UtcNow });
-        db.CustomSteps.Add(new CustomStep { Id = Guid.NewGuid(), Name = name, DisplayName = $"Display {name}", Created = DateTime.UtcNow, Updated = DateTime.UtcNow });
         db.AiProviders.Add(new AiProvider { Id = Guid.NewGuid(), Name = name, DisplayName = name, CreatedAt = DateTime.UtcNow });
         db.Runners.Add(new Runner { Id = Guid.NewGuid(), Name = name, Status = "online" });
         await db.SaveChangesAsync();
@@ -201,8 +199,6 @@ public sealed class PostgreSqlCaseInsensitivityTests
         string[] requested = [name.ToLowerInvariant()];
         Assert.Multiple(() =>
         {
-            Assert.That(read.Flows.Any(f => f.Name == other), Is.True);
-            Assert.That(read.CustomSteps.Any(x => x.Name == other || x.DisplayName == other), Is.True);
             Assert.That(read.AiProviders.Any(p => p.Name == other && p.IsActive), Is.True);
             Assert.That(read.Runners.Any(r => requested.Contains(r.Name) && r.Status == "online"), Is.True);
             Assert.That(read.Runners.Any(r => r.Name == other), Is.True);

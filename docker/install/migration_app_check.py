@@ -33,8 +33,6 @@ USER_ENDPOINTS = {
     'schedules': '/api/action-schedules',
     'projects': '/api/projects',
     'apikeys': '/api/ApiKeys',
-    'flows': '/api/flows',
-    'customsteps': '/api/customsteps',
 }
 
 

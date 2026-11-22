@@ -27,6 +27,50 @@ public sealed class MachineHostContainerOperationTests
     }
 }
 
+[TestFixture]
+public sealed class HostContainerResultReadyEventTests
+{
+    [Test]
+    public async Task SavingAHostContainerResultPublishesOneResultReadyEventForItsRunnerAndSecondResultIsDropped()
+    {
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(), ApiKeyId = Guid.NewGuid(), Name = "machine", Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement, LastHeartbeatAtUtc = DateTime.UtcNow, RunnerUsers = []
+        };
+        db.Runners.Add(runner);
+        await db.SaveChangesAsync();
+        var events = new RecordingPublisher();
+        var service = RunnerExecutionTestServices.Operations(db, events);
+        var operationId = Guid.NewGuid();
+        await service.QueueHostContainerAsync(operationId, runner.Id, Guid.NewGuid(), new HostContainerExecutionRequest
+        {
+            OperationId = operationId,
+            Scope = new(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: runner.Id),
+            Operation = HostContainerOperationKinds.RemoveTargetContainers
+        }, CancellationToken.None);
+        events.Published.Clear();
+
+        await service.ApplyAsync(runner.ApiKeyId!.Value, operationId, RunnerExecutionResult.Interrupted("stopped"),
+            CancellationToken.None, runnerId: runner.Id);
+        await service.ApplyAsync(runner.ApiKeyId.Value, operationId, RunnerExecutionResult.Interrupted("stopped"),
+            CancellationToken.None, runnerId: runner.Id);
+
+        Assert.That(events.Published, Is.EqualTo(new object[]
+            { new Automaton.Messaging.Events.RunnerExecutionResultReadyEvent(operationId, runner.Id) }));
+        Assert.That((await db.RunnerExecutionOperations.SingleAsync()).ResultJson, Is.Not.Null, "the row stays the source of truth");
+    }
+
+    private sealed class RecordingPublisher : Automaton.Messaging.Abstractions.IEventPublisher
+    {
+        public List<object> Published { get; } = [];
+        public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
+        { Published.Add(message); return Task.CompletedTask; }
+    }
+}
+
 internal sealed class MachineHostContainerOperationScenario(ApplicationDbContext db, Runner runner,
     RunnerExecutionOperationService service, Guid operationId, Guid actorId, HostContainerExecutionRequest request)
     : IAsyncDisposable

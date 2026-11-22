@@ -82,7 +82,7 @@ public class AppsService
 
     public Task Update(Guid id, AppModel app) => appMutationService.Update(id, app);
 
-    public Task Remove(Guid id, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
+    public Task<IReadOnlyList<string>> Remove(Guid id, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
         => appMutationService.Remove(id, recoverInterrupted, abandonOfflineRuntimes);
     public Task Publish(
         Guid id,
@@ -164,6 +164,9 @@ public class AppsService
             Summary = entity.Summary,
             Description = entity.Description,
             IsPublished = entity.IsPublished,
+            IsPaused = entity.IsPaused,
+            PausedReason = entity.IsPaused ? entity.PausedReason : null,
+            ActionsOnly = AppListingService.IsActionsOnly(entity.ApplicationContractJson),
             IsForkable = entity.IsForkable,
             PublicUrl = entity.PublicUrl,
             PublishedAt = entity.PublishedAt,
@@ -212,7 +215,10 @@ public class AppsService
             ForkedFromAppId = entity.ForkedFromAppId,
             ForkedFromAuthorUserId = entity.ForkedFromAuthorUserId,
             ForkedFromAppName = entity.ForkedFromAppName,
-            ForkedFromAuthorName = entity.ForkedFromAuthorName
+            ForkedFromAuthorName = entity.ForkedFromAuthorName,
+            InstalledFromRepo = entity.InstalledFromRepo,
+            InstalledFromFolder = entity.InstalledFromFolder,
+            InstalledFromCommit = entity.InstalledFromCommit
         };
     }
 
@@ -270,6 +276,9 @@ public class AppsService
 
     public Task<string?> DeleteScreenshotAsync(Guid appId, Guid screenshotId)
         => appMetadataService.DeleteScreenshotAsync(appId, screenshotId);
+
+    public Task ReorderScreenshotsAsync(Guid appId, IReadOnlyList<Guid> orderedIds)
+        => appMetadataService.ReorderScreenshotsAsync(appId, orderedIds);
     internal static void ApplyStorageMetadata(AppModel app, AppStorageMetadata? metadata)
     {
         if (app == null || metadata == null)

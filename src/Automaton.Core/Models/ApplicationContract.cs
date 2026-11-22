@@ -16,6 +16,18 @@ public sealed class ApplicationContract
     public ApplicationStorageSpec Storage { get; set; } = new();
     public ApplicationComposeSpec? Compose { get; set; }
 
+    /// <summary>Optional: <c>web</c> or <c>api</c> for a running app. Missing means web.</summary>
+    public string? Kind { get; set; }
+
+    /// <summary>Optional one-line description of the app.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Optional key paths of a web app, each with a label.</summary>
+    public List<ApplicationPageDeclaration> Pages { get; set; } = [];
+
+    /// <summary>Optional path of the app's OpenAPI document (an API app), relative to the app's address.</summary>
+    public string? OpenApi { get; set; }
+
     /// <summary>
     /// Secrets the app needs by name. An app secret of that name wins; otherwise a declared name is
     /// filled from the project vault, then the owner's vault. Undeclared vault secrets never reach the app.
@@ -31,8 +43,17 @@ public sealed class ApplicationContract
     /// </summary>
     public List<string> OpenPaths { get; set; } = [];
 
+    /// <summary>
+    /// Optional hint that the app receives calls from outside (check-in URLs, a tracking script) and so only works for
+    /// them once it is public. Apps are private by default; the install page shows this before installing.
+    /// </summary>
+    public ApplicationPublicAccessDeclaration? PublicAccess { get; set; }
+
     /// <summary>Plain (non-secret) values an installer chooses, delivered as environment variables like secrets.</summary>
     public List<ApplicationSettingDeclaration> Settings { get; set; } = [];
+
+    /// <summary>Optional: how often the platform runs the app's <c>home-card</c> Action (default every 15 minutes).</summary>
+    public ApplicationHomeCardSpec? HomeCard { get; set; }
 
     /// <summary>Action schedules the installer is offered; each is created only when the installer accepts it.</summary>
     public List<ApplicationScheduleDeclaration> Schedules { get; set; } = [];
@@ -47,6 +68,29 @@ public sealed class ApplicationContract
         && !string.IsNullOrWhiteSpace(Build.OutputDirectory);
 }
 
+/// <summary>How often the platform refreshes the app's Studio Home card.</summary>
+public sealed class ApplicationHomeCardSpec
+{
+    public const int DefaultIntervalSeconds = 900;
+    public const int MinimumIntervalSeconds = 300;
+    public const int MaximumIntervalSeconds = 86_400;
+
+    public int? IntervalSeconds { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+/// <summary>A key path of a web app with a short label.</summary>
+public sealed class ApplicationPageDeclaration
+{
+    public string Path { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
 /// <summary>A secret the app expects as an environment variable.</summary>
 public sealed class ApplicationSecretDeclaration
 {
@@ -58,6 +102,25 @@ public sealed class ApplicationSecretDeclaration
 
     /// <summary>Optional source in a vault under another name: <c>project:NAME</c> or <c>user:NAME</c>.</summary>
     public string? From { get; set; }
+
+    /// <summary>The app works without a value (it reads an empty or missing variable), so the installer may leave it empty.</summary>
+    public bool Optional { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+/// <summary>Why and how strongly an app wants to be reachable without Automaton sign-in.</summary>
+public sealed class ApplicationPublicAccessDeclaration
+{
+    public const string Required = "required";
+    public const string Recommended = "recommended";
+
+    /// <summary><c>required</c> (the app does not work for its callers otherwise) or <c>recommended</c>.</summary>
+    public string Level { get; set; } = string.Empty;
+
+    /// <summary>One sentence for the installer: who calls the app from outside and why.</summary>
+    public string Reason { get; set; } = string.Empty;
 
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
@@ -177,12 +240,24 @@ public sealed class ApplicationBuildSpec
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
+public static class RuntimeUpdateModes
+{
+    /// <summary>The new container starts and becomes ready while the old one keeps serving (default).</summary>
+    public const string SideBySide = "side-by-side";
+    /// <summary>The old container stops before the new one starts; it starts again if the new one fails. For apps that lock their data folder.</summary>
+    public const string StopFirst = "stop-first";
+
+    public static bool IsValid(string? value) => value is null or SideBySide or StopFirst;
+}
+
 public sealed class ApplicationRuntimeSpec
 {
     /// <summary>OCI image that owns the application runtime process.</summary>
     public string? Image { get; set; }
     /// <summary>Optional numeric Linux UID or UID:GID for the runtime process.</summary>
     public string? User { get; set; }
+    /// <summary>How an update replaces the running container: <see cref="RuntimeUpdateModes.SideBySide"/> (default) or <see cref="RuntimeUpdateModes.StopFirst"/>.</summary>
+    public string? Update { get; set; }
     public ApplicationCommandSpec? Command { get; set; }
     public int Port { get; set; } = 8080;
 
@@ -313,8 +388,10 @@ public static class ApplicationContractValidator
         ValidateSecrets(contract.Secrets, errors);
         ValidatePermissions(contract.Permissions, errors);
         ValidateOpenPaths(contract.OpenPaths, errors);
+        ValidatePublicAccess(contract.PublicAccess, errors);
         ValidateSettings(contract.Settings, contract.Secrets, errors);
         ValidateSchedules(contract.Schedules, errors);
+        ValidateDescriptors(contract, errors);
 
         return errors;
     }
@@ -322,10 +399,59 @@ public static class ApplicationContractValidator
     /// <summary>The first supported app permission, read access to the server's backups.</summary>
     public const string SupportedPermission = "backups:read";
 
+    /// <summary>The app receives the server's own logs over OpenTelemetry (OTLP/HTTP).</summary>
+    public const string LogsReceivePermission = "logs:receive";
+
     /// <summary>Every app permission an app can request.</summary>
-    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read"];
+    public static readonly IReadOnlyList<string> SupportedPermissions = [SupportedPermission, "server:read", "notify:email", "server:cleanup", "runner:maintain", "backups:run", "server:restart", "server:update-os", "apps:read-status", "security:read", "security:manage", LogsReceivePermission];
 
     public const int MaxOpenPaths = 20;
+    public const int MaxDescriptionLength = 200;
+    public const int MaxPages = 10;
+    public const int MaxPageLabelLength = 40;
+
+    /// <summary>Why <paramref name="text"/> is not a valid one-line description, or null.</summary>
+    public static string? DescriptionError(string? text, string name)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        if (string.IsNullOrWhiteSpace(text)) return $"{name} cannot be empty";
+        if (text.Any(char.IsControl)) return $"{name} must be one line of plain text";
+        if (text.Length > MaxDescriptionLength) return $"{name} can be at most {MaxDescriptionLength} characters";
+        if (text.Contains('\n') || text.Contains('\r')) return $"{name} must be one line";
+        return null;
+    }
+
+    private static void ValidateDescriptors(ApplicationContract contract, ICollection<string> errors)
+    {
+        if (contract.Kind is not null && contract.Kind is not ("web" or "api"))
+            errors.Add("kind must be 'web' or 'api'");
+        if (DescriptionError(contract.Description, "description") is { } descriptionError) errors.Add(descriptionError);
+        ValidatePages(contract.Pages ?? [], errors);
+        if (contract.HomeCard?.IntervalSeconds is { } interval
+            && interval is < ApplicationHomeCardSpec.MinimumIntervalSeconds or > ApplicationHomeCardSpec.MaximumIntervalSeconds)
+            errors.Add($"homeCard.intervalSeconds must be between {ApplicationHomeCardSpec.MinimumIntervalSeconds} and {ApplicationHomeCardSpec.MaximumIntervalSeconds}");
+        if (contract.OpenApi is not null && !IsPlainPath(contract.OpenApi))
+            errors.Add("openApi must be a path that starts with / (for example /openapi.json)");
+    }
+
+    private static bool IsPlainPath(string? path)
+        => !string.IsNullOrEmpty(path) && path.Length is >= 2 and <= 200 && path[0] == '/'
+            && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains("..", StringComparison.Ordinal)
+            && path.All(c => c is not ('?' or '#' or '\\') && !char.IsWhiteSpace(c) && !char.IsControl(c));
+
+    private static void ValidatePages(List<ApplicationPageDeclaration> pages, ICollection<string> errors)
+    {
+        if (pages.Count > MaxPages) errors.Add($"pages can contain at most {MaxPages} entries");
+        var index = 0;
+        foreach (var page in pages)
+        {
+            index++;
+            if (page is null || !(page.Path == "/" || IsPlainPath(page.Path)))
+                errors.Add($"pages entry {index} ('{page?.Path}') needs a path that starts with / and has no spaces or ..");
+            if (page is null || string.IsNullOrWhiteSpace(page.Label) || page.Label.Length > MaxPageLabelLength)
+                errors.Add($"pages entry {index} needs a label of 1-{MaxPageLabelLength} characters");
+        }
+    }
 
     /// <summary>True for <c>/exact/path</c> or <c>/folder/*</c>, using only URL path characters.</summary>
     public static bool IsValidOpenPath(string? path)
@@ -336,6 +462,15 @@ public static class ApplicationContractValidator
         // "/" and "/*" would open the whole app; a declared path names at least one folder or file.
         return body.Length > 1
             && body.All(c => c is '/' or '-' or '_' or '.' or '~' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'));
+    }
+
+    private static void ValidatePublicAccess(ApplicationPublicAccessDeclaration? access, ICollection<string> errors)
+    {
+        if (access is null) return;
+        if (access.Level is not (ApplicationPublicAccessDeclaration.Required or ApplicationPublicAccessDeclaration.Recommended))
+            errors.Add("publicAccess.level must be 'required' or 'recommended'");
+        if (string.IsNullOrWhiteSpace(access.Reason) || access.Reason.Length > 300)
+            errors.Add("publicAccess.reason is required and at most 300 characters");
     }
 
     private static void ValidateOpenPaths(List<string>? paths, ICollection<string> errors)
@@ -457,6 +592,8 @@ public static class ApplicationContractValidator
         ValidatePort(runtime.Port, "runtime.port", errors);
         if (runtime.User is not null && !IsValidRuntimeUser(runtime.User))
             errors.Add("runtime.user must be a numeric UID or UID:GID");
+        if (!RuntimeUpdateModes.IsValid(runtime.Update))
+            errors.Add("runtime.update must be side-by-side or stop-first");
     }
 
     private static bool IsValidRuntimeUser(string value)

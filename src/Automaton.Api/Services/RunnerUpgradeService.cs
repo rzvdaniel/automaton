@@ -27,9 +27,9 @@ public sealed class RunnerUpgradeService(
     }
 
     /// <summary>Starts the upgrade on an online, idle Runner. The image is always the server's configured one.</summary>
-    public async Task<RunnerUpgradeStatus> StartAsync(Guid id, CancellationToken token)
+    public async Task<RunnerUpgradeStatus> StartAsync(Guid id, CancellationToken token, bool trusted = false)
     {
-        var entity = await LoadAsync(id, token);
+        var entity = await LoadAsync(id, token, trusted);
         var image = hostedRunnerOptions.Value.DockerImage;
         if (!RunnerPresenceEvaluator.IsOnline(entity.ConnectionId, entity.LastHeartbeatAtUtc, DateTime.UtcNow))
             throw new InvalidOperationException("The Runner is offline. Run the manual upgrade command on its server instead.");
@@ -52,9 +52,9 @@ public sealed class RunnerUpgradeService(
     }
 
     /// <summary>Reports how an upgrade that was started is going: in progress, reconnected or rolled back.</summary>
-    public async Task<RunnerUpgradeStatus> StatusAsync(Guid id, CancellationToken token)
+    public async Task<RunnerUpgradeStatus> StatusAsync(Guid id, CancellationToken token, bool trusted = false)
     {
-        var entity = await LoadAsync(id, token);
+        var entity = await LoadAsync(id, token, trusted);
         var image = hostedRunnerOptions.Value.DockerImage;
         if (IsCurrent(entity.ImageDigest, image)
             && RunnerPresenceEvaluator.IsOnline(entity.ConnectionId, entity.LastHeartbeatAtUtc, DateTime.UtcNow))
@@ -101,11 +101,12 @@ public sealed class RunnerUpgradeService(
                 && target.ExecutionRunnerId == runnerId), token);
     }
 
-    private async Task<Runner> LoadAsync(Guid id, CancellationToken token)
+    /// <param name="trusted">The caller already checked access (an app approved for this machine, for a system administrator).</param>
+    private async Task<Runner> LoadAsync(Guid id, CancellationToken token, bool trusted = false)
     {
         // Upgrading replaces the Runner's software without changing who may use it, so the owner may
         // upgrade a Runner that projects share; deleting it still requires removing it from them first.
-        if (!await authorization.CanUpdateRunnerAsync(id, token))
+        if (!trusted && !await authorization.CanUpdateRunnerAsync(id, token))
             throw new UnauthorizedAccessException($"You do not have permission to manage runner {id}");
         return await db.Runners.AsNoTracking().SingleAsync(entity => entity.Id == id, token);
     }

@@ -1,6 +1,5 @@
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Automaton.Core.Scripting.Engines;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Automaton.Api.Models;
@@ -21,7 +20,6 @@ public class RunnerService
     private readonly RunnerDeletionService runnerDeletionService;
     private readonly RunnerConnectionSessionService connectionSessionService;
     private readonly RunnerQueryService runnerQueryService;
-    private readonly RunnerFlowExecutionService flowExecutionService;
     private readonly RunnerConnectionLifecycleService connectionLifecycleService;
     private readonly Serilog.ILogger logger;
 
@@ -34,7 +32,6 @@ public class RunnerService
         RunnerDeletionService runnerDeletionService,
         RunnerConnectionSessionService connectionSessionService,
         RunnerQueryService runnerQueryService,
-        RunnerFlowExecutionService flowExecutionService,
         RunnerConnectionLifecycleService connectionLifecycleService)
     {
         this.dbContext = dbContext;
@@ -43,7 +40,6 @@ public class RunnerService
         this.runnerDeletionService = runnerDeletionService;
         this.connectionSessionService = connectionSessionService;
         this.runnerQueryService = runnerQueryService;
-        this.flowExecutionService = flowExecutionService;
         this.connectionLifecycleService = connectionLifecycleService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
@@ -142,79 +138,6 @@ public class RunnerService
 
     public Task Delete(Guid id, CancellationToken cancellationToken, bool hostCleanupConfirmed = false)
         => runnerDeletionService.DeleteAsync(id, cancellationToken, hostCleanupConfirmed);
-
-    public Task<IEnumerable<RunnerFlowResult>> ExecuteFlow(
-        Guid flowId,
-        IEnumerable<Guid> runnerIds,
-        CancellationToken cancellationToken)
-        => flowExecutionService.ExecuteAsync(flowId, runnerIds, cancellationToken);
-
-    public Task<IEnumerable<RunnerFlowResult>> ExecuteFlow(
-        Guid flowId,
-        IEnumerable<Guid> runnerIds,
-        Guid userId,
-        CancellationToken cancellationToken)
-        => flowExecutionService.ExecuteAsync(flowId, runnerIds, userId, cancellationToken);
-    /// <summary>
-    /// Get script engine settings for a specific runner
-    /// </summary>
-    public async Task<RunnerScriptEngineSettings?> GetScriptEngineSettings(Guid id, CancellationToken cancellationToken)
-    {
-        // Check if user can access this runner (personal owner OR project member)
-        if (!await authorizationService.CanAccessRunnerAsync(id, cancellationToken))
-        {
-            return null;
-        }
-
-        var runner = await dbContext.Runners
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        if (runner == null || string.IsNullOrWhiteSpace(runner.ScriptEngineSettings))
-        {
-            return null;
-        }
-
-        try
-        {
-            var settings = JsonSerializer.Deserialize<RunnerScriptEngineSettings>(
-                runner.ScriptEngineSettings,
-               new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                   );
-
-            return settings;
-        }
-        catch (JsonException ex)
-        {
-            logger.Warning(ex, "Failed to deserialize script engine settings for runner {RunnerId}", id);
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Update script engine settings for a specific runner
-    /// </summary>
-    public async Task UpdateScriptEngineSettings(Guid id, string? settingsJson, CancellationToken cancellationToken)
-    {
-        // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
-        if (!await authorizationService.CanUpdateRunnerAsync(id, cancellationToken))
-        {
-            throw new UnauthorizedAccessException($"You do not have permission to update runner {id}");
-        }
-
-        var runner = await dbContext.Runners
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        if (runner == null)
-        {
-            throw new InvalidOperationException($"Runner {id} not found");
-        }
-
-        runner.ScriptEngineSettings = settingsJson;
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        logger.Debug("Updated script engine settings for runner {RunnerId}", id);
-    }
 
     public Task<RunnerDetails?> GetByNameAsync(string name, CancellationToken cancellationToken)
         => runnerQueryService.GetByNameAsync(name, cancellationToken);

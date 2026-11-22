@@ -25,48 +25,6 @@ public sealed class DeleteHintLeakTests
         => new(db, AppAuthorizationTestData.CreateUserContextService(userId));
 
     [Test]
-    public void Flow_StrangerGetsAPlainRefusal_OwnerGetsTheExplanation()
-    {
-        var (db, owner, stranger, project, flow) = Seed();
-        db.FlowUsers.Add(new FlowUser { FlowId = flow, UserId = owner });
-        db.ProjectFlows.Add(new ProjectFlow { ProjectId = project, FlowId = flow });
-        db.SaveChanges();
-        FlowsService Service(Guid user) => new(db, null!, null!,
-            AppAuthorizationTestData.CreateUserContextService(user), Authorization(db, user), null!);
-
-        var refused = Assert.ThrowsAsync<UnauthorizedAccessException>(() => Service(stranger).Remove(flow));
-        var unknown = Assert.ThrowsAsync<UnauthorizedAccessException>(() => Service(stranger).Remove(Guid.NewGuid()));
-        var explained = Assert.ThrowsAsync<InvalidOperationException>(() => Service(owner).Remove(flow));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(refused!.Message, Does.Not.Contain("project"));
-            Assert.That(unknown!.Message, Does.StartWith("You do not have permission to delete flow"));
-            Assert.That(explained!.Message, Does.Contain(Hint));
-        });
-    }
-
-    [Test]
-    public void CustomStep_StrangerGetsAPlainRefusal_OwnerGetsTheExplanation()
-    {
-        var (db, owner, stranger, project, step) = Seed();
-        db.CustomStepUsers.Add(new CustomStepUser { CustomStepId = step, UserId = owner });
-        db.ProjectCustomSteps.Add(new ProjectCustomStep { ProjectId = project, CustomStepId = step });
-        db.SaveChanges();
-        CustomStepsService Service(Guid user) => new(db,
-            AppAuthorizationTestData.CreateUserContextService(user), null!, null!, Authorization(db, user), null!);
-
-        var refused = Assert.ThrowsAsync<UnauthorizedAccessException>(() => Service(stranger).Remove(step));
-        var explained = Assert.ThrowsAsync<InvalidOperationException>(() => Service(owner).Remove(step));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(refused!.Message, Does.Not.Contain("project"));
-            Assert.That(explained!.Message, Does.Contain(Hint));
-        });
-    }
-
-    [Test]
     public void Runner_StrangerGetsAPlainRefusal_OwnerGetsTheExplanation()
     {
         var (db, owner, stranger, project, runner) = Seed();

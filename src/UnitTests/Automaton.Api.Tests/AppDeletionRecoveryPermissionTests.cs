@@ -27,7 +27,7 @@ public sealed class AppDeletionRecoveryPermissionTests
     }
 
     [Test]
-    public async Task OfflineRuntimeAbandonment_RequiresAdministratorAndRecovery()
+    public async Task OfflineRuntimeAbandonment_RequiresAdministrator()
     {
         var controller = new AppsController(null!, NullLogger<AppsController>.Instance, null!, null!, null!, null!)
         {
@@ -41,9 +41,7 @@ public sealed class AppDeletionRecoveryPermissionTests
         };
         Assert.That(await controller.Delete(Guid.NewGuid(), recoverInterrupted: true, abandonOfflineRuntimes: true),
             Is.TypeOf<ForbidResult>());
-
-        controller.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, "Admin")], "test"));
-        Assert.That(await controller.Delete(Guid.NewGuid(), abandonOfflineRuntimes: true), Is.TypeOf<BadRequestObjectResult>());
+        Assert.That(await controller.Delete(Guid.NewGuid(), abandonOfflineRuntimes: true), Is.TypeOf<ForbidResult>());
     }
 
     [Test]

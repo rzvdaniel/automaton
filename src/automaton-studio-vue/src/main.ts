@@ -12,18 +12,17 @@ import 'primeflex/primeflex.css'
 // Application styles - AFTER PrimeVue imports
 import './assets/styles/tokens.css'
 import './assets/styles/main.css'
+import './assets/styles/page-family.css'
 import { StudioPreset } from './assets/styles/studio-preset'
 
 import App from './App.vue'
 import router from './router'
 import { setUnauthorizedCallback } from '@/shared/services/api/axios-instance'
-import { analytics } from '@/shared/services/analytics/analytics'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 // Create app
 const app = createApp(App)
 
-analytics.init()
 
 // Pinia store
 const pinia = createPinia()

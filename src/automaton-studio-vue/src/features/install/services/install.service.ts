@@ -1,5 +1,5 @@
 import apiClient from '@/shared/services/api/axios-instance'
-import type { InstallCommand, InstallationStatusResponse, InstallationCheck, InstallationBackupStatus, InstallationUpdateStatus } from '../types/install.types'
+import type { InstallCommand, InstallationStatusResponse, InstallationCheck, InstallationBackupStatus, InstallationUpdateStatus, InstallationSummary } from '../types/install.types'
 
 class InstallService {
   async getStatus(): Promise<InstallationStatusResponse> {
@@ -7,11 +7,28 @@ class InstallService {
     return data
   }
 
+  /** The running server version; signed-in users only (the anonymous status has none). */
+  async getVersion(): Promise<string | null> {
+    const { data } = await apiClient.get<{ version?: string | null }>('/api/install/version')
+    return data.version ?? null
+  }
+
   async check(setupToken = ''): Promise<InstallationCheck[]> {
     const { data } = await apiClient.post<InstallationCheck[]>('/api/install/checks', null, {
       headers: { 'X-Automaton-Setup-Token': setupToken },
     })
     return data
+  }
+
+  /** Counts, version and whether email is configured (system administrators). */
+  async getSummary(): Promise<InstallationSummary> {
+    const { data } = await apiClient.get<InstallationSummary>('/api/install/summary')
+    return data
+  }
+
+  /** Asks the host to take a backup now (system administrators). */
+  async startBackup(): Promise<void> {
+    await apiClient.post('/api/install/backups')
   }
 
   async getBackups(): Promise<InstallationBackupStatus> {

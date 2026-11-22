@@ -113,6 +113,28 @@ public class RunnerDeploymentService
         finally { gate.Release(); }
     }
 
+    /// <summary>The last lines of an app container's output.</summary>
+    public Task<string?> ReadRuntimeLogsAsync(Guid appId, Guid deploymentTargetId, int lines, CancellationToken cancellationToken)
+        => runtimeProcessManager.ReadLogsAsync(appId, deploymentTargetId, lines, cancellationToken);
+
+    /// <summary>Stops a runtime without removing its files, under the same per-target gate as deployments.</summary>
+    public async Task<bool> PauseRuntimeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var gate = deploymentGates.GetOrAdd((appId, deploymentTargetId), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try { return await runtimeProcessManager.PauseAsync(appId, deploymentTargetId, cancellationToken); }
+        finally { gate.Release(); }
+    }
+
+    /// <summary>Starts a paused runtime again under the same per-target gate as deployments.</summary>
+    public async Task<bool> ResumeRuntimeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var gate = deploymentGates.GetOrAdd((appId, deploymentTargetId), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try { return await runtimeProcessManager.ResumeAsync(appId, deploymentTargetId, cancellationToken); }
+        finally { gate.Release(); }
+    }
+
     public async Task CleanupTargetAsync(
         Guid appId,
         Guid deploymentTargetId,
@@ -128,6 +150,25 @@ public class RunnerDeploymentService
     {
         await runtimeProcessManager.StopAsync(appId, deploymentTargetId);
         await storageCleanup.DeleteComposeVolumesAsync(appId);
+        try { DeleteApplicationFiles(appId, deploymentTargetId); }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException)
+        {
+            // The app's runtime user (for example root or UID 33) may own files the Runner user cannot remove.
+            try
+            {
+                foreach (var root in runnerWorkspaceService.GetApplicationCleanupRoots(appId, deploymentTargetId))
+                    await storageCleanup.EmptyDirectoryAsync(root);
+            }
+            catch (InvalidOperationException helperError)
+            {
+                throw new InvalidOperationException($"{helperError.Message} First error: {error.Message}", error);
+            }
+            DeleteApplicationFiles(appId, deploymentTargetId);
+        }
+    }
+
+    private void DeleteApplicationFiles(Guid appId, Guid deploymentTargetId)
+    {
         runnerWorkspaceService.DeleteApplicationTarget(appId, deploymentTargetId);
         runnerWorkspaceService.DeleteApplicationStorage(appId);
     }

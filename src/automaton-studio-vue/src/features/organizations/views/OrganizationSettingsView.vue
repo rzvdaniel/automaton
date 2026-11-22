@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHead from '@/shared/components/PageHead.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { organizationsService } from '../services/organizationsService'
@@ -98,7 +99,7 @@ async function loadOrganization() {
         appExecutionAllowUserOverride: organization.value.appExecutionAllowUserOverride,
       }
     }
-  } catch (error) {
+  } catch {
     router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
   } finally {
     loading.value = false
@@ -121,7 +122,7 @@ async function handleSaveSettings() {
     saving.value = true
     await organizationsService.updateOrganization(organizationId.value, settingsForm.value)
     await loadOrganization()
-  } catch (error) {
+  } catch {
     // Error toast is already shown by service
   } finally {
     saving.value = false
@@ -134,27 +135,11 @@ function navigateBack() {
 </script>
 
 <template>
-  <div class="organization-settings">
-    <div class="page-header">
-      <div class="flex align-items-center gap-3">
-        <Button
-          icon="pi pi-arrow-left"
-          text
-          rounded
-          @click="navigateBack"
-        />
-        <div>
-          <h1>Organization Settings</h1>
-          <p class="text-muted">Manage organization details and preferences</p>
-        </div>
-      </div>
-      <Button
-        label="Save Changes"
-        icon="pi pi-save"
-        :loading="saving"
-        @click="handleSaveSettings"
-      />
-    </div>
+  <div class="organization-settings studio-page">
+    <PageHead title="Team settings" line="Name, access and preferences for this team.">
+      <Button icon="pi pi-arrow-left" label="Back" outlined class="btn-small" @click="navigateBack" />
+      <Button label="Save changes" class="btn-main" :loading="saving" @click="handleSaveSettings" />
+    </PageHead>
 
     <div v-if="loading" class="loading-state">
       <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>

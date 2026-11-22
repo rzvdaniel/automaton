@@ -5,7 +5,8 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { appsService } from '../services/apps.service'
-import type { AppSharing, SharingAudience } from '../types/apps.types'
+import type { AppSharing, MyTeam, SharingAudience } from '../types/apps.types'
+import { useToast } from 'primevue/usetoast'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const props = defineProps<{
@@ -18,11 +19,15 @@ const emit = defineEmits<{
   'update:visible': [value: boolean]
   /** Who can open the app changed; the page reloads the app. */
   changed: []
+  /** The person wants the Domain or Store listing tab. */
+  open: [tab: 'domain' | 'store']
 }>()
+const toast = useToast()
 
 const CHOICES: ReadonlyArray<{ key: SharingAudience, title: string, line: string, icon: string }> = [
   { key: 'me', title: 'Only me', line: 'Nobody else can open this app.', icon: 'pi pi-lock' },
   { key: 'people', title: 'People I choose', line: 'Only the people you add below can open it.', icon: 'pi pi-users' },
+  { key: 'team', title: 'A team', line: 'Members of a team you pick can open it after signing in.', icon: 'pi pi-sitemap' },
   { key: 'server', title: 'Everyone on this server', line: 'Anyone with an account here can open it after signing in.', icon: 'pi pi-building' },
   { key: 'internet', title: 'Anyone on the internet', line: 'No sign-in. The app gets a public address.', icon: 'pi pi-globe' },
 ]
@@ -31,6 +36,9 @@ const sharing = ref<AppSharing | null>(null)
 const selected = ref<SharingAudience>('me')
 const address = ref('')
 const email = ref('')
+const teams = ref<MyTeam[]>([])
+const teamId = ref('')
+const listed = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -44,8 +52,10 @@ const addressValid = computed(() => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(addre
 const publicUrl = computed(() => getPublishedAppUrl(address.value || 'your-app'))
 const unchanged = computed(() => !!sharing.value
   && sharing.value.audience === selected.value
-  && (selected.value !== 'internet' || address.value === (sharing.value.publicUrlSlug ?? '')))
-const canSave = computed(() => !saving.value && !unchanged.value
+  && (selected.value !== 'internet' || (address.value === (sharing.value.publicUrlSlug ?? '') && listed.value === (sharing.value.listed ?? false))))
+const teamChanged = computed(() => selected.value === 'team' && teamId.value !== (sharing.value?.team?.id ?? ''))
+const canSave = computed(() => !saving.value && (!unchanged.value || teamChanged.value)
+  && (selected.value !== 'team' || !!teamId.value)
   && (selected.value !== 'internet' || addressValid.value)
   && (selected.value !== 'people' || (sharing.value?.people.length ?? 0) > 0))
 
@@ -58,13 +68,24 @@ function apply(state: AppSharing) {
   sharing.value = state
   selected.value = state.audience
   address.value = state.publicUrlSlug ?? address.value
+  teamId.value = state.team?.id ?? teamId.value
+  listed.value = state.listed ?? false
+}
+
+const teamsFailed = ref(false)
+
+async function loadTeams() {
+  teamsFailed.value = false
+  try { teams.value = await appsService.listMyTeams() } catch { teams.value = []; teamsFailed.value = true }
 }
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    apply(await appsService.getSharing(props.appId))
+    const state = await appsService.getSharing(props.appId)
+    apply(state)
+    await loadTeams()
     if (!address.value) address.value = appsService.generateSlug(props.appName)
   } catch (reason) {
     error.value = messageOf(reason, 'Could not load who can open this app.')
@@ -90,7 +111,17 @@ async function save() {
   saving.value = true
   error.value = ''
   try {
-    apply(await appsService.setSharing(props.appId, selected.value, selected.value === 'internet' ? address.value : undefined))
+    const internet = selected.value === 'internet'
+    const state = await appsService.setSharing(
+      props.appId,
+      selected.value,
+      internet ? address.value : undefined,
+      selected.value === 'team' ? teamId.value : undefined,
+      internet ? listed.value : undefined,
+    )
+    apply(state)
+    toast.add({ severity: 'success', summary: 'Sharing saved', life: 2500 })
+    isVisible.value = false
     emit('changed')
   } catch (reason) {
     error.value = messageOf(reason, 'Sharing was not changed.')
@@ -181,6 +212,20 @@ async function copyAddress() {
         <p v-else class="share__hint">Nobody yet. They need an account on this server first.</p>
       </section>
 
+      <section v-if="selected === 'team'" class="share__more" data-testid="share-team">
+        <label for="share-team" class="share__label">Team</label>
+        <select id="share-team" v-model="teamId" class="share__select" :disabled="teams.length === 0">
+          <option value="" disabled>Pick a team</option>
+          <option v-for="team in teams" :key="team.id" :value="team.id">{{ team.displayName }}</option>
+        </select>
+        <p v-if="teamsFailed" class="share__hint" data-testid="share-teams-error">
+          Your teams could not be loaded.
+          <Button label="Retry" text size="small" data-testid="share-teams-retry" @click="loadTeams" />
+        </p>
+        <p v-else-if="teams.length === 0" class="share__hint">You are not in a team yet. Create one under Teams first.</p>
+        <p v-else class="share__hint">Members can open the app. They cannot change it or share it.</p>
+      </section>
+
       <section v-if="selected === 'internet'" class="share__more" data-testid="share-internet">
         <label for="share-address" class="share__label">Public address</label>
         <InputText id="share-address" :model-value="address" placeholder="my-app" @input="onAddressInput" />
@@ -190,6 +235,17 @@ async function copyAddress() {
         </p>
         <p v-else class="share__hint">Use at least 3 lowercase letters, numbers or hyphens.</p>
         <p class="share__hint">Anyone with the address can open the app, so keep private data out of it.</p>
+
+        <label class="share__check" data-testid="share-list">
+          <input v-model="listed" type="checkbox">
+          <span><strong>List in the store</strong> Show it in the public marketplace.</span>
+        </label>
+        <p v-if="listed" class="share__hint">
+          <a href="#" data-testid="share-store-link" @click.prevent="emit('open', 'store')">Edit listing →</a>
+        </p>
+        <p v-if="sharing?.audience === 'internet'" class="share__hint">
+          <a href="#" data-testid="share-domain-link" @click.prevent="emit('open', 'domain')">Your own domain →</a>
+        </p>
       </section>
     </div>
 
@@ -222,6 +278,9 @@ async function copyAddress() {
 .share__add :deep(input) { flex: 1; }
 .share__people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .share__people li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+.share__select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--p-content-border-color, var(--p-surface-border)); background: var(--p-content-background, transparent); color: inherit; }
+.share__check { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; cursor: pointer; }
+.share__check span { display: flex; flex-direction: column; }
 .share__label { font-weight: 600; font-size: 14px; }
 .share__hint { margin: 0; font-size: 13px; color: var(--p-text-muted-color, var(--p-text-color-secondary)); overflow-wrap: anywhere; }
 </style>

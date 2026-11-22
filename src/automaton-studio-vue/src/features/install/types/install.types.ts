@@ -52,6 +52,16 @@ export interface SmtpSettingsSummary {
   verifiedAt: string | null
 }
 
+/** GET /api/install/summary (system administrators). `emailConfigured` is absent on servers older than this field. */
+export interface InstallationSummary {
+  version: string | null
+  users: number
+  apps: number
+  runners: number
+  lastBackupAt: string | null
+  emailConfigured?: boolean | null
+}
+
 export interface SmtpSettingsUpdate {
   emailHost: string
   emailPort: number
@@ -104,6 +114,14 @@ export interface InstallationBackupStatus {
   directory: string | null
   backupNowCommand: string
   backupRecipient: string | null
-  backupKeyCommand: string
+  /** Set only while the private key is still on the server; null when it is kept off the server. */
+  backupKeyCommand: string | null
   backups: InstallationBackup[]
+  /** When the host timer next starts a backup, if the host reports it. */
+  nextRunAt?: string | null
+  /** The host can start a backup requested from Studio. */
+  triggerAvailable?: boolean
+  requestPending?: boolean
+  /** Set when the host has not picked up a backup request. */
+  hint?: string | null
 }

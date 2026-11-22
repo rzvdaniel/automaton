@@ -1,13 +1,12 @@
+using Automaton.Core.Constants;
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -27,9 +26,8 @@ public sealed class MachineStaticTunnelTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
-            Assert.That(fixture.LastRequest?.Destination, Is.EqualTo(TunnelDestinations.StaticSite));
-            Assert.That(fixture.LastRequest?.RuntimePath, Is.EqualTo("assets/site.css"));
+            Assert.That(response.Status, Is.EqualTo(StatusCodes.Status200OK));
+            Assert.That(fixture.LastRequest?.StaticSite, Is.True);
         });
 
         var dispatchedRequest = fixture.LastRequest;
@@ -38,7 +36,7 @@ public sealed class MachineStaticTunnelTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
+            Assert.That(response.Status, Is.EqualTo(StatusCodes.Status404NotFound));
             Assert.That(fixture.LastRequest, Is.SameAs(dispatchedRequest));
         });
     }
@@ -53,15 +51,33 @@ public sealed class MachineStaticTunnelTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
-            Assert.That(fixture.LastRequest?.Destination, Is.EqualTo(TunnelDestinations.StaticSite));
+            Assert.That(response.Status, Is.EqualTo(StatusCodes.Status200OK));
+            Assert.That(fixture.LastRequest?.StaticSite, Is.True);
         });
 
         var dispatchedRequest = fixture.LastRequest;
         response = await fixture.ForwardAsync();
         Assert.Multiple(() =>
         {
-            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
+            Assert.That(response.Status, Is.EqualTo(StatusCodes.Status404NotFound));
+            Assert.That(fixture.LastRequest, Is.SameAs(dispatchedRequest));
+        });
+    }
+
+    [Test]
+    public async Task ForwardAsync_AnswersThePausedPageWithoutReachingTheRunner()
+    {
+        await using var fixture = await StaticSiteFixture.CreateAsync();
+        await fixture.ForwardAsync();
+        var dispatchedRequest = fixture.LastRequest;
+        await fixture.PauseAsync();
+
+        var response = await fixture.ForwardAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+            Assert.That(response.Body, Does.Contain("This app is paused"));
             Assert.That(fixture.LastRequest, Is.SameAs(dispatchedRequest));
         });
     }
@@ -86,8 +102,8 @@ public sealed class MachineStaticTunnelTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
-            Assert.That(fixture.LastRequest?.Destination, Is.EqualTo(TunnelDestinations.RuntimeGateway));
+            Assert.That(response.Status, Is.EqualTo(StatusCodes.Status200OK));
+            Assert.That(fixture.LastRequest?.StaticSite, Is.False);
         });
     }
 
@@ -100,7 +116,7 @@ public sealed class MachineStaticTunnelTests
 
         var response = await fixture.ForwardAsync();
 
-        Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
+        Assert.That(response.Status, Is.EqualTo(StatusCodes.Status404NotFound));
         Assert.That(fixture.LastRequest, Is.Null);
     }
 
@@ -113,17 +129,15 @@ public sealed class MachineStaticTunnelTests
         private readonly Guid targetId;
 
         private StaticSiteFixture(ApplicationDbContext db, RuntimeTunnelService service,
-            Guid appId, Guid targetId, CapturingHubContext hub)
+            Guid appId, Guid targetId)
         {
             this.db = db;
             this.service = service;
             this.appId = appId;
             this.targetId = targetId;
-            Hub = hub;
         }
 
-        public CapturingHubContext Hub { get; }
-        public TunnelRequest? LastRequest => Hub.LastRequest;
+        public Dispatch? LastRequest { get; private set; }
 
         public async Task MarkRetiredHostedAsync(bool deleted)
         {
@@ -143,8 +157,7 @@ public sealed class MachineStaticTunnelTests
             var identity = new ApiInstanceIdentityService();
             var appId = Guid.NewGuid();
             var targetId = await AddPublishedSiteAsync(db, appId, identity, contract ?? StaticContract());
-            var (service, hub) = CreateRuntimeService(db, identity);
-            return new StaticSiteFixture(db, service, appId, targetId, hub);
+            return new StaticSiteFixture(db, CreateRuntimeService(db, identity), appId, targetId);
         }
 
         private static ApplicationContract StaticContract() => new()
@@ -156,18 +169,27 @@ public sealed class MachineStaticTunnelTests
             }
         };
 
-        public Task<TunnelResponse> ForwardAsync()
+        public Task<Outcome> ForwardAsync()
         {
             var request = new DefaultHttpContext().Request;
             request.Host = new HostString(PublicHost);
-            return service.ForwardAsync(appId, targetId, request, "assets/site.css", CancellationToken.None);
+            return ResolveAsync(request);
         }
 
-        public Task<TunnelResponse> ForwardPrivateAsync()
+        public Task<Outcome> ForwardPrivateAsync()
         {
             var request = new DefaultHttpContext().Request;
             request.Host = new HostString(PublishedAppHostNames.BuildPrivateAppHost(appId, "apps.automaton.monster"));
-            return service.ForwardAsync(appId, targetId, request, "assets/site.css", CancellationToken.None);
+            return ResolveAsync(request);
+        }
+
+        /// <summary>What the API would do with the request: answer with a failure itself, or send it to the Runner.</summary>
+        private async Task<Outcome> ResolveAsync(HttpRequest request)
+        {
+            var resolved = await service.ResolveAsync(appId, targetId, request, "assets/site.css", CancellationToken.None);
+            if (resolved.Failure is { } failure) return new Outcome(failure.StatusCode, failure.Body);
+            LastRequest = new Dispatch(resolved.StaticSite);
+            return new Outcome(StatusCodes.Status200OK, string.Empty);
         }
 
         public async Task UnpublishAsync()
@@ -175,6 +197,12 @@ public sealed class MachineStaticTunnelTests
             var app = db.WebApps.Local.Single(item => item.Id == appId);
             app.IsPublished = false;
             app.RuntimeVisibility = AppRuntimeVisibilities.Private;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task PauseAsync()
+        {
+            db.WebApps.Local.Single(app => app.Id == appId).IsPaused = true;
             await db.SaveChangesAsync();
         }
 
@@ -201,6 +229,7 @@ public sealed class MachineStaticTunnelTests
             ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
             ConnectionId = "machine-runner-connection",
             ApiInstanceId = identity.ApiInstanceId,
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current,
             LastHeartbeatAtUtc = DateTime.UtcNow
         });
         db.WebApps.Add(new WebApp
@@ -228,66 +257,17 @@ public sealed class MachineStaticTunnelTests
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
 
-    private static (RuntimeTunnelService Service, CapturingHubContext Hub) CreateRuntimeService(
-        ApplicationDbContext db, ApiInstanceIdentityService identity)
+    private sealed record Outcome(int Status, string Body);
+
+    private sealed record Dispatch(bool StaticSite);
+
+    private static RuntimeTunnelService CreateRuntimeService(ApplicationDbContext db, ApiInstanceIdentityService identity)
     {
-        var registry = new TunnelRequestRegistry();
-        var hub = new CapturingHubContext(registry);
-        var sender = new RuntimeTunnelRequestSender(hub, registry, new TunnelLongLivedLimiter(),
-            Options.Create(new RuntimeTunnelConfig()), NullLogger<RuntimeTunnelRequestSender>.Instance);
-        var service = new RuntimeTunnelService(db, sender,
+        var tunnels = new RunnerTunnelRegistry();
+        foreach (var runner in db.Runners.AsNoTracking().ToList())
+            tunnels.Add(runner.Id, new TunnelConnectionStream(new MemoryStream()), out _);
+        return new RuntimeTunnelService(db, tunnels,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
-            identity, NullLogger<RuntimeTunnelService>.Instance);
-        return (service, hub);
-    }
-
-    private sealed class CapturingHubContext : IHubContext<AutomatonHub>
-    {
-        private readonly CapturingHubClients clients;
-
-        public CapturingHubContext(TunnelRequestRegistry registry)
-        {
-            clients = new CapturingHubClients(registry, request => LastRequest = request);
-        }
-
-        public IHubClients Clients => clients;
-        public IGroupManager Groups { get; } = null!;
-        public TunnelRequest? LastRequest { get; private set; }
-    }
-
-    private sealed class CapturingHubClients(TunnelRequestRegistry registry, Action<TunnelRequest> capture) : IHubClients
-    {
-        private readonly CapturingClientProxy client = new(registry, capture);
-        public IClientProxy All => throw new NotSupportedException();
-        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public ISingleClientProxy Client(string connectionId) => client;
-        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => client;
-        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
-        public IClientProxy Group(string groupName) => throw new NotSupportedException();
-        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
-        public IClientProxy User(string userId) => throw new NotSupportedException();
-        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
-    }
-
-    private sealed class CapturingClientProxy(TunnelRequestRegistry registry, Action<TunnelRequest> capture)
-        : ISingleClientProxy
-    {
-        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
-        {
-            if (method == AutomatonHubMethods.TunnelRequest && args[0] is TunnelRequest request)
-            {
-                capture(request);
-                registry.TryComplete(new TunnelResponse
-                {
-                    RequestId = request.RequestId,
-                    StatusCode = StatusCodes.Status200OK
-                });
-            }
-            return Task.CompletedTask;
-        }
+            identity, NullLogger<RuntimeTunnelService>.Instance, new RuntimeTunnelTargetCache(TimeSpan.Zero, TimeProvider.System));
     }
 }

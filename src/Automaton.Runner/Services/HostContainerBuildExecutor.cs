@@ -146,7 +146,7 @@ internal sealed class HostContainerBuildExecutor(
             await StopTimedOutBuildAsync(container);
             return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
         }
-        return Failure("build_failed", result.Error);
+        return Failure("build_failed", BuildFailureOutput(result.Output, result.Error, result.ExitStatus));
     }
 
     private async Task<(bool Exists, string? Image, HostContainerExecutionResponse? Failure)> InspectBuildContainerAsync(
@@ -217,7 +217,20 @@ internal sealed class HostContainerBuildExecutor(
         if (exitCode == 0)
             return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
         var logs = await executor(["docker", "logs", container], TimeSpan.FromSeconds(30), cancellationToken);
-        return Failure("build_failed", logs.Output + logs.Error);
+        return Failure("build_failed", BuildFailureOutput(logs.Output, logs.Error, exitCode));
+    }
+
+    /// <summary>The last lines of the build's output, so the developer sees why it failed.</summary>
+    internal static string BuildFailureOutput(string output, string error, int exitStatus)
+    {
+        const int maxLines = 30, maxChars = 2500;
+        var lines = (output + "\n" + error).Split('\n', StringSplitOptions.TrimEntries)
+            .Where(line => line.Length > 0).TakeLast(maxLines);
+        var tail = string.Join('\n', lines);
+        if (tail.Length > maxChars) tail = "..." + tail[^maxChars..];
+        return tail.Length == 0
+            ? $"The build exited with code {exitStatus} and printed nothing."
+            : $"The build exited with code {exitStatus}. Last output:\n{tail}";
     }
 
     private async Task StopTimedOutBuildAsync(string container)

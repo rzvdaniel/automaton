@@ -27,4 +27,16 @@ public sealed class RunnerRuntimeNetworkPolicyTests
         Assert.That(RunnerRuntimeNetworkPolicy.IsReadinessProbeFailure(new TaskCanceledException(), caller.Token), Is.False);
         Assert.That(RunnerRuntimeNetworkPolicy.IsReadinessProbeFailure(new InvalidOperationException(), CancellationToken.None), Is.False);
     }
+
+    [Test]
+    public void ReadinessFailsAtOnceWhenTheContainerHasExited_NotAfterTheStartupTimeout()
+    {
+        var policy = new RunnerRuntimeNetworkPolicy(new RunnerRuntimeRegistry());
+        var started = DateTime.UtcNow;
+        var error = Assert.ThrowsAsync<InvalidOperationException>(() => policy.WaitForReadinessAsync(
+            1, new Automaton.Core.Models.ApplicationHealthSpec { StartupTimeoutSeconds = 120 }, CancellationToken.None,
+            _ => Task.FromResult(false)));
+        Assert.That(error!.Message, Does.Contain("exited"));
+        Assert.That(DateTime.UtcNow - started, Is.LessThan(TimeSpan.FromSeconds(20)));
+    }
 }

@@ -3,6 +3,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -120,6 +121,50 @@ public class AppDeploymentTargetStateServiceTests
                 typeof(AppDeploymentTargetSummary).GetProperty("RuntimeDeployed"),
                 Is.Null);
         });
+    }
+
+    [Test]
+    public async Task RuntimeReport_FailsARunningTargetOfThatRunnerAndRecoversIt()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        var target = app.DeploymentTargets.Single(item => !item.IsDefault);
+        target.Status = DeploymentTargetStatus.Running;
+        AddRunners(db, app);
+        await db.SaveChangesAsync();
+        var service = new AppDeploymentTargetStateService(db);
+
+        await service.ApplyRuntimeReportsAsync(target.ExecutionRunnerId!.Value, [new(app.Id, target.Id, true, "could not start")]);
+        Assert.That((await db.AppDeploymentTargets.FindAsync(target.Id))!.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
+
+        await service.ApplyRuntimeReportsAsync(target.ExecutionRunnerId!.Value, [new(app.Id, target.Id, false, null)]);
+        Assert.That((await db.AppDeploymentTargets.FindAsync(target.Id))!.Status, Is.EqualTo(DeploymentTargetStatus.Running));
+    }
+
+    [Test]
+    public async Task RuntimeReport_IgnoresOtherRunnersAndTargetsThatAreNotRunning()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        var target = app.DeploymentTargets.Single(item => !item.IsDefault);
+        target.Status = DeploymentTargetStatus.Running;
+        AddRunners(db, app);
+        var deploying = app.DeploymentTargets.Single(item => item.IsDefault);
+        deploying.Status = DeploymentTargetStatus.Deploying;
+        await db.SaveChangesAsync();
+        var service = new AppDeploymentTargetStateService(db);
+
+        await service.ApplyRuntimeReportsAsync(Guid.NewGuid(), [new(app.Id, target.Id, true, "x")]);
+        await service.ApplyRuntimeReportsAsync(deploying.ExecutionRunnerId ?? Guid.NewGuid(), [new(app.Id, deploying.Id, true, "x")]);
+
+        Assert.That((await db.AppDeploymentTargets.FindAsync(target.Id))!.Status, Is.EqualTo(DeploymentTargetStatus.Running));
+        Assert.That((await db.AppDeploymentTargets.FindAsync(deploying.Id))!.Status, Is.EqualTo(DeploymentTargetStatus.Deploying));
+    }
+
+    private static void AddRunners(ApplicationDbContext db, WebApp app)
+    {
+        foreach (var runnerId in app.DeploymentTargets.Select(item => item.ExecutionRunnerId!.Value).Distinct())
+            db.Runners.Add(new Runner { Id = runnerId, Name = $"runner-{runnerId:N}", Purpose = RunnerPurposes.Managed, ConnectionId = "connection", Status = "online" });
     }
 
     private static WebApp AddAppWithTwoTargets(ApplicationDbContext db)

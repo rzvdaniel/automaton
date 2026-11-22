@@ -15,12 +15,20 @@ public static class CatalogInstallValues
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         var number = 0;
-        foreach (var raw in text.Split('\n'))
+        var lines = text.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
         {
             number++;
-            var line = raw.TrimEnd('\r');
+            var line = lines[index].TrimEnd('\r');
             if (line.Trim().Length == 0 || line.TrimStart().StartsWith('#')) continue;
             var equals = line.IndexOf('=');
+            var block = line.IndexOf("<<", StringComparison.Ordinal);
+            if (block > 0 && (equals < 0 || block < equals))
+            {
+                var (blockName, blockValue) = ReadBlock(lines, ref index, ref number, line, block, origin);
+                values[blockName] = blockValue;
+                continue;
+            }
             var name = equals > 0 ? line[..equals].Trim() : "";
             if (name.Length == 0 || name.Any(c => !(char.IsLetterOrDigit(c) || c == '_')))
                 throw new InvalidOperationException($"{origin}, line {number}: expected NAME=VALUE (letters, digits and _ in the name).");
@@ -29,6 +37,26 @@ public static class CatalogInstallValues
         return values;
     }
 
+    /// <summary>NAME<<END, the value lines, then END alone on a line. Every value line ends with a newline, as in a shell heredoc.</summary>
+    private static (string Name, string Value) ReadBlock(string[] lines, ref int index, ref int number, string line, int block, string origin)
+    {
+        var name = line[..block].Trim();
+        var tag = line[(block + 2)..].Trim();
+        if (!IsName(name) || tag.Length == 0)
+            throw new InvalidOperationException($"{origin}, line {number}: expected NAME<<END (letters, digits and _ in the name, then a closing word).");
+        var value = new StringBuilder();
+        while (++index < lines.Length)
+        {
+            number++;
+            var inner = lines[index].TrimEnd('\r');
+            if (inner == tag) return (name, value.ToString());
+            value.Append(inner).Append('\n');
+        }
+        throw new InvalidOperationException($"{origin}, line {number}: the block {name}<<{tag} is not closed; end it with {tag} alone on a line.");
+    }
+
+    private static bool IsName(string name) => name.Length > 0 && name.All(c => char.IsLetterOrDigit(c) || c == '_');
+
     public static Dictionary<string, string> WithoutEmpty(Dictionary<string, string> values)
         => values.Where(item => item.Value.Trim().Length > 0).ToDictionary(item => item.Key, item => item.Value);
 
@@ -36,13 +64,31 @@ public static class CatalogInstallValues
         => ParseLines(string.Join('\n', arguments), "--setting");
 
     /// <summary>Secrets from a file or standard input; the two are alternatives. Returns none when neither is given.</summary>
-    public static Dictionary<string, string> ReadSecrets(string? file, bool fromStdin, TextReader? stdin = null)
+    public static Dictionary<string, string> ReadSecrets(string? file, bool fromStdin, TextReader? stdin = null, IEnumerable<string>? secretFiles = null)
+    {
+        var result = ReadSecretLines(file, fromStdin, stdin);
+        // --secret-file NAME=PATH: the whole file is the value, as is (line breaks kept), so a multi-line key is passed without printing it.
+        foreach (var argument in secretFiles ?? [])
+        {
+            var equals = argument.IndexOf('=');
+            var name = equals > 0 ? argument[..equals].Trim() : "";
+            if (name.Length == 0 || name.Any(c => !(char.IsLetterOrDigit(c) || c == '_')) || equals == argument.Length - 1)
+                throw new InvalidOperationException("--secret-file: expected NAME=PATH (letters, digits and _ in the name).");
+            var path = ExpandHome(argument[(equals + 1)..]);
+            result[name] = File.Exists(path) ? File.ReadAllText(path).Replace("\r\n", "\n") : throw new InvalidOperationException($"The file {argument[(equals + 1)..]} for secret {name} does not exist.");
+        }
+        return result;
+    }
+
+    private static string ExpandHome(string file)
+        => file.StartsWith("~/", StringComparison.Ordinal) ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), file[2..]) : file;
+
+    private static Dictionary<string, string> ReadSecretLines(string? file, bool fromStdin, TextReader? stdin)
     {
         if (file is not null && fromStdin) throw new InvalidOperationException("Use either --secrets-file or --secrets-stdin, not both.");
         if (file is not null)
         {
-            var path = file.StartsWith("~/", StringComparison.Ordinal)
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), file[2..]) : file;
+            var path = ExpandHome(file);
             return File.Exists(path) ? ParseLines(File.ReadAllText(path), file) : throw new InvalidOperationException($"The secrets file {file} does not exist.");
         }
         return fromStdin ? ParseLines((stdin ?? Console.In).ReadToEnd(), "standard input") : [];
@@ -58,7 +104,7 @@ public static class CatalogInstallValues
             .Concat(secrets.Keys.Where(name => !declaredSecrets.ContainsKey(name)).Select(name => $"secret {name}")).ToList();
         var missingSettings = declaredSettings.Where(item => item.Value.GetBoolOrFalse("required") && string.IsNullOrEmpty(item.Value.GetTextOrEmpty("default")) && !settings.ContainsKey(item.Key))
             .Select(item => item.Key).ToList();
-        var missingSecrets = declaredSecrets.Where(item => string.IsNullOrEmpty(item.Value.GetTextOrEmpty("from")) && !secrets.ContainsKey(item.Key))
+        var missingSecrets = declaredSecrets.Where(item => string.IsNullOrEmpty(item.Value.GetTextOrEmpty("from")) && !item.Value.GetBoolOrFalse("optional") && !secrets.ContainsKey(item.Key))
             .Select(item => item.Key).ToList();
         return (unknown, missingSettings, missingSecrets);
     }

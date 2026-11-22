@@ -792,7 +792,6 @@ public class OrganizationService : IOrganizationService
             .Include(p => p.Owner)
             .Include(p => p.Members)
             .Include(p => p.ProjectApps)
-            .Include(p => p.ProjectFlows)
             .OrderByDescending(p => p.Updated)
             .ToListAsync(cancellationToken);
 
@@ -812,7 +811,6 @@ public class OrganizationService : IOrganizationService
             IsActive = p.IsActive,
             MemberCount = p.Members.Count(m => m.IsActive),
             AppCount = p.ProjectApps.Count,
-            FlowCount = p.ProjectFlows.Count,
             CurrentUserRole = ProjectRole.Viewer
         });
 
@@ -969,7 +967,9 @@ public class OrganizationService : IOrganizationService
         // Apps an owner shared with this person, or with everyone on the server, belong in the same list.
         assigned.AddRange(await dbContext.WebApps
             .Where(app => app.DeletionClaimId == null &&
-                          (app.SharedWithServer || dbContext.AppShares.Any(share => share.WebAppId == app.Id && share.UserId == userId)))
+                          (app.SharedWithServer || dbContext.AppShares.Any(share => share.WebAppId == app.Id && share.UserId == userId) ||
+                           (app.SharedWithProjectId != null && dbContext.ProjectMembers.Any(member =>
+                               member.ProjectId == app.SharedWithProjectId && member.UserId == userId && member.IsActive && member.Project!.IsActive))))
             .ToListAsync(cancellationToken));
         // Apps in a project (team) the user is an active member of: the user can already open them, so list them too.
         assigned.AddRange(await dbContext.ProjectApps

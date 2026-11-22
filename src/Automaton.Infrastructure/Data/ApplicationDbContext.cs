@@ -49,15 +49,26 @@ namespace Automaton.Api.Data
                 .HasOne<WebApp>().WithMany().HasForeignKey(approval => approval.AppId).OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<AppPermissionApproval>()
                 .Property(approval => approval.Status).HasDefaultValue(AppPermissionStatuses.Pending);
+            modelBuilder.Entity<AppSettingValue>()
+                .HasIndex(setting => new { setting.AppId, setting.Name }).IsUnique();
+            modelBuilder.Entity<AppSettingValue>()
+                .HasOne<WebApp>().WithMany().HasForeignKey(setting => setting.AppId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<ServerCleanupSettings>().Property(item => item.Id).ValueGeneratedNever();
+            modelBuilder.Entity<ServerCleanupRun>().HasIndex(run => run.StartedAtUtc);
+            modelBuilder.Entity<AppRunnerPermission>().HasIndex(grant => new { grant.AppId, grant.RunnerId, grant.Permission }).IsUnique();
+            modelBuilder.Entity<AppRunnerPermission>().HasOne<WebApp>().WithMany().HasForeignKey(grant => grant.AppId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<AppRunnerPermission>().HasOne<Runner>().WithMany().HasForeignKey(grant => grant.RunnerId).OnDelete(DeleteBehavior.Cascade);
             if (Database.IsNpgsql()) PostgreSqlModelConfiguration.Apply(modelBuilder);
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
             PrepareDeploymentTargets();
+            var changesAccess = ChangesRuntimeAccess();
             using var admission = OpenRunnerAssignmentAdmission();
             var result = base.SaveChanges(acceptAllChangesOnSuccess);
             admission?.Commit();
+            if (changesAccess) RuntimeAccessVersion.Bump();
             return result;
         }
 
@@ -66,11 +77,26 @@ namespace Automaton.Api.Data
             CancellationToken cancellationToken = default)
         {
             await PrepareDeploymentTargetsAsync(cancellationToken);
+            var changesAccess = ChangesRuntimeAccess();
             await using var admission = await OpenRunnerAssignmentAdmissionAsync(cancellationToken);
             var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
             if (admission is not null) await admission.CommitAsync(cancellationToken);
+            if (changesAccess) RuntimeAccessVersion.Bump();
             return result;
         }
+
+        // Who may open an app's address is reused briefly by the proxy's sign-in check; a change to any of these ends that reuse.
+        private static readonly HashSet<string> RuntimeAccessEntities = new(StringComparer.Ordinal)
+        {
+            nameof(WebApp), nameof(WebAppUser), nameof(AppShare), nameof(Project), nameof(ProjectMember), nameof(ProjectApp),
+            nameof(OrganizationAppAssignment), nameof(OrganizationMember), nameof(Organization),
+            nameof(ApplicationUserRole), nameof(ApplicationRole), nameof(ApplicationUser)
+        };
+
+        private bool ChangesRuntimeAccess()
+            => ChangeTracker.Entries().Any(entry =>
+                entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                && RuntimeAccessEntities.Contains(entry.Metadata.ClrType.Name));
 
         private void PrepareDeploymentTargets()
         {

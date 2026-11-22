@@ -192,6 +192,78 @@ class InstallationConfigurationTests(unittest.TestCase):
         return {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*')
                 if p.is_file() and p.relative_to(self.root).as_posix() not in skip}
 
+    def test_ensure_custom_domain_resolver_migrates_cloudflare_installation_once(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        traefik_path = self.root / 'traefik.yml'
+        traefik = json.loads(traefik_path.read_text())
+        del traefik['certificatesResolvers']['letsencrypt']
+        traefik_path.write_text(json.dumps(traefik))
+        settings_path = self.root / 'appsettings.Production.json'
+        settings = json.loads(settings_path.read_text())
+        del settings['PublishedApps']['CustomDomainCertificateResolver']
+        settings_path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_custom_domain_resolver(self.root), 'changed')
+        fresh = Path(self.temporary.name) / 'fresh'
+        module.configure(fresh, 'example.com', 'owner@example.com', 'cloudflare')
+        self.assertEqual(json.loads(traefik_path.read_text()), json.loads((fresh / 'traefik.yml').read_text()))
+        self.assertEqual(json.loads(settings_path.read_text())['PublishedApps']['CustomDomainCertificateResolver'], 'letsencrypt')
+        before = self.snapshot()
+        self.assertEqual(module.ensure_custom_domain_resolver(self.root), 'unchanged')
+        self.assertEqual(before, self.snapshot())
+
+    def test_access_log_is_json_without_headers_and_migrates_existing_installation_once(self):
+        module.configure(self.root, 'example.com', 'owner@example.com')
+        traefik_path = self.root / 'traefik.yml'
+        access_log = json.loads(traefik_path.read_text())['accessLog']
+        self.assertEqual(access_log['format'], 'json')
+        self.assertEqual(access_log['filePath'], '/certificates/logs/access.log')
+        self.assertEqual(access_log['fields']['headers']['defaultMode'], 'drop')
+        before = json.loads(traefik_path.read_text())
+        del before['accessLog']
+        traefik_path.write_text(json.dumps(before))
+        self.assertEqual(module.ensure_access_log(self.root), 'changed')
+        self.assertEqual(json.loads(traefik_path.read_text())['accessLog'], access_log)
+        self.assertEqual(module.ensure_access_log(self.root), 'unchanged')
+        traefik_path.write_text('entryPoints: {}  # hand written\n')
+        self.assertEqual(module.ensure_access_log(self.root), 'skipped')
+
+    def test_ensure_custom_domain_resolver_skips_hand_written_traefik_and_http_mode(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        (self.root / 'traefik.yml').write_text('entryPoints: {}\n')
+        before = self.snapshot()
+        self.assertEqual(module.ensure_custom_domain_resolver(self.root), 'skipped')
+        self.assertEqual(before, self.snapshot())
+        other = Path(self.temporary.name) / 'http'
+        module.configure(other, 'example.com', 'owner@example.com')
+        self.assertEqual(module.ensure_custom_domain_resolver(other), 'unchanged')
+
+    def test_ensure_runner_broker_host_replaces_private_address_only(self):
+        module.configure(self.root, 'example.com', 'owner@example.com')
+        path = self.root / 'appsettings.Production.json'
+        settings = json.loads(path.read_text())
+        local = dict(settings['InfrastructureRunnerRabbitMq'])
+        settings['HostedRunnerRabbitMq'] = dict(Host='10.0.0.3', Port=5672, TlsEnabled=False, TlsServerName=None)
+        path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'changed')
+        migrated = json.loads(path.read_text())
+        self.assertEqual(migrated['HostedRunnerRabbitMq'], dict(Host='api.example.com', Port=5671, TlsEnabled=True, TlsServerName='api.example.com'))
+        self.assertEqual(migrated['InfrastructureRunnerRabbitMq'], local)
+        before = self.snapshot()
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'unchanged')
+        self.assertEqual(before, self.snapshot())
+
+    def test_ensure_runner_broker_host_keeps_custom_public_host_and_fresh_install(self):
+        module.configure(self.root, 'example.com', 'owner@example.com')
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'unchanged')
+        path = self.root / 'appsettings.Production.json'
+        settings = json.loads(path.read_text())
+        settings['HostedRunnerRabbitMq']['Host'] = 'broker.other.net'
+        path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'unchanged')
+        settings['HostedRunnerRabbitMq']['Host'] = 'rabbitmq'
+        path.write_text(json.dumps(settings))
+        self.assertEqual(module.ensure_runner_broker_host(self.root), 'changed')
+
     def test_switch_to_cloudflare_rewrites_only_tls_files(self):
         self.configure()
         touched = ('traefik.yml', 'dynamic/installation.yml', 'dynamic/store.yml', 'dynamic/studio-paths.yml',

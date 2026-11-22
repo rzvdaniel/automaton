@@ -13,6 +13,12 @@ public class AppModel
     public string Description { get; set; } = string.Empty;
     [JsonRequired]
     public bool IsPublished { get; set; }
+    /// <summary>Read-only here: change it with POST /api/apps/{id}/pause and /resume.</summary>
+    public bool IsPaused { get; set; }
+    /// <summary>Why the app was paused (set with the pause call); null when not paused or no reason was given.</summary>
+    public string? PausedReason { get; set; }
+    /// <summary>The app has no web runtime or static site: it only has Actions (no container to restart).</summary>
+    public bool ActionsOnly { get; set; }
     [JsonRequired]
     public bool IsForkable { get; set; }
     public string? PublicUrl { get; set; }
@@ -58,6 +64,10 @@ public class AppModel
     public Guid? ForkedFromAuthorUserId { get; set; }
     public string? ForkedFromAppName { get; set; }
     public string? ForkedFromAuthorName { get; set; }
+    /// <summary>Public GitHub repository, folder and commit the app was installed from (catalog or pasted URL).</summary>
+    public string? InstalledFromRepo { get; set; }
+    public string? InstalledFromFolder { get; set; }
+    public string? InstalledFromCommit { get; set; }
     public string DevelopmentMode { get; set; } = Constants.AppDevelopmentModes.Studio;
     public bool SourceAvailable { get; set; } = true;
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;

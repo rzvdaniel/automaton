@@ -69,7 +69,7 @@ public sealed partial class HostContainerExecutionService
         try
         {
             args.Add("--workdir");
-            args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(request.Command.WorkingDirectory, "/automaton/app"));
+            args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(request.Command!.WorkingDirectory, "/automaton/app"));
             DockerContainerRuntime.AddEnvironment(args, environment);
             DockerContainerRuntime.AddEntrypoint(args, request.Command, "/automaton/app");
             args.Add(resolved.ResolvedImage);
@@ -155,6 +155,9 @@ public sealed partial class HostContainerExecutionService
         var arguments = request.Operation switch
         {
             HostContainerOperationKinds.StartContainer => new[] { "docker", "start", inspection.ContainerId },
+            HostContainerOperationKinds.StopContainer => new[] { "docker", "stop", "--time", "20", inspection.ContainerId },
+            // Only the live container gets this: Docker brings it back after a host reboot, but a manual stop stays stopped.
+            HostContainerOperationKinds.EnableAutoRestart => new[] { "docker", "update", "--restart", "unless-stopped", inspection.ContainerId },
             HostContainerOperationKinds.GetContainerLogs => new[] { "docker", "logs", "--tail", "200", inspection.ContainerId },
             HostContainerOperationKinds.RemoveContainer => new[] { "docker", "rm", "-f", inspection.ContainerId },
             _ => throw new InvalidOperationException("Unsupported container operation.")
@@ -186,7 +189,12 @@ public sealed partial class HostContainerExecutionService
             return inspection with { Logs = logs.Length <= MaximumLogCharacters ? logs : logs[^MaximumLogCharacters..] };
         }
         if (request.Operation == HostContainerOperationKinds.RemoveContainer)
+        {
+            await ReleaseImageAsync(inspection.Labels, cancellationToken);
             return new HostContainerExecutionResponse { Success = true, ContainerId = inspection.ContainerId };
+        }
+        if (request.Operation is HostContainerOperationKinds.StopContainer or HostContainerOperationKinds.EnableAutoRestart)
+            return new HostContainerExecutionResponse { Success = true, Exists = true, ContainerId = inspection.ContainerId };
         var postStart = await InspectOwnedContainerAsync(inspection.ContainerId, request.Scope, cancellationToken, discoverEndpoint: true);
         if (!postStart.Success || !postStart.Exists || !postStart.Running || !postStart.HostPort.HasValue)
             return Failure("container_start_endpoint", "The application container started without a valid running private endpoint.") with
@@ -199,6 +207,25 @@ public sealed partial class HostContainerExecutionService
             };
         return postStart;
     }
+
+    /// <summary>
+    /// A removed app container is either the previous version (the new one is healthy) or a failed candidate. Either way its
+    /// image is no longer needed: remove it, unless another container still uses it (Docker refuses then), and cap the build cache.
+    /// Best effort; a cleanup problem must not fail the deployment.
+    /// </summary>
+    private async Task ReleaseImageAsync(IReadOnlyDictionary<string, string>? labels, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (labels is not null && labels.TryGetValue("automaton.resolved-image", out var image)
+                && image.Contains("@sha256:", StringComparison.Ordinal) && !image.StartsWith('-'))
+                await executor(["docker", "rmi", image], RuntimeOperationTimeout, cancellationToken);
+            await executor(["docker", "builder", "prune", "--force", "--keep-storage", BuildCacheLimit], RuntimeOperationTimeout, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { }
+    }
+
+    internal const string BuildCacheLimit = "2GB";
 
     private async Task<HostContainerExecutionResponse> InspectOwnedContainerAsync(
         string reference, HostContainerScope scope, CancellationToken cancellationToken, bool discoverEndpoint)
@@ -216,12 +243,13 @@ public sealed partial class HostContainerExecutionService
             RejectDuplicateProperties(root);
             var inspection = ReadContainerIdentity(root, scope);
             if (inspection.Failure is not null) return inspection.Failure;
-            if (!discoverEndpoint) return CreateInspectionResponse(inspection.Id!, inspection.Running, inspection.Labels!);
+            var restartCount = root.TryGetProperty("RestartCount", out var count) && count.TryGetInt32(out var n) ? n : 0;
+            if (!discoverEndpoint) return CreateInspectionResponse(inspection.Id!, inspection.Running, inspection.Labels!, inspection.Restarting) with { RestartCount = restartCount };
             if (inspection.Labels!.ContainsKey("com.automaton.compose-candidate"))
                 return HostContainerComposeProjectExecutor.ReadComposeEndpoint(
                     root, inspection.Id!, inspection.Running, inspection.Labels,
                     HostContainerRuntimeEndpoint.GetPrivateRuntimeHostAddress());
-            return HostContainerRuntimeEndpoint.Read(root, inspection.Id!, inspection.Running, inspection.Labels!);
+            return HostContainerRuntimeEndpoint.Read(root, inspection.Id!, inspection.Running, inspection.Labels!, inspection.Restarting) with { RestartCount = restartCount };
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
         {
@@ -229,26 +257,28 @@ public sealed partial class HostContainerExecutionService
         }
     }
 
-    private static (string? Id, bool Running, Dictionary<string, string>? Labels, HostContainerExecutionResponse? Failure)
+    private static (string? Id, bool Running, bool Restarting, Dictionary<string, string>? Labels, HostContainerExecutionResponse? Failure)
         ReadContainerIdentity(JsonElement root, HostContainerScope scope)
     {
         var id = root.GetProperty("Id").GetString();
         if (!HostContainerRuntimeValidation.IsContainerId(id)) throw new JsonException("Invalid container ID.");
         var running = root.GetProperty("State").GetProperty("Running").GetBoolean();
+        var restarting = root.GetProperty("State").TryGetProperty("Restarting", out var flag) && flag.ValueKind == JsonValueKind.True;
         var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(root.GetProperty("Config").GetProperty("Labels"))
             ?? throw new JsonException("Missing labels.");
         if (labels.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
             throw new JsonException("Invalid labels.");
         if (RuntimeLabels(scope).Any(pair => !labels.TryGetValue(pair.Key, out var value) || value != pair.Value))
-            return (null, false, null, Failure("container_ownership", "The container is not owned by the requested application and machine scope."));
-        return (id, running, labels, null);
+            return (null, false, false, null, Failure("container_ownership", "The container is not owned by the requested application and machine scope."));
+        return (id, running, restarting, labels, null);
     }
 
     private static HostContainerExecutionResponse CreateInspectionResponse(
         string id,
         bool running,
-        Dictionary<string, string> labels)
-        => new() { Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels };
+        Dictionary<string, string> labels,
+        bool restarting = false)
+        => new() { Success = true, Exists = true, Running = running, Restarting = restarting, ContainerId = id, Labels = labels };
 
     private static Dictionary<string, string> RuntimeLabels(HostContainerScope scope)
     {

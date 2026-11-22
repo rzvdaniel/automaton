@@ -10,6 +10,7 @@
     "type-check": "vue-tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint . --fix",
+    "lint:check": "eslint .",
     "format": "prettier --write src/",
     "smoke": "playwright test --config playwright.config.ts"
   },
@@ -24,18 +25,17 @@
     "@codemirror/lang-yaml": "^6.1.2",
     "@microsoft/signalr": "^9.0.6",
     "@primevue/themes": "^4.5.4",
-    "axios": "^1.13.2",
+    "axios": "^1.21.1",
     "chart.js": "^4.5.1",
     "codemirror": "^6.0.2",
     "marked": "^15.0.12",
     "pinia": "^3.0.4",
-    "posthog-js": "^1.258.3",
     "primeflex": "^4.0.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
     "vue": "^3.5.44",
-    "vue-chartjs": "^5.3.3",
-    "vue-router": "^4.6.4"
+    "vue-chartjs": "^5.3.4",
+    "vue-router": "^5.5.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -51,8 +51,12 @@
     "jsdom": "^29.1.1",
     "prettier": "^3.7.4",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4",
+    "vite": "^7.3.0",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.1.4"
+  },
+  "//overrides": "minimatch below 11.0.1 has a denial-of-service advisory (GHSA-g3hv-75wg-m249); force the patched major.",
+  "overrides": {
+    "minimatch@>=7 <11": "^11.0.1"
   }
 }

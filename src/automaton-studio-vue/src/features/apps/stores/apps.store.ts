@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
+import { appActionErrorMessage } from '../utils/app-action-error'
 import type { App, AppListItem, AppListFilters, PublishAppRequest } from '../types/apps.types'
 
 export const useAppsStore = defineStore('apps', () => {
@@ -107,18 +108,33 @@ export const useAppsStore = defineStore('apps', () => {
     }
   }
 
-  async function deleteApp(id: string): Promise<void> {
+  /** With `abandonOffline` (administrators) cleanup on an offline Runner is skipped; returns what was skipped. */
+  async function deleteApp(id: string, abandonOffline = false): Promise<string[]> {
     try {
-      await appsService.delete(id)
+      let skipped: string[] = []
+      if (abandonOffline) skipped = await appsService.deleteAbandoningOfflineRuntimes(id)
+      else await appsService.delete(id)
 
       // Remove from local state
       apps.value = apps.value.filter((app) => app.id !== id)
       if (selectedApp.value?.id === id) {
         selectedApp.value = null
       }
+      return skipped
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
       throw new Error(errorMessage)
+    }
+  }
+
+  /** Pauses or resumes an app and shows the new state in the list. */
+  async function setAppPaused(id: string, paused: boolean): Promise<string[]> {
+    try {
+      const state = await appsService.setPaused(id, paused)
+      listApps.value = listApps.value.map((app) => (app.id === id ? { ...app, isPaused: state.paused } : app))
+      return state.warnings ?? []
+    } catch (err: unknown) {
+      throw new Error(appActionErrorMessage(err, getErrorMessage(err)))
     }
   }
 
@@ -284,6 +300,7 @@ export const useAppsStore = defineStore('apps', () => {
     fetchApp,
     updateApp,
     deleteApp,
+    setAppPaused,
     publishApp,
     unpublishApp,
     setSearchFilter,

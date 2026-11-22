@@ -72,6 +72,9 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain("forwardAuth:"));
             Assert.That(content, Does.Contain($"private-{appId:N}-auth-strip"));
             Assert.That(content, Does.Contain("https://api.test/internal/runtime/auth"));
+            Assert.That(content, Does.Contain("authResponseHeaders:"));
+            Assert.That(content, Does.Contain("- X-Automaton-Viewer-Token"));
+            Assert.That(content, Does.Contain("X-Automaton-Viewer-Role: \"\""));
             Assert.That(content, Does.Contain($"X-App-Id: \"{appId}\""));
             Assert.That(content, Does.Contain("X-App-Id: \"\""));
             Assert.That(content, Does.Contain("X-Automaton-Runtime-Auth: \"\""));
@@ -116,6 +119,9 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain($"slug-{appId}-runtime"));
             Assert.That(content, Does.Not.Contain($"slug-{appId}-auth"));
             Assert.That(content, Does.Contain($"private-{appId}-auth:"));
+            Assert.That(content, Does.Contain("viewer-strip:"));
+            Assert.That(content, Does.Contain($"slug-{appId}-runtime:"));
+            Assert.That(content, Does.Contain("middlewares: [\"viewer-strip\", \"slug-"));
         });
     }
 
@@ -136,7 +142,7 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain("&& Path(`/callback`) && !PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)\"" + Environment.NewLine + "      priority: 60"));
             Assert.That(content, Does.Contain("!PathRegexp(`([.][.]|%2[eEfF]|%5[cC])`)"));
             Assert.That(content, Does.Contain($"private-{appId}-open0-runtime"));
-            Assert.That(content, Does.Contain($"middlewares: [\"private-{appId}-rewrite\"]"));
+            Assert.That(content, Does.Contain($"middlewares: [\"viewer-strip\", \"private-{appId}-rewrite\"]"));
         });
     }
 
@@ -227,6 +233,39 @@ public class BackendRouteConfigServiceTests
         await service.RefreshAsync();
 
         Assert.That(await File.ReadAllTextAsync(routePath), Is.EqualTo(routeBeforeTargetBDeployment));
+    }
+
+    [Test]
+    public async Task RefreshAsync_Succeeds_WhenDeploysRefreshRoutesAtTheSameTime()
+    {
+        var rootPath = CreateTempDirectory();
+        var databaseName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(databaseName).Options;
+        await using (var seed = new ApplicationDbContext(options))
+        {
+            var runnerId = Guid.NewGuid();
+            AddMachineRunner(seed, runnerId);
+            foreach (var _ in Enumerable.Range(0, 2))
+            {
+                var appId = Guid.NewGuid();
+                var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+                target.GenericRuntimeDeployed = true;
+                AddApp(seed, appId, target, GenericRuntimeContractJson());
+            }
+            await seed.SaveChangesAsync();
+        }
+
+        // Two deploys of different apps finish together: each refresh used the same temporary file name,
+        // so one could move the other's file away and fail with "Could not find file ...yml.tmp".
+        for (var round = 0; round < 50; round++)
+        {
+            var refreshes = Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
+            {
+                await using var context = new ApplicationDbContext(options);
+                await CreateService(context, rootPath).RefreshAsync();
+            }));
+            Assert.DoesNotThrowAsync(() => Task.WhenAll(refreshes));
+        }
     }
 
     [Test]

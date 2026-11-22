@@ -46,6 +46,9 @@ layout, build system, or application architecture.
 its arguments, working directory, environment, shell setting, and timeout.
 When `build.image` is omitted, `runtime.image` is used.
 `build.outputDirectory` is optional and identifies the build artifact to use.
+The build container's `/tmp` is small: work inside the app folder and point `HOME` and
+`TMPDIR` there, or a build that unpacks downloads fails with "No space left on
+device". A failed build shows the last lines of its output.
 
 `runtime.command` names the process to start. It is required for a dynamic HTTP
 application.
@@ -82,6 +85,10 @@ configured request timeout.
 `storage.dataDirectory` is the durable application data directory. Automaton
 supplies its path in `AUTOMATON_APP_DATA_DIR`. Data there survives runtime
 replacement. Build and runtime artifacts are disposable.
+
+`AUTOMATON_API_URL` is the server's public API base URL (no trailing slash), set
+in every runtime and Action. Use it to call the Automaton API with an approved
+permission key; do not ask the user for it or guess it from your own host.
 
 Use structured commands by default. Set `useShell` only when shell semantics
 are required. Keep every managed path inside the application workspace.

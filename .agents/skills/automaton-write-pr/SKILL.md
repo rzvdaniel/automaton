@@ -1,6 +1,6 @@
 ---
 name: automaton-write-pr
-description: Use whenever you open a pull request in Automaton or automaton-apps, from any flow, so every PR says what changed, how it was verified, what could break, and never closes its issue before production.
+description: Use whenever you open a pull request in Automaton or automaton-apps, from any flow, so every PR says what changed, how it was verified, how to revert it, what to check after release, and never closes its issue before production.
 license: Apache-2.0
 ---
 
@@ -12,31 +12,29 @@ What the change does for people, in the imperative: "Let app owners delete apps 
 
 ## Body
 
-```markdown
-Refs #<issue>.
+Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_template.md) and pass it with
+`gh pr create --body-file`. The merge gate refuses a PR without "How verified", "Risk", "How to revert" and "Docs".
+- **Docs** is one line: "updated `<page>`" (a page in `src/automaton-vue/docs` or an architecture guide) or
+  "none, because ...". Ask "which user page does this change make wrong?" before you write "none". The verifier
+  follows the page you name when it runs your "Check after release" list.
 
-- **<behaviour>:** what changed and why, one line each.
-- **Docs:** which Admin or architecture docs were updated, or why none were needed.
-- **Tests:** what was added, and what ran (project names, pass counts).
-
-**How verified:** end-to-end on the test server (link the proof) / unit tests only (why) / not yet (after release).
-**Risk:** what could break and how to roll back, in one line.
-
-**Not in this PR:** anything from the issue left for later, with the follow-up issue number.
-```
-
-For Studio or website changes, add a screenshot (push it to the `pr-screenshots` branch and link it).
-
-"How verified" usually says "not yet" when the PR opens, because test-server checks run after merge. Update it in a
-comment when the proof is attached.
+- **How verified** is evidence, not a claim: the commands and what came back. For a bug, name the test that failed
+  before the fix. The merge gate checks the proof by what the PR changes: a UI change (Studio, website, store, app
+  UI) needs a screenshot (markdown image or `<img>`); an API, CLI, script, installer or deploy change needs a fenced
+  code block with the command and its output (`curl -i` with the status code, or the CLI run); docs-only, tests-only,
+  CI-only and dependency bumps need none. If proof is truly impossible, add a line `Proof: not possible, because ...`;
+  the gate then warns and the reviewer judges it.
+- **Check after release** is what the verifier will run on the test server, written so an agent that never saw your
+  work can follow it: who signs in, what they do, what they see. It comes from the issue's "Done when". Every value in it (a setting, a limit, an input)
+  must pass this PR's own validation: check the minimum and maximum in the code before you write it.
 
 Never write `Closes #N` or `Fixes #N`: an issue closes only when its change is live on production. Use
 `Part of #N` when the PR delivers only part of the issue.
 
 ## Documentation
 
-Update documentation in the same PR when behaviour that administrators or users see changes (admin-docs skill), or
-when architecture changes (`AGENTS.md`). Keep it brief: say what is true now, in a few sentences, in the existing
+Update documentation in the same PR when behaviour that administrators or users see changes, or
+when architecture changes (`AGENTS.md`). User-facing behaviour (install, update, backup, Runners, CLI) is documented in `src/automaton-vue/docs`, nowhere else. Keep it brief: say what is true now, in a few sentences, in the existing
 page. Do not add new pages, change logs or plans unless the task asks for them.
 
 ## Commits

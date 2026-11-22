@@ -10,6 +10,8 @@ public class RateLimitingOptionsValidation : IValidateOptions<RateLimitingOption
 
         ValidatePolicy(options.GlobalAnonymous, nameof(options.GlobalAnonymous), errors);
         ValidatePolicy(options.GlobalAuthenticated, nameof(options.GlobalAuthenticated), errors);
+        ValidatePolicy(options.AppStaticAssets, nameof(options.AppStaticAssets), errors);
+        ValidatePolicy(options.RunnerApi, nameof(options.RunnerApi), errors);
         ValidatePolicy(options.AuthLogin, nameof(options.AuthLogin), errors);
         ValidatePolicy(options.AuthRegistration, nameof(options.AuthRegistration), errors);
         ValidatePolicy(options.AuthForgotPassword, nameof(options.AuthForgotPassword), errors);
@@ -20,6 +22,7 @@ public class RateLimitingOptionsValidation : IValidateOptions<RateLimitingOption
         ValidatePolicy(options.PublicAppControllerExecution, nameof(options.PublicAppControllerExecution), errors);
         ValidatePolicy(options.PublicAppFlowExecution, nameof(options.PublicAppFlowExecution), errors);
         ValidatePolicy(options.PublicAppStepExecution, nameof(options.PublicAppStepExecution), errors);
+        ValidatePolicy(options.ActionWebhookCall, nameof(options.ActionWebhookCall), errors);
 
         if (options.MaxConcurrentMultipartRequests <= 0)
         {

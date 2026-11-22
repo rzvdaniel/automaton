@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import MarketplaceAppRow from '@/components/MarketplaceAppRow.vue'
 import StoreFooter from '@/components/StoreFooter.vue'
 import StoreHeader from '@/components/StoreHeader.vue'
-import { publicAppConfig } from '@/config/publicAppConfig'
+import { serverHostName } from '@/config/resolveStoreConfig'
 import { useMarketplaceApps } from '@/composables/useMarketplaceApps'
 import { useSiteTheme } from '@/composables/useSiteTheme'
 import type { MarketplaceAppCard } from '@/types/marketplace'
@@ -20,6 +20,7 @@ const { apps, categories, loading, error, loadApps, loadCategories } = useMarket
 useSiteTheme()
 
 const publishDocsUrl = 'https://automaton.monster/docs/deploy#marketplace-listing'
+const hostName = serverHostName(window.location.origin)
 
 // Older links used ?category=Featured or "Live Apps" to mean every app; keep them working.
 const activeCategory = computed(() => {
@@ -88,11 +89,11 @@ onMounted(async () => {
     <main>
       <section class="band intro">
         <div class="wrap">
-          <p class="eyebrow">Public apps</p>
-          <h1>{{ publicAppConfig.storeTitle }}</h1>
-          <p class="lede">
-            Apps published on this server. Open one, see who made it, or list your own.
-          </p>
+          <p class="eyebrow">Public apps · this server</p>
+          <h1>
+            Apps running on{{ ' ' }}<em v-if="hostName">{{ hostName }}</em><template v-else>this server</template>
+          </h1>
+          <p class="lede">Open any of them in your browser. Every one runs on this server, and you can run the same apps on your own.</p>
         </div>
       </section>
 
@@ -156,21 +157,11 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section class="band" aria-labelledby="publish-title">
+      <section class="band" aria-label="List your app">
         <div class="wrap">
           <div class="publish">
-            <div class="section-head">
-              <p class="eyebrow">Your app here</p>
-              <h2 id="publish-title">List your own app</h2>
-              <p>
-                Deploy an app to this server, then open it in Studio and choose
-                <strong>Publishing</strong> to list it here.
-              </p>
-            </div>
-            <div class="cta">
-              <a v-if="publicAppConfig.studioUrl" class="btn primary" :href="publicAppConfig.studioUrl">Open Studio <span class="arrow" aria-hidden="true">→</span></a>
-              <a class="btn" :href="publishDocsUrl" target="_blank" rel="noopener">How publishing works</a>
-            </div>
+            <p><strong>Want your app here?</strong> Publish it from Studio, or let your AI do it.</p>
+            <a class="btn small" :href="publishDocsUrl" target="_blank" rel="noopener">How publishing works</a>
           </div>
         </div>
       </section>
@@ -182,13 +173,18 @@ onMounted(async () => {
 
 <style scoped>
 .intro .wrap {
-  padding-block: 40px 28px;
+  padding-block: 36px 12px;
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 .intro h1 {
-  font-size: clamp(2.4rem, 5.4vw, 4rem);
+  font-size: clamp(1.9rem, 4.4vw, 3rem);
   font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.intro h1 em {
+  font-style: normal;
+  color: var(--signal-ink);
 }
 
 .toolbar {
@@ -201,10 +197,10 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   max-width: 560px;
-  padding: 12px 18px;
-  border: 1.5px solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
 }
 .search:focus-within {
   outline: 3px solid var(--signal);
@@ -226,7 +222,7 @@ onMounted(async () => {
   outline: 0;
   background: transparent;
   color: var(--ink);
-  font: 400 1rem var(--body);
+  font: 400 0.95rem var(--body);
 }
 .search input::placeholder {
   color: var(--ink-soft);
@@ -237,13 +233,13 @@ onMounted(async () => {
   gap: 8px;
 }
 .site .chip {
-  font: 500 0.9rem var(--body);
-  padding: 7px 14px;
+  font: 500 0.82rem var(--body);
+  padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--ink-soft);
   text-decoration: none;
-  background: var(--paper);
+  background: var(--card);
 }
 .site .chip:hover {
   color: var(--ink);
@@ -261,19 +257,19 @@ onMounted(async () => {
   gap: 18px;
 }
 .count {
-  font: 600 0.75rem/1 var(--body);
-  letter-spacing: 0.14em;
+  font: 500 0.75rem/1 var(--mono);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
 .app-grid {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 18px;
 }
 .app-grid.single {
-  grid-template-columns: minmax(0, 560px);
+  grid-template-columns: minmax(0, 360px);
 }
 .state {
   display: grid;
@@ -295,30 +291,20 @@ onMounted(async () => {
 }
 
 .publish {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) auto;
-  gap: 32px;
-  align-items: end;
-  margin-block: 8px 72px;
-  padding: 34px;
-  border-radius: 26px;
-  background: var(--panel);
-}
-.publish .cta {
-  margin-top: 0;
+  margin-bottom: 56px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-@media (max-width: 900px) {
-  .app-grid,
-  .app-grid.single,
-  .publish {
+@media (max-width: 560px) {
+  .app-grid.single {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 620px) {
-  .publish {
-    padding: 22px;
   }
 }
 </style>

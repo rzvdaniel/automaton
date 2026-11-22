@@ -1,0 +1,129 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { isAxiosError } from 'axios'
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
+import { appsService } from '../services/apps.service'
+import type { App, AppSettingValue, ApplicationSettingDeclaration } from '../types/apps.types'
+import { formatWhen } from '../utils/app-overview'
+import AppRestartButton from './AppRestartButton.vue'
+
+const props = defineProps<{ appId: string; app: App; declared: ApplicationSettingDeclaration[] }>()
+/** The API moves values saved as secrets before settings had their own store into it on first read, so every plain value can be shown. */
+const values = ref<AppSettingValue[]>([])
+const editing = ref<string | null>(null)
+const value = ref('')
+const saving = ref(false)
+const error = ref<string | null>(null)
+const changed = ref(false)
+
+const rows = computed(() => props.declared.map((item) => ({ ...item, current: values.value.find((setting) => setting.name === item.name) })))
+
+onMounted(load)
+watch(() => props.appId, load)
+
+async function load() {
+  try {
+    values.value = await appsService.listSettingValues(props.appId)
+  } catch {
+    error.value = 'Settings could not be loaded.'
+  }
+}
+
+async function edit(name: string) {
+  editing.value = name
+  value.value = values.value.find((setting) => setting.name === name)?.value ?? rows.value.find((row) => row.name === name)?.default ?? ''
+  error.value = null
+  await nextTick()
+  document.getElementById('setting-value')?.focus()
+}
+
+function cancel() {
+  editing.value = null
+  error.value = null
+}
+
+function failureMessage(failure: unknown, fallback: string) {
+  return isAxiosError(failure) ? failure.response?.data?.message ?? fallback : fallback
+}
+
+async function save() {
+  if (!editing.value) return
+  if (!value.value.trim()) {
+    error.value = 'Enter a value, or use the default.'
+    return
+  }
+  saving.value = true
+  try {
+    await appsService.setSettingValue(props.appId, editing.value, value.value.trim())
+    editing.value = null
+    changed.value = true
+    await load()
+  } catch (failure) {
+    error.value = failureMessage(failure, 'The setting could not be saved.')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function useDefault(name: string) {
+  try {
+    await appsService.deleteSettingValue(props.appId, name)
+    changed.value = true
+    await load()
+  } catch (failure) {
+    error.value = failureMessage(failure, 'The setting could not be reset.')
+  }
+}
+</script>
+
+<template>
+  <section class="card" aria-labelledby="settings-title" data-testid="settings-card">
+    <div class="card-head">
+      <h2 id="settings-title">Settings</h2>
+      <AppRestartButton v-if="!app.isPaused && !app.actionsOnly" :app-id="appId" />
+    </div>
+    <p v-if="app.actionsOnly" class="hint" data-testid="settings-note">Plain values the app reads as environment variables. Changes apply on the next run.</p>
+    <p v-else class="hint" data-testid="settings-note">Plain values the app reads as environment variables. A change applies when the app restarts.</p>
+    <p v-if="changed && !app.isPaused && !app.actionsOnly" class="hint" data-testid="settings-restart-hint">Changed. Restart the app to apply it.</p>
+    <template v-for="item in rows" :key="item.name">
+      <form v-if="editing === item.name" class="row editing" data-testid="setting-row" @submit.prevent="save" @keydown.esc.prevent="cancel">
+        <label class="name" for="setting-value"><code>{{ item.name }}</code></label>
+        <InputText id="setting-value" v-model="value" class="field" autocomplete="off" />
+        <Button type="submit" label="Save setting" size="small" :loading="saving" />
+        <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
+      </form>
+      <div v-else class="row" data-testid="setting-row">
+        <span class="name">
+          <code>{{ item.name }}<span v-if="item.required" class="hint"> (required)</span></code>
+          <small v-if="item.description" class="desc" data-testid="setting-description">{{ item.description }}</small>
+        </span>
+        <span class="value hint">
+          <template v-if="item.current"><code data-testid="setting-current">{{ item.current.value }}</code> (custom, set {{ formatWhen(item.current.updatedAtUtc) }})</template>
+          <template v-else-if="item.default">default: <code>{{ item.default }}</code></template>
+          <template v-else>not set</template>
+        </span>
+        <span class="hint">
+          <button type="button" class="link" :aria-label="`Set ${item.name}`" @click="edit(item.name)">{{ item.current ? 'replace' : 'set' }}</button>
+          <template v-if="item.current"> · <button type="button" class="link" :aria-label="`Use the default for ${item.name}`" @click="useDefault(item.name)">use default</button></template>
+        </span>
+      </div>
+    </template>
+    <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+  </section>
+</template>
+
+<style scoped>
+.card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.hint { color: var(--ink-soft); font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 5px 0; border-bottom: 1px solid var(--row-line); }
+.name { display: flex; flex-direction: column; gap: 2px; flex: 0 1 220px; overflow-wrap: anywhere; }
+.desc { color: var(--ink-soft); font-size: 12px; }
+.value { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+code { font-family: var(--mono); font-size: 13px; }
+.link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+.field { flex: 1 1 200px; min-width: 0; }
+</style>

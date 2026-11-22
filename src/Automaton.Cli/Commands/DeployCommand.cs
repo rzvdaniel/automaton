@@ -8,7 +8,7 @@ using System.CommandLine.Invocation;
 namespace Automaton.Cli.Commands;
 
 /// <summary>
-/// automaton deploy [--clean] [--publish]
+/// automaton deploy [--clean] [--publish] [--resume]
 ///
 /// Workflow:
 ///   1. Read automaton.json for appId + application contract
@@ -47,8 +47,11 @@ public static class DeployCommand
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
         var environmentOption = new Option<string?>("--env", "Use a local project linkage/credential profile from ./.automaton/environments/<name>.json");
 
+        var resumeOption = new Option<bool>("--resume", "Resume the app after a successful deploy (a deploy otherwise keeps a paused app paused)");
+
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
+            resumeOption,
             targetArgument,
             runnerOption,
             cleanOption,
@@ -61,19 +64,40 @@ public static class DeployCommand
             environmentOption
         };
 
-        cmd.SetHandler(context => DeployCommandHandler.HandleAsync(
-            config,
-            context,
-            targetArgument,
-            runnerOption,
-            cleanOption,
-            dirOption,
-            jsonOption,
-            verboseOption,
-            publishOption,
-            openOption,
-            nonInteractiveOption,
-            environmentOption));
+        cmd.SetHandler(async context =>
+        {
+            await DeployCommandHandler.HandleAsync(
+                config,
+                context,
+                targetArgument,
+                runnerOption,
+                cleanOption,
+                dirOption,
+                jsonOption,
+                verboseOption,
+                publishOption,
+                openOption,
+                nonInteractiveOption,
+                environmentOption,
+                resumeOption);
+            // A paused app stays paused through a deploy, so it is resumed only once the deploy succeeded.
+            if (context.ParseResult.GetValueForOption(resumeOption) && context.ExitCode == 0)
+            {
+                try
+                {
+                    var resumed = await PauseCommand.ResumeLinkedAsync(
+                        config, context.ParseResult.GetValueForOption(environmentOption), context.GetCancellationToken());
+                    if (resumed && !context.ParseResult.GetValueForOption(jsonOption))
+                        AnsiConsole.MarkupLine("[green]The app is running again.[/]");
+                }
+                catch (Exception exception)
+                {
+                    if (context.ParseResult.GetValueForOption(jsonOption)) CliJson.Write(new { success = false, error = exception.Message });
+                    else AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(exception.Message)}");
+                    context.ExitCode = 1;
+                }
+            }
+        });
         return cmd;
     }
 
@@ -269,6 +293,7 @@ public static class DeployCommand
                     ? "[yellow bold]Deploy complete with warnings.[/]"
                     : "[green bold]Deploy complete.[/]");
             }
+            WriteWarnings(result, rich: true);
             WriteStaticSiteNote(result, rich: true);
         }
     }
@@ -395,12 +420,22 @@ public static class DeployCommand
         => !asJson && !alreadyWritten &&
            !string.IsNullOrWhiteSpace(appName) && !string.IsNullOrWhiteSpace(appId);
 
+    // The default profile is not worth naming; only a profile the person chose is.
+    internal static bool ShowProfile(string? profileName)
+        => !string.IsNullOrWhiteSpace(profileName) &&
+           !string.Equals(profileName, ConfigService.DefaultEnvironmentName, StringComparison.OrdinalIgnoreCase);
+
+    internal static string TargetLabel(DeploymentTargetInfo target)
+        => string.Equals(target.Name, target.Slug, StringComparison.OrdinalIgnoreCase)
+            ? target.Name
+            : $"{target.Name} ({target.Slug})";
+
     private static void WritePlainHeading(
         string appName, string appId, string? profileName, DeploymentTargetInfo target, string? server)
     {
         Console.WriteLine($"Deploying {appName} ({appId})");
-        Console.WriteLine($"Local profile: {profileName ?? "default credentials"}");
-        Console.WriteLine($"Deployment target: {target.Name} ({target.Slug})");
+        if (ShowProfile(profileName)) Console.WriteLine($"Local profile: {profileName}");
+        Console.WriteLine($"Deployment target: {TargetLabel(target)}");
         if (!string.IsNullOrWhiteSpace(server)) Console.WriteLine($"Server: {server}");
     }
 
@@ -408,8 +443,8 @@ public static class DeployCommand
         string appName, string appId, string? profileName, DeploymentTargetInfo target, string? server)
     {
         AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appName}[/] ({appId})");
-        AnsiConsole.MarkupLine($"[bold]Local profile:[/] {Markup.Escape(profileName ?? "default credentials")}");
-        AnsiConsole.MarkupLine($"[bold]Deployment target:[/] {Markup.Escape(target.Name)} ({Markup.Escape(target.Slug)})");
+        if (ShowProfile(profileName)) AnsiConsole.MarkupLine($"[bold]Local profile:[/] {Markup.Escape(profileName!)}");
+        AnsiConsole.MarkupLine($"[bold]Deployment target:[/] {Markup.Escape(TargetLabel(target))}");
         if (!string.IsNullOrWhiteSpace(server))
         {
             AnsiConsole.MarkupLine($"[bold]Server:[/] {Markup.Escape(server)}");
@@ -463,7 +498,18 @@ public static class DeployCommand
             {
                 Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
             }
+            WriteWarnings(result, rich: false);
             WriteStaticSiteNote(result, rich: false);
+        }
+    }
+
+    private static void WriteWarnings(DeployResult result, bool rich)
+    {
+        foreach (var check in result.Checks.Where(check => !check.Success && check.IsWarning))
+        {
+            var text = $"{check.Name}: {check.Message}";
+            if (rich) AnsiConsole.MarkupLine($" - [yellow]{Markup.Escape(text)}[/]");
+            else Console.WriteLine($" - {text}");
         }
     }
 
@@ -511,7 +557,7 @@ public static class DeployCommand
         CliJson.Write(new
         {
             success = deployResult.Success && publishResult.Success,
-            summary = publishResult.CertificatePending ? "Deployed and published, certificate pending"
+            summary = publishResult.CertificatePending ? "Deployed and published, but the HTTPS certificate request failed"
                 : publishResult.Success ? "Deploy and publish complete" : "Deploy complete, publish failed",
             deployed = deployResult.Success,
             published = publishResult.Success,

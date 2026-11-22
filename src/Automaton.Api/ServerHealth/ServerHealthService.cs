@@ -20,12 +20,13 @@ public sealed class ServerHealthService(
     public async Task<ServerHealthResponse> GetAsync(DateTime nowUtc, CancellationToken token)
     {
         var host = await reports.LatestAsync(token);
+        host = host is null ? null : host with { AppDisk = null, Fail2Ban = null };
         var backup = await InstallationBackups.ReadAsync(configuration, token);
         return new(nowUtc,
             await VersionAsync(token),
             host,
             host is null ? null : (int)Math.Max(0, (nowUtc - host.MeasuredAtUtc).TotalSeconds),
-            await RunnersAsync(token),
+            await RunnersAsync(nowUtc, token),
             await CertificatesAsync(nowUtc, token),
             new(backup.Available, backup.LastAttemptAt, backup.LastSuccessAt,
                 backup.LastSuccessAt is { } success ? Math.Round(Math.Max(0, (nowUtc - success.UtcDateTime).TotalHours), 1) : null,
@@ -42,19 +43,30 @@ public sealed class ServerHealthService(
     }
 
     // Only administrator-owned Machine Management Runners are listed.
-    private async Task<IReadOnlyList<ServerRunnerInfo>> RunnersAsync(CancellationToken token)
+    private async Task<IReadOnlyList<ServerRunnerInfo>> RunnersAsync(DateTime nowUtc, CancellationToken token)
     {
         var image = runnerOptions.Value.DockerImage;
         var runners = await db.Runners.AsNoTracking()
             .Where(item => item.ApplicationProfile == RunnerApplicationProfiles.MachineManagement && item.DeletionRequestedAtUtc == null)
             .OrderBy(item => item.Name)
-            .Select(item => new { item.Name, item.Status, item.Version, item.LastHeartbeatAtUtc, item.ImageDigest, item.InstallationId })
+            .Select(item => new { item.Name, item.Status, item.Version, item.LastHeartbeatAtUtc, item.ImageDigest, item.InstallationId, item.MachineHostHealthJson, item.MachineHostHealthMeasuredAtUtc })
             .ToListAsync(token);
-        return runners.Select(item => new ServerRunnerInfo(item.Name, item.Status, item.Version, item.LastHeartbeatAtUtc,
-            !string.IsNullOrEmpty(item.InstallationId) && !RunnerUpgradeService.IsCurrent(item.ImageDigest, image))).ToArray();
+        var reported = runners.Select(item => HostHealthReportService.Parse(item.MachineHostHealthJson)).ToArray();
+        var appIds = reported.SelectMany(host => host?.AppDisk ?? []).Select(usage => usage.AppId).Distinct().ToArray();
+        var names = await db.WebApps.AsNoTracking().Where(app => appIds.Contains(app.Id)).ToDictionaryAsync(app => app.Id, app => app.Name, token);
+        return runners.Select((item, index) =>
+        {
+            var host = reported[index];
+            var apps = host?.AppDisk?.Select(usage => AppDiskUsageResponse.From(usage, names.GetValueOrDefault(usage.AppId), host.MeasuredAtUtc))
+                .OrderByDescending(usage => usage.TotalBytes).ToArray();
+            host = host is null ? null : host with { AppDisk = null, Fail2Ban = null };
+            return new ServerRunnerInfo(item.Name, item.Status, item.Version, item.LastHeartbeatAtUtc,
+                !string.IsNullOrEmpty(item.InstallationId) && !RunnerUpgradeService.IsCurrent(item.ImageDigest, image),
+                host, host is null ? null : (int)Math.Max(0, (nowUtc - host.MeasuredAtUtc).TotalSeconds), apps);
+        }).ToArray();
     }
 
-    private async Task<IReadOnlyList<CertificateInfo>> CertificatesAsync(DateTime nowUtc, CancellationToken token)
+    public async Task<IReadOnlyList<CertificateInfo>> CertificatesAsync(DateTime nowUtc, CancellationToken token)
     {
         var hosts = new[] { appConfiguration.WebsiteUrl, runnerOptions.Value.ServerUrl }
             .Select(url => Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps ? uri.Host : null)

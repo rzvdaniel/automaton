@@ -1,9 +1,10 @@
 import type { AppListItem } from '../types/apps.types'
+import { getPublishedAppUrl, getStudioApplicationUrl } from './public-app-url'
 
 export type AppFilter = 'all' | 'web' | 'actions' | 'stopped'
 export type AppKind = 'Web app' | 'Website' | 'Action'
-export type AppAccess = 'private' | 'public' | 'action'
-export type AppStateTone = 'live' | 'ok' | 'stopped'
+
+export type AppStateTone = 'live' | 'ok' | 'stopped' | 'failing'
 
 export interface AppState {
   label: string
@@ -38,18 +39,24 @@ export function appKind(app: AppListItem): AppKind {
   return app.liveEnvironment?.isStaticHosting ? 'Website' : 'Web app'
 }
 
-/** The list data has no per-app visibility or team flag, so access is public when it can launch publicly. */
-export function appAccess(app: AppListItem): AppAccess {
-  if (app.actionsOnly) return 'action'
-  return app.canLaunchPublicly ? 'public' : 'private'
-}
 
 export function appDescription(app: AppListItem): string {
   const text = (app.summary || app.description || '').trim()
-  return text ? `${appKind(app)} · ${text}` : appKind(app)
+  const parts = [appKind(app), text, nextRunLabel(app)].filter(Boolean)
+  return parts.join(' · ')
+}
+
+/** "next run 02:00" today, otherwise with the date; empty when no schedule is enabled. */
+export function nextRunLabel(app: AppListItem, now = new Date()): string {
+  if (!app.actionsOnly || !app.nextActionRunAtUtc) return ''
+  const next = new Date(app.nextActionRunAtUtc)
+  if (Number.isNaN(next.getTime())) return ''
+  const time = next.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return next.toDateString() === now.toDateString() ? `next run ${time}` : `next run ${next.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`
 }
 
 export function isStopped(app: AppListItem): boolean {
+  if (app.isPaused) return true
   if (app.actionsOnly) return false
   const environment = app.liveEnvironment
   if (!environment) return app.runner?.connectivityStatus !== 'Online'
@@ -58,12 +65,15 @@ export function isStopped(app: AppListItem): boolean {
 
 /** The list data has no schedule, so an action shows when it last ran. */
 export function appState(app: AppListItem): AppState {
+  if (app.isPaused) return { label: 'paused', tone: 'stopped' }
   if (app.actionsOnly) {
     const run = app.lastActionRun
     if (!run) return { label: 'no runs yet', tone: 'stopped' }
     const ok = run.status === 'Succeeded'
-    return { label: `${ok ? 'ran' : run.status.toLowerCase()} ${formatShortTime(run.createdAtUtc)}`, tone: ok ? 'ok' : 'stopped' }
+    const failed = ['Failed', 'TimedOut', 'Lost', 'RunnerUnavailable'].includes(run.status)
+    return { label: failed ? 'failing' : `${ok ? 'ran' : run.status.toLowerCase()} ${formatShortTime(run.createdAtUtc)}`, tone: ok ? 'ok' : failed ? 'failing' : 'stopped' }
   }
+  if (app.liveEnvironment?.status === 'Failed') return { label: 'failing', tone: 'failing' }
   return isStopped(app) ? { label: 'stopped', tone: 'stopped' } : { label: 'live', tone: 'live' }
 }
 
@@ -88,4 +98,16 @@ export function matchesSearch(app: AppListItem, query: string): boolean {
   const needle = query.trim().toLowerCase()
   if (!needle) return true
   return [app.name, app.summary, app.description, ...app.tags].some((text) => text?.toLowerCase().includes(needle))
+}
+
+/** Official apps are named "Automaton Flow Check"; the list already says it is Automaton's, so drop the prefix. */
+export function catalogName(name: string): string {
+  const short = name.replace(/^Automaton\s+/i, '').trim()
+  return short || name
+}
+
+/** Where the app itself opens, or '' when it has no screen: the same check as the app page's Open app button (an Actions-only or not-yet-deployed app has none). */
+export function appOpenUrl(app: AppListItem): string {
+  if (app.actionsOnly || !app.liveEnvironment?.genericRuntimeDeployed) return ''
+  return app.canLaunchPublicly && app.publicUrl ? getPublishedAppUrl(app.publicUrl) : getStudioApplicationUrl(app.id)
 }

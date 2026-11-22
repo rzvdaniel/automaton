@@ -1,6 +1,7 @@
 ---
 title: Publish your own app catalog
 description: The format of an apps repository (catalog.json, catalog-apps.json, app folders) and how to create one with automaton catalog init and add it as a catalog source.
+order: 135
 ---
 
 # Publish your own app catalog
@@ -22,6 +23,8 @@ git remote add origin https://github.com/<you>/my-apps.git && git push -u origin
 A system administrator then opens **Apps → Catalog → Catalog sources** in Studio and adds `https://github.com/<you>/my-apps`. The form labels every field (repository address, optional branch and name, read token) with help text; leave the branch empty for the default branch. The server reads `catalog.json` before saving the source, says why if it cannot, and tells you how many apps the source added. For a private repository, add a fine-grained, read-only token with Contents access to that one repository: the server stores it encrypted, uses it only to read the catalog and to download apps the catalog lists, and never shows it again. The source's apps then appear in the Catalog tab with the source's name; select **Install** to install one. See [Deploy and publish an app](./deploy).
 
 Only add sources you trust: an app is code that runs on your Runners.
+
+The official catalog lists the essentials. Showcase apps, games and experiments (GoatCounter, linkding, Harbour and others) are in the [automaton.monster store](https://github.com/rzvdaniel/automaton-monster): add `https://github.com/rzvdaniel/automaton-monster` as a source to list them. An app you installed from the official catalog before it moved keeps running; it gets updates again once the store is a turned-on source.
 
 ## Manage sources from the terminal
 
@@ -71,6 +74,8 @@ You edit this file. Each entry names an app folder:
 - `category` (required): a short label shown on the entry.
 - `minServerVersion` (required): the oldest Automaton Server that can run the app, as `1.2.3`. Servers older than that show the entry but do not offer Install.
 - `repo` (optional): `owner/name`. When it is missing the build uses `--repo` or the `GITHUB_REPOSITORY` variable that GitHub Actions sets.
+- `publisher` (optional, `{ "name": "Acme", "logo": "https://…/logo.svg" }`): who publishes the app; the build copies it into `catalog.json` and the Catalog tab shows it on the app. `name` is required when `publisher` is present, `logo` is an optional `https` image address. The build leaves the field out when you do not set it. Only apps from the official catalog can show the verified tick, whatever name you give.
+- `movedFrom` (optional, `{ "repo": "rzvdaniel/automaton-apps", "folder": "…" }`): the app used to be in the official catalog at that folder. A server that installed it there finds it again here, shows it as installed, and updates it from this catalog (it then records this repository and folder). It works only when the source that lists it is turned on, only for apps that left the official catalog, and an exact match in another source always wins.
 
 ## Large catalogs
 

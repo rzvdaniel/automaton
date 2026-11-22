@@ -35,7 +35,7 @@ public sealed class AppActionDurableOperationTests
             var app = Guid.NewGuid(); var target = Guid.NewGuid();
             Db.AppModuleExecutions.Add(new() { Id = Id, AppId = app, DeploymentTargetId = target, RunnerId = RunnerId,
                 Status = "Dispatching", ModuleKey = "acceptance", ModuleType = "Action", TriggerType = "Manual", ExecutionDeadlineUtc = DateTime.UtcNow.AddMinutes(1) });
-            await Service.QueueAsync(RunnerId, Guid.NewGuid(), new(null, null, AppActionCommand.Create("execute",
+            await Service.QueueAsync(RunnerId, Guid.NewGuid(), new( AppActionCommand.Create("execute",
                 new ExecuteAppActionModuleRequest { ExecutionId = Id, AppId = app, DeploymentTargetId = target, ActionKey = "acceptance",
                     Input = JsonSerializer.SerializeToElement(new { value = "private-value" }) })), CancellationToken.None, Id);
         }

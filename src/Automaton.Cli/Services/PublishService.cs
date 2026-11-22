@@ -38,8 +38,10 @@ public sealed class PublishService
 
             if (FindEmptyAppProblem(app, directory) is { } emptyApp)
             {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, emptyApp));
-                nextSteps.Add(EmptyAppHint);
+                var (message, hints) = await DescribeEmptyAppAsync(
+                    emptyApp, () => FindLastDeployErrorAsync(client, context.AppId, cancellationToken));
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, message));
+                foreach (var hint in hints) nextSteps.Add(hint);
                 return new PublishResult
                 {
                     Success = false,
@@ -82,6 +84,32 @@ public sealed class PublishService
                 StudioAppUrl = string.Empty
             };
         }
+    }
+
+    private static async Task<string?> FindLastDeployErrorAsync(
+        AutomatonApiClient client, string appId, CancellationToken cancellationToken)
+        => PickDeployError(await client.ListDeploymentTargetsAsync(appId, cancellationToken));
+
+    /// <summary>The default (Live) target is the one publish uses, so its error wins over other targets' errors.</summary>
+    internal static string? PickDeployError(IEnumerable<DeploymentTargetInfo> targets)
+    {
+        var list = targets.ToList();
+        return list.Where(t => t.IsDefault).Concat(list.Where(t => !t.IsDefault))
+            .Select(t => t.LastDeploymentError).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+    }
+
+    /// <summary>The deploy lookup is best-effort: any failure falls back to the empty-app message alone.</summary>
+    internal static async Task<(string Message, string[] Hints)> DescribeEmptyAppAsync(
+        string emptyApp, Func<Task<string?>> findDeployError)
+    {
+        string? failedDeploy = null;
+        try { failedDeploy = await findDeployError(); }
+        catch (Exception) { /* keep the empty-app message */ }
+        const string fixDeploy = "Fix the deploy error, run automaton deploy until it succeeds, then publish";
+        var notDeployed = emptyApp == NotDeployedMessage;
+        if (failedDeploy is null) return (emptyApp, [notDeployed ? NotDeployedHint : EmptyAppHint]);
+        return ($"{emptyApp}; the last deploy {(notDeployed ? "" : "also ")}failed: {failedDeploy}",
+            notDeployed ? [fixDeploy] : [EmptyAppHint, fixDeploy]);
     }
 
     private PublishContextResolution ResolvePublishContext(
@@ -221,25 +249,28 @@ public sealed class PublishService
         CancellationToken cancellationToken)
     {
         var publishedUrl = CliAppUrlBuilder.BuildPublishedUrl(context.Server, settings.Slug);
-        var certificatePending = true;
+        string? certificateError = "the check was cancelled";
         try
         {
-            certificatePending = !await PublishedCertificate.WaitAsync(new Uri(publishedUrl), cancellationToken);
+            certificateError = await PublishedCertificate.CheckAsync(new Uri(publishedUrl), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Publication already succeeded. Only the certificate check was cancelled.
         }
+        var certificatePending = certificateError is not null;
         var resultChecks = checks.ToList();
         resultChecks.Add(new CommandDiagnosticCheck(
             CommandDiagnosticCheckNames.Publish, true, $"published at {publishedUrl}"));
         return new PublishResult
         {
             Success = true,
-            Summary = certificatePending ? "Published, certificate pending" : "Publish complete",
+            Summary = certificatePending ? "Published, but the HTTPS certificate request failed" : "Publish complete",
             CertificatePending = certificatePending,
             Checks = resultChecks,
-            NextSteps = certificatePending ? ["Retry opening the public URL in a minute"] : [],
+            NextSteps = certificatePending
+                ? [$"The server could not get a valid certificate for {new Uri(publishedUrl).Host} ({certificateError}). Often Let's Encrypt refused it (weekly limit) or DNS for the host is missing; see \"If HTTPS setup fails\" in the install guide, then rerun the server installer or restart Traefik and publish again"]
+                : [],
             AppId = context.AppId,
             AppName = context.AppConfig.Name,
             Slug = settings.Slug,
@@ -291,19 +322,42 @@ public sealed class PublishService
     internal const string EmptyAppHint =
         "Declare a runtime command, a static-site build command and output directory, or at least one Action for an Actions-only app";
 
-    /// <summary>An app with no runtime, static site, compose file or Action would publish an empty page.</summary>
+    internal const string NotDeployedMessage = "this app has no successful deploy yet, so there is nothing to publish";
+    internal const string NotDeployedHint = "Run automaton deploy until it succeeds, then publish";
+
+    /// <summary>
+    /// An app with no runtime, static site, compose file or Action would publish an empty page. The app on the
+    /// server has none until a deploy succeeds, so a runtime declared only in the local automaton.json means the
+    /// app is not deployed yet, not that it declares nothing.
+    /// </summary>
     internal static string? FindEmptyAppProblem(JsonElement app, string directory)
     {
-        if (app.TryGetProperty("application", out var application) && application.ValueKind == JsonValueKind.Object)
-        {
-            if (TryReadBool(application, "isStaticSite") == true) return null;
-            if (HasValue(application, "compose")) return null;
-            if (application.TryGetProperty("runtime", out var runtime) && runtime.ValueKind == JsonValueKind.Object
-                && HasValue(runtime, "command")) return null;
-        }
-        return Core.Models.AppActionManifestParser.Discover(directory).Count > 0
-            ? null
+        if (DeclaresRuntime(app) || Core.Models.AppActionManifestParser.Discover(directory).Count > 0) return null;
+        return DeclaresLocalRuntime(directory)
+            ? NotDeployedMessage
             : "this app declares no runtime command, static site or Action, so there is nothing to publish";
+    }
+
+    private static bool DeclaresRuntime(JsonElement app)
+        => app.TryGetProperty("application", out var application) && application.ValueKind == JsonValueKind.Object
+            && (TryReadBool(application, "isStaticSite") == true
+                || HasValue(application, "compose")
+                || (application.TryGetProperty("runtime", out var runtime) && runtime.ValueKind == JsonValueKind.Object
+                    && HasValue(runtime, "command")));
+
+    private static bool DeclaresLocalRuntime(string directory)
+    {
+        try
+        {
+            var path = Path.Combine(directory, "automaton.json");
+            if (!File.Exists(path)) return false;
+            using var local = JsonDocument.Parse(File.ReadAllText(path));
+            return DeclaresRuntime(local.RootElement);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static bool HasValue(JsonElement element, string propertyName)

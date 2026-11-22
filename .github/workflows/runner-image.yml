@@ -8,8 +8,6 @@ on:
       - '.github/workflows/runner-image.yml'
       - 'src/Automaton.Runner/**'
       - 'src/Automaton.Core/**'
-      - 'src/Automaton.Core.Scripting/**'
-      - 'src/Automaton.Steps/**'
       - 'src/Automaton.Ai/**'
       - 'src/Automaton.AiGuidance/**'
       - 'src/Automaton.Mcp/**'

@@ -9,17 +9,17 @@ import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
 import { adminUsersService, type AdminProvisionedUser } from '../services/adminUsersService'
 
-const props = defineProps<{ canGrantAdministrator: boolean }>()
+type Mode = 'invite' | 'create'
+const props = withDefaults(defineProps<{ canGrantAdministrator: boolean; initialMode?: Mode }>(), { initialMode: 'invite' })
 const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{ added: [user: AdminProvisionedUser] }>()
 
-type Mode = 'invite' | 'create'
 const modes = [
   { label: 'Invite by email', value: 'invite' as Mode },
   { label: 'Create with password', value: 'create' as Mode },
 ]
 
-const mode = ref<Mode>('invite')
+const mode = ref<Mode>(props.initialMode)
 const email = ref('')
 const name = ref('')
 const password = ref('')
@@ -36,7 +36,7 @@ const canSubmit = computed(() =>
   email.value.trim().length > 3 && (mode.value === 'invite' || generatePassword.value || password.value.length > 0))
 
 function reset() {
-  mode.value = 'invite'
+  mode.value = props.initialMode
   email.value = ''
   name.value = ''
   password.value = ''

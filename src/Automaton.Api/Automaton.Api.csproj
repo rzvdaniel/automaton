@@ -13,6 +13,8 @@
 	<ItemGroup>
     <PackageReference Include="Destructurama.Attributed" Version="4.0.0" />
     <PackageReference Include="Destructurama.JsonNet" Version="3.0.0" />
+    <PackageReference Include="DnsClient" Version="1.8.0" />
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageReference Include="DotNetCore.CAP" Version="10.0.1" />
     <PackageReference Include="DotNetCore.CAP.PostgreSql" Version="10.0.1" />
     <PackageReference Include="DotNetCore.CAP.RabbitMQ" Version="10.0.1" />
@@ -49,12 +51,10 @@
     <PackageReference Include="Stripe.net" Version="50.4.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.1.0" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
-    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
     <ProjectReference Include="..\Automaton.Messaging\Automaton.Messaging.csproj" />
-    <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
     <ProjectReference Include="..\Automaton.Ai\Automaton.Ai.csproj" />
     <ProjectReference Include="..\Automaton.Mcp\Automaton.Mcp.csproj" />
     <ProjectReference Include="..\Automaton.Infrastructure\Automaton.Infrastructure.csproj" />
@@ -91,10 +91,6 @@
 	  <None Include="SystemPrompts\ExternalMcpInstructions.md">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-    <Content Include="Documentation\Admin\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <Watch Remove="AppData\media\**\*" />

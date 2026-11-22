@@ -1,22 +1,38 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import AppFilterBar from '../components/AppFilterBar.vue'
 import AppRow from '../components/AppRow.vue'
+import PinToHomeButton from '@/features/home/components/PinToHomeButton.vue'
+import { useHomeStore } from '@/features/home/stores/home.store'
 import NewAppDialog from '../components/NewAppDialog.vue'
 import CatalogPanel from '../components/CatalogPanel.vue'
 import SharedAppsSection from '../components/SharedAppsSection.vue'
+import { adminAppsService } from '@/features/admin/services/adminAppsService'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { organizationsService, type OrganizationAppSummary } from '@/features/organizations/services/organizationsService'
 import { useAppsStore } from '../stores/apps.store'
+import { APP_START_PROGRESS } from '../utils/app-action-error'
 import {
-  appAccess, appDescription, appState, matchesFilter, matchesSearch, type AppFilter,
+  appDescription, appState, matchesFilter, matchesSearch, type AppFilter,
+  appOpenUrl,
 } from '../utils/app-list-display'
 
 const router = useRouter()
 const route = useRoute()
 const appsStore = useAppsStore()
+const homeStore = useHomeStore()
+
+// Notice for system administrators when permission requests are waiting.
+const authStore = useAuthStore()
+const waitingRequests = ref(0)
+onMounted(async () => {
+  if (authStore.user?.roles?.includes('SysAdmin')) waitingRequests.value = await adminAppsService.waitingCount()
+})
 
 // Tab state: the Apps list or the Catalog.
 const activeTabIndex = ref(route.meta.appsTab === 'catalog' ? 1 : 0)
@@ -55,6 +71,7 @@ onMounted(async () => {
   } catch {
     // Error is handled in the store
   }
+  void homeStore.ensureLoaded()
   await loadSharedApps()
 })
 
@@ -65,6 +82,27 @@ onUnmounted(() => {
 const goToCatalog = () => router.push({ name: 'apps-catalog' })
 const showNewApp = ref(false)
 const newApp = () => { showNewApp.value = true }
+
+const toast = useToast()
+const pausing = ref<string | null>(null)
+
+/** Pauses or resumes one app; the row shows the new state when the server has answered. */
+async function togglePaused(id: string, name: string, paused: boolean) {
+  pausing.value = id
+  if (!paused) toast.add({ severity: 'info', summary: 'Resuming', detail: APP_START_PROGRESS, life: 6000 })
+  try {
+    const warnings = await appsStore.setAppPaused(id, paused)
+    if (warnings.length > 0) {
+      toast.add({ severity: 'warn', summary: paused ? 'Paused with warnings' : 'Resumed with warnings', detail: warnings.join(' '), life: 8000 })
+      return
+    }
+    toast.add({ severity: 'success', summary: paused ? 'Paused' : 'Resumed', detail: `"${name}" is ${paused ? 'paused' : 'running again'}`, life: 3000 })
+  } catch (err: unknown) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err instanceof Error ? err.message : 'Could not change the app', life: 5000 })
+  } finally {
+    pausing.value = null
+  }
+}
 
 const handleRetry = async () => {
   appsStore.clearError()
@@ -91,24 +129,22 @@ const handleRetry = async () => {
         </div>
       </header>
 
-      <div v-if="appsStore.hasApps" class="apps-toolbar">
-        <label class="apps-search">
-          <span class="sr-only">Search apps</span>
-          <i class="pi pi-search" aria-hidden="true" />
-          <input v-model="searchQuery" type="search" placeholder="Search apps" />
-        </label>
-        <div class="apps-pills" role="group" aria-label="Filter apps">
-          <button
-            v-for="pill in filterPills"
-            :key="pill.value"
-            type="button"
-            class="apps-pill"
-            :class="{ 'apps-pill--active': filter === pill.value }"
-            :aria-pressed="filter === pill.value"
-            @click="filter = pill.value"
-          >{{ pill.label }}</button>
-        </div>
-      </div>
+      <p v-if="waitingRequests > 0" class="apps-waiting" data-testid="waiting-notice">
+        <RouterLink to="/admin/apps?waiting=true">
+          {{ waitingRequests }} permission {{ waitingRequests === 1 ? 'request is' : 'requests are' }} waiting
+        </RouterLink>
+      </p>
+
+      <AppFilterBar
+        v-if="appsStore.hasApps"
+        v-model:search="searchQuery"
+        label="Search apps"
+        group-label="Filter apps"
+        placeholder="Search apps"
+        :pills="filterPills"
+        :active="(value) => filter === value"
+        @select="filter = $event as AppFilter"
+      />
 
       <div v-if="appsStore.isLoading" class="apps-card" aria-busy="true">
         <Skeleton v-for="i in 4" :key="i" height="68px" border-radius="12px" />
@@ -128,12 +164,33 @@ const handleRetry = async () => {
             :id="app.id"
             :key="app.id"
             :to="`/apps/${app.id}`"
+            :href="appOpenUrl(app)"
             :name="app.name"
             :line="appDescription(app)"
             :image-url="app.thumbnailUrl"
-            :access="appAccess(app)"
             :state="appState(app)"
-          />
+          >
+            <template #action>
+              <RouterLink
+                v-if="appOpenUrl(app)" :to="`/apps/${app.id}`" class="p-button p-button-text p-button-secondary p-button-icon-only mr-1"
+                :aria-label="`${app.name} settings`" title="Automaton page" data-testid="app-settings"
+              >
+                <i class="pi pi-cog" />
+              </RouterLink>
+              <PinToHomeButton :app-id="app.id" :app-name="app.name" compact class="mr-2" />
+              <Button
+                v-if="app.canUpdate"
+                :label="app.isPaused ? 'Resume' : 'Pause'"
+                :icon="app.isPaused ? 'pi pi-play' : 'pi pi-pause'"
+                size="small"
+                severity="secondary"
+                outlined
+                :loading="pausing === app.id"
+                :aria-label="`${app.isPaused ? 'Resume' : 'Pause'} ${app.name}`"
+                @click="togglePaused(app.id, app.name, !app.isPaused)"
+              />
+            </template>
+          </AppRow>
         </div>
 
         <div v-else-if="appsStore.hasApps" class="apps-card apps-empty">
@@ -168,26 +225,12 @@ const handleRetry = async () => {
 .apps-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .apps-head__title { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); }
 .apps-head__line { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; max-width: 52ch; }
+.apps-waiting { margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--signal); border-radius: var(--radius-card); font-size: 14px; }
+.apps-waiting a { color: var(--signal-ink); font-weight: 600; }
 .apps-head__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-ink.p-button { min-height: 44px; background: var(--ink); border-color: var(--ink); color: var(--paper); border-radius: 999px; font-weight: 600; }
 .btn-ink.p-button:hover { background: var(--ink); border-color: var(--signal); color: var(--paper); }
 .btn-outline.p-button { min-height: 44px; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; font-weight: 600; }
-.apps-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
-.apps-search { position: relative; flex: 1 1 240px; max-width: 360px; }
-.apps-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); }
-.apps-search input {
-  width: 100%; min-height: 44px; padding: 8px 12px 8px 34px; box-sizing: border-box;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px;
-}
-.apps-search input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.apps-pills { display: flex; flex-wrap: wrap; gap: 8px; }
-.apps-pill {
-  min-height: 44px; padding: 6px 16px; border: 1px solid var(--line); border-radius: 999px;
-  background: transparent; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
-}
-.apps-pill--active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-.apps-pill:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 .apps-card {
   display: flex; flex-direction: column; gap: 8px; padding: 16px;
   background: var(--paper); border: 1px solid var(--line); border-radius: 18px;

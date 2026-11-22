@@ -11,6 +11,8 @@ public static class HostContainerOperationKinds
     public const string InspectComposeProject = "inspect-compose-project";
     public const string RemoveComposeProject = "remove-compose-project";
     public const string StartContainer = "start-container";
+    public const string StopContainer = "stop-container";
+    public const string EnableAutoRestart = "enable-auto-restart";
     public const string InspectContainer = "inspect-container";
     public const string GetContainerLogs = "get-container-logs";
     public const string RemoveContainer = "remove-container";
@@ -48,7 +50,7 @@ public sealed record HostContainerResourceRef(
 public sealed record HostContainerResourceLimits(decimal CpuLimitCores, int MemoryLimitMb, int PidsLimit)
 {
     public bool IsValid() => CpuLimitCores is >= 0.10m and <= 8.0m
-        && MemoryLimitMb is >= 256 and <= 16_384
+        && MemoryLimitMb is >= 64 and <= 16_384
         && PidsLimit is >= 32 and <= 4096;
 }
 
@@ -109,6 +111,10 @@ public sealed record HostContainerExecutionResponse
     public string ContainerId { get; init; } = string.Empty;
     public string ContainerName { get; init; } = string.Empty;
     public bool Running { get; init; }
+    /// <summary>Docker is waiting to start the container again after it exited (a crash loop).</summary>
+    public bool Restarting { get; init; }
+    /// <summary>Docker's count of automatic restarts of this container.</summary>
+    public int RestartCount { get; init; }
     public bool Exists { get; init; }
     public string? HostAddress { get; init; }
     public int? HostPort { get; init; }

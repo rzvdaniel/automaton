@@ -27,7 +27,7 @@ function openCatalog() {
       <p class="small">
         First time? Install and approve the CLI, then the agent can work:
       </p>
-      <CopyCommand class="box" command="dotnet tool install -g Automaton.Cli" />
+      <CopyCommand class="box" command="curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh" />
       <CopyCommand class="box" command="automaton login" />
       <p class="small">
         Studio asks you to approve the login. Approved agents and API keys are listed under

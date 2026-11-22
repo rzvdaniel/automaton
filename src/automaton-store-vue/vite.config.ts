@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@site-nav': path.resolve(__dirname, '../../shared/site-nav'),
     },
   },
   server: {

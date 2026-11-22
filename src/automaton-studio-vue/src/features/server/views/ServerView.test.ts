@@ -1,19 +1,38 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
 import ServerView from './ServerView.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
+import { serverConsoleService } from '../services/server-console.service'
 import { installService } from '@/features/install/services/install.service'
 import { serverHealthService } from '../services/server-health.service'
-import type { ServerHealth } from '../types/server.types'
+import { serverCleanupService } from '../services/server-cleanup.service'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
+import type { ServerCleanup, ServerHealth } from '../types/server.types'
+
+const cleanupBody = (): ServerCleanup => ({
+  settings: { timeUtc: '05:00', keepDays: 7, journalLimitMb: 200 },
+  nextRunAtUtc: '2026-11-14T05:00:00Z',
+  runs: [{
+    id: 'c1', runnerName: 'runner-01', startedAtUtc: '2026-11-13T05:12:00Z', finishedAtUtc: '2026-11-13T05:13:00Z',
+    result: 'Succeeded', bytesFreed: 1.8 * 1024 ** 3, trigger: 'Scheduled', message: null,
+  }, {
+    id: 'c2', runnerName: 'Renamed Twice', startedAtUtc: '2026-11-13T05:12:00Z', finishedAtUtc: '2026-11-13T05:12:01Z',
+    result: 'Failed', bytesFreed: 0, trigger: 'Scheduled', message: 'Runner too old',
+  }],
+})
 
 vi.mock('@/features/runners/services/runners.service', () => ({ runnersService: { list: vi.fn() } }))
 vi.mock('@/features/install/services/install.service', () => ({ installService: { getUpdate: vi.fn(), startUpdate: vi.fn() } }))
+vi.mock('../services/server-console.service', () => ({ serverConsoleService: { get: vi.fn(), install: vi.fn() } }))
 vi.mock('../services/server-health.service', () => ({ serverHealthService: { get: vi.fn() } }))
+vi.mock('../services/server-cleanup.service', () => ({
+  serverCleanupService: { get: vi.fn(), saveSettings: vi.fn(), run: vi.fn() },
+}))
 vi.mock('@/features/runners/components/SelfHostedRunnerInstallDialog.vue', () => ({
   default: { props: ['visible'], template: '<div data-testid="install-dialog" :data-visible="visible" />' },
 }))
@@ -35,31 +54,125 @@ const runner = (overrides = {}) => ({
   operatingSystem: 'Ubuntu 24.04', appCount: 3, version: '0.2.6', upgradeAvailable: false, ...overrides,
 })
 
-const mountView = () => mount(ServerView, {
-  attachTo: document.body,
-  global: { plugins: [createPinia(), PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} } },
-})
+const mountView = (roles: string[] = ['User']) => {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  useAuthStore().user = { roles } as never
+  return mount(ServerView, {
+    attachTo: document.body,
+    global: { plugins: [pinia, PrimeVue, ConfirmationService, ToastService], directives: { tooltip: {} }, stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } },
+  })
+}
 
 describe('ServerView', () => {
   beforeEach(() => {
     vi.mocked(runnersService.list).mockReset().mockResolvedValue([runner()] as never)
+    vi.mocked(serverConsoleService.install).mockReset().mockResolvedValue({ appId: 'sc1', running: false })
+    vi.mocked(serverConsoleService.get).mockReset().mockResolvedValue({ appId: null, running: false })
     vi.mocked(serverHealthService.get).mockReset().mockResolvedValue(health(false))
     vi.mocked(installService.getUpdate).mockReset().mockResolvedValue({
       currentVersion: 'server-v1', triggerAvailable: true, run: null, log: null, stale: false, requestPending: false, requestAgeSeconds: null, hint: null,
     })
     vi.mocked(installService.startUpdate).mockReset().mockResolvedValue()
+    vi.mocked(serverCleanupService.get).mockReset().mockResolvedValue(cleanupBody())
+    vi.mocked(serverCleanupService.saveSettings).mockReset().mockResolvedValue(cleanupBody())
+    vi.mocked(serverCleanupService.run).mockReset().mockResolvedValue(cleanupBody())
   })
 
-  it('shows the health tiles and each Runner with OS, apps and version', async () => {
+  it('shows the cleanup only to system administrators', async () => {
+    for (const roles of [['User'], ['Admin']]) {
+      const plain = mountView(roles)
+      await flushPromises()
+      expect(plain.find('[data-testid="cleanup-section"]').exists()).toBe(false)
+      plain.unmount()
+    }
+    expect(serverCleanupService.get).not.toHaveBeenCalled()
+
+    const wrapper = mountView(['Admin', 'SysAdmin'])
+    await flushPromises()
+    expect(wrapper.get('[data-testid="cleanup-line"]').text()).toContain('nightly at 05:00')
+    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toBe('last run freed 1.8 GB')
+    expect(wrapper.find('[data-testid="cleanup-line"]').classes()).not.toContain('text-red-500')
+    expect(wrapper.find('[data-testid="cleanup-run"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cleanup-save"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('links the cleanup line to Server Console when it is installed', async () => {
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1' } as never)
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    expect(wrapper.get('[data-testid="cleanup-manage"]').attributes('href')).toBe('/apps/sc1')
+    expect(wrapper.find('[data-testid="cleanup-install"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('turns the cleanup line red with the error when the last run failed', async () => {
+    const body = cleanupBody()
+    body.runs = [body.runs[1]!]
+    vi.mocked(serverCleanupService.get).mockResolvedValue(body)
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    expect(wrapper.get('[data-testid="cleanup-line"]').classes()).toContain('text-red-500')
+    expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('Runner too old')
+    wrapper.unmount()
+  })
+
+  it('offers to install Server Console from the cleanup line when it is missing', async () => {
+    vi.mocked(serverConsoleService.get).mockRejectedValue(new Error('none'))
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    expect(wrapper.find('[data-testid="cleanup-manage"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="cleanup-install"]').trigger('click')
+    await flushPromises()
+    expect(serverConsoleService.install).toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('shows each Runner with OS, apps and version and no health cards', async () => {
     const wrapper = mountView()
     await flushPromises()
-    expect(wrapper.get('[data-testid="tile-disk"]').text()).toContain('50% used')
-    expect(wrapper.get('[data-testid="tile-updates"]').text()).toContain('3 pending')
-    expect(wrapper.get('[data-testid="tile-backup"]').text()).toContain('7 hours ago')
+    expect(wrapper.find('[data-testid="health-tiles"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="host-os"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Automaton server-v1')
     expect(wrapper.get('[data-testid="runner-os"]').text()).toBe('Ubuntu 24.04')
     expect(wrapper.get('[data-testid="runner-apps"]').text()).toBe('3')
     expect(wrapper.get('[data-testid="runner-version"]').text()).toBe('0.2.6')
     expect(wrapper.find('[data-testid="update-available"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="server-console-link"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="server-console-notice"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('links a system administrator to Server Console, or says how to install it', async () => {
+    const missing = mountView(['SysAdmin'])
+    await flushPromises()
+    expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('not installed')
+    expect(serverConsoleService.install).not.toHaveBeenCalled()
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1', running: false })
+    await missing.get('[data-testid="server-console-install"]').trigger('click')
+    await flushPromises()
+    expect(serverConsoleService.install).toHaveBeenCalledTimes(1)
+    expect(missing.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
+    expect(missing.find('[data-testid="server-console-notice"]').exists()).toBe(false)
+    missing.unmount()
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: null, running: false })
+
+    vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1', running: false })
+    const installed = mountView(['SysAdmin'])
+    await flushPromises()
+    expect(installed.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
+    expect(installed.find('[data-testid="server-console-notice"]').exists()).toBe(false)
+    installed.unmount()
+  })
+
+  it('says why Server Console could not be installed', async () => {
+    vi.mocked(serverConsoleService.install).mockRejectedValue({ isAxiosError: true, response: { status: 409, data: { error: 'Server Console is not available in the official catalog.' } } })
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    await wrapper.get('[data-testid="server-console-install"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="server-console-install-error"]').text()).toContain('not available')
     wrapper.unmount()
   })
 
@@ -85,7 +198,6 @@ describe('ServerView', () => {
     const wrapper = mountView()
     await flushPromises()
     expect(wrapper.find('[data-testid="health-denied"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="health-tiles"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="runner-row"]')).toHaveLength(1)
     wrapper.unmount()
   })

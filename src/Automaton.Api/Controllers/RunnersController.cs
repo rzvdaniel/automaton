@@ -2,7 +2,6 @@
 using Automaton.Api.Authentication;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
-using Automaton.Core.Scripting.Engines;
 using Microsoft.AspNetCore.Authorization;
 using Automaton.Api.Config;
 using Microsoft.AspNetCore.Mvc;
@@ -52,12 +51,20 @@ public class RunnersController : BaseController
     [HttpDelete("{id}")]
     [Authorize(Policy = "DeveloperApiAccess")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken,
-        [FromQuery] bool hostCleanupConfirmed = false)
+        [FromQuery] bool hostCleanupConfirmed = false,
+        [FromQuery] bool abandonOffline = false,
+        [FromServices] OfflineRunnerDeletionService? offlineDeletion = null)
     {
         if (!AppChangeKeyScope.IsAllowed(User))
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot delete Runners. Use a key with the Developer scope." });
+        if (abandonOffline && !User.IsInRole("Admin") && !User.IsInRole("SysAdmin")) return Forbid();
         try
         {
+            if (abandonOffline)
+            {
+                var skipped = await offlineDeletion!.DeleteAsync(id, cancellationToken);
+                return skipped is null ? NotFound() : Ok(new { skippedHostCleanup = skipped });
+            }
             await runnersService.Delete(id, cancellationToken, hostCleanupConfirmed);
         }
         catch (UnauthorizedAccessException)
@@ -87,11 +94,18 @@ public class RunnersController : BaseController
     /// <summary>Upgrades an online Runner to the server's configured image.</summary>
     [HttpPost("{id}/upgrade")]
     [Authorize(Policy = "DeveloperApiAccess")]
-    public async Task<IActionResult> Upgrade(Guid id, [FromServices] RunnerUpgradeService upgrade, CancellationToken cancellationToken)
+    public async Task<IActionResult> Upgrade(Guid id, [FromServices] RunnerUpgradeService upgrade,
+        [FromServices] ServerMaintenanceHistory history, CancellationToken cancellationToken)
     {
         if (!AppChangeKeyScope.IsAllowed(User))
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot upgrade Runners. Use a key with the Developer scope." });
-        try { return Accepted(await upgrade.StartAsync(id, cancellationToken)); }
+        try
+        {
+            var started = await upgrade.StartAsync(id, cancellationToken);
+            var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            await history.RecordUpgradeStartedAsync(id, email, DateTimeOffset.UtcNow, cancellationToken);
+            return Accepted(started);
+        }
         catch (UnauthorizedAccessException) { return Forbid(); }
         catch (InvalidOperationException exception) { return Conflict(new { message = exception.Message }); }
     }
@@ -129,36 +143,6 @@ public class RunnersController : BaseController
             TotalRunners = runners.Count(),
             OnlineRunners = onlineRunners
         });
-    }
-
-    /// <summary>
-    /// Get script engine settings for a specific runner
-    /// </summary>
-    [HttpGet("{id}/script-settings")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<ActionResult<RunnerScriptEngineSettings>> GetScriptSettings(Guid id, CancellationToken cancellationToken)
-    {
-        var settings = await runnersService.GetScriptEngineSettings(id, cancellationToken);
-
-        if (settings == null)
-        {
-            return NotFound();
-        }
-
-        return Ok(settings);
-    }
-
-    /// <summary>
-    /// Update script engine settings for a specific runner
-    /// </summary>
-    [HttpPut("{id}/script-settings")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> UpdateScriptSettings(Guid id, [FromBody] RunnerScriptEngineSettings settings, CancellationToken cancellationToken)
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(settings);
-        try { await runnersService.UpdateScriptEngineSettings(id, json, cancellationToken); }
-        catch (UnauthorizedAccessException) { return Forbid(); }
-        return NoContent();
     }
 
     [HttpGet("by-name/{name}")]

@@ -83,6 +83,7 @@ internal static class RunnerRuntimeMetadataPolicy
         {
             Image = string.IsNullOrWhiteSpace(resolvedImage) ? runtime.Image : resolvedImage,
             User = runtime.User,
+            Update = runtime.Update,
             Command = runtime.Command,
             Port = runtime.Port
         };

@@ -23,7 +23,7 @@ public sealed class RunnerExecutionOperationTests
         await using var db = Db();
         var publisher = new Publisher();
         var service = RunnerExecutionTestServices.Operations(db, publisher);
-        await service.QueueAsync(Guid.NewGuid(), Guid.NewGuid(), new(null, null,
+        await service.QueueAsync(Guid.NewGuid(), Guid.NewGuid(), new(
             AppActionCommand.Create(kind, new { })), CancellationToken.None);
         Assert.That(publisher.Command!.Management, Is.False);
     }
@@ -33,10 +33,10 @@ public sealed class RunnerExecutionOperationTests
     {
         await using var db = Db(); var publisher = new Publisher();
         var service = RunnerExecutionTestServices.Operations(db, publisher); var runner = Guid.NewGuid();
-        var execution = await service.QueueAsync(runner, Guid.NewGuid(), new(null, null,
+        var execution = await service.QueueAsync(runner, Guid.NewGuid(), new(
             AppActionCommand.Create("execute", new { })), CancellationToken.None);
         Assert.That(publisher.Command!.Management, Is.False);
-        await service.QueueAsync(runner, Guid.NewGuid(), new(null, null,
+        await service.QueueAsync(runner, Guid.NewGuid(), new(
             AppActionCommand.Create("read-logs", new { })), CancellationToken.None);
         Assert.That(publisher.Command.Management, Is.True);
         await service.CancelAsync(execution, CancellationToken.None);
@@ -58,8 +58,8 @@ public sealed class RunnerExecutionOperationTests
         var publisher = new Publisher();
         var service = RunnerExecutionTestServices.Operations(db, publisher);
         var runnerId = Guid.NewGuid();
-        var id = await service.QueueAsync(runnerId, Guid.NewGuid(), new(null,
-            new() { Id = Guid.NewGuid(), Code = "private-secret", Language = "python" }), CancellationToken.None);
+        var id = await service.QueueAsync(runnerId, Guid.NewGuid(), new(
+            AppActionCommand.Create("execute", new { Code = "private-secret" })), CancellationToken.None);
         var protectedRequest = (await db.RunnerExecutionOperations.SingleAsync()).ProtectedRequest;
         return new QueuedWorkflowOperation(id, runnerId, protectedRequest, publisher.Command);
     }
@@ -75,7 +75,7 @@ public sealed class RunnerExecutionOperationTests
         var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
         var protection = Protection();
         var initiating = RunnerExecutionTestServices.Operations(db, protection: protection);
-        var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
+        var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(AppActionCommand.Create("cleanup-app", new { })), CancellationToken.None);
         var callback = RunnerExecutionTestServices.Operations(db, protection: protection);
         Assert.That((await callback.AssignmentAsync(runner.ApiKeyId!.Value, id, CancellationToken.None)).Disposition, Is.EqualTo("execute"));
         var before = await ApplyWorkflowResultAsync(db, callback, runner.ApiKeyId.Value, id);
@@ -88,7 +88,7 @@ public sealed class RunnerExecutionOperationTests
     {
         await using var db = Db(); var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
         var service = RunnerExecutionTestServices.Operations(db);
-        var id = await service.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
+        var id = await service.QueueAsync(runner.Id, Guid.NewGuid(), new(AppActionCommand.Create("execute", new { })), CancellationToken.None);
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.AssignmentAsync(Guid.NewGuid(), id, CancellationToken.None));
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ApplyAsync(Guid.NewGuid(), id, new(), CancellationToken.None));
         await service.ApplyAsync(runner.ApiKeyId!.Value, id, new(), CancellationToken.None);
@@ -100,7 +100,7 @@ public sealed class RunnerExecutionOperationTests
     {
         await using var db = Db(); var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
         var service = RunnerExecutionTestServices.Operations(db);
-        var id = await service.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
+        var id = await service.QueueAsync(runner.Id, Guid.NewGuid(), new(AppActionCommand.Create("execute", new { })), CancellationToken.None);
         await service.CancelAsync(id, CancellationToken.None);
         await AssertCancellationAssignmentAsync(service, runner, id);
         await AssertNotCompletedAsync(db);
@@ -118,9 +118,25 @@ public sealed class RunnerExecutionOperationTests
         runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }];
         db.Runners.Add(runner); await db.SaveChangesAsync();
         var service = RunnerExecutionTestServices.Operations(db);
-        var id = await service.QueueAsync(runner.Id, actor, new(Guid.NewGuid(), null), CancellationToken.None);
+        var id = await service.QueueAsync(runner.Id, actor, new(AppActionCommand.Create("execute", new { })), CancellationToken.None);
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.AssignmentAsync(key, id, CancellationToken.None,
             authenticatedUserId: actor, runnerId: runner.Id));
+    }
+
+    [Test]
+    public async Task ADisconnectingCallerDoesNotCancelTheRunnerOperation()
+    {
+        await using var db = Db(); var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
+        var service = RunnerExecutionTestServices.Operations(db);
+        using var disconnected = new CancellationTokenSource();
+        var waiting = service.QueueAndWaitAsync(runner.Id, Guid.NewGuid(),
+            new(AppActionCommand.Create("execute", new { })), TimeSpan.FromSeconds(30), disconnected.Token);
+        while (!await db.RunnerExecutionOperations.AsNoTracking().AnyAsync()) await Task.Delay(50);
+        disconnected.Cancel();
+        await Task.Delay(500);
+        Assert.That(await db.RunnerExecutionOperations.AsNoTracking().AnyAsync(o => o.CancellationRequested), Is.False);
+        await service.TerminateRunnerAsync(runner.Id, CancellationToken.None);
+        Assert.ThrowsAsync<RuntimeCommandFailedException>(() => waiting);
     }
 
     [Test]
@@ -128,48 +144,9 @@ public sealed class RunnerExecutionOperationTests
     {
         await using var db = Db(); var service = RunnerExecutionTestServices.Operations(db);
         var runnerId = Guid.NewGuid();
-        var id = await service.QueueAsync(runnerId, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
+        var id = await service.QueueAsync(runnerId, Guid.NewGuid(), new(AppActionCommand.Create("execute", new { })), CancellationToken.None);
         await service.TerminateRunnerAsync(runnerId, CancellationToken.None);
         Assert.That((await service.WaitAsync(id, CancellationToken.None)).Outcome, Is.EqualTo("Lost"));
-    }
-
-    [TestCase(RunnerPurposes.Managed, "Standard")]
-    [TestCase(RunnerPurposes.Managed, "PrivilegedHost")]
-    public async Task RetiredApplicationProfilesAreRejected(string purpose, string profile)
-    {
-        await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner();
-        runner.Purpose = purpose; runner.ApplicationProfile = profile;
-        runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }];
-        db.Runners.Add(runner); await db.SaveChangesAsync();
-        var admission = new RunnerExecutionAdmissionService(db, null!, null!);
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => admission.AuthorizeAsync(runner.Id, actor, CancellationToken.None));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => admission.AuthorizeAsync(runner.Id, Guid.NewGuid(), CancellationToken.None));
-    }
-
-    [Test]
-    public async Task InfrastructureProfileRequiresAdministrator()
-    {
-        await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner(); runner.Purpose = "Infrastructure";
-        runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }]; db.Runners.Add(runner); await db.SaveChangesAsync();
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => new RunnerExecutionAdmissionService(db, null!, null!)
-            .AuthorizeAsync(runner.Id, actor, CancellationToken.None));
-    }
-
-    [Test]
-    public async Task MachineManagementApiAdmissionRejectsRawWorkflowExecution()
-    {
-        await using var db = Db();
-        var actor = Guid.NewGuid();
-        var runner = Runner();
-        runner.ApplicationProfile = RunnerApplicationProfiles.MachineManagement;
-        runner.CapabilitiesJson = "[\"ApplicationHosting\",\"ManagedContainerExecution\",\"WorkflowExecution\"]";
-        runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }];
-        db.Runners.Add(runner);
-        await db.SaveChangesAsync();
-
-        var admission = new RunnerExecutionAdmissionService(db, null!, null!);
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            admission.AuthorizeAsync(runner.Id, actor, CancellationToken.None));
     }
 
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);

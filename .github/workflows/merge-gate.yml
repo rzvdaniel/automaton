@@ -1,0 +1,39 @@
+name: Merge gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: merge-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  merge-gate:
+    # Required check name for branch protection: "Merge gate / merge-gate"
+    name: merge-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # The gate comes from the base branch, so a pull request cannot loosen its own gate.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      # Check only: never --merge. The other checks are required by branch protection, so --skip-ci.
+      # A base branch from before --skip-ci existed has nothing to run yet (only the pull request that adds this file).
+      - name: Run merge-gate.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! grep -q -- '--skip-ci' .agents/tools/merge-gate.py; then
+            echo "The base branch's merge-gate.py has no --skip-ci yet; nothing to check."
+            exit 0
+          fi
+          python3 .agents/tools/merge-gate.py "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --skip-ci

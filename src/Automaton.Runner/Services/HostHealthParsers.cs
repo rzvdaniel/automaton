@@ -85,6 +85,103 @@ internal static partial class HostHealthParsers
         catch (InvalidOperationException) { return null; }
     }
 
+    /// <summary>
+    /// From Docker's <c>/system/df</c>: per-app writable-layer and image bytes of containers labelled with an app id, and the
+    /// size of images no container uses.
+    /// </summary>
+    public static (Dictionary<Guid, (long Container, long Image)> Apps, long UnusedImages)? ParseDockerAppUsage(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json ?? "");
+            var root = document.RootElement;
+            var (imageSizes, unused) = ReadImages(root);
+            var perApp = new Dictionary<Guid, (long Container, HashSet<string> Images)>();
+            foreach (var container in Items(root, "Containers"))
+            {
+                if (!container.TryGetProperty("Labels", out var labels) || labels.ValueKind != JsonValueKind.Object
+                    || !labels.TryGetProperty("com.automaton.app-id", out var label)
+                    || !Guid.TryParse(label.GetString(), out var appId)) continue;
+                var entry = perApp.GetValueOrDefault(appId, (0, []));
+                if (container.TryGetProperty("ImageID", out var imageId) && imageId.GetString() is { } image) entry.Images.Add(image);
+                perApp[appId] = (entry.Container + Math.Max(0, Number(container, "SizeRw")), entry.Images);
+            }
+            return (perApp.ToDictionary(item => item.Key,
+                item => (item.Value.Container, item.Value.Images.Sum(image => imageSizes.GetValueOrDefault(image)))), unused);
+        }
+        catch (JsonException) { return null; }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    /// <summary>Ids of running containers labelled with an app id, from Docker's <c>/system/df</c>.</summary>
+    public static IReadOnlyList<(Guid AppId, string ContainerId)> ParseRunningAppContainers(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json ?? "");
+            var found = new List<(Guid, string)>();
+            foreach (var container in Items(document.RootElement, "Containers"))
+            {
+                if (!container.TryGetProperty("State", out var state) || state.GetString() != "running"
+                    || !container.TryGetProperty("Id", out var id) || id.GetString() is not { Length: > 0 } containerId
+                    || !container.TryGetProperty("Labels", out var labels) || labels.ValueKind != JsonValueKind.Object
+                    || !labels.TryGetProperty("com.automaton.app-id", out var label) || !Guid.TryParse(label.GetString(), out var appId)) continue;
+                found.Add((appId, containerId));
+            }
+            return found;
+        }
+        catch (JsonException) { return []; }
+        catch (InvalidOperationException) { return []; }
+    }
+
+    /// <summary>
+    /// CPU percent (100 is one core, like <c>docker stats</c>) and memory bytes (usage without reclaimable page cache) from one
+    /// non-streaming Docker stats response.
+    /// </summary>
+    public static (double? Cpu, long? Memory) ParseContainerStats(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json ?? "");
+            var root = document.RootElement;
+            double? cpu = null;
+            if (root.TryGetProperty("cpu_stats", out var now) && root.TryGetProperty("precpu_stats", out var before))
+            {
+                var total = Number(now.TryGetProperty("cpu_usage", out var a) ? a : default, "total_usage")
+                    - Number(before.TryGetProperty("cpu_usage", out var b) ? b : default, "total_usage");
+                var system = Number(now, "system_cpu_usage") - Number(before, "system_cpu_usage");
+                var cpus = Math.Max(1, Number(now, "online_cpus"));
+                if (system > 0 && total >= 0) cpu = Math.Round(100.0 * total / system * cpus, 1);
+            }
+            long? memory = null;
+            if (root.TryGetProperty("memory_stats", out var stats) && stats.TryGetProperty("usage", out var usage) && usage.TryGetInt64(out var used))
+            {
+                var cache = stats.TryGetProperty("stats", out var detail) ? Math.Max(Number(detail, "inactive_file"), Number(detail, "total_inactive_file")) : 0;
+                memory = Math.Max(0, used - cache);
+            }
+            return (cpu, memory);
+        }
+        catch (JsonException) { return (null, null); }
+        catch (InvalidOperationException) { return (null, null); }
+    }
+
+    private static (Dictionary<string, long> Sizes, long Unused) ReadImages(JsonElement root)
+    {
+        var sizes = new Dictionary<string, long>(StringComparer.Ordinal);
+        long unused = 0;
+        foreach (var image in Items(root, "Images"))
+        {
+            var size = Math.Max(0, Number(image, "Size"));
+            if (image.TryGetProperty("Id", out var id) && id.GetString() is { } key) sizes[key] = size;
+            // Like `docker system df`: what only unused images hold, not layers they share with images in use.
+            if (Number(image, "Containers") == 0) unused += Math.Max(0, size - Math.Max(0, Number(image, "SharedSize")));
+        }
+        return (sizes, unused);
+    }
+
+    private static IEnumerable<JsonElement> Items(JsonElement root, string name)
+        => root.TryGetProperty(name, out var list) && list.ValueKind == JsonValueKind.Array ? list.EnumerateArray() : [];
+
     private static long Number(JsonElement item, string name)
         => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number) ? number : 0;
 
@@ -123,20 +220,22 @@ internal static partial class HostHealthParsers
         return (pretty ?? name, version);
     }
 
-    /// <summary>Ubuntu's update-notifier summary; null counts when the file is missing or unreadable.</summary>
-    public static (int? Pending, int? Security) ParseUpdatesAvailable(string? text)
+    /// <summary>
+    /// Update counts from <c>apt-check</c> ("all;security") or, as a fallback, <c>apt list --upgradable</c>; null counts when
+    /// neither produced a usable answer.
+    /// </summary>
+    public static (int? Pending, int? Security) ParseUpdateCounts(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return (null, null);
-        var pending = PendingPattern().Match(text);
-        if (!pending.Success) return (null, null);
-        var security = SecurityPattern().Match(text);
-        return (int.Parse(pending.Groups[1].Value, CultureInfo.InvariantCulture),
-            security.Success ? int.Parse(security.Groups[1].Value, CultureInfo.InvariantCulture) : 0);
+        var check = AptCheckPattern().Match(text);
+        if (check.Success)
+            return (int.Parse(check.Groups[1].Value, CultureInfo.InvariantCulture),
+                int.Parse(check.Groups[2].Value, CultureInfo.InvariantCulture));
+        var lines = text.Split('\n', StringSplitOptions.TrimEntries).Where(line => line.Contains("[upgradable from", StringComparison.Ordinal)).ToArray();
+        if (lines.Length == 0 && !text.Contains("Listing", StringComparison.Ordinal)) return (null, null);
+        return (lines.Length, lines.Count(line => line.Split(' ', 2)[0].Split('/', 2)[^1].Contains("-security", StringComparison.Ordinal)));
     }
 
-    [GeneratedRegex(@"(\d+) updates? can be applied", RegexOptions.IgnoreCase)]
-    private static partial Regex PendingPattern();
-
-    [GeneratedRegex(@"(\d+) of these updates? (?:is|are) (?:a )?standard security updates?", RegexOptions.IgnoreCase)]
-    private static partial Regex SecurityPattern();
+    [GeneratedRegex(@"^\s*(\d+);(\d+)\s*$", RegexOptions.Multiline)]
+    private static partial Regex AptCheckPattern();
 }

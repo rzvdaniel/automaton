@@ -7,7 +7,7 @@ const apiUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).rep
 const cliDocsUrl = 'https://automaton.monster/docs/automaton-cli'
 
 const steps = [
-  { title: 'Install the CLI (needs the .NET 10 SDK)', command: 'dotnet tool install -g Automaton.Cli' },
+  { title: 'Install the CLI (no .NET needed; on Windows see the CLI guide)', command: 'curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh' },
   { title: 'Sign in to this server (approve it in Studio when the browser opens)', command: `automaton login --server ${apiUrl}` },
 ]
 

@@ -49,12 +49,17 @@ const createForm = ref<CreateApiKeyRequest>({
 })
 
 // Advanced key types. Developer / CLI is the default and does not require a choice.
-const advancedScopeOptions = [
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+const permissionsAdminDays = 30
+const advancedScopeOptions = computed(() => [
   { label: 'Developer / CLI — Recommended', value: ApiKeyScope.Developer },
   { label: 'Read Only', value: ApiKeyScope.ReadOnly },
   { label: 'Workflow Execution', value: ApiKeyScope.WorkflowExecution },
   { label: 'Web App (Experimental)', value: ApiKeyScope.WebApp },
-]
+  ...(isSystemAdministrator.value
+    ? [{ label: `Admin: approve app permissions (expires in ${permissionsAdminDays} days)`, value: ApiKeyScope.PermissionsAdmin }]
+    : []),
+])
 
 // Load API keys
 async function loadApiKeys() {
@@ -116,7 +121,11 @@ async function createApiKey() {
 
   createLoading.value = true
   try {
-    const response = await apiKeysService.create(createForm.value)
+    const request: CreateApiKeyRequest = { ...createForm.value }
+    if (request.scope === ApiKeyScope.PermissionsAdmin) {
+      request.expiresAt = new Date(Date.now() + permissionsAdminDays * 86_400_000).toISOString()
+    }
+    const response = await apiKeysService.create(request)
     newApiKeyData.value = response
     showCreateDialog.value = false
     showSuccessDialog.value = true
@@ -275,39 +284,39 @@ onMounted(() => {
       </div>
     </template>
 
-    <Column field="name" header="Name" :sortable="true" />
+    <Column field="name" header="Name" body-class="cell-name" :sortable="true" />
 
-    <Column field="keyPrefix" header="Key">
+    <Column field="keyPrefix" header="Key" body-class="cell-key">
       <template #body="{ data }">
         <code class="monospace text-sm text-color-secondary">{{ data.keyPrefix }}</code>
       </template>
     </Column>
 
-    <Column field="scope" header="Key type" :sortable="true">
+    <Column field="scope" header="Key type" body-class="cell-scope" :sortable="true">
       <template #body="{ data }">
         <Tag :value="getScopeDisplayName(data.scope)" :severity="getScopeSeverity(data.scope)" />
       </template>
     </Column>
 
-    <Column field="source" header="Created by" :sortable="true">
+    <Column field="source" header="Created by" body-class="cell-source" :sortable="true">
       <template #body="{ data }">
         <span class="text-sm text-color-secondary">{{ getSourceDisplayName(data.source) }}</span>
       </template>
     </Column>
 
-    <Column field="createdAt" header="Created" :sortable="true">
+    <Column field="createdAt" header="Created" body-class="cell-created" :sortable="true">
       <template #body="{ data }">
         <span class="text-sm text-color-secondary">{{ formatDate(data.createdAt) }}</span>
       </template>
     </Column>
 
-    <Column field="lastUsedAt" header="Last Used" :sortable="true">
+    <Column field="lastUsedAt" header="Last Used" body-class="cell-used" :sortable="true">
       <template #body="{ data }">
         <span class="text-sm text-color-secondary">{{ formatDate(data.lastUsedAt) }}</span>
       </template>
     </Column>
 
-    <Column field="isActive" header="Status" :sortable="true">
+    <Column field="isActive" header="Status" body-class="cell-status" :sortable="true">
       <template #body="{ data }">
         <Tag
           :value="data.isActive ? 'Active' : 'Revoked'"
@@ -316,7 +325,7 @@ onMounted(() => {
       </template>
     </Column>
 
-    <Column header="" style="width: 100px; text-align: right">
+    <Column header="" body-class="cell-actions" style="width: 100px; text-align: right">
       <template #body="{ data }">
         <div class="row-actions">
           <Button
@@ -338,7 +347,7 @@ onMounted(() => {
     v-model:visible="showCreateDialog"
     header="Create API Key"
     :modal="true"
-    :style="{ width: '500px' }"
+    :style="{ width: '500px', maxWidth: '95vw' }"
   >
     <div class="flex flex-column gap-4">
       <div class="flex flex-column gap-2">
@@ -404,7 +413,7 @@ onMounted(() => {
     header="API Key Created"
     :modal="true"
     :closable="true"
-    :style="{ width: '600px' }"
+    :style="{ width: '600px', maxWidth: '95vw' }"
   >
     <div v-if="newApiKeyData" class="flex flex-column gap-4">
       <Message severity="warn" :closable="false">
@@ -544,5 +553,41 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* Phone width: each key is a stacked card (label left, value right) instead of a table wider than the screen. */
+@media (max-width: 640px) {
+  .keys-table :deep(thead) { display: none; }
+  .keys-table :deep(tbody tr:not(.p-datatable-empty-message)) {
+    display: block;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--p-content-border-color);
+  }
+  .keys-table :deep(tbody tr:not(.p-datatable-empty-message) td) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: auto !important;
+    padding: 0.25rem 1rem;
+    border: 0;
+    text-align: right;
+  }
+  .keys-table :deep(tbody tr:not(.p-datatable-empty-message) td::before) {
+    flex: none;
+    color: var(--p-text-muted-color);
+    font-size: 0.8125rem;
+    text-align: left;
+  }
+  .keys-table :deep(td.cell-name::before) { content: 'Name'; }
+  .keys-table :deep(td.cell-key::before) { content: 'Key'; }
+  .keys-table :deep(td.cell-scope::before) { content: 'Key type'; }
+  .keys-table :deep(td.cell-source::before) { content: 'Created by'; }
+  .keys-table :deep(td.cell-created::before) { content: 'Created'; }
+  .keys-table :deep(td.cell-used::before) { content: 'Last used'; }
+  .keys-table :deep(td.cell-status::before) { content: 'Status'; }
+  .keys-table :deep(td.cell-actions::before) { content: none; }
+  .keys-table :deep(td.cell-actions) { justify-content: flex-end; }
+  .keys-table :deep(td.cell-name) { font-weight: 600; word-break: break-word; }
 }
 </style>

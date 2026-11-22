@@ -23,6 +23,39 @@ vi.mock('@/features/admin/services/adminAppsService', () => ({ adminAppsService:
 window.matchMedia ??= (() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })) as never
 
 describe('InstallAppView', () => {
+  it('says before installing that the app needs public access and which paths are open, and lets optional secrets stay empty', async () => {
+    vi.mocked(appsService.getInstallSource).mockResolvedValue({
+      id: 'src-1', name: 'Heartbeat', creatorDisplayName: 'Me',
+      application: {
+        publicAccess: { level: 'required', reason: 'Your jobs check in from outside.' },
+        openPaths: ['/ping/*'],
+        secrets: [{ name: 'WEBHOOK_URL', optional: true }],
+      },
+    })
+    const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
+    await flushPromises()
+
+    const notice = wrapper.get('[data-testid="public-access-notice"]').text()
+    expect(notice).toContain('Needs public access.')
+    expect(notice).toContain('Your jobs check in from outside.')
+    expect(notice).toContain('/ping/*')
+    expect(wrapper.text()).toContain('(optional)')
+    const install = wrapper.findAll('button').find((b) => b.text().includes('Install'))!
+    expect(install.attributes('disabled')).toBeUndefined()
+  })
+
+  it('shows the app README before install, and nothing when the app ships none', async () => {
+    vi.mocked(appsService.getInstallSource).mockResolvedValue({ id: 'src-1', name: 'Gauntlet', readme: '# Gauntlet\n\nRuns **trials**.', application: {} })
+    const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="install-readme"]').html()).toContain('<strong>trials</strong>')
+
+    vi.mocked(appsService.getInstallSource).mockResolvedValue({ id: 'src-1', name: 'Plain', application: {} })
+    const plain = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
+    await flushPromises()
+    expect(plain.find('[data-testid="install-readme"]').exists()).toBe(false)
+  })
+
   it('installs with settings, secrets, approval and a schedule, in order', async () => {
     vi.mocked(appsService.getInstallSource).mockResolvedValue({
       id: 'src-1', name: 'Off-site Backup', creatorDisplayName: 'Me',
@@ -39,6 +72,7 @@ describe('InstallAppView', () => {
     const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="public-access-notice"]').exists()).toBe(false)
     const install = () => wrapper.findAll('button').find((b) => b.text().includes('Install'))!
     expect(install().attributes('disabled')).toBeDefined() // secret still missing
     await wrapper.find('#secret-S3_SECRET_ACCESS_KEY').setValue('shh')
@@ -55,7 +89,7 @@ describe('InstallAppView', () => {
     expect(wrapper.text()).not.toContain('shh')
     expect(wrapper.get('.install-progress').text()).toContain('Installed')
     expect(wrapper.get('.install-progress').text()).toContain('Deploy and start the app')
-    expect(wrapper.get('.install-progress').text()).toContain('Nightly runs on cron 30 3 * * *')
+    expect(wrapper.get('.install-progress').text()).toContain('Nightly runs every day at 03:30 UTC')
     expect(wrapper.text()).toContain('Open the installed app')
   })
 

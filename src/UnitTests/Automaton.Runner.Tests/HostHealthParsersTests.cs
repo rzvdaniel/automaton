@@ -37,6 +37,48 @@ public class HostHealthParsersTests
     }
 
     [Test]
+    public void DockerAppUsage_GroupsContainersAndImagesByAppAndSumsUnusedImages()
+    {
+        var app = Guid.NewGuid();
+        var usage = HostHealthParsers.ParseDockerAppUsage($$$"""
+            {"Images":[{"Id":"a","Size":500,"Containers":2},{"Id":"b","Size":70,"Containers":0,"SharedSize":20},{"Id":"c","Size":30,"Containers":0,"SharedSize":-1}],
+             "Containers":[{"ImageID":"a","SizeRw":10,"Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"ImageID":"a","SizeRw":5,"Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"ImageID":"a","SizeRw":99,"Labels":{}}]}
+            """);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(usage!.Value.Apps, Is.EqualTo(new Dictionary<Guid, (long, long)> { [app] = (15, 500) }));
+            Assert.That(usage.Value.UnusedImages, Is.EqualTo(80), "unique size only: (70 - 20) + 30");
+            Assert.That(HostHealthParsers.ParseDockerAppUsage("nope"), Is.Null);
+        });
+    }
+
+    [Test]
+    public void ContainerStats_GiveCpuPercentOfOneCoreAndMemoryWithoutCache_AndRunningAppContainersAreListed()
+    {
+        var app = Guid.NewGuid();
+        var (cpu, memory) = HostHealthParsers.ParseContainerStats("""
+            {"cpu_stats":{"cpu_usage":{"total_usage":300},"system_cpu_usage":2000,"online_cpus":2},
+             "precpu_stats":{"cpu_usage":{"total_usage":200},"system_cpu_usage":1000},
+             "memory_stats":{"usage":1000,"stats":{"inactive_file":400}}}
+            """);
+        var containers = HostHealthParsers.ParseRunningAppContainers($$$"""
+            {"Containers":[{"Id":"c1","State":"running","Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"Id":"c2","State":"exited","Labels":{"com.automaton.app-id":"{{{app}}}"}},
+                           {"Id":"c3","State":"running","Labels":{}}]}
+            """);
+        Assert.Multiple(() =>
+        {
+            Assert.That(cpu, Is.EqualTo(20.0), "100 / 1000 * 2 cpus * 100");
+            Assert.That(memory, Is.EqualTo(600));
+            Assert.That(HostHealthParsers.ParseContainerStats("nope"), Is.EqualTo(((double?)null, (long?)null)));
+            Assert.That(containers, Is.EqualTo(new[] { (app, "c1") }));
+        });
+    }
+
+    [Test]
     public void DockerDiskUsage_SumsLayersContainersVolumesAndUnsharedBuildCache()
     {
         var usage = HostHealthParsers.ParseDockerDiskUsage("""
@@ -50,25 +92,45 @@ public class HostHealthParsersTests
     }
 
     [Test]
-    public void HelperOutput_ParsesOsUpdatesAndRebootSections()
+    public void HelperOutput_ParsesOsAndRebootSections()
     {
-        var sections = HostHealthParsers.SplitSections("[os]\nPRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\n[updates]\n12 updates can be applied immediately.\n5 of these updates are standard security updates.\n[reboot]\n1700000000\n");
+        var sections = HostHealthParsers.SplitSections("[os]\nPRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\n[reboot]\n1700000000\n");
 
         Assert.Multiple(() =>
         {
             Assert.That(HostHealthParsers.ParseOsRelease(sections["os"]), Is.EqualTo(("Ubuntu 24.04.1 LTS", "24.04")));
-            Assert.That(HostHealthParsers.ParseUpdatesAvailable(sections["updates"]), Is.EqualTo(((int?)12, (int?)5)));
             Assert.That(sections["reboot"].Trim(), Is.EqualTo("1700000000"));
         });
     }
 
-    [TestCase("1 update can be applied immediately.\n1 of these updates is a standard security update.\n", 1, 1)]
-    [TestCase("3 updates can be applied immediately.\n", 3, 0)]
-    [TestCase("0 updates can be applied immediately.\n", 0, 0)]
-    public void UpdateNotifierText_ReadsCounts(string text, int pending, int security)
-        => Assert.That(HostHealthParsers.ParseUpdatesAvailable(text), Is.EqualTo(((int?)pending, (int?)security)));
+    [TestCase("71;12\n", 71, 12)]
+    [TestCase("/usr/lib/update-notifier/apt-check:387: Warning: W:Unable to read x\n  depcache = apt_pkg.DepCache(cache)\n42;0", 42, 0)]
+    [TestCase("0;0", 0, 0)]
+    [TestCase("Listing... Done\nopenssl/noble-security 3.0.13 amd64 [upgradable from: 3.0.12]\nvim/noble-updates 9.1 amd64 [upgradable from: 9.0]\n", 2, 1)]
+    [TestCase("Listing... Done\n", 0, 0)]
+    public void UpdateCounts_ReadAptCheckAndTheAptListFallback(string text, int pending, int security)
+        => Assert.That(HostHealthParsers.ParseUpdateCounts(text), Is.EqualTo(((int?)pending, (int?)security)));
+
+    [TestCase("")]
+    [TestCase("E: Could not open lock file\n")]
+    public void UnusableUpdateOutput_MeansUnknownNotZero(string text)
+        => Assert.That(HostHealthParsers.ParseUpdateCounts(text), Is.EqualTo(((int?)null, (int?)null)));
 
     [Test]
-    public void MissingUpdateNotifierFile_MeansUnknownNotZero()
-        => Assert.That(HostHealthParsers.ParseUpdatesAvailable(""), Is.EqualTo(((int?)null, (int?)null)));
+    public void DirectorySize_CountsFilesBelowThePath_AndIsZeroForAMissingOne()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "e2e-disk-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "sub"));
+        File.WriteAllBytes(Path.Combine(root, "a.bin"), new byte[100]);
+        File.WriteAllBytes(Path.Combine(root, "sub", "b.bin"), new byte[23]);
+        try
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(AppDiskMeasurer.DirectorySize(root), Is.EqualTo(123));
+                Assert.That(AppDiskMeasurer.DirectorySize(Path.Combine(root, "missing")), Is.Zero);
+            });
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
 }

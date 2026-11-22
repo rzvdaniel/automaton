@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import { isAxiosError } from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import RunnerRemovalDialog from '@/features/runners/components/RunnerRemovalDialog.vue'
 import RunnerUpgradeDialog from '@/features/runners/components/RunnerUpgradeDialog.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
@@ -48,6 +49,41 @@ function confirmRemoval(runner: Runner) {
   })
 }
 
+const isAdmin = computed(() => (useAuthStore().user?.roles ?? []).some((role) => role === 'Admin' || role === 'SysAdmin'))
+
+// An administrator can remove a Runner that is offline for good together with its apps, without cleaning up its machine.
+function confirmOfflineRemoval(runner: Runner) {
+  confirm.require({
+    message: `Delete "${runner.name}" and every app assigned to it? The Runner is offline, so nothing is cleaned up on its machine: containers and files may remain there. This cannot be undone.`,
+    header: 'Delete offline Runner and its apps',
+    icon: 'pi pi-exclamation-triangle',
+    rejectLabel: 'Cancel',
+    acceptLabel: 'Delete without cleanup',
+    acceptClass: 'p-button-danger',
+    accept: () => void deleteOffline(runner),
+  })
+}
+
+async function deleteOffline(runner: Runner) {
+  try {
+    const skipped = await runnersService.deleteOffline(runner.id)
+    toast.add({
+      severity: 'warn',
+      summary: 'Runner deleted',
+      detail: skipped.length ? `Skipped cleanup: ${skipped.join(' ')}` : `"${runner.name}" has been deleted`,
+      life: 15000,
+    })
+    emit('changed')
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: isAxiosError(error) ? error.response?.data?.message ?? 'Failed to delete the Runner' : 'Failed to delete the Runner',
+      life: 10000,
+    })
+  }
+}
+
 async function prepareRemoval(runner: Runner) {
   try {
     removal.value = await runnersService.prepareRemoval(runner.id)
@@ -87,6 +123,11 @@ async function prepareRemoval(runner: Runner) {
           data-testid="runner-upgrade-button" @click="openUpgrade(runner)"
         />
         <Button
+          v-if="isAdmin && runner.status !== RunnerStatus.Online && !runner.isHostedRunner && !isRunnerLinkedToProject(runner)"
+          v-tooltip.top="'Delete offline Runner and its apps'" icon="pi pi-times-circle" text rounded size="small" severity="danger"
+          aria-label="Delete offline Runner and its apps" data-testid="runner-delete-offline-button" @click="confirmOfflineRemoval(runner)"
+        />
+        <Button
           v-if="!runner.isHostedRunner && !isRunnerLinkedToProject(runner)" v-tooltip.top="'Delete Runner'"
           icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Delete Runner" @click="confirmRemoval(runner)"
         />
@@ -109,9 +150,11 @@ async function prepareRemoval(runner: Runner) {
 .runner-rows {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--p-content-border-color);
-  border-radius: 8px;
-  background: var(--p-content-background);
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper);
 }
 
 .runner-row {
@@ -119,11 +162,9 @@ async function prepareRemoval(runner: Runner) {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem 1.5rem;
-  padding: 0.85rem 1rem;
-}
-
-.runner-row + .runner-row {
-  border-top: 1px solid var(--p-content-border-color);
+  padding: 12px 14px;
+  border: 1px solid var(--row-line);
+  border-radius: 12px;
 }
 
 .runner-row__name {
@@ -142,8 +183,8 @@ async function prepareRemoval(runner: Runner) {
   flex-shrink: 0;
 }
 
-.is-online { background: var(--p-green-500); }
-.is-offline { background: var(--p-red-500); }
+.is-online { background: var(--ok); }
+.is-offline { background: var(--signal); }
 
 .runner-row__facts {
   display: flex;
@@ -153,7 +194,7 @@ async function prepareRemoval(runner: Runner) {
 }
 
 .runner-row__facts dt {
-  color: var(--p-text-muted-color);
+  color: var(--ink-soft);
   font-size: 0.8rem;
 }
 

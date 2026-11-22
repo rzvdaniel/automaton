@@ -11,17 +11,7 @@ public enum ChatResourceType
     General = 0,
 
     /// <summary>
-    /// Chat session associated with a Custom Step
-    /// </summary>
-    CustomStep = 1,
-
-    /// <summary>
     /// Chat session associated with a Web App
     /// </summary>
-    WebApp = 2,
-
-    /// <summary>
-    /// Chat session associated with a Flow
-    /// </summary>
-    Flow = 3
+    WebApp = 2
 }

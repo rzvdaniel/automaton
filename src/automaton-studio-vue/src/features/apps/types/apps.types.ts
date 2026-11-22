@@ -48,6 +48,12 @@ export interface App {
   summary: string
   description: string
   isPublished: boolean
+  /** Stopped on purpose: schedules off, address shows a paused page. */
+  isPaused?: boolean
+  /** Why the app was paused, when the person who paused it said. */
+  pausedReason?: string | null
+  /** No web runtime or static site: the app only has Actions (nothing to restart). */
+  actionsOnly?: boolean
   canLaunchPublicly?: boolean
   isForkable: boolean
   publicUrl?: string
@@ -88,6 +94,10 @@ export interface App {
   forkedFromAuthorUserId?: string | null
   forkedFromAppName?: string | null
   forkedFromAuthorName?: string | null
+  /** Set for apps installed from a public GitHub repository (a catalog entry or a pasted URL). */
+  installedFromRepo?: string | null
+  installedFromFolder?: string | null
+  installedFromCommit?: string | null
   developmentMode: AppDevelopmentMode
   sourceAvailable: boolean
   runtimeSource: AppRuntimeSource
@@ -140,15 +150,32 @@ export interface ApplicationContract {
   health: ApplicationHealthSpec
   storage: ApplicationStorageSpec
   secrets?: ApplicationSecretDeclaration[]
+  settings?: ApplicationSettingDeclaration[]
   permissions?: string[]
   isStaticSite?: boolean
   compose?: unknown
+  /** 'api' when the app declares it is an API; web is assumed otherwise (#864). */
+  kind?: string | null
+  /** One-line description of the app, from automaton.json. */
+  description?: string | null
+  /** Key paths of a web app, each with a label. */
+  pages?: Array<{ path: string; label?: string; method?: string; description?: string }>
+  /** Path of an API app's OpenAPI document. */
+  openApi?: string | null
 }
 
 export interface ApplicationSecretDeclaration {
   name: string
   description?: string | null
   from?: string | null
+  optional?: boolean
+}
+
+export interface ApplicationSettingDeclaration {
+  name: string
+  description?: string | null
+  default?: string | null
+  required?: boolean
 }
 
 export interface AppListItem {
@@ -159,10 +186,15 @@ export interface AppListItem {
   thumbnailUrl?: string | null
   tags: string[]
   isPublished: boolean
+  isPaused?: boolean
+  /** Why the app was paused, when the person who paused it said. */
+  pausedReason?: string | null
   canLaunchPublicly?: boolean
   publicUrl?: string | null
   updatedAtUtc: string
   canDelete: boolean
+  /** May deploy, pause and resume the app. */
+  canUpdate?: boolean
   runner?: { id: string; name: string; purpose: string; connectivityStatus: 'None' | 'Online' | 'Offline' } | null
   liveEnvironment?: {
     name: string
@@ -179,6 +211,8 @@ export interface AppListItem {
   /** No web runtime or static site: the app only has Actions. */
   actionsOnly?: boolean
   lastActionRun?: { moduleKey: string; status: string; createdAtUtc: string } | null
+  /** Soonest run of an enabled schedule of an Actions-only app. */
+  nextActionRunAtUtc?: string | null
 }
 
 export const DeploymentTargetStatus = {
@@ -456,6 +490,12 @@ export interface AppPermissionsResponse {
   approvalUrl?: string | null
 }
 
+export interface AppSettingValue {
+  name: string
+  value: string
+  updatedAtUtc: string
+}
+
 export interface AppSecretSummary {
   name: string
   version: number
@@ -498,6 +538,8 @@ export interface InstallSource {
   description?: string | null
   creatorDisplayName?: string
   application?: InstallManifest | null
+  /** The app's docs/README.md (Markdown) for catalog and Git installs; absent when it ships none. */
+  readme?: string | null
   /** Set when the app comes from a Git repository (a catalog entry or a pasted URL) rather than this server. */
   git?: GitAppSource
 }
@@ -509,6 +551,13 @@ export interface GitAppSource {
   commit: string
 }
 
+/** Who made a catalog app. `verified` is set by the server: Automaton's own apps in the official catalog. */
+export interface CatalogPublisher {
+  name: string
+  logo?: string | null
+  verified: boolean
+}
+
 export interface CatalogEntry extends GitAppSource {
   id: string
   name: string
@@ -517,12 +566,14 @@ export interface CatalogEntry extends GitAppSource {
   minServerVersion: string
   permissions: string[]
   requiresNewerServer: boolean
+  requiresNewerRunner?: boolean
   installedAppId: string | null
   sourceId: string
   sourceName: string
   customSource: boolean
   tags?: string[]
   icon?: string | null
+  publisher?: CatalogPublisher | null
 }
 
 /** The filters and page the Catalog tab sends; the server filters and pages. */
@@ -577,8 +628,10 @@ export interface CatalogResponse {
 }
 
 export interface InstallManifest {
+  publicAccess?: { level: 'required' | 'recommended'; reason: string } | null
+  openPaths?: string[]
   settings?: Array<{ name: string; description?: string | null; default?: string | null; required?: boolean }>
-  secrets?: Array<{ name: string; description?: string | null; from?: string | null }>
+  secrets?: Array<{ name: string; description?: string | null; from?: string | null; optional?: boolean }>
   permissions?: string[]
   schedules?: Array<{
     name: string
@@ -592,7 +645,7 @@ export interface InstallManifest {
 }
 
 /** Who can open an app: only the owner, chosen people, everyone signed in on the server, or anyone on the internet. */
-export type SharingAudience = 'me' | 'people' | 'server' | 'internet'
+export type SharingAudience = 'me' | 'people' | 'team' | 'server' | 'internet'
 
 export interface SharedPerson {
   userId: string
@@ -600,8 +653,71 @@ export interface SharedPerson {
   displayName: string
 }
 
+/** Disk an app uses on its Runner's machine; a part the Runner could not measure is null. */
+export interface AppDiskUsage {
+  appId: string
+  appName?: string | null
+  filesBytes?: number | null
+  dataBytes?: number | null
+  logsBytes?: number | null
+  containerBytes?: number | null
+  imageBytes?: number | null
+  totalBytes: number
+  measuredAtUtc?: string | null
+}
+
+/** The answer to pausing or resuming an app. */
+export interface AppPauseState {
+  appId: string
+  paused: boolean
+  pausedAt?: string | null
+  pausedReason?: string | null
+  schedulesChanged: number
+  warnings: string[]
+}
+
 export interface AppSharing {
   audience: SharingAudience
   people: SharedPerson[]
   publicUrlSlug?: string | null
+  /** The team whose members open the app (audience 'team'). */
+  team?: { id: string, name: string } | null
+  /** For 'internet': whether the app is listed in the store. */
+  listed?: boolean
+}
+
+export interface AppCustomDomain {
+  id: string
+  host: string
+  isPrimary: boolean
+  verified: boolean
+  /** Served over a valid certificate; only a live domain is the primary address. */
+  live: boolean
+  status: 'WaitingForDns' | 'Verified' | 'Live'
+  /** The TXT record that proves you own the domain: this name, this value. */
+  challengeHost: string
+  challengeValue: string
+}
+
+/** An app's own domains and the address their DNS must point at. */
+export interface AppCustomDomains {
+  target: string
+  targetAddresses: string[]
+  domains: AppCustomDomain[]
+  /** Set on the answer to a DNS check: what was found, step by step. */
+  check?: DomainCheckStep[]
+}
+
+/** One step of a DNS check: ownership (TXT), points here, certificate. */
+export interface DomainCheckStep {
+  key: 'txt' | 'points' | 'certificate'
+  title: string
+  status: 'ok' | 'failed' | 'skipped'
+  detail: string
+}
+
+/** A team (project) the signed-in person belongs to. */
+export interface MyTeam {
+  id: string
+  displayName: string
 }

@@ -1,28 +1,36 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { isAxiosError } from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
 import Message from 'primevue/message'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import { appsService } from '../services/apps.service'
-import type { AppSecretSummary, ApplicationSecretDeclaration, SecretAuditEntry } from '../types/apps.types'
+import type { AppSecretSummary, ApplicationSecretDeclaration } from '../types/apps.types'
+import { formatWhen } from '../utils/app-overview'
 
-const props = defineProps<{ appId: string; declared?: ApplicationSecretDeclaration[] }>()
+const props = defineProps<{ appId: string; declared?: ApplicationSecretDeclaration[]; settingNames?: string[] }>()
 /** Secrets the app declares that have no value yet. */
 const missing = computed(() => (props.declared ?? []).filter((item) => !secrets.value.some((secret) => secret.name === item.name)))
+const describe = (secretName: string) => props.declared?.find((item) => item.name === secretName)?.description
 const confirm = useConfirm()
-const secrets = ref<AppSecretSummary[]>([])
+const all = ref<AppSecretSummary[]>([])
+/** Settings are saved like secrets but listed on their own card. */
+const secrets = computed(() => all.value.filter((secret) => !(props.settingNames ?? []).includes(secret.name)))
 const name = ref('')
 const value = ref('')
 const saving = ref(false)
+const loaded = ref(false)
+const adding = ref(false)
 const error = ref<string | null>(null)
-const history = ref<SecretAuditEntry[] | null>(null)
-const historyLoading = ref(false)
+/** The name field is only for a new secret; an existing name is edited in its own row. */
+const rowName = ref('')
+const inRow = computed(() => adding.value && rowName.value !== '')
+const rowEditing = (secretName: string) => adding.value && rowName.value === secretName
 const namePattern = /^[A-Z_][A-Z0-9_]{0,99}$/
+
+/** Tells password managers (1Password, LastPass, Bitwarden) this is not a login form. */
+const noAutofill = { 'data-1p-ignore': 'true', 'data-lpignore': 'true', 'data-bwignore': 'true', 'data-form-type': 'other' }
 
 onMounted(load)
 watch(() => props.appId, load)
@@ -30,15 +38,30 @@ watch(() => props.appId, load)
 async function load() {
   error.value = null
   try {
-    secrets.value = await appsService.listSecrets(props.appId)
+    all.value = await appsService.listSecrets(props.appId)
+    loaded.value = true
   } catch (failure) {
     error.value = message(failure, 'Secrets could not be loaded.')
   }
 }
 
-function edit(secretName: string) {
+/** Opens the form in place and focuses the first empty field. */
+async function openForm(secretName = '') {
   name.value = secretName
+  rowName.value = secretName
   value.value = ''
+  error.value = null
+  adding.value = true
+  await nextTick()
+  document.getElementById(secretName ? 'secret-value' : 'secret-name')?.focus()
+}
+
+function cancel() {
+  adding.value = false
+  rowName.value = ''
+  name.value = ''
+  value.value = ''
+  error.value = null
 }
 
 async function save() {
@@ -55,8 +78,7 @@ async function save() {
   saving.value = true
   try {
     await appsService.setSecret(props.appId, secretName, value.value)
-    name.value = ''
-    value.value = ''
+    cancel()
     await load()
   } catch (failure) {
     error.value = message(failure, 'The secret could not be saved.')
@@ -67,47 +89,20 @@ async function save() {
 
 function remove(secretName: string) {
   confirm.require({
-    header: 'Delete secret?',
-    message: `Delete ${secretName}? Actions started afterwards no longer receive it.`,
+    header: 'Remove secret?',
+    message: `Remove ${secretName}? Actions started afterwards no longer receive it.`,
     icon: 'pi pi-exclamation-triangle',
     acceptClass: 'p-button-danger',
-    acceptLabel: 'Delete',
+    acceptLabel: 'Remove',
     accept: async () => {
       try {
         await appsService.deleteSecret(props.appId, secretName)
         await load()
       } catch (failure) {
-        error.value = message(failure, 'The secret could not be deleted.')
+        error.value = message(failure, 'The secret could not be removed.')
       }
     },
   })
-}
-
-async function toggleHistory() {
-  if (history.value) {
-    history.value = null
-    return
-  }
-  historyLoading.value = true
-  try {
-    history.value = await appsService.listSecretHistory(props.appId)
-  } catch (failure) {
-    error.value = message(failure, 'Secret history could not be loaded.')
-  } finally {
-    historyLoading.value = false
-  }
-}
-
-function describe(entry: SecretAuditEntry) {
-  if (entry.delivered.length === 0) return entry.version ? `${entry.name} v${entry.version}` : entry.name ?? ''
-  return entry.delivered
-    .map((item) => `${item.name}${item.version ? ` v${item.version}` : ''} (${item.from ? `${item.scope}:${item.from}` : item.scope})`)
-    .join(', ')
-}
-
-function actor(entry: SecretAuditEntry) {
-  if (entry.runnerId) return 'Runner'
-  return entry.userName || (entry.userId ? 'User' : 'Platform')
 }
 
 function message(failure: unknown, fallback: string) {
@@ -116,77 +111,74 @@ function message(failure: unknown, fallback: string) {
 </script>
 
 <template>
-  <div class="flex flex-column gap-3">
-    <p class="m-0 text-color-secondary">
-      Secrets are passed to this app as environment variables, for example API keys or storage credentials: to each
-      Action run, and to the running app (API or server-rendered site) whenever it starts. They are stored encrypted,
-      never shown again after saving, and removed from Action logs and results. A running app picks up a change on its
-      next start: redeploy it with <code>automaton deploy</code>. Static sites cannot use secrets, because their files
-      are sent to the browser.
-    </p>
-    <Message v-if="missing.length > 0" severity="warn" :closable="false" data-testid="missing-secrets">
-      <div class="font-medium">Needed by this app and not set yet</div>
-      <ul class="m-0 mt-2 pl-4">
-        <li v-for="item in missing" :key="item.name">
-          <button type="button" class="p-link font-medium" @click="edit(item.name)"><code>{{ item.name }}</code></button>
-          <span v-if="item.description"> {{ item.description }}</span>
-        </li>
-      </ul>
-    </Message>
-    <DataTable :value="secrets" size="small" data-key="name">
-      <template #empty>No secrets yet.</template>
-      <Column field="name" header="Name" />
-      <Column header="Version">
-        <template #body="{ data }">{{ data.version }}</template>
-      </Column>
-      <Column header="Updated">
-        <template #body="{ data }">{{ new Date(data.updatedAtUtc).toLocaleString() }}</template>
-      </Column>
-      <Column header="" style="width: 7rem">
-        <template #body="{ data }">
-          <Button icon="pi pi-pencil" text rounded size="small" aria-label="Replace value" @click="edit(data.name)" />
-          <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Delete secret" @click="remove(data.name)" />
-        </template>
-      </Column>
-    </DataTable>
-    <div class="flex gap-2 align-items-end flex-wrap">
-      <div class="flex flex-column gap-1">
-        <label for="secret-name">Name</label>
-        <InputText id="secret-name" v-model="name" placeholder="S3_SECRET_KEY" autocomplete="off" />
-      </div>
-      <div class="flex flex-column gap-1">
-        <label for="secret-value">Value</label>
-        <Password input-id="secret-value" v-model="value" :feedback="false" toggle-mask autocomplete="new-password" />
-      </div>
-      <Button label="Save secret" icon="pi pi-lock" :loading="saving" @click="save" />
+  <section class="card" aria-labelledby="secrets-title" data-testid="secrets-card">
+    <div class="card-head">
+      <h2 id="secrets-title">Secrets</h2>
+      <Button v-if="!adding" label="Add a secret" icon="pi pi-plus" size="small" severity="secondary" outlined data-testid="add-secret" @click="openForm()" />
     </div>
-    <small class="text-color-secondary">Saving an existing name replaces its value.</small>
+    <p v-if="loaded && secrets.length === 0 && missing.length === 0" class="hint">No secrets yet. They are encrypted, never shown again and used from the next start.</p>
+    <template v-for="secret in secrets" :key="secret.name">
+      <form v-if="rowEditing(secret.name)" class="row editing" data-testid="secret-form" @submit.prevent="save" @keydown.esc.prevent="cancel">
+        <label class="rowname" for="secret-value"><code>{{ secret.name }}</code></label>
+        <InputText id="secret-value" v-model="value" class="field" name="secret-value" type="password" autocomplete="new-password" v-bind="noAutofill" />
+        <Button type="submit" label="Save secret" size="small" icon="pi pi-lock" :loading="saving" />
+        <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
+      </form>
+      <div v-else class="row">
+      <span class="rowname">
+        <code>{{ secret.name }}</code>
+        <small v-if="describe(secret.name)" class="desc" data-testid="secret-description">{{ describe(secret.name) }}</small>
+      </span>
+      <span class="hint">
+        set {{ formatWhen(secret.updatedAtUtc) }} ·
+        <button type="button" class="link" :aria-label="`Replace ${secret.name}`" @click="openForm(secret.name)">replace</button> ·
+        <button type="button" class="link" :aria-label="`Remove ${secret.name}`" @click="remove(secret.name)">remove</button>
+      </span>
+      </div>
+    </template>
+    <div v-if="missing.length > 0" data-testid="missing-secrets">
+      <template v-for="item in missing" :key="item.name">
+      <form v-if="rowEditing(item.name)" class="row editing" data-testid="secret-form" @submit.prevent="save" @keydown.esc.prevent="cancel">
+        <label class="rowname" for="secret-value"><code>{{ item.name }}</code></label>
+        <InputText id="secret-value" v-model="value" class="field" name="secret-value" type="password" autocomplete="new-password" v-bind="noAutofill" />
+        <Button type="submit" label="Save secret" size="small" icon="pi pi-lock" :loading="saving" />
+        <Button type="button" label="Cancel" size="small" severity="secondary" text @click="cancel" />
+      </form>
+      <div v-else class="row">
+        <span class="rowname">
+          <span><code>{{ item.name }}</code> <span class="hint">{{ item.optional ? "optional, not set" : "needed, not set" }}</span></span>
+          <small v-if="item.description" class="desc" data-testid="secret-description">{{ item.description }}</small>
+        </span>
+        <button type="button" class="link" @click="openForm(item.name)">set</button>
+      </div>
+      </template>
+    </div>
+    <form v-if="adding && !inRow" class="add" data-testid="secret-form" @submit.prevent="save" @keydown.esc.prevent="cancel">
+      <label for="secret-name">Name
+        <InputText id="secret-name" v-model="name" name="secret-name" placeholder="S3_SECRET_KEY" autocomplete="off" v-bind="noAutofill" />
+      </label>
+      <label for="secret-value">Value
+        <InputText id="secret-value" v-model="value" name="secret-value" type="password" autocomplete="new-password" v-bind="noAutofill" />
+      </label>
+      <Button type="submit" label="Save secret" icon="pi pi-lock" :loading="saving" />
+      <Button type="button" label="Cancel" severity="secondary" text @click="cancel" />
+    </form>
+    <small v-if="adding && !inRow" class="hint">Saving an existing name replaces its value.</small>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <div>
-      <Button
-        :label="history ? 'Hide history' : 'Show history'"
-        icon="pi pi-history"
-        text
-        size="small"
-        :loading="historyLoading"
-        @click="toggleHistory"
-      />
-    </div>
-    <DataTable v-if="history" :value="history" size="small">
-      <template #empty>No history yet.</template>
-      <Column header="When">
-        <template #body="{ data }">{{ new Date(data.createdAtUtc).toLocaleString() }}</template>
-      </Column>
-      <Column field="message" header="Event" />
-      <Column header="Secrets">
-        <template #body="{ data }">{{ describe(data) }}</template>
-      </Column>
-      <Column header="By">
-        <template #body="{ data }">{{ actor(data) }}</template>
-      </Column>
-    </DataTable>
-    <small v-if="history" class="text-color-secondary">
-      Changes and deliveries to Action runs and runtime starts, newest first, kept for 180 days. Values are never recorded.
-    </small>
-  </div>
+  </section>
 </template>
+
+<style scoped>
+.card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.hint { color: var(--ink-soft); font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
+code { font-family: var(--mono); font-size: 13px; }
+.link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+.rowname { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.desc { color: var(--ink-soft); font-size: 12px; }
+.field { flex: 1 1 200px; min-width: 0; }
+.add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 6px; }
+.add label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+</style>

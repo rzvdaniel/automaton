@@ -13,6 +13,7 @@ public sealed class AppsRuntimeController(
     AppsService appsService,
     UserContextService userContextService,
     RuntimeCookieService runtimeCookieService,
+    AppFramingProbe framingProbe,
     ResourceAuthorizationService authorizationService,
     IOptions<PublishedAppsConfig> publishedAppsOptions) : ControllerBase
 {
@@ -27,6 +28,17 @@ public sealed class AppsRuntimeController(
         AppendRuntimeCookie(id);
         // runtimeUrl lets Studio navigate to the app directly: a plain page navigation to launch-runtime carries no bearer token.
         return Ok(new { runtimeToken = string.Empty, runtimeUrl = BuildRestrictedRuntimeUrl(id) });
+    }
+
+    /// <summary>Whether the app lets Studio show it in a frame; Studio opens a new tab when it does not.</summary>
+    [HttpGet("{id}/embeddable")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> GetEmbeddable(Guid id, CancellationToken cancellationToken)
+    {
+        if (await DenyAsync(id, cancellationToken) is { } denied) return denied;
+
+        var studioOrigin = Request.Headers.Origin.FirstOrDefault() ?? $"{Request.Scheme}://{Request.Host}";
+        return Ok(new { canBeFramed = await framingProbe.CanBeFramedAsync(id, studioOrigin, cancellationToken) });
     }
 
     [HttpGet("{id}/launch-runtime")]

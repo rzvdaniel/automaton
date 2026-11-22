@@ -46,6 +46,20 @@ public static class ActionScheduleOccurrenceStatuses
     public const string Failed = "Failed";
 }
 
+/// <summary>
+/// Marks the platform's own schedule for an app's <c>home-card</c> Action. It belongs to the app's owner but is not one of
+/// their plan's schedules: it does not count against their schedule, run or monthly limits.
+/// </summary>
+public static class HomeCardScheduleIdentity
+{
+    public const string Prefix = "home-card:";
+
+    public static string For(Guid appId) => Prefix + appId.ToString("N");
+
+    public static bool IsPlatformSchedule(ActionSchedule schedule)
+        => schedule.SystemIdentity?.StartsWith(Prefix, StringComparison.Ordinal) == true;
+}
+
 public sealed class ActionSchedule
 {
     public Guid Id { get; set; }
@@ -63,6 +77,8 @@ public sealed class ActionSchedule
     public string? CronExpression { get; set; }
     public string TimeZone { get; set; } = "Etc/UTC";
     public bool Enabled { get; set; } = true;
+    /// <summary>Was enabled when its app was paused, so resuming the app turns it on again.</summary>
+    public bool PausedByApp { get; set; }
     public DateTime? NextRunAtUtc { get; set; }
     public DateTime? LastTriggeredAtUtc { get; set; }
     public Guid? LastExecutionId { get; set; }

@@ -148,7 +148,7 @@ public sealed class DeploymentTargetService(ConfigService config)
         {
             var runner = string.IsNullOrWhiteSpace(runnerReference)
                 ? null
-                : await ResolveRunnerAsync(client, runnerReference, cancellationToken);
+                : await ResolveRunnerForAppAsync(client, appId, runnerReference, cancellationToken);
             var normalizedSlug = slug.Trim().ToLowerInvariant();
             return await client.CreateDeploymentTargetAsync(
                 appId,
@@ -170,8 +170,8 @@ public sealed class DeploymentTargetService(ConfigService config)
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
         {
-            var runner = await ResolveRunnerAsync(
-                client, runnerReference, cancellationToken);
+            var runner = await ResolveRunnerForAppAsync(
+                client, appId, runnerReference, cancellationToken);
             await client.AssignDeploymentTargetRunnerAsync(
                 appId, target.Id, runner, cleanupRuntime, ct: cancellationToken);
         }
@@ -227,7 +227,9 @@ public sealed class DeploymentTargetService(ConfigService config)
             1 => available[0].GetProperty("id").GetString()!,
             0 => throw new InvalidOperationException(
                 "This app has no assigned Runner and no online Machine Management Runner is available to it. " +
-                "Install or start one in Studio under Runners, then deploy again."),
+                "Install or start one in Studio under Runners, then deploy again. For an app in a team project, a personal Runner " +
+                "is used only after you share it with the project: automaton project runners add <runner> --project <project>. " +
+                "That lets every project member deploy to it."),
             _ => throw new InvalidOperationException(
                 "This app has no assigned Runner and several online Runners are available. " +
                 "Choose one with 'automaton set-runner <runner>' or 'automaton deploy --runner <runner>'.")
@@ -299,12 +301,46 @@ public sealed class DeploymentTargetService(ConfigService config)
             project.Name ?? resolved.AppId);
     }
 
-    private static async Task<string> ResolveRunnerAsync(
+    // A project app can only use Runners shared with its project. Say so, and how to share one, instead of
+    // reporting a personal Runner as missing or letting the server refuse it.
+    private static async Task<string> ResolveRunnerForAppAsync(
         AutomatonApiClient client,
+        string appId,
         string runnerReference,
         CancellationToken cancellationToken)
     {
-        var runners = await client.ListRunnersAsync(cancellationToken);
+        var app = await client.GetAppAsync(appId, cancellationToken);
+        var projectId = app.TryGetProperty("projectId", out var project) && project.ValueKind == JsonValueKind.String
+            ? project.GetString()
+            : null;
+        if (projectId == null) return await ResolveRunnerAsync(client, runnerReference, null, cancellationToken);
+        try
+        {
+            return await ResolveRunnerAsync(client, runnerReference, projectId, cancellationToken);
+        }
+        catch (InvalidOperationException notFound) when (notFound.Message.Contains("was not found", StringComparison.Ordinal))
+        {
+            if (!await IsPersonalRunnerAsync(client, runnerReference, cancellationToken)) throw;
+            throw new InvalidOperationException(
+                $"Runner '{runnerReference}' is your personal Runner and is not shared with this app's project. " +
+                $"Sharing it lets every project member deploy to it, so it is not done automatically. " +
+                $"To share it: automaton project runners add {runnerReference} --project {projectId}");
+        }
+    }
+
+    private static async Task<bool> IsPersonalRunnerAsync(AutomatonApiClient client, string reference, CancellationToken cancellationToken)
+    {
+        try { await ResolveRunnerAsync(client, reference, null, cancellationToken); return true; }
+        catch (InvalidOperationException) { return false; }
+    }
+
+    private static async Task<string> ResolveRunnerAsync(
+        AutomatonApiClient client,
+        string runnerReference,
+        string? projectId,
+        CancellationToken cancellationToken)
+    {
+        var runners = await client.ListRunnersAsync(projectId, cancellationToken);
         var matches = runners.ValueKind == System.Text.Json.JsonValueKind.Array
             ? runners.EnumerateArray()
                 .Where(runner =>

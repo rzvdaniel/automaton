@@ -9,14 +9,32 @@ public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOpt
 {
     public const string Scheme = "AppPermission";
     public const string BackupsReadPolicy = "AppPermission:backups:read";
+    public const string BackupsRunPolicy = "AppPermission:backups:run";
+    public const string ServerRestartPolicy = "AppPermission:server:restart";
+    public const string ServerUpdateOsPolicy = "AppPermission:server:update-os";
     public const string ServerReadPolicy = "AppPermission:server:read";
+    public const string SecurityReadPolicy = "AppPermission:security:read";
+    public const string SecurityManagePolicy = "AppPermission:security:manage";
+    public const string AppsReadStatusPolicy = "AppPermission:apps:read-status";
+    public const string ServerCleanupPolicy = "AppPermission:server:cleanup";
+    public const string RunnerMaintainPolicy = "AppPermission:runner:maintain";
+    public const string NotifyEmailPolicy = "AppPermission:notify:email";
 
-    /// <summary>Allows system administrators and apps whose approved credential carries the permission.</summary>
+    /// <summary>Allows only an app whose approved credential carries the permission; administrators and API keys are refused because the call acts on behalf of an app.</summary>
+    public static void AddAppOnlyPermissionPolicy(Microsoft.AspNetCore.Authorization.AuthorizationOptions options, string policyName, string permission)
+        => options.AddPolicy(policyName, policy => policy
+            .AddAuthenticationSchemes(Scheme)
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context => context.User.HasClaim("app_permission", permission)
+                && Guid.TryParse(context.User.FindFirst("app_id")?.Value, out _)));
+
+    /// <summary>Allows system administrators (signed in or with a Developer API key) and apps whose approved credential carries the permission.</summary>
     public static void AddPermissionPolicy(Microsoft.AspNetCore.Authorization.AuthorizationOptions options, string policyName, string permission)
         => options.AddPolicy(policyName, policy => policy
-            .AddAuthenticationSchemes(Scheme, Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+            .AddAuthenticationSchemes(Scheme, ApiKeyAuthenticationSchemeOptions.DefaultScheme, Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
             .RequireAuthenticatedUser()
-            .RequireAssertion(context => context.User.IsInRole(Automaton.Api.Enums.UserRole.SystemAdministrator)
+            .RequireAssertion(context => (context.User.IsInRole(Automaton.Api.Enums.UserRole.SystemAdministrator)
+                    && context.User.FindFirst("api_key_scope")?.Value is null or nameof(Automaton.Core.Enums.ApiKeyScope.Developer))
                 || context.User.HasClaim("app_permission", permission)));
 }
 

@@ -45,6 +45,32 @@ public sealed class AutomatonApiClientCleanupTests
     }
 
     [Test]
+    public async Task OfflineDeletionsUseTheAbandonFlagsAndReadTheSkippedCleanup()
+    {
+        var requests = new List<string>();
+        using var http = new HttpClient(new Handler(request =>
+        {
+            requests.Add(request.Method.Method + " " + request.RequestUri!.PathAndQuery);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"skippedHostCleanup\":[\"Environment 'live' on Runner 'r1'\"]}", Encoding.UTF8, "application/json")
+            };
+        })) { BaseAddress = new Uri("https://api.example.test/") };
+        using var client = new AutomatonApiClient(http, "key");
+
+        var app = await client.DeleteAppAbandoningOfflineRuntimesAsync("app-1");
+        var runner = await client.DeleteOfflineRunnerAsync("runner-1");
+
+        Assert.That(requests, Is.EqualTo(new[]
+        {
+            "DELETE /api/apps/app-1?abandonOfflineRuntimes=true",
+            "DELETE /api/runners/runner-1?abandonOffline=true"
+        }));
+        Assert.That(app, Is.EqualTo(new[] { "Environment 'live' on Runner 'r1'" }));
+        Assert.That(runner, Is.EqualTo(app));
+    }
+
+    [Test]
     public async Task RunnerInstallationSendsAProfileTheServerAccepts()
     {
         string? body = null;
@@ -64,6 +90,24 @@ public sealed class AutomatonApiClientCleanupTests
         Assert.That(Automaton.Core.Enums.RunnerApplicationProfiles.TryNormalize(profile, out _), Is.True);
         Assert.That(profile, Is.EqualTo("MachineManagement"));
         Assert.That(Automaton.Core.Enums.RunnerApplicationProfiles.Normalize("machine-management"), Is.EqualTo("MachineManagement"));
+    }
+
+    [Test]
+    public async Task SettingValuesAreSavedThroughTheReadableSettingsRoute()
+    {
+        string? method = null, path = null, body = null;
+        using var http = new HttpClient(new Handler(request =>
+        {
+            method = request.Method.Method; path = request.RequestUri!.AbsolutePath;
+            body = request.Content!.ReadAsStringAsync().Result;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+        })) { BaseAddress = new Uri("https://api.example.test/") };
+        using var client = new AutomatonApiClient(http, "key");
+
+        await client.SetSettingValueAsync("app-1", "SITES", "a.com,b.com");
+
+        Assert.That((method, path), Is.EqualTo(("PUT", "/api/apps/app-1/setting-values/SITES")));
+        Assert.That(body, Does.Contain("a.com,b.com"));
     }
 
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler

@@ -90,7 +90,7 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" modal header="Invite people" :style="{ width: '30rem' }" :breakpoints="{ '640px': '95vw' }">
+  <Dialog v-model:visible="visible" modal header="Invite people" :style="{ width: '30rem', maxWidth: '95vw' }" :breakpoints="{ '640px': '95vw' }">
     <div class="form">
       <p class="hint">
         <template v-if="canInviteAccounts">

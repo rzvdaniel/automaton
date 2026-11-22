@@ -1,6 +1,7 @@
 ---
 title: Security overview
 description: How an Automaton installation isolates apps, protects secrets and app permissions, audits changes, and what is out of scope.
+order: 160
 ---
 
 # Security overview
@@ -26,6 +27,10 @@ Generic deployments do not accept host mounts, privileged containers, host netwo
 
 Containers are a process boundary, not a virtual machine. On a shared machine they suit people who trust each other (one person, a team, an organisation), not mutually untrusted tenants. Put workloads you do not trust on a separate machine with its own Runner.
 
+## Runners and the docker socket
+
+A Machine Management Runner has access to the host's Docker socket to manage bounded app and Action containers, so a compromised Runner could control host Docker. Install it only on machines you trust, keep user code in the isolated containers above, and keep a Runner's enrollment command private: it is a one-time secret, returned once and stored by the API as a hash.
+
 ## Secrets
 
 - App, project and personal secrets are stored encrypted on the server (ASP.NET Core Data Protection).
@@ -35,11 +40,19 @@ Containers are a process boundary, not a virtual machine. On a shared machine th
 
 ## App permissions
 
-An app that needs platform access declares permissions in `automaton.json` (for example `backups:read` or the read-only `server:read`). Nothing is granted until a system administrator approves the request in Studio; the platform then issues a scoped key and stores it as an app secret. The API rejects calls outside the approved permissions, and revoking the approval stops the next call.
+An app that needs platform access declares permissions in `automaton.json` (for example `backups:read` the read-only `server:read` and `security:read` (fail2ban bans, no firewall access), `security:manage` (unban or allowlist an address for a system administrator; approve only for an app that administrators alone can open), `server:cleanup` (read the nightly cleanup and change or run it; approve only for an app that administrators alone can open), or `notify:email`, which only emails the server's own users and an administrator-managed allowed list). Nothing is granted until a system administrator approves the request in Studio; the platform then issues a scoped key and stores it as an app secret. The API rejects calls outside the approved permissions, and revoking the approval stops the next call.
 
 ## Audit log
 
 Secret changes and uses (names, scopes and versions, never values) are recorded in the platform audit log and kept for 180 days; app permission requests, approvals and revocations are recorded there too. App owners see their app's history under **Secrets → Show history**; administrators see all events under **Admin → Audit Events**.
+
+## Scanners and password guessing
+
+The installer and every update set up [fail2ban](https://github.com/fail2ban/fail2ban) with three jails: `sshd`, `automaton-scanner` (20 requests for junk paths such as `/.env`, `/wp-admin` or `*credentials*` that answer 404, or 404 bursts on Studio, the API root and the store, within a minute) and `automaton-signin` (10 failed Automaton sign-ins within ten minutes). A banned address is blocked at the firewall (Docker's `DOCKER-USER` chain, so ports 80, 443 and 5671 are really closed to it) for an hour, longer each time it returns. Real traffic is never limited: pages, published apps' links, Studio's live connection and uploads do not count. The jails read Traefik's access log (no headers), kept in the certificates volume and rotated daily.
+
+To never ban an address, for example an office behind one shared IP, create `/etc/fail2ban/jail.local` if it does not exist and add a `[DEFAULT]` section with your address, keeping the loopback ones: `[DEFAULT]` then `ignoreip = 127.0.0.1/8 ::1 203.0.113.7` (space-separated, one line; `sshd` and the Automaton jails extend it, so the reload is enough). Run `sudo fail2ban-client reload`; `sudo fail2ban-client status` lists all jails. The installer and updates also add the address you run them from in an SSH terminal session to the `sshd` jail's allowlist, so failed logins before the install (a wrong key) cannot lock you out; this works only when the session has a terminal and a real IPv4 or IPv6 address, otherwise allowlist your address yourself. Those addresses stay until you remove them from the `# admin-ssh-ip:` line in `/etc/fail2ban/jail.d/automaton.conf` (then run `fail2ban.sh` again). List bans with `sudo fail2ban-client status automaton-scanner` (or `sshd`, `automaton-signin`) and lift one with `sudo fail2ban-client unban <address>` (for SSH: `sudo fail2ban-client set sshd unbanip <address>`).
+
+Behind a proxy or load balancer, Traefik sees the proxy's address, so allowlist the proxy or turn the Automaton jails off (`enabled = false` in a `jail.local` section for each of them).
 
 ## Out of scope
 

@@ -3,6 +3,7 @@ namespace Automaton.Api.Constants;
 public static class AuditEntityTypes
 {
     public const string ActionSchedule = "ActionSchedule";
+    public const string ActionWebhook = "ActionWebhook";
     public const string ApiKey = "ApiKey";
     public const string App = "App";
     public const string Runner = "Runner";
@@ -23,5 +24,6 @@ public static class AuditEntityTypes
     public const string UserSecretVault = "UserSecretVault";
     public const string AppPermission = "AppPermission";
     public const string ServerInstallation = "ServerInstallation";
+    public const string RetentionSettings = "RetentionSettings";
     public const string CatalogSource = "CatalogSource";
 }

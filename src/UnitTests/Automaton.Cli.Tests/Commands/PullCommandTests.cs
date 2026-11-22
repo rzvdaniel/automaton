@@ -11,6 +11,25 @@ namespace Automaton.Cli.Tests.Commands;
 public class PullCommandTests
 {
     [Test]
+    public async Task DownloadFileAsync_WritesFileWithoutByteOrderMark()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pull-bom-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var local = Path.Combine(dir, "sub", ".automatonignore");
+            await PullCommand.DownloadFileAsync(new PullCommand.SourceDownload(".automatonignore", local), _ => Task.FromResult("# Pulled\nnode_modules\n"));
+
+            var bytes = await File.ReadAllBytesAsync(local);
+            Assert.That(bytes.Take(3).ToArray(), Is.EqualTo(new byte[] { 0x23, 0x20, 0x50 }));
+            Assert.That(Encoding.UTF8.GetString(bytes), Is.EqualTo("# Pulled\nnode_modules\n"));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public async Task ResolveAppAsync_WhenGivenExactSlugLoadsTheAccessibleAppById()
     {
         const string appId = "11111111-1111-1111-1111-111111111111";

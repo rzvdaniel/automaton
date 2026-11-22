@@ -11,5 +11,4 @@ public sealed record AutomatonGuidanceDocument(
     bool RequiredByDefault,
     bool IsModelLoadable,
     int SortOrder,
-    int Version,
-    bool IsDatabaseDocument);
+    int Version);

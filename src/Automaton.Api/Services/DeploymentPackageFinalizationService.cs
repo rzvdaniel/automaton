@@ -15,7 +15,6 @@ namespace Automaton.Api.Services;
 public sealed class DeploymentPackageFinalizationService(
     ApplicationDbContext dataContext,
     AppFileStorageService fileStorageService,
-    ConnectedFlowArtifactService connectedFlowArtifactService,
     BackendRouteConfigService backendRouteConfigService,
     MachineStaticAppPublicationService? staticPublication = null)
 {
@@ -32,13 +31,6 @@ public sealed class DeploymentPackageFinalizationService(
         // Source and managed artifacts belong to the project owner for project apps, where Studio deploy
         // reads them even when a project editor ran the deploy (forking still reads the first linked user).
         var sourceOwnerId = await ResolveSourceOwnerIdAsync(appId, ownerId, cancellationToken);
-        await connectedFlowArtifactService.SynchronizeAsync(
-            appId,
-            deploymentTargetId,
-            sourceOwnerId,
-            [runner],
-            cancellationToken,
-            deploymentOperationId);
         await DeployPackageContractService.PersistAsync(dataContext, appId, packageApplication, cancellationToken);
         await PersistSourceAsync(appId, sourceOwnerId, file, cancellationToken);
         await fileStorageService.UpdateAppStorageMetadataAsync(sourceOwnerId, appId, metadata =>

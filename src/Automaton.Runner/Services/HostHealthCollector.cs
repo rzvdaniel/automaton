@@ -7,14 +7,13 @@ namespace Automaton.Runner.Console.Services;
 /// Reads host figures from the Runner container (/proc is host-wide), the Docker API on the mounted socket, and a
 /// short-lived read-only helper container for the few host files the Runner cannot see. Nothing here is exposed to apps.
 /// </summary>
-public sealed class HostHealthCollector
+public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
 {
     private const string DockerSocket = "/var/run/docker.sock";
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(60);
 
     private const string HelperScript =
         "echo '[os]'; cat /host/os-release 2>/dev/null; " +
-        "echo '[updates]'; cat /host/updates/updates-available 2>/dev/null; " +
         "if [ -e /host/reboot-required ]; then echo '[reboot]'; stat -c %Y /host/reboot-required; fi";
 
     public async Task<MachineHostHealth> CollectAsync(CancellationToken token)
@@ -23,15 +22,50 @@ public sealed class HostHealthCollector
         var load = HostHealthParsers.ParseLoad(Read("/proc/loadavg"));
         var memory = HostHealthParsers.ParseMemory(Read("/proc/meminfo"));
         var disk = ReadDisk();
-        var docker = HostHealthParsers.ParseDockerDiskUsage(await DockerDiskUsageAsync(token));
-        var files = HostFiles.From(await ReadHostFilesAsync(token));
+        var (docker, dockerApps, apps) = await ReadDockerAsync(token);
+        var files = HostFiles.From(await ReadHostFilesAsync(token), await ReadUpdateCountsAsync(token));
+        var fail2Ban = await Fail2BanReader.ReadAsync(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE"), token);
 
         return new MachineHostHealth(
             DateTime.UtcNow, files.OsName, files.OsVersion, HostHealthParsers.ParseUptimeSeconds(Read("/proc/uptime")),
             cpus, cpuPercent, load?.Load1, load?.Load5, load?.Load15, memory?.Total, memory?.Available,
             disk?.Total, disk?.Available, docker?.Images, docker?.Containers, docker?.Volumes, docker?.BuildCache,
             files.Pending, files.Security, files.RebootRequired, files.RebootSince,
-            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString());
+            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps, fail2Ban);
+    }
+
+    private async Task<(
+        (long Images, long Containers, long Volumes, long BuildCache)? Totals,
+        (Dictionary<Guid, (long Container, long Image)> Apps, long UnusedImages)? Apps,
+        IReadOnlyList<AppDiskUsage> Disk)> ReadDockerAsync(CancellationToken token)
+    {
+        var json = await DockerDiskUsageAsync(token);
+        var perApp = HostHealthParsers.ParseDockerAppUsage(json);
+        return (HostHealthParsers.ParseDockerDiskUsage(json), perApp, appDisk.Measure(perApp?.Apps, await ReadAppStatsAsync(json, token)));
+    }
+
+    private const int MaximumStatsContainers = 100;
+
+    // Docker samples CPU for about a second per call, so the containers are read in parallel; an app sums its containers.
+    private static async Task<Dictionary<Guid, (double? Cpu, long? Memory)>?> ReadAppStatsAsync(string? dockerJson, CancellationToken token)
+    {
+        if (dockerJson is null) return null;
+        var running = HostHealthParsers.ParseRunningAppContainers(dockerJson).Take(MaximumStatsContainers).ToArray();
+        using var gate = new SemaphoreSlim(8);
+        var samples = await Task.WhenAll(running.Select(async item =>
+        {
+            await gate.WaitAsync(token);
+            try
+            {
+                var result = await RunAsync("curl", ["--silent", "--fail", "--max-time", "10", "--unix-socket", DockerSocket,
+                    $"http://localhost/containers/{Uri.EscapeDataString(item.ContainerId)}/stats?stream=false"], token);
+                return (item.AppId, Stats: result?.ExitCode == 0 ? HostHealthParsers.ParseContainerStats(result.Output) : (Cpu: (double?)null, Memory: (long?)null));
+            }
+            finally { gate.Release(); }
+        }));
+        return samples.GroupBy(sample => sample.AppId).ToDictionary(group => group.Key, group => (
+            group.Any(s => s.Stats.Cpu is not null) ? group.Sum(s => s.Stats.Cpu ?? 0) : (double?)null,
+            group.Any(s => s.Stats.Memory is not null) ? group.Sum(s => s.Stats.Memory ?? 0) : (long?)null));
     }
 
     private static async Task<(int? Cpus, double? Percent)> ReadCpuAsync(CancellationToken token)
@@ -46,14 +80,13 @@ public sealed class HostHealthCollector
     private sealed record HostFiles(
         string? OsName, string? OsVersion, int? Pending, int? Security, bool? RebootRequired, DateTime? RebootSince)
     {
-        public static HostFiles From(Dictionary<string, string> sections)
+        public static HostFiles From(Dictionary<string, string> sections, (int? Pending, int? Security) updates)
         {
             var (name, version) = HostHealthParsers.ParseOsRelease(sections.GetValueOrDefault("os"));
-            var (pending, security) = HostHealthParsers.ParseUpdatesAvailable(sections.GetValueOrDefault("updates"));
             DateTime? since = long.TryParse(sections.GetValueOrDefault("reboot")?.Trim(), out var seconds)
                 ? DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime : null;
             // The helper container only ran when the os section exists; otherwise "restart required" is unknown.
-            return new(name, version, pending, security, sections.ContainsKey("os") ? sections.ContainsKey("reboot") : null, since);
+            return new(name, version, updates.Pending, updates.Security, sections.ContainsKey("os") ? sections.ContainsKey("reboot") : null, since);
         }
     }
 
@@ -85,15 +118,14 @@ public sealed class HostHealthCollector
     }
 
     // Each attempt mounts fewer host paths: docker refuses a bind mount whose source is missing (no reboot-required file
-    // when no restart is pending, no update-notifier on Debian).
+    // when no restart is pending).
     private static async Task<Dictionary<string, string>> ReadHostFilesAsync(CancellationToken token)
     {
         var image = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE");
         if (string.IsNullOrWhiteSpace(image)) return [];
         var os = ("/etc/os-release", "/host/os-release");
         var reboot = ("/run/reboot-required", "/host/reboot-required");
-        var updates = ("/var/lib/update-notifier", "/host/updates");
-        (string Source, string Target)[][] attempts = [[os, reboot, updates], [os, reboot], [os, updates], [os]];
+        (string Source, string Target)[][] attempts = [[os, reboot], [os]];
         foreach (var mounts in attempts)
         {
             var args = new List<string>
@@ -110,9 +142,21 @@ public sealed class HostHealthCollector
         return [];
     }
 
-    private sealed record CommandResult(int ExitCode, string Output);
+    // Asks apt on the host (apt-check works as a normal user and reads the lists apt-daily.timer refreshes) instead of the
+    // update-notifier summary file Ubuntu rewrites root-only. apt-check prints "all;security" on stderr.
+    private const string UpdateCountScript = "/usr/lib/update-notifier/apt-check 2>&1 || apt list --upgradable 2>/dev/null";
 
-    private static async Task<CommandResult?> RunAsync(string file, IEnumerable<string> arguments, CancellationToken token)
+    private static async Task<(int? Pending, int? Security)> ReadUpdateCountsAsync(CancellationToken token)
+    {
+        var image = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE");
+        if (string.IsNullOrWhiteSpace(image)) return (null, null);
+        var result = await RunAsync("docker", HostCleanupService.HostCommand(image, "sh", "-c", UpdateCountScript), token);
+        return result?.ExitCode == 0 ? HostHealthParsers.ParseUpdateCounts(result.Output) : (null, null);
+    }
+
+    internal sealed record CommandResult(int ExitCode, string Output);
+
+    internal static async Task<CommandResult?> RunAsync(string file, IEnumerable<string> arguments, CancellationToken token)
     {
         var info = new ProcessStartInfo(file) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         foreach (var argument in arguments) info.ArgumentList.Add(argument);

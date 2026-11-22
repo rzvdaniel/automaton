@@ -1,6 +1,7 @@
 ---
 title: Secrets and permissions
 description: Give an app its credentials with automaton secrets and request platform permissions that an administrator approves.
+order: 110
 ---
 
 # Secrets and permissions
@@ -9,7 +10,7 @@ This page covers how an app gets credentials (secrets) and platform access (perm
 
 ## Prerequisites
 
-An app folder linked to an app on your server ([Create your first app](./getting-started)).
+An app folder linked to an app on your server ([Your first app](./getting-started)).
 
 ## Give an app a secret
 
@@ -30,13 +31,26 @@ An app folder linked to an app on your server ([Create your first app](./getting
 
 ## Request a platform permission
 
-Declare `application.permissions` (`backups:read` and `server:read`), deploy, then show the state:
+Declare `application.permissions` (`backups:read`, `server:read`, `security:read` (fail2ban bans, read-only), `security:manage` (unban or allowlist an address), `server:cleanup`, `backups:run`, `server:restart`, `server:update-os` and `notify:email`), deploy, then show the state:
 
 ```bash
 automaton permissions status
 ```
 
-A system administrator approves it in Studio (the command prints the approval link). Nothing is granted before that, and revoking stops the next call.
+A system administrator approves it in Studio: Home names each request with Approve and Reject, and Admin > Permission requests lists every waiting request by app (the command prints the approval link). Nothing is granted before that, and revoking stops the next call.
+
+### Email people with `notify:email`
+
+With `notify:email` approved, the app can ask the server to email through the server's own SMTP (Admin > Settings); it never sees SMTP credentials. Call it with the app's key:
+
+```bash
+curl -X POST "$AUTOMATON_API_URL/api/notify/email" \
+  -H "Authorization: Bearer $APP_AUTOMATON_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to":["administrators"],"subject":"Disk almost full","text":"Only 2 GB left."}'
+```
+
+`to` takes `owner` (the app's owners), `administrators`, `project` (the members of the app's project) and addresses an administrator put on the server's allowed list (`PUT /api/admin/installation/notify-recipients`). Any other address gets 403; apps cannot email arbitrary addresses, so an app that needs that brings its own SMTP or uses a webhook. The subject is prefixed with `[app name]`, the text is plain text (up to 10,000 characters), and each recipient gets their own message. An app can send 10 emails per hour (429 with `Retry-After` beyond that). Answers: 200 `{"sent":n}`, 400 invalid request, 403 not approved or address not allowed, 404 no recipient resolved, 409 SMTP not configured. Every send and refusal appears in Admin > Audit Events (subject and counts, never the text).
 
 ## Verify it worked
 
@@ -49,5 +63,9 @@ Every declared secret shows `present` and the scope that provides it. `automaton
 ## Common errors
 
 - **Secret shows `missing`.** Set it in the right scope (`--project` needs `automaton project add-app` first).
-- **Static site cannot use secrets.** Its files go to the browser. Put secrets in an API or server-rendered app.
+- **Static site cannot use secrets.** Its files go to the browser. Put secrets in an API or server-rendered app. `secrets set`, `secrets status` and `deploy` do not refuse them for a static site, but the values never reach it.
 - **Values are never shown again.** Saving the same name replaces the value.
+
+The proxy removes any `X-Automaton-Viewer-Role` and `X-Automaton-Viewer-Token` a client sends, on every route including public apps and open paths. Your app receives them only on requests the platform signed in, so you can trust them; without them the request is anonymous.
+
+`server:cleanup` writes are checked per viewer: the app receives `X-Automaton-Viewer-Role` (to hide controls) and a short-lived `X-Automaton-Viewer-Token` on each request, and must forward the token as the `X-Automaton-Viewer-Token` header on `PUT`/`POST` calls to `/api/server/cleanup`. The API refuses with 403 unless it belongs to a system administrator.

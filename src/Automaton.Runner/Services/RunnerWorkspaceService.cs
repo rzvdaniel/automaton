@@ -368,30 +368,36 @@ public class RunnerWorkspaceService
     /// Deletes deployment-target-owned state while preserving the application's
     /// persistent data root. Persistent data has a separate explicit operation.
     /// </summary>
+    private string[] ApplicationTargetRoots(Guid appId, Guid deploymentTargetId) => new[]
+    {
+        GetDeploymentTargetRoot(appId, deploymentTargetId),
+        GetLegacyControllerTargetRoot(appId, deploymentTargetId)
+    }.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+    private string[] ApplicationStorageRoots(Guid appId)
+    {
+        if (appId == Guid.Empty) throw new ArgumentException("App ID is required.", nameof(appId));
+        return new[] {
+            ManagedPathBoundary.ResolveInside(AppsRoot, appId.ToString(), "app cleanup"),
+            ManagedPathBoundary.ResolveInside(GetFastApiScriptsRoot(), appId.ToString(), "legacy app cleanup"),
+            ManagedPathBoundary.ResolveInside(DataRoot, appId.ToString(), "app data cleanup"),
+            ManagedPathBoundary.ResolveInside(RunnerRoot, $"deployments/{appId}", "app staging cleanup") }
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    /// <summary>Every existing directory whole-app deletion removes, for emptying files another user owns.</summary>
+    public IReadOnlyList<string> GetApplicationCleanupRoots(Guid appId, Guid deploymentTargetId)
+        => ApplicationTargetRoots(appId, deploymentTargetId).Concat(ApplicationStorageRoots(appId)).Where(Directory.Exists).ToArray();
+
     public void DeleteApplicationTarget(Guid appId, Guid deploymentTargetId)
     {
-        var targetRoots = new[]
-        {
-            GetDeploymentTargetRoot(appId, deploymentTargetId),
-            GetLegacyControllerTargetRoot(appId, deploymentTargetId)
-        };
-
-        foreach (var targetRoot in targetRoots.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            if (Directory.Exists(targetRoot))
-                Directory.Delete(targetRoot, recursive: true);
-        }
+        foreach (var targetRoot in ApplicationTargetRoots(appId, deploymentTargetId))
+            if (Directory.Exists(targetRoot)) Directory.Delete(targetRoot, recursive: true);
     }
 
     public void DeleteApplicationStorage(Guid appId)
     {
-        if (appId == Guid.Empty) throw new ArgumentException("App ID is required.", nameof(appId));
-        var roots = new[] {
-            ManagedPathBoundary.ResolveInside(AppsRoot, appId.ToString(), "app cleanup"),
-            ManagedPathBoundary.ResolveInside(GetFastApiScriptsRoot(), appId.ToString(), "legacy app cleanup"),
-            ManagedPathBoundary.ResolveInside(DataRoot, appId.ToString(), "app data cleanup"),
-            ManagedPathBoundary.ResolveInside(RunnerRoot, $"deployments/{appId}", "app staging cleanup") };
-        foreach (var root in roots.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var root in ApplicationStorageRoots(appId))
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
     }
 

@@ -124,6 +124,44 @@ public sealed class RunnerRemovalTests
         Assert.That((await db.ApiKeys.SingleAsync(item => item.Id == key.Id)).IsActive, Is.False);
     }
 
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    public async Task AbandonOffline_DeletesOnlyAnOfflineRunnerWithoutPreparationOrHostCleanup(bool online, bool deleted)
+    {
+        await using var db = AppAuthorizationTestData.CreateDbContext();
+        var owner = Guid.NewGuid();
+        var runner = SeedRunner(db, owner);
+        if (online)
+        {
+            runner.ConnectionId = "still-connected";
+            runner.LastHeartbeatAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        var service = new RunnerDeletionService(db, Policy(db, owner), new Audit(),
+            AppAuthorizationTestData.CreateUserContextService(owner), RunnerExecutionTestServices.Revocation(db));
+
+        if (deleted) await service.DeleteAsync(runner.Id, CancellationToken.None, abandonOffline: true);
+        else Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteAsync(runner.Id, CancellationToken.None, abandonOffline: true));
+
+        Assert.That(await db.Runners.AnyAsync(item => item.Id == runner.Id), Is.EqualTo(!deleted));
+    }
+
+    [Test]
+    public async Task AbandonOffline_IgnoresAssignmentsButTheNormalPathStillRefusesThem()
+    {
+        await using var db = AppAuthorizationTestData.CreateDbContext();
+        var owner = Guid.NewGuid();
+        var runner = SeedRunner(db, owner);
+        var appId = Guid.NewGuid();
+        AppAuthorizationTestData.SeedApp(db, appId, owner, "tasks");
+        (await db.AppDeploymentTargets.SingleAsync(target => target.WebAppId == appId)).ExecutionRunnerId = runner.Id;
+        await db.SaveChangesAsync();
+        var policy = Policy(db, owner);
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => policy.EnsureCanDeleteAsync(runner.Id, CancellationToken.None));
+        Assert.DoesNotThrowAsync(() => policy.EnsureCanDeleteAsync(runner.Id, CancellationToken.None, abandonOffline: true));
+    }
+
     [Test]
     public async Task PrepareRemoval_RejectsOtherOwners()
     {
@@ -148,7 +186,7 @@ public sealed class RunnerRemovalTests
 
     private static async Task QueueManagementAsync(RunnerExecutionOperationService operations, Guid runnerId, Guid owner)
         => await operations.QueueAsync(runnerId, owner,
-            new(null, null, AppActionCommand.Create("list-modules", new { })), CancellationToken.None);
+            new( AppActionCommand.Create("list-modules", new { })), CancellationToken.None);
 
     private static Runner SeedRunner(Automaton.Api.Data.ApplicationDbContext db, Guid owner)
     {

@@ -172,10 +172,37 @@ internal static class AppActionProcessExecutor
             return CreateFailedResult(request, exitCode, AppModuleExecutionErrorCodes.InvalidResult,
                 validationError, deploymentHash, startedAt);
         await File.WriteAllTextAsync(resultPath, redactedStdout, cancellationToken);
-        return AppActionExecutionResultFactory.Create(
+        var succeeded = AppActionExecutionResultFactory.Create(
             request.ExecutionId, AppModuleExecutionStatuses.Succeeded, exitCode, null, null,
             deploymentHash, startedAt, logs: true, result: true);
+        succeeded.HomeCardJson = ExtractHomeCard(request.ActionKey, redactedStdout);
+        return succeeded;
     }
+
+    /// <summary>
+    /// The card a run offers for the app's Studio Home card: the whole result of the <c>home-card</c> Action, or the
+    /// <c>homeCard</c> object of any other Action's result. Null when there is none. The API validates it.
+    /// </summary>
+    internal static string? ExtractHomeCard(string actionKey, string stdout)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(stdout);
+            var root = document.RootElement;
+            JsonElement card;
+            if (actionKey == HomeCardActionKey) card = root;
+            else if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("homeCard", out card)) return null;
+            var raw = card.GetRawText();
+            return Encoding.UTF8.GetByteCount(raw) > MaximumHomeCardBytes ? "!too-large" : raw;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    internal const string HomeCardActionKey = "home-card";
+    private const int MaximumHomeCardBytes = 16384;
 
     private static AppActionExecutionResult CreateFailedResult(
         ExecuteAppActionModuleRequest request,

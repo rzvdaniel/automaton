@@ -5,11 +5,7 @@ VisualStudioVersion = 17.0.32002.185
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core", "src\Automaton.Core\Automaton.Core.csproj", "{1E18D1BF-1A0D-46A6-9734-B82CFF067348}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Steps", "src\Automaton.Steps\Automaton.Steps.csproj", "{2668B7B6-4410-4433-AB86-388A5671CAD5}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Api", "src\Automaton.Api\Automaton.Api.csproj", "{D6140B93-4232-4845-B10B-F41DDD8A61EE}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Scripting", "src\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj", "{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{28B06BA2-AC92-4F2F-9CA1-2CBBB8652448}"
 EndProject
@@ -25,18 +21,10 @@ Global
 		{1E18D1BF-1A0D-46A6-9734-B82CFF067348}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E18D1BF-1A0D-46A6-9734-B82CFF067348}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1E18D1BF-1A0D-46A6-9734-B82CFF067348}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2668B7B6-4410-4433-AB86-388A5671CAD5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2668B7B6-4410-4433-AB86-388A5671CAD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2668B7B6-4410-4433-AB86-388A5671CAD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2668B7B6-4410-4433-AB86-388A5671CAD5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D6140B93-4232-4845-B10B-F41DDD8A61EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D6140B93-4232-4845-B10B-F41DDD8A61EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D6140B93-4232-4845-B10B-F41DDD8A61EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D6140B93-4232-4845-B10B-F41DDD8A61EE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{159069F1-CCD8-4806-B545-8172CF4F994C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{159069F1-CCD8-4806-B545-8172CF4F994C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{159069F1-CCD8-4806-B545-8172CF4F994C}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -1,6 +1,7 @@
 ---
 title: Current limitations
 description: What Automaton does not do yet, stated specifically.
+order: 150
 ---
 
 # Current limitations
@@ -10,7 +11,7 @@ Automaton is early. These are the specific things to know before you rely on it.
 ## Platform
 
 - **x86_64 Linux only.** Ubuntu and Debian 12 are supported (apt, systemd, Docker Engine) for the server and the Runner host. Other x86_64 Linux with systemd and Docker may work but is untested, and you install Docker yourself. ARM and fully offline or private-only installs are not supported yet.
-- **Public DNS and HTTPS.** The server needs `api`, `studio`, `store`, `apps` and `*.apps` records and public ports 80, 443 and 5671.
+- **Public DNS and HTTPS.** The server needs two DNS records (`example.com` and `*.example.com`, DNS only) and public ports 80, 443 and 5671.
 - **A Runner is the agent you install on a server to run apps.** With one Runner, `automaton deploy` uses it automatically; with several you pick one per app. There is no automatic balancing.
 - **No high availability.** The API, database and each Runner run on single machines. A machine that goes down takes its apps with it until you restore it.
 - **No autoscaling or cross-region failover.** Each app runs where it is assigned.
@@ -31,6 +32,6 @@ Automaton is early. These are the specific things to know before you rely on it.
 
 ## Tooling
 
-- **The CLI needs the .NET 10 SDK or later** to install from NuGet. The server installer does not need .NET.
+- **The standalone CLI needs no .NET.** Only the NuGet tool (`dotnet tool install`) needs the .NET 10 SDK or later; standalone builds cover Linux x64/arm64, macOS x64/arm64 and Windows x64.
 
 We update this page as these are fixed. See the [roadmap](https://github.com/rzvdaniel/automaton/blob/main/docs/roadmap/README.md) for what is planned.

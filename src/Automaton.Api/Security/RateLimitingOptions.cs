@@ -5,7 +5,10 @@ public class RateLimitingOptions
     public const string SectionName = "RateLimiting";
 
     public RateLimitPolicyOptions GlobalAnonymous { get; set; } = new(200, 60);
+    public RateLimitPolicyOptions RunnerApi { get; set; } = new(2000, 60);
     public RateLimitPolicyOptions GlobalAuthenticated { get; set; } = new(1000, 60);
+    /// <summary>Static files (scripts, styles, images, fonts) of an app, per visitor address; a page loads dozens at once.</summary>
+    public RateLimitPolicyOptions AppStaticAssets { get; set; } = new(3000, 60);
     public int MaxConcurrentMultipartRequests { get; set; } = 2;
     public RateLimitPolicyOptions AuthLogin { get; set; } = new(5, 60);
     public RateLimitPolicyOptions AuthRegistration { get; set; } = new(3, 3600);
@@ -17,6 +20,8 @@ public class RateLimitingOptions
     public RateLimitPolicyOptions PublicAppControllerExecution { get; set; } = new(10, 60);
     public RateLimitPolicyOptions PublicAppFlowExecution { get; set; } = new(10, 60);
     public RateLimitPolicyOptions PublicAppStepExecution { get; set; } = new(10, 60);
+    /// <summary>Calls to Action webhooks per caller address, secret or not; each webhook also allows a number of accepted calls a minute.</summary>
+    public RateLimitPolicyOptions ActionWebhookCall { get; set; } = new(120, 60);
     public RateLimitPolicyOptions PublicMarketplaceAppLaunch { get; set; } = new(1, 600);
 }
 

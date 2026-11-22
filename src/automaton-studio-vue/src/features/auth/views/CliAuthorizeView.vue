@@ -16,6 +16,7 @@ const error = ref('')
 const loadingDetails = ref(true)
 const details = ref<CliAuthorizationDetails | null>(null)
 const cancelling = ref(false)
+const isAdminKey = computed(() => details.value?.scope === 'PermissionsAdmin')
 
 onMounted(async () => {
   if (!requestId.value || !userCode.value) {
@@ -78,12 +79,14 @@ function formatDate(value?: string) {
 
 <template>
   <AuthCard
-    title="Let your AI agent in?"
-    :lead="approved ? undefined : 'An AI agent is asking to use Automaton as you. Check that this code matches the one it shows.'"
+    :title="isAdminKey ? 'Give an admin key for app permissions?' : 'Let your AI agent in?'"
+    :lead="approved ? undefined : isAdminKey
+      ? 'A command-line session is asking for an admin key. Approve only if you just ran automaton login --permissions-admin yourself; otherwise press Deny. The machine name and code below must match your terminal.'
+      : 'An AI agent is asking to use Automaton as you. Check that this code matches the one it shows.'"
   >
     <Message v-if="error" severity="error" :closable="false" class="mb-4">{{ error }}</Message>
     <Message v-if="approved" severity="success" :closable="false" class="mb-4">
-      Automaton CLI is authorized on this device. You can return to the terminal.
+      {{ isAdminKey ? 'The admin key was approved. You can return to the terminal.' : 'Automaton CLI is authorized on this device. You can return to the terminal.' }}
     </Message>
 
     <template v-if="!approved">
@@ -94,6 +97,18 @@ function formatDate(value?: string) {
           <span v-else class="cli-code-char">{{ char }}</span>
         </template>
       </div>
+      <template v-if="isAdminKey">
+        <p class="auth-note" style="margin-bottom: 8px">Approving gives that machine a key, valid for 30 days, that can only:</p>
+        <ul class="cli-list">
+          <li>Approve or reject the permissions apps ask for, as you (a system administrator).</li>
+        </ul>
+        <p class="auth-note" style="margin-bottom: 16px">
+          It cannot do anything else, and stops working if you stop being a system administrator.
+          Only system administrators can approve this request.
+          Nobody else can read the key; it is shown only to the waiting CLI process.
+        </p>
+      </template>
+      <template v-else>
       <p class="auth-note" style="margin-bottom: 8px">Approving lets the agent, through the Automaton CLI:</p>
       <ul class="cli-list">
         <li>Create, change, deploy and publish apps as you.</li>
@@ -103,11 +118,13 @@ function formatDate(value?: string) {
         It does not get API-key management, administration, billing or infrastructure enrollment.
         The credential is shown only to the waiting CLI process.
       </p>
+      </template>
       <div v-if="details" class="cli-details">
-        <div><span>Device</span><span>{{ details.deviceName }}</span></div>
+        <div><span>{{ isAdminKey ? 'Machine name (chosen by the requester)' : 'Machine name' }}</span><span>{{ details.deviceName }}</span></div>
         <div><span>Requested from</span><span>{{ details.remoteIp || 'Not available' }}</span></div>
         <div><span>Requested time</span><span>{{ formatDate(details.createdAt) }}</span></div>
-        <div><span>Credential</span><span>Developer / CLI</span></div>
+        <div><span>Credential</span><span>{{ isAdminKey ? 'Admin: approve app permissions (30 days)' : 'Developer / CLI' }}</span></div>
+        <div><span>Request expires</span><span>{{ formatDate(details.expiresAt) }}</span></div>
       </div>
       <div class="cli-actions">
         <Button label="Deny" class="auth-outline" :loading="cancelling" @click="cancel" />

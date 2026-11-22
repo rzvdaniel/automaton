@@ -14,11 +14,11 @@ internal static class ApplicationModelConfiguration
         ConfigureMarketplaceCategory(modelBuilder);
         ConfigureWebAppUser(modelBuilder);
         ConfigureAppShare(modelBuilder);
+        ConfigureAppCustomDomain(modelBuilder);
         ConfigureWebAppStar(modelBuilder);
+        ConfigureUserHome(modelBuilder);
         ConfigureWebAppScreenshot(modelBuilder);
-        ConfigureWebAppStep(modelBuilder);
         ConfigureAppVersion(modelBuilder);
-        ConfigureAppVersionStep(modelBuilder);
         ConfigureRefreshToken(modelBuilder);
         ConfigureRecentActivity(modelBuilder);
     }
@@ -55,6 +55,8 @@ internal static class ApplicationModelConfiguration
 
     private static void ConfigureAppShare(ModelBuilder modelBuilder)
     {
+        // A team share ends when the team is deleted.
+        modelBuilder.Entity<WebApp>().HasOne<Project>().WithMany().HasForeignKey(e => e.SharedWithProjectId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<AppShare>(entity =>
         {
             entity.HasKey(e => new { e.WebAppId, e.UserId });
@@ -62,6 +64,20 @@ internal static class ApplicationModelConfiguration
             // A share goes away with the app or the person it names.
             entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.WebAppId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureAppCustomDomain(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AppCustomDomain>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Host).IsRequired().HasMaxLength(253);
+            entity.Property(e => e.VerificationToken).IsRequired().HasMaxLength(64);
+            entity.HasIndex(e => e.Host).IsUnique();
+            entity.HasIndex(e => e.WebAppId);
+            // A domain goes away with its app.
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.WebAppId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 
@@ -76,6 +92,42 @@ internal static class ApplicationModelConfiguration
             });
     }
 
+    private static void ConfigureUserHome(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserHomePin>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.AppId });
+            entity.HasIndex(e => new { e.UserId, e.SortOrder });
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<UserHomeSetting>(entity =>
+        {
+            entity.HasKey(e => e.UserId);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<UserHomeDismissal>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.CardKey });
+            entity.Property(e => e.CardKey).HasMaxLength(100);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<UserNotificationAck>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.Key });
+            entity.Property(e => e.Key).HasMaxLength(100);
+            entity.Property(e => e.Fingerprint).HasMaxLength(64);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<AppHomeCard>(entity =>
+        {
+            entity.HasKey(e => e.AppId);
+            entity.Property(e => e.CardJson).IsRequired().HasMaxLength(16384);
+            entity.Property(e => e.InvalidReason).HasMaxLength(300);
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
     private static void ConfigureWebAppScreenshot(ModelBuilder modelBuilder)
     {
             modelBuilder.Entity<WebAppScreenshot>(entity =>
@@ -88,33 +140,6 @@ internal static class ApplicationModelConfiguration
 
                 entity.HasIndex(e => e.WebAppId);
                 entity.HasIndex(e => new { e.WebAppId, e.SortOrder });
-            });
-    }
-
-    private static void ConfigureWebAppStep(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<WebAppStep>(entity =>
-            {
-                entity.HasKey(e => new { e.WebAppId, e.CustomStepId });
-                entity.Property(e => e.LinkedAt).IsRequired();
-
-                entity.HasIndex(e => e.WebAppId);
-                entity.HasIndex(e => e.CustomStepId);
-
-                entity.HasOne(e => e.WebApp)
-                    .WithMany()
-                    .HasForeignKey(e => e.WebAppId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.CustomStep)
-                    .WithMany()
-                    .HasForeignKey(e => e.CustomStepId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.LinkedByUser)
-                    .WithMany()
-                    .HasForeignKey(e => e.LinkedBy)
-                    .OnDelete(DeleteBehavior.Restrict);
             });
     }
 
@@ -149,34 +174,6 @@ internal static class ApplicationModelConfiguration
                     .WithMany()
                     .HasForeignKey(e => e.CreatedBy)
                     .OnDelete(DeleteBehavior.Restrict);
-            });
-    }
-
-    private static void ConfigureAppVersionStep(ModelBuilder modelBuilder)
-    {
-            modelBuilder.Entity<AppVersionStep>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.AppVersionId).IsRequired();
-                entity.Property(e => e.StepId).IsRequired();
-                entity.Property(e => e.StepName).IsRequired().HasMaxLength(200);
-                entity.Property(e => e.Action).IsRequired();
-                entity.Property(e => e.Description).HasMaxLength(2000);
-                entity.Property(e => e.CodeSnapshot).IsRequired();
-                entity.Property(e => e.VariablesSnapshot).IsRequired().HasColumnType("jsonb");
-
-                entity.HasIndex(e => e.AppVersionId);
-                entity.HasIndex(e => e.StepId);
-
-                entity.HasOne(e => e.AppVersion)
-                    .WithMany(p => p.Steps)
-                    .HasForeignKey(e => e.AppVersionId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.Step)
-                    .WithMany()
-                    .HasForeignKey(e => e.StepId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
     }
 

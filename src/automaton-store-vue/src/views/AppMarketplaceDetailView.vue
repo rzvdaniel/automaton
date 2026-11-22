@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import AppMark from '@/components/AppMark.vue'
 import MarketplaceAppRow from '@/components/MarketplaceAppRow.vue'
 import StoreFooter from '@/components/StoreFooter.vue'
 import StoreHeader from '@/components/StoreHeader.vue'
@@ -45,7 +46,6 @@ const summary = computed(() => app.value?.summary || app.value?.description || '
 const description = computed(() => app.value?.description || app.value?.summary || '')
 const tags = computed(() => app.value?.tags?.split(',').map((tag) => tag.trim()).filter(Boolean) ?? [])
 const otherCreatorApps = computed(() => creatorApps.value.filter((other) => other.id !== app.value?.id))
-const initial = computed(() => [...(app.value?.name.trim() ?? '?')][0]?.toUpperCase() ?? '?')
 
 function formatDate(value?: string) {
   if (!value) return ''
@@ -167,7 +167,10 @@ onBeforeUnmount(() => {
     <main>
       <section class="band">
         <div class="wrap top-area">
-          <RouterLink class="back" to="/"><span aria-hidden="true">←</span> All public apps</RouterLink>
+          <p class="eyebrow crumbs">
+            <RouterLink class="back" to="/"><span aria-hidden="true">←</span> All apps</RouterLink>
+            <template v-if="app?.category"> · {{ app.category }}</template>
+          </p>
 
           <p v-if="loading" class="state">Loading app…</p>
 
@@ -176,14 +179,16 @@ onBeforeUnmount(() => {
             <RouterLink class="btn small" to="/">Browse public apps</RouterLink>
           </div>
 
-          <div v-else-if="app" class="hero">
+          <div v-else-if="app" class="hero" :class="{ plain: !selectedImage }">
             <div class="hero-text">
               <div class="badges">
                 <span class="badge">{{ app.hasWebPage === false ? 'Installable' : app.canLaunch ? 'Live app' : 'Media preview' }}</span>
                 <span v-if="app.isFeatured" class="badge signal">Featured</span>
-                <span v-if="app.category" class="badge">{{ app.category }}</span>
               </div>
-              <h1>{{ app.name }}</h1>
+              <div class="title">
+                <AppMark :id="app.id" :name="app.name" :image-url="app.thumbnailUrl" :size="56" />
+                <h1>{{ app.name }}</h1>
+              </div>
               <p v-if="creatorName" class="by">
                 by
                 <RouterLink v-if="app.creatorPublicUsername" :to="`/creators/${app.creatorPublicUsername}`">{{ creatorName }}</RouterLink>
@@ -200,11 +205,35 @@ onBeforeUnmount(() => {
               <p v-if="!launchUrl && app.hasWebPage === false" class="note">This app has no web page: people install it from Studio on their own server.</p>
               <p v-else-if="!launchUrl" class="note">This app has a private runtime. Its screenshots show what it does.</p>
               <p v-if="shareMessage" class="note" role="status">{{ shareMessage }}</p>
+              <div v-if="tags.length" class="feats">
+                <span v-for="tag in tags" :key="tag" class="feat">{{ tag }}</span>
+              </div>
+              <dl class="facts">
+                <div>
+                  <dt>Opened</dt>
+                  <dd>{{ count(app.viewCount, 'time') }}</dd>
+                </div>
+                <div v-if="app.category">
+                  <dt>Category</dt>
+                  <dd>{{ app.category }}</dd>
+                </div>
+                <div v-if="app.canRemix">
+                  <dt>Forks</dt>
+                  <dd>{{ count(app.forkCount, 'fork') }}</dd>
+                </div>
+                <div v-if="formatDate(app.publishedAt)">
+                  <dt>Published</dt>
+                  <dd>{{ formatDate(app.publishedAt) }}</dd>
+                </div>
+                <div v-if="formatDate(app.updatedAt)">
+                  <dt>Updated</dt>
+                  <dd>{{ formatDate(app.updatedAt) }}</dd>
+                </div>
+              </dl>
             </div>
 
-            <div class="gallery">
+            <div v-if="selectedImage" class="gallery">
               <button
-                v-if="selectedImage"
                 class="stage"
                 type="button"
                 :aria-label="`View ${selectedImage.caption} larger`"
@@ -212,7 +241,6 @@ onBeforeUnmount(() => {
               >
                 <img :src="resolveMarketplaceAssetUrl(selectedImage.imageUrl)" :alt="selectedImage.caption" />
               </button>
-              <div v-else class="stage stage-empty" aria-hidden="true">{{ initial }}</div>
 
               <div v-if="gallery.length > 1" class="thumbs" role="list" aria-label="Screenshots">
                 <button
@@ -229,62 +257,37 @@ onBeforeUnmount(() => {
                   <img :src="resolveMarketplaceAssetUrl(image.imageUrl)" alt="" loading="lazy" />
                 </button>
               </div>
+              <p class="cap">{{ gallery.length > 1 ? `${selectedIndex + 1} / ${gallery.length} · ` : '' }}{{ selectedImage.caption }}</p>
             </div>
           </div>
         </div>
       </section>
 
       <template v-if="app && !loading">
-        <hr class="rule" />
-
         <section class="band" aria-labelledby="about-title">
           <div class="wrap about">
             <div class="section-head">
-              <p class="eyebrow">About</p>
-              <h2 id="about-title">About {{ app.name }}</h2>
+              <h2 id="about-title">About</h2>
               <p v-if="description">{{ description }}</p>
               <p v-else>The creator has not written a description yet. Open the app to see what it does.</p>
-              <div v-if="tags.length" class="tags">
-                <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
-              </div>
             </div>
+          </div>
+        </section>
 
-            <dl class="facts">
-              <template v-if="creatorName">
-                <dt>Creator</dt>
-                <dd>
-                  <RouterLink v-if="app.creatorPublicUsername" :to="`/creators/${app.creatorPublicUsername}`">{{ creatorName }}</RouterLink>
-                  <template v-else>{{ creatorName }}</template>
-                </dd>
-              </template>
-              <template v-if="app.category">
-                <dt>Category</dt>
-                <dd>{{ app.category }}</dd>
-              </template>
-              <dt>Opened</dt>
-              <dd>{{ count(app.viewCount, 'time') }}</dd>
-              <template v-if="app.canRemix">
-                <dt>Forks</dt>
-                <dd>{{ count(app.forkCount, 'fork') }}</dd>
-              </template>
-              <template v-if="formatDate(app.publishedAt)">
-                <dt>Published</dt>
-                <dd>{{ formatDate(app.publishedAt) }}</dd>
-              </template>
-              <template v-if="formatDate(app.updatedAt)">
-                <dt>Updated</dt>
-                <dd>{{ formatDate(app.updatedAt) }}</dd>
-              </template>
-            </dl>
+        <section v-if="app.catalogOrigin" class="band" aria-labelledby="own-server-title">
+          <div class="wrap">
+            <div class="own-server">
+              <h2 id="own-server-title">Run it on your own server</h2>
+              <p>{{ app.name }} is in the Automaton catalog ({{ app.catalogOrigin.catalog }}, {{ app.catalogOrigin.appPath }}). Ask your AI:</p>
+              <code>install {{ app.name }} from the Automaton catalog</code>
+            </div>
           </div>
         </section>
 
         <section v-if="app.forksAndRemixes?.length" class="band" aria-labelledby="forks-title">
           <div class="wrap list-block">
             <div class="section-head">
-              <p class="eyebrow">Forks and remixes</p>
               <h2 id="forks-title">Built from {{ app.name }}</h2>
-              <p>Forks keep their attribution, so you can see how an app evolves.</p>
             </div>
             <ul class="rows">
               <li v-for="remix in app.forksAndRemixes" :key="remix.id"><MarketplaceAppRow :app="remix" /></li>
@@ -295,7 +298,6 @@ onBeforeUnmount(() => {
         <section v-if="otherCreatorApps.length" class="band" aria-labelledby="more-title">
           <div class="wrap list-block">
             <div class="section-head">
-              <p class="eyebrow">Same creator</p>
               <h2 id="more-title">More from {{ creatorName || 'this creator' }}</h2>
             </div>
             <ul class="rows">
@@ -319,7 +321,7 @@ onBeforeUnmount(() => {
       <figure>
         <img :src="resolveMarketplaceAssetUrl(selectedImage.imageUrl)" :alt="selectedImage.caption" />
         <figcaption>
-          <span>{{ selectedIndex + 1 }} / {{ gallery.length }} · {{ selectedImage.caption }}</span>
+          <span>{{ gallery.length > 1 ? `${selectedIndex + 1} / ${gallery.length} · ` : '' }}{{ selectedImage.caption }}</span>
           <span class="lightbox-actions">
             <button v-if="gallery.length > 1" class="btn small" type="button" aria-label="Previous screenshot" @click="showImage(selectedIndex - 1)">←</button>
             <button v-if="gallery.length > 1" class="btn small" type="button" aria-label="Next screenshot" @click="showImage(selectedIndex + 1)">→</button>
@@ -333,41 +335,50 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .top-area {
-  padding-block: 16px 64px;
+  padding-block: 8px 24px;
   display: grid;
-  gap: 24px;
+  gap: 16px;
+}
+.crumbs {
+  text-transform: uppercase;
 }
 .site .back {
-  justify-self: start;
-  color: var(--ink-soft);
+  color: inherit;
   text-decoration: none;
-  font-size: 0.95rem;
 }
 .site .back:hover {
-  color: var(--ink);
+  text-decoration: underline;
 }
 
 .state {
   display: grid;
   gap: 14px;
   justify-items: start;
-  padding: 26px;
-  border-radius: 18px;
+  padding: 20px;
+  border-radius: 16px;
   border: 1px dashed var(--line);
   color: var(--ink-soft);
 }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: 48px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 34px;
   align-items: start;
+}
+.hero.plain {
+  grid-template-columns: minmax(0, 40rem);
+}
+.title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .hero-text {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   align-content: start;
-  padding-top: 8px;
 }
 .badges {
   display: flex;
@@ -375,10 +386,10 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 .badge {
-  font: 600 0.72rem var(--body);
+  font: 600 0.65rem var(--body);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 5px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--ink-soft);
@@ -389,7 +400,9 @@ onBeforeUnmount(() => {
   color: var(--on-signal);
 }
 .hero h1 {
-  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
   font-weight: 800;
 }
 .by {
@@ -412,10 +425,10 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   max-width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   padding: 0;
-  border: 1.5px solid var(--ink);
-  border-radius: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   overflow: hidden;
   background: var(--panel);
   cursor: zoom-in;
@@ -426,34 +439,25 @@ onBeforeUnmount(() => {
   object-fit: cover;
   display: block;
 }
-.stage-empty {
-  display: grid;
-  place-items: center;
-  cursor: default;
-  background: var(--signal);
-  color: var(--on-signal);
-  font: 800 6rem var(--display);
-}
 .thumbs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 96px), 1fr));
   gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
 }
 .thumb {
-  flex: none;
-  width: 104px;
   aspect-ratio: 16 / 10;
   padding: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1.5px solid var(--line);
+  border: 2px solid transparent;
   background: var(--panel);
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.75;
 }
-.thumb.active,
 .thumb:hover {
+  opacity: 1;
+}
+.thumb.active {
   opacity: 1;
   border-color: var(--signal);
 }
@@ -470,51 +474,58 @@ onBeforeUnmount(() => {
 }
 
 .about {
-  padding-block: 64px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 48px;
-  align-items: start;
+  padding-block: 26px 32px;
+  border-top: 1px solid var(--line);
 }
-.tags {
+.feats {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 6px;
 }
-.tag {
-  font: 500 0.82rem var(--mono);
-  padding: 5px 10px;
+.feat {
+  font: 500 0.82rem var(--body);
+  padding: 5px 11px;
   border-radius: 999px;
-  background: var(--panel);
-  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--signal) 16%, var(--paper));
+  color: var(--signal-ink);
 }
 .facts {
+  margin-top: 8px;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  border-top: 1.5px solid var(--ink);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
 }
-.facts dt,
-.facts dd {
-  padding: 12px 0;
+.facts div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 .facts dt {
-  font: 500 0.82rem var(--mono);
+  font: 0.7rem var(--mono);
   color: var(--ink-soft);
-  padding-right: 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.facts dd {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.cap {
+  font: 0.78rem var(--mono);
+  color: var(--ink-soft);
 }
 
 .list-block {
-  padding-block: 8px 64px;
+  padding-block: 8px 40px;
   display: grid;
-  gap: 24px;
+  gap: 14px;
 }
 .rows {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 18px;
 }
 
 .lightbox {
@@ -556,13 +567,27 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .hero,
-  .about,
-  .rows {
+  .hero {
     grid-template-columns: minmax(0, 1fr);
   }
   .hero {
     gap: 28px;
   }
+}
+.own-server {
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: #15171c;
+  color: #f1f1ee;
+}
+.own-server h2 {
+  margin: 0 0 0.5rem;
+}
+.own-server code {
+  display: block;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: #0b0c0f;
+  font: 0.85rem var(--mono);
 }
 </style>

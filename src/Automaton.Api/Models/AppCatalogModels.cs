@@ -19,7 +19,14 @@ public sealed record CatalogEntryDto(
     string SourceName,
     bool CustomSource,
     IReadOnlyList<string>? Tags = null,
-    string? Icon = null);
+    string? Icon = null,
+    bool Recommended = false,
+    int? RecommendedOrder = null,
+    CatalogPublisherDto? Publisher = null,
+    bool RequiresNewerRunner = false);
+
+/// <summary>Who made a catalog app. Verified only for Automaton's own apps in the official catalog; the server decides, never the catalog file.</summary>
+public sealed record CatalogPublisherDto(string Name, string? Logo, bool Verified);
 
 /// <summary>A filter option with the number of apps behind it (over the whole catalog, not the current filters).</summary>
 public sealed record CatalogFacet(string Value, string Label, int Count);
@@ -68,6 +75,8 @@ public sealed class CatalogInstallSourceModel
     public string Folder { get; set; } = string.Empty;
     public string Commit { get; set; } = string.Empty;
     public ApplicationContract? Application { get; set; }
+    /// <summary>The app's docs/README.md at the pinned commit, or null when it ships none (or it is too large).</summary>
+    public string? Readme { get; set; }
 }
 
 public sealed class CatalogInstallRequest

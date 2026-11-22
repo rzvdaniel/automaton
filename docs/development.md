@@ -6,7 +6,7 @@
 - **Worker**: .NET background worker for CAP/RabbitMQ consumers and async side effects (`src/Automaton.Worker/`)
 - **CLI**: .NET global tool for local app workflows (`src/Automaton.Cli/`)
 - **Runner**: cross-platform .NET runner for backend execution (`src/Automaton.Runner/`)
-- **Core libraries**: `Automaton.Core`, `Automaton.Steps`, `Automaton.Core.Scripting`
+- **Core libraries**: `Automaton.Core`
 
 AI provider implementation currently lives under `src/Automaton.Mcp/`; check current project naming and intent before extending it.
 
@@ -121,4 +121,4 @@ Run focused tests for the change. For backend changes, follow the build/analyzer
 dotnet build Automaton.All.sln -c Debug --no-incremental
 ```
 
-Release workflows live under [.github/workflows](../.github/workflows). Server bundles, Runner images and CLI/NuGet releases are published separately. See [CLI publishing](prod/cli-nuget-publishing.md).
+Release workflows live under [.github/workflows](../.github/workflows). Server bundles, Runner images and CLI/NuGet releases are published separately. See [CLI publishing](maintainers/cli-nuget-publishing.md).

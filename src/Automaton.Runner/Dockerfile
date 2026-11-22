@@ -15,8 +15,6 @@ WORKDIR /src
 # Copy solution and project files for restore
 COPY src/*.sln ./
 COPY src/Automaton.Core/*.csproj ./Automaton.Core/
-COPY src/Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
-COPY src/Automaton.Steps/*.csproj ./Automaton.Steps/
 COPY src/Automaton.Ai/*.csproj ./Automaton.Ai/
 COPY src/Automaton.AiGuidance/*.csproj ./Automaton.AiGuidance/
 COPY src/Automaton.Mcp/*.csproj ./Automaton.Mcp/
@@ -30,8 +28,6 @@ RUN dotnet restore Automaton.Runner/Automaton.Runner.csproj
 
 # Copy all source code
 COPY src/Automaton.Core/ ./Automaton.Core/
-COPY src/Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
-COPY src/Automaton.Steps/ ./Automaton.Steps/
 COPY src/Automaton.Ai/ ./Automaton.Ai/
 COPY src/Automaton.AiGuidance/ ./Automaton.AiGuidance/
 COPY src/Automaton.Mcp/ ./Automaton.Mcp/
@@ -56,61 +52,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libicu76 \
     libssl3 \
     ca-certificates \
-    wget \
     curl \
     docker-cli \
     util-linux \
     sudo \
-    ffmpeg \
-    ghostscript \
-    imagemagick \
-    poppler-utils \
-    pandoc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the .NET 10 ASP.NET Core runtime. The runner hosts the HTTP runtime gateway.
+# The ASP.NET Core runtime is copied from the official runtime image (the runner hosts the HTTP
+# runtime gateway); no installer or download tool stays in this image.
 ENV DOTNET_ROOT=/usr/share/dotnet
-RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
-    && chmod +x dotnet-install.sh \
-    && ./dotnet-install.sh --runtime aspnetcore --channel 10.0 --install-dir $DOTNET_ROOT \
-    && rm dotnet-install.sh \
-    && ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
-
-# Install common Python packages for custom steps
-# These are the most frequently used packages in automation workflows
-RUN pip install --no-cache-dir \
-    # HTTP & API
-    requests \
-    httpx \
-    aiohttp \
-    python-multipart \
-    # Validation & configuration
-    pydantic \
-    pydantic-settings \
-    # Data processing
-    pandas \
-    numpy \
-    pytz \
-    # JSON/YAML/CSV
-    pyyaml \
-    python-dateutil \
-    openpyxl \
-    xlsxwriter \
-    python-docx \
-    pypdf \
-    # Database connectors
-    sqlalchemy \
-    pymysql \
-    psycopg2-binary \
-    # Cloud SDKs
-    boto3 \
-    # Utilities
-    beautifulsoup4 \
-    lxml \
-    Pillow \
-    python-dotenv \
-    jinja2 \
-    markdown
+COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0 /usr/share/dotnet $DOTNET_ROOT
+RUN ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
 
 # Create non-root user
 RUN useradd -m -s /bin/bash automaton
@@ -161,9 +113,6 @@ ENV AUTOMATON_RUNNER_NAME=""
 ENV AUTOMATON_WORKSPACE_ROOT=/automaton/workspace
 ENV RUNNER_SCRIPTS_DIR=/automaton/workspace/apps
 
-# PythonNet configuration - required for Python custom steps on Linux
-ENV PYTHONNET_PYDLL=/usr/local/lib/libpython3.13.so
-ENV PYTHONHOME=/usr/local
 ENV PATH="/usr/local/bin:/usr/share/dotnet:$PATH"
 
 USER automaton

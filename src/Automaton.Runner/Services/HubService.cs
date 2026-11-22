@@ -26,7 +26,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
     private readonly AppActionExecutionService appActionExecutionService;
-    private readonly HubExecutionHandlerRegistrar executionHandlerRegistrar;
+    private readonly RunnerTunnel tunnel;
     private readonly HubControlHandlerRegistrar controlHandlerRegistrar;
     private readonly HubConnectionFailureReporter connectionFailureReporter;
     private readonly SemaphoreSlim connectionLoopSignal = new(0, 1);
@@ -40,21 +40,32 @@ public class HubService : IRuntimeTunnelReconnectRequester
     private Task? retryTask;
     private readonly HubHeartbeatService heartbeatService;
 
+    private readonly IServiceProvider serviceProvider;
+
     public HubService(
         ConfigurationService configService,
         ApiKeyAuthenticationService apiKeyAuthService,
-        TunnelForwarderService tunnelForwarder,
+        RunnerTunnel tunnel,
         IServiceProvider serviceProvider,
         AppActionExecutionService appActionExecutionService)
     {
         this.configService = configService;
+        this.serviceProvider = serviceProvider;
         this.apiKeyAuthService = apiKeyAuthService;
         this.logger = Log.ForContext<HubService>();
-        heartbeatService = new HubHeartbeatService(() => connection, logger);
+        heartbeatService = new HubHeartbeatService(() => connection, logger,
+            async (hub, token) =>
+            {
+                var registry = serviceProvider.GetService<RunnerRuntimeRegistry>();
+                await new RunnerLogSinkSync(registry, logger).SyncAsync(hub, token);
+                if (serviceProvider.GetService<RunnerRuntimeContainerManager>() is { } manager)
+                    await manager.ProbeRestartingAsync(token);
+                await new RunnerRuntimeStateSync(registry, logger).SyncAsync(hub, token);
+            });
         this.appActionExecutionService = appActionExecutionService;
-        executionHandlerRegistrar = new HubExecutionHandlerRegistrar(
-            tunnelForwarder,
-            logger);
+        this.tunnel = tunnel;
+        tunnel.TryBeginRequest = tunnelReconnectState.TryBeginTunnelRequest;
+        tunnel.CompleteRequest = CompleteTunnelRequest;
         controlHandlerRegistrar = new HubControlHandlerRegistrar(serviceProvider, logger);
         connectionFailureReporter = new HubConnectionFailureReporter(configService, logger);
 
@@ -183,6 +194,15 @@ public class HubService : IRuntimeTunnelReconnectRequester
 
     private void ReportConnectionEstablished(int attempts)
     {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await (serviceProvider.GetService<RunnerSelfUpgradeService>()?.CleanupAfterUpgradeAsync(
+                    TimeSpan.FromSeconds(60), TimeSpan.FromMinutes(3), CancellationToken.None) ?? Task.CompletedTask);
+            }
+            catch (Exception ex) { logger.Debug(ex, "Upgrade cleanup skipped"); }
+        });
         logger.Debug("Successfully connected via continuous retry loop (attempts: {Attempts})", attempts);
         if (attempts <= 1)
         {
@@ -245,10 +265,6 @@ public class HubService : IRuntimeTunnelReconnectRequester
             // Keep-alive interval to maintain connection during long operations
             connection.KeepAliveInterval = TimeSpan.FromSeconds(15);
 
-            executionHandlerRegistrar.Register(
-                connection,
-                tunnelReconnectState.TryBeginTunnelRequest,
-                CompleteTunnelRequest);
             controlHandlerRegistrar.Register(
                 connection,
                 SetConnectedApiIdentity,
@@ -260,6 +276,8 @@ public class HubService : IRuntimeTunnelReconnectRequester
             await connection.StartAsync(cancellationToken);
             await heartbeatService.StartAsync(cancellationToken);
             await heartbeatService.SendAsync(cancellationToken);
+            await ReportRuntimeGatewayAsync(connection, cancellationToken);
+            await tunnel.StartAsync(apiKey, cancellationToken);
 
             // Use logger for success and avoid duplicate console messages — the retry loop will report higher-level status
             logger.Debug("Connected to hub at {HubUrl}", hubUrl);
@@ -273,6 +291,15 @@ public class HubService : IRuntimeTunnelReconnectRequester
         }
     }
 
+    // Tells the server where its proxy can reach this Runner's gateway directly (#1181). A server that does not know
+    // the method, or cannot reach the address, keeps using the tunnel, so a failure here is not a connection failure.
+    private async Task ReportRuntimeGatewayAsync(HubConnection hub, CancellationToken cancellationToken)
+    {
+        if (RunnerGatewayAccess.Published() is not { } gateway) return;
+        try { await hub.InvokeAsync("ReportRuntimeGateway", gateway.Url, gateway.Secret, cancellationToken); }
+        catch (Exception ex) { logger.Debug(ex, "The server did not accept the runtime gateway report"); }
+    }
+
     public async Task DisconnectAsync()
     {
         // Stop the retry loop
@@ -284,7 +311,8 @@ public class HubService : IRuntimeTunnelReconnectRequester
         retryTokenSource?.Dispose();
         retryTokenSource = null;
         await heartbeatService.StopAsync();
-        
+        await tunnel.StopAsync();
+
         if (connection != null)
         {
             try
@@ -381,6 +409,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
         try
         {
             await heartbeatService.StopAsync();
+            await tunnel.StopAsync();
             await currentConnection.StopAsync();
         }
         catch (Exception exception)

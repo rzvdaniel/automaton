@@ -8,11 +8,6 @@ namespace Automaton.Api.Data;
 public partial class ApplicationDbContext
 {
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
-    public virtual DbSet<Flow> Flows { get; set; }
-    public virtual DbSet<FlowUser> FlowUsers { get; set; }
-    public virtual DbSet<FlowExecution> FlowExecutions { get; set; }
-    public virtual DbSet<FlowExecutionUser> FlowExecutionUsers { get; set; }
-    public virtual DbSet<FlowExecutionLog> FlowExecutionLogs { get; set; }
     public virtual DbSet<AuditEvent> AuditEvents { get; set; }
     public virtual DbSet<RunnerExecutionOperation> RunnerExecutionOperations { get; set; }
     public virtual DbSet<Runner> Runners { get; set; }
@@ -34,10 +29,6 @@ public partial class ApplicationDbContext
     public virtual DbSet<HostedRunnerStorageObservation> HostedRunnerStorageObservations { get; set; }
     public virtual DbSet<HostedRunnerStorageVerification> HostedRunnerStorageVerifications { get; set; }
     public virtual DbSet<HostContainerExecutionOperation> HostContainerExecutionOperations { get; set; }
-    public virtual DbSet<CustomStep> CustomSteps { get; set; }
-    public virtual DbSet<CustomStepUser> CustomStepUsers { get; set; }
-    public virtual DbSet<Schedule> Schedules { get; set; }
-    public virtual DbSet<ScheduleUser> ScheduleUsers { get; set; }
     public virtual DbSet<RecentActivity> RecentActivities { get; set; }
     public virtual DbSet<ApiKey> ApiKeys { get; set; }
     public virtual DbSet<ApiKeyUser> ApiKeyUsers { get; set; }
@@ -45,35 +36,41 @@ public partial class ApplicationDbContext
     public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
     public virtual DbSet<AiProvider> AiProviders { get; set; }
     public virtual DbSet<AiModel> AiModels { get; set; }
-    public virtual DbSet<AiGuidanceDocument> AiGuidanceDocuments { get; set; }
     public virtual DbSet<WebApp> WebApps { get; set; }
     public virtual DbSet<AppDeploymentTarget> AppDeploymentTargets { get; set; }
     public virtual DbSet<DeploymentOperation> DeploymentOperations { get; set; }
     public virtual DbSet<MarketplaceCategory> MarketplaceCategories { get; set; }
     public virtual DbSet<WebAppStar> WebAppStars { get; set; }
+    public virtual DbSet<UserHomePin> UserHomePins { get; set; }
+    public virtual DbSet<UserHomeDismissal> UserHomeDismissals { get; set; }
+    public virtual DbSet<UserHomeSetting> UserHomeSettings { get; set; }
+    public virtual DbSet<UserNotificationAck> UserNotificationAcks { get; set; }
+    public virtual DbSet<AppHomeCard> AppHomeCards { get; set; }
     public virtual DbSet<WebAppScreenshot> WebAppScreenshots { get; set; }
     public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
     public virtual DbSet<AppShare> AppShares { get; set; }
-    public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
+    public virtual DbSet<AppCustomDomain> AppCustomDomains { get; set; }
     public virtual DbSet<AppVersion> AppVersions { get; set; }
-    public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }
     public virtual DbSet<AppModuleExecution> AppModuleExecutions { get; set; }
     public virtual DbSet<ActionSchedule> ActionSchedules { get; set; }
     public virtual DbSet<ActionScheduleOccurrence> ActionScheduleOccurrences { get; set; }
+    public virtual DbSet<ActionWebhook> ActionWebhooks { get; set; }
+    public virtual DbSet<ActionWebhookCall> ActionWebhookCalls { get; set; }
+    public virtual DbSet<ServerMaintenanceRun> ServerMaintenanceRuns { get; set; }
     public virtual DbSet<SecretDefinition> SecretDefinitions { get; set; }
     public virtual DbSet<AppPermissionApproval> AppPermissionApprovals { get; set; }
+    public virtual DbSet<AppSettingValue> AppSettingValues { get; set; }
+    public virtual DbSet<ServerCleanupSettings> ServerCleanupSettings { get; set; }
+    public virtual DbSet<ServerCleanupRun> ServerCleanupRuns { get; set; }
+    public virtual DbSet<AppRunnerPermission> AppRunnerPermissions { get; set; }
     public virtual DbSet<SecretVersion> SecretVersions { get; set; }
     public virtual DbSet<ExecutionSecretGrant> ExecutionSecretGrants { get; set; }
     public virtual DbSet<Setting> Settings { get; set; }
-    public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
-    public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
     public virtual DbSet<UserGitHubToken> UserGitHubTokens { get; set; }
     public virtual DbSet<Project> Projects { get; set; }
     public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
     public virtual DbSet<ProjectApp> ProjectApps { get; set; }
-    public virtual DbSet<ProjectFlow> ProjectFlows { get; set; }
     public virtual DbSet<ProjectRunner> ProjectRunners { get; set; }
-    public virtual DbSet<ProjectCustomStep> ProjectCustomSteps { get; set; }
     public virtual DbSet<ProjectApiKey> ProjectApiKeys { get; set; }
     public virtual DbSet<ProjectAiApiKey> ProjectAiApiKeys { get; set; }
     public virtual DbSet<InvitationToken> InvitationTokens { get; set; }

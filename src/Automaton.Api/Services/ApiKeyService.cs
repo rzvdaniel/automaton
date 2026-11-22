@@ -20,7 +20,8 @@ public class ApiKeyService
         ApiKeyScope.Developer,
         ApiKeyScope.ReadOnly,
         ApiKeyScope.WorkflowExecution,
-        ApiKeyScope.WebApp
+        ApiKeyScope.WebApp,
+        ApiKeyScope.PermissionsAdmin
     ];
 
     private const int RawKeyLength = 40;
@@ -62,6 +63,7 @@ public class ApiKeyService
             ApiKeyScope.WebApp => "ak_webapp_",
             ApiKeyScope.FullAccess => "ak_fullaccess_",
             ApiKeyScope.Developer => "ak_developer_",
+            ApiKeyScope.PermissionsAdmin => "ak_permadmin_",
             _ => "ak_"
         };
 

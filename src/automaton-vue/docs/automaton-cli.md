@@ -1,6 +1,7 @@
 ---
 title: Automaton CLI reference
 description: CLI commands for creating, linking, validating, deploying, and publishing Automaton apps.
+order: 120
 ---
 
 # Automaton CLI
@@ -10,19 +11,19 @@ Automaton. Read `automaton.json` and the generated local guidance before editing
 
 ## Install and authenticate
 
-Use the API URL from [your server installation](./install-server) or your team administrator. The NuGet CLI requires the .NET 10 SDK or later. Ubuntu 22.04 and Debian 12 have no .NET 10 package in apt; install the SDK per user:
+Use the API URL from [your server installation](./install-server) or your team administrator. The CLI is a single file that needs no .NET. On Linux or macOS:
 
 ```bash
-curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
-bash dotnet-install.sh --channel 10.0
-export DOTNET_ROOT="$HOME/.dotnet"
-export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
+curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh
 ```
 
-Add the two `export` lines to your shell profile so `automaton` is found in new sessions.
+On Windows (PowerShell): `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. The script puts `automaton` in `~/.local/bin` (Windows: `%LOCALAPPDATA%\Automaton\bin`) and checks its SHA-256. The script always installs the latest release unless you set `AUTOMATON_VERSION=server-v<version>`; a newer CLI works with an older server.
+
+If `automaton whoami` already names your server and user, skip login. If the CLI is older than the server (a command or option is missing), rerun the install script above, or `dotnet tool update -g Automaton.Cli`; check with `automaton --version`.
+
+Already have the .NET 10 SDK? `dotnet tool install -g Automaton.Cli` installs the same CLI.
 
 ```bash
-dotnet tool install -g Automaton.Cli
 automaton --help
 automaton login --server https://api.your-domain.com
 ```
@@ -33,20 +34,31 @@ automaton login --server https://api.your-domain.com
 
 On a server over SSH, or for an AI agent, use one of these. Neither needs a browser on the machine that runs the CLI.
 
-**Device approval.** Run `automaton login --device --server https://api.your-domain.com`. It prints an approval URL and a code, and waits. Approve it from any signed-in session: open the URL in a browser on another device, or approve it from a terminal with an administrator or user token:
+**Device approval.** Run `automaton login --device --server https://api.your-domain.com`. It prints an approval URL and a code, and waits, so run it in the background and keep its output in a private file (it contains the code). Approve it from any signed-in session: open the URL in a browser on another device, or approve it from a terminal with an administrator or user token. The email and password are the account's own sign-in; for the first administrator that is the email chosen at [setup](./first-admin).
 
 ```bash
 API=https://api.your-domain.com
-# URL printed by the CLI: .../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
+OUT=$(umask 077; mktemp)   # private file (mode 600) for the --device output
+automaton login --device --server "$API" > "$OUT" 2>&1 &
+for _ in $(seq 20); do grep -q 'cli/authorize' "$OUT" && break; sleep 1; done   # wait for the URL
+# The output has a line: https://studio.../cli/authorize?requestId=REQUEST_ID&code=USER_CODE
+URL=$(grep -o 'https://[^ ]*cli/authorize?[^ ]*' "$OUT" | head -1)
+REQUEST_ID=${URL#*requestId=}; REQUEST_ID=${REQUEST_ID%%&*}
+USER_CODE=${URL#*code=}; USER_CODE=${USER_CODE%%&*}
 read -rp "Email: " EMAIL; read -rsp "Password: " PASSWORD; echo   # no terminal: PASSWORD=$(< /root/admin-password), a 0600 file; needs jq
 TOKEN=$(jq -n --arg e "$EMAIL" --arg p "$PASSWORD" '{email:$e,password:$p}' |
   curl -s -X POST "$API/api/Account/LoginUser" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/REQUEST_ID/approve" \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"userCode":"USER_CODE"}'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/api/cli-auth/requests/$REQUEST_ID/approve" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$(jq -n --arg c "$USER_CODE" '{userCode:$c}')"
 unset PASSWORD TOKEN
+wait; tail -n 3 "$OUT"; rm -f "$OUT"   # "Signed in as ..." once approved. If the code was refused, stop the wait with Ctrl+C or `kill %1`.
 ```
 
-`200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. The `--device` output contains the approval code: do not share it. Codes expire after a few minutes, so approve soon after `login` prints it.
+An agent that just created the administrator skips the two `read` prompts: `EMAIL` and `PASSWORD` are already set in the same shell; it runs the script, then `unset`s them. Never print them.
+
+`POST /api/Account/LoginUser` with `{"email","password"}` returns JSON whose `accessToken` goes in `Authorization: Bearer`; do not rely on a cookie. The approve body is `{"userCode": "..."}`.
+
+The code is letters, digits and a dash (for example `ABCD-1234`), so it needs no URL decoding. `200` means approved; `401` means the sign-in failed, and `403` that the account's email is not confirmed. The waiting CLI notices within about five seconds. The `--device` output contains the approval code: do not share it. Codes expire after a few minutes, so approve soon after `login` prints it.
 
 **API key.** Create a key in Studio (**API Keys**) or with `POST /api/ApiKeys` (`{"name": "my-cli"}`, bearer token as above; the response `apiKey` is shown once). Then:
 
@@ -62,7 +74,7 @@ an AI conversation.
 
 ## Install a Runner
 
-`automaton runners upgrade RUNNER [--wait]` upgrades an online Runner to the server's current image (non-zero exit if it rolled back); `automaton server update --wait [--runners]` lists, or with `--runners` upgrades, Runners left on an old image. `automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. Steps, options and errors: [Add a Runner](./deploy-runner).
+`automaton runners upgrade RUNNER [--wait]` upgrades an online Runner to the server's current image (non-zero exit if it rolled back); `automaton server update --runners` (it implies `--wait`) names every Runner with its state (current or on an old image) and upgrades the old ones; `--wait` alone only lists them with the upgrade command. `automaton runners install --name NAME --ssh user@host | --local | --print-command [--yes] [--project NAME]`. `automaton runners delete RUNNER` removes one, including a Runner that is offline for good (`--abandon-offline --yes`): see [Remove a Runner](./deploy-runner#remove-a-runner). Steps, options and errors: [Add a Runner](./deploy-runner).
 
 ## Several servers
 
@@ -86,16 +98,17 @@ The shared file `~/.automaton/config.json` changed format (version 2, with a `pr
 ## Create or link
 
 ```bash
-automaton new "My App"
+automaton new "My App" --template node   # or python, dotnet, static
 automaton link <app-id-or-slug>
 ```
 
-`automaton new` creates a valid local `automaton.json`, creates a remote app,
+`automaton new --template ...` creates a local `automaton.json` with a runtime command, creates a remote app,
 and records its ID in the selected local profile. It also syncs the generated
 AI guidance. `automaton link` requires an existing valid `automaton.json` and
 records the remote app ID in the selected profile without downloading or
 changing local source or guidance files. After linking, deploy the local source
-with `automaton deploy`.
+with `automaton deploy`. Without `--template`, `automaton new` writes an empty
+contract and `automaton deploy` fails with "runtime command is required".
 
 `automaton pull <app-id-or-slug>` creates a new local project from portable
 remote source. App IDs work for accessible apps; exact public slugs are resolved
@@ -131,20 +144,27 @@ deployed URL.
 ```bash
 automaton sync-ai
 automaton pull
-automaton apps                  # your apps: ID, name, Runner, status, public URL
+automaton docs <app>            # print the app's docs/README.md (its description if it ships none); --open shows the Docs tab in Studio
+automaton apps                  # your apps: ID, name, Runner, status (Paused when paused), public URL
 automaton installation-status   # server version, counts, last backup
+automaton notifications         # the same notices as Studio Home; add --json for scripts and agents
+automaton notifications acknowledge <key>   # hide one (critical notices stay until fixed)
 automaton runners
 automaton project runners       # list, add or remove a project's Runners
 automaton project list
 automaton publish --yes --slug NAME
-automaton share status           # who can open the app: me, people, server or internet (same choices as the Share dialog)
-automaton share set server       # or: me, people, internet --slug NAME; add/remove EMAIL manage "people"
+automaton share status           # who can open the app: me, people, a team, server or internet (same choices as the Share dialog)
+automaton share set server       # or: me, people, team --team NAME, internet --slug NAME [--list|--no-list] (store listing text: automaton listing); add/remove EMAIL manage "people"
+automaton pause --reason "why"  # (reason optional; the owner sees it) stop the linked app, switch its schedules off, show a paused page (also: automaton apps pause APP)
+automaton resume                # start it again and turn its schedules back on (also: automaton apps resume APP); automaton deploy --resume resumes first
 automaton delete --yes          # permanently delete the linked remote app
+automaton apps delete <name-or-id> --yes   # delete any app you may delete, no linked folder needed (for example a catalog-installed app)
 automaton listing show
 automaton catalog init my-apps  # files for your own apps repository (writes only; no git, no GitHub)
 automaton catalog build         # generate catalog.json from catalog-apps.json
 automaton catalog list          # apps in the server's catalog: id, source, permissions
 automaton catalog install ID --name NAME --runner RUNNER --setting NAME=VALUE --secrets-file FILE --wait
+automaton catalog update APP --check   # is there a newer commit? (exit 2 = yes); without --check it updates and redeploys
 ```
 
 `sync-ai` restores the canonical local guidance files. `pull` downloads app
@@ -153,7 +173,7 @@ public and requires explicit user approval. `listing` sets the app's marketplace
 summary, description, category, tags, cover and screenshots; see
 [Deploy and publish an app](./deploy#marketplace-listing).
 
-`catalog list` and `catalog install` do from the terminal what **Apps → Catalog → Install** does: `list` shows every entry with its id, source and requested permissions (`--search`, `--category`, `--source`, `--installed`, `--json`); `install <id>` prints the pinned commit and the permissions the app requests, creates the app, saves its settings and secrets and deploys it (`--wait` reports whether the deployment succeeded). Give settings as `--setting NAME=VALUE` (repeat the option). Secrets are never arguments: pass `NAME=VALUE` lines in a file only you can read (`--secrets-file`) or on standard input (`--secrets-stdin`), or run the command in a terminal and type each one at a hidden prompt. The command stops before creating anything when a required setting or secret is missing, and says which. Permissions still need a system administrator's approval in Studio. If two catalog sources have the same id, add `--source <id>`.
+`catalog list` and `catalog install` do from the terminal what **Apps → Catalog → Install** does: `list` shows every entry with its id, source and requested permissions (`--search`, `--category`, `--source`, `--installed`, `--json`; without a terminal, as in a script or an AI agent, the table wraps at 80 columns, so use `--json`); `install <id>` prints the pinned commit and the permissions the app requests, creates the app, saves its settings and secrets and deploys it (`--wait` reports whether the deployment succeeded). Give settings as `--setting NAME=VALUE` (repeat the option). Secrets are never arguments: pass `NAME=VALUE` lines in a file only you can read (`--secrets-file`) or on standard input (`--secrets-stdin`), or run the command in a terminal and type each one at a hidden prompt. A multi-line secret such as an SSH private key: `--secret-file NAME=PATH` (repeatable) reads that one secret's whole value from a file, or write `NAME<<END`, the lines, then `END` alone on a line in the secrets file. `catalog update` takes the same options. The command stops before creating anything when a required setting or secret is missing, and says which. Permissions still need a system administrator's approval in Studio. If two catalog sources have the same id, add `--source <id>`. `catalog update <app>` (app id or slug) does what Studio's Update button does: it shows the installed and pinned commits, the compare link and new settings, secrets and permissions, then replaces the files and redeploys (`--wait`, `--json`). Files edited after the install need `--confirm-edited`; new secrets come from `--secrets-file` or `--secrets-stdin`. A new secret the manifest marks `optional` never blocks the update; to skip one the manifest does not mark optional, give it an explicit empty value (`NAME=`), which leaves it unset (`catalog install` does the same). The update also brings the app's default schedules up to the new manifest (add, update, rename, remove; schedules you edited are kept and listed), and `--check` lists those changes. Studio's **Catalog** shows **Update** (or **Retry** when the last deploy failed) beside an installed app that has one, and so does that app's **Open** page when it never deployed.
 
 `catalog init` and `catalog build` create and maintain an apps repository that servers can use as a catalog source: see [Publish your own app catalog](./apps-repository).
 
@@ -169,3 +189,50 @@ deployment target. Its `--env <name>` option instead selects a local project
 profile for credentials and app linkage.
 
 Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
+
+## All commands
+
+Run `automaton <command> --help` for a command's options.
+
+<!-- cli-commands:start (generated by scripts/generate-cli-reference.mjs; do not edit) -->
+
+| Command | What it does |
+| --- | --- |
+| `automaton new <name>` | Create a new Automaton app and link this directory |
+| `automaton sync-ai` | Refresh the generated local AI guidance files in this folder |
+| `automaton login` | Authorize the Automaton CLI or validate an existing API key |
+| `automaton profiles` | List and select server profiles |
+| `automaton logout` | Clear stored CLI credentials |
+| `automaton whoami` | Show the current authenticated Automaton user |
+| `automaton create` | Create a remote Automaton app for the current folder and link the selected local profile |
+| `automaton delete` | Delete the remote app linked to this folder |
+| `automaton status` | Show the current linked app, deploy settings, and publish state |
+| `automaton current-runner` | Show the Runner assigned to the Live environment |
+| `automaton validate` | Validate the current project before deploy or publish |
+| `automaton action` | Validate and run Actions in the linked App; `action schedule list\|add\|edit\|on\|off\|delete` manages an Action's cron schedules and `action webhook add\|list\|rotate\|delete` the webhooks that start it from outside; add `--app <name\|id>` to work on any app you may update without a linked folder |
+| `automaton secrets` | Check and fill the secrets this app declares in automaton.json (application.secrets) |
+| `automaton project` | Create projects, list yours and add the current app to one |
+| `automaton permissions` | Show the platform permissions this app requests and whether an administrator approved them |
+| `automaton init` | Create a new Automaton app or link an existing one to this directory |
+| `automaton link <app-id-or-slug>` | Link this directory to an existing Automaton app |
+| `automaton deploy <target>` | Build, upload, and deploy the app to Automaton |
+| `automaton open <environment>` | Open the current app in the browser |
+| `automaton docs <app>` | Print an app's docs (docs/README.md), or its description when it ships none |
+| `automaton logs <environment>` | Open runtime logs for an environment |
+| `automaton pull <app>` | Download editable app source files from the server |
+| `automaton publish` | Make the latest deployed app publicly accessible |
+| `automaton share` | Show or change who can open this app (same choices as Studio's Share dialog) |
+| `automaton pause` | Pause the linked app: stop it, switch its schedules off and show a paused page at its address. Data and settings are kept. |
+| `automaton resume` | Resume the linked app and turn its schedules back on |
+| `automaton runners` | List runners available on your Automaton account |
+| `automaton apps` | List apps in your personal workspace |
+| `automaton installation-status` | Show server version, resource counts and last backup |
+| `automaton notifications [--json]` | List your notifications: server update, expiring certificate, offline Runner, failed backup, permission requests, failing apps. `acknowledge <key>` hides one |
+| `automaton server` | Update the Automaton server you are logged in to |
+| `automaton set-runner <runner>` | Assign or clear the Runner for the Live environment |
+| `automaton config` | View or update global CLI settings |
+| `automaton target` | Manage deployment targets for the linked app |
+| `automaton listing` | Set how the linked app appears in the public marketplace: summary, description, category, tags, cover image and screenshots. Publishing lists an app by default. |
+| `automaton catalog` | Create and build an apps repository for use as a catalog source, and manage the server's catalog sources |
+
+<!-- cli-commands:end -->

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Core.Models;
@@ -94,7 +95,7 @@ public sealed class AdminAppDirectoryService(ApplicationDbContext db, AdminAutho
     {
         // Only apps whose stored contract mentions a supported permission can request one.
         var candidates = await db.WebApps.AsNoTracking()
-            .Where(app => app.ApplicationContractJson.Contains(AppPermissionApproval.BackupsRead) || app.ApplicationContractJson.Contains(AppPermissionApproval.ServerRead))
+            .Where(MentionsSupportedPermission())
             .Select(app => new { app.Id, app.ApplicationContractJson })
             .ToListAsync(token);
         if (candidates.Count == 0) return [];
@@ -114,5 +115,32 @@ public sealed class AdminAppDirectoryService(ApplicationDbContext db, AdminAutho
             if (waiting.Length > 0) result[app.Id] = waiting;
         }
         return result;
+    }
+
+    private static readonly string[] MentionablePermissions =
+    [
+        AppPermissionApproval.BackupsRead,
+        AppPermissionApproval.BackupsRun,
+        AppPermissionApproval.ServerRestart,
+        AppPermissionApproval.ServerUpdateOs,
+        AppPermissionApproval.ServerRead,
+        AppPermissionApproval.NotifyEmail,
+        AppPermissionApproval.ServerCleanup,
+        AppPermissionApproval.RunnerMaintain,
+        AppPermissionApproval.AppsReadStatus,
+        AppPermissionApproval.SecurityRead,
+        AppPermissionApproval.LogsReceive,
+        AppPermissionApproval.SecurityManage
+    ];
+
+    private static Expression<Func<WebApp, bool>> MentionsSupportedPermission()
+    {
+        var app = Expression.Parameter(typeof(WebApp), "app");
+        var json = Expression.Property(app, nameof(WebApp.ApplicationContractJson));
+        var contains = typeof(string).GetMethod(nameof(string.Contains), [typeof(string)])!;
+        var any = MentionablePermissions
+            .Select(permission => (Expression)Expression.Call(json, contains, Expression.Constant(permission)))
+            .Aggregate(Expression.OrElse);
+        return Expression.Lambda<Func<WebApp, bool>>(any, app);
     }
 }

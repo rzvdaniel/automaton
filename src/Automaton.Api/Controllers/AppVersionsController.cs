@@ -43,6 +43,12 @@ public class AppVersionsController : BaseController
                 return NotFound(new { message = "App not found" });
             }
 
+            // Get() also opens the app for administrators who only read it; a restore point is a change.
+            if (!app.CanUpdate)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only the people who manage this app can create restore points." });
+            }
+
             var userId = GetUserId();
             if (userId == Guid.Empty && app.UserId.HasValue)
             {

@@ -25,6 +25,7 @@ public static class AppModuleTriggerKinds
     public const string Manual = "Manual";
     public const string Internal = "Internal";
     public const string Scheduled = "Scheduled";
+    public const string Webhook = "Webhook";
 }
 
 public static class AppModuleExecutionErrorCodes
@@ -70,6 +71,8 @@ public sealed class AppActionExecutionResult
     public DateTime? ResultExpireAtUtc { get; set; }
     public DateTime StartedAtUtc { get; set; }
     public DateTime CompletedAtUtc { get; set; }
+    /// <summary>For a <c>home-card</c> Action or a result with <c>homeCard</c>: the card's JSON, taken from the redacted result. The API validates it.</summary>
+    public string? HomeCardJson { get; set; }
 }
 
 public sealed record CancelAppModuleExecutionRequest(Guid ExecutionId);
