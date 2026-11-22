@@ -197,6 +197,9 @@ public class AutomatonHub : Hub
 
         // Only a Runner whose gateway the server probed has a verified host; any other Runner receives nothing.
         var host = services.GetRequiredService<RunnerGatewayRegistry>().Find(runner.Id)?.Url.Host;
+        if (host is null && runtimes is { Length: > 0 } && LogSinkWarnings.FirstMissingGateway(runner.Id))
+            logger.LogWarning("Runner {RunnerId} reported {Count} runtimes for the log receiver, but the server has no verified gateway host for it, so none is used", runner.Id, runtimes.Length);
+        else if (host is not null) LogSinkWarnings.GatewayFound(runner.Id);
         return await services.GetRequiredService<LogSinkService>().SyncAsync(runner.Id, host, runtimes, Context.ConnectionAborted);
     }
 
@@ -322,4 +325,12 @@ public class AutomatonHub : Hub
 
         await runnerService.UpdateConnection(runner.Id, userId, runner, CancellationToken.None);
     }
+}
+
+/// <summary>Remembers which Runners already got the "no gateway host" warning, so it is logged once, not every 30 seconds.</summary>
+internal static class LogSinkWarnings
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> Warned = new();
+    public static bool FirstMissingGateway(Guid runnerId) => Warned.TryAdd(runnerId, true);
+    public static void GatewayFound(Guid runnerId) => Warned.TryRemove(runnerId, out _);
 }

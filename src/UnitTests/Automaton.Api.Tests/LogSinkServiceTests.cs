@@ -212,4 +212,27 @@ public sealed class LogSinkServiceTests
         await f.Service.SyncAsync(f.RunnerId, Host, [f.Report()], default);
         Assert.That((await f.Db.Settings.SingleAsync()).Value, Is.Not.EqualTo(first));
     }
+
+    private sealed class CapturingLogger : Microsoft.Extensions.Logging.ILogger<LogSinkService>
+    {
+        public int Warnings { get; private set; }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == Microsoft.Extensions.Logging.LogLevel.Warning) Warnings++;
+        }
+    }
+
+    [Test]
+    public async Task Reports_dropped_for_a_wrong_host_warn_once_not_every_sync()
+    {
+        var f = await CreateAsync();
+        var logger = new CapturingLogger();
+        var service = new LogSinkService(f.Db, f.Clock, logger);
+
+        for (var i = 0; i < 3; i++) await service.SyncAsync(f.RunnerId, "172.19.0.9", [f.Report()], default);
+
+        Assert.That(logger.Warnings, Is.EqualTo(1));
+    }
 }

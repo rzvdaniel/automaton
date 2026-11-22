@@ -18,8 +18,9 @@ namespace Automaton.Api.Services;
 /// app reports its runtimes; the server keeps the address of the approved one in a setting, and the API and Worker read
 /// it. Pausing, uninstalling or revoking the permission ends it; so does a Runner that stops reporting.
 /// </summary>
-public sealed class LogSinkService(ApplicationDbContext db, TimeProvider? clock = null)
+public sealed class LogSinkService(ApplicationDbContext db, TimeProvider? clock = null, ILogger<LogSinkService>? logger = null)
 {
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> WarnedRunners = new();
     public const string SettingKey = "Logging.Sink";
 
     /// <summary>A report older than this no longer counts: the Runner reports every 30 seconds.</summary>
@@ -44,6 +45,8 @@ public sealed class LogSinkService(ApplicationDbContext db, TimeProvider? clock 
             .OrderBy(item => item.Report.AppId).ThenBy(item => item.Report.DeploymentTargetId)
             .ToList();
 
+        WarnWhenAllDropped(runnerId, runnerHost, running?.Count ?? 0, reports.Count);
+
         var existing = await db.Settings.SingleOrDefaultAsync(setting => setting.Key == SettingKey, token);
         var stored = existing is null ? null : Read(existing);
         LogSinkAssignment? chosen = await ChooseAsync(runnerId, reports.Select(item => (item.Report, item.Address!)).ToList(), token);
@@ -59,6 +62,13 @@ public sealed class LogSinkService(ApplicationDbContext db, TimeProvider? clock 
             await db.SaveChangesAsync(token);
         }
         return chosen;
+    }
+
+    private void WarnWhenAllDropped(Guid runnerId, string? runnerHost, int reported, int kept)
+    {
+        if (reported > 0 && kept == 0 && runnerHost is not null && WarnedRunners.TryAdd(runnerId, true))
+            logger?.LogWarning("Runner {RunnerId} reported {Count} runtimes for the log receiver, but none has a private http address on host {Host}; none is used", runnerId, reported, runnerHost);
+        else if (kept > 0) WarnedRunners.TryRemove(runnerId, out _);
     }
 
     private async Task<LogSinkAssignment?> ChooseAsync(Guid runnerId, List<(LogSinkRuntimeReport Report, string Address)> reports, CancellationToken token)
@@ -188,7 +198,7 @@ public static class LogForwardingRegistration
 {
     public static IServiceCollection AddAutomatonLogForwarding(this IServiceCollection services)
     {
-        services.AddScoped<LogSinkService>(provider => new LogSinkService(provider.GetRequiredService<ApplicationDbContext>()));
+        services.AddScoped<LogSinkService>(provider => new LogSinkService(provider.GetRequiredService<ApplicationDbContext>(), null, provider.GetService<ILogger<LogSinkService>>()));
         services.AddHostedService<LogForwardingService>();
         return services;
     }
