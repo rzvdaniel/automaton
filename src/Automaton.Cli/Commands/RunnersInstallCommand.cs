@@ -196,7 +196,7 @@ public static class RunnersInstallCommand
                     response = await client.GetRunnerInstallationStatusAsync(installationId, limit.Token);
                     failures = 0;
                 }
-                catch (HttpRequestException error) when (++failures <= 5 && !Regex.IsMatch(error.Message, @"API error 4\d\d"))
+                catch (HttpRequestException error) when (++failures <= 5 && !(error.StatusCode is >= System.Net.HttpStatusCode.BadRequest and < System.Net.HttpStatusCode.InternalServerError) && !Regex.IsMatch(error.Message, @"API error 4\d\d"))
                 {
                     Console.Error.WriteLine($"Waiting for Runner: transient error ({error.Message}), retrying");
                     await Task.Delay(pollDelay * failures, limit.Token);
