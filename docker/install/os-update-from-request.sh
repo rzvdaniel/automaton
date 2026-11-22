@@ -204,7 +204,7 @@ print(scope)
 PY
 }
 
-apt_env() { DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a "$@"; }
+apt_env() { LC_ALL=C DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a "$@"; }
 
 # Names of the packages with a pending security update (apt simulates the upgrade; no package changes).
 security_packages() {
