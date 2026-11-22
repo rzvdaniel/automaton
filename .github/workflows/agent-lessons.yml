@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: agent
+  group: agent-lessons   # own group: a queued lessons run must not cancel a queued issue run
   cancel-in-progress: false
 
 jobs:

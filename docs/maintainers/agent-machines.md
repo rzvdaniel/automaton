@@ -19,6 +19,12 @@ Agent workflows never use `pull_request` triggers, and fork PRs must not be allo
 The run step calls the `claude` CLI with `CLAUDE_CODE_OAUTH_TOKEN` (not `claude-code-action`, which needs the Claude GitHub app);
 the machine's `gh` login is rzvdaniel-bot. No production key is on the machine.
 
+Before registering a runner, the owner checks (nothing in the repo enforces it): Settings → Actions → General →
+"Require approval for all outside collaborators"; the runner sits in a runner group limited to the agent workflows
+(`agent-issue.yml`, `agent-pick-next.yml`, `agent-lessons.yml`); no other workflow uses `runs-on: self-hosted`.
+The agent runs with permissions skipped as the bot: the prompt treats text from other logins as untrusted, and only the owner's
+comments reopen a failed card. `pick` serves `rzvdaniel/automaton` only (`automaton-apps` needs its own workflow first).
+
 ## Add an agent machine
 
 1. Install Claude Code, `gh` (logged in as rzvdaniel-bot), .NET and Node for the user `agent`; clone the repo to `~/automaton`.

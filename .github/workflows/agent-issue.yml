@@ -48,3 +48,19 @@ jobs:
             "$B" move "$REPO" "$NUMBER" "Ready for agents" || true
           fi
           "$B" pick
+
+  refuse:
+    # agent:go added by anyone else: take it off again so the queue is not blocked
+    if: github.event.label.name == 'agent:go' && !contains(fromJSON('["rzvdaniel","rzvdaniel-bot"]'), github.actor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          gh issue edit "$NUMBER" -R "$GITHUB_REPOSITORY" --remove-label agent:go
+          gh issue comment "$NUMBER" -R "$GITHUB_REPOSITORY" --body "Refused: only the owner or the bot may start agent work (label added by $ACTOR)."
