@@ -37,7 +37,7 @@ work="$update_dir/work"
 request="$requests/request.json"
 version_pattern='^server-v[0-9]+\.[0-9]+\.[0-9]+$'
 # Read by write_status.
-export REQUESTED_VERSION='' FROM_VERSION='' STARTED='' REQUESTED_BY='' RECOVERY_BACKUP='' MESSAGE=''
+export REQUESTED_VERSION='' FROM_VERSION='' STARTED='' REQUESTED_BY='' RECOVERY_BACKUP='' MESSAGE='' STEP=''
 
 install_units() {
     # The API container runs as root, so requests/ is root-only on the host as well; status/ is mounted read-only.
@@ -98,6 +98,7 @@ status = {
     'recoveryBackup': value('RECOVERY_BACKUP'),
     'requestedBy': value('REQUESTED_BY'),
     'message': value('MESSAGE'),
+    'step': value('STEP'),
 }
 target = sys.argv[1]
 temporary = target + '.tmp'
@@ -135,6 +136,15 @@ with open(temporary, 'w') as stream:
 os.chmod(temporary, 0o640)
 os.replace(temporary, sys.argv[2])
 PY
+}
+
+# The step the updater has reached, read from its progress lines: backup, download, restart or health.
+current_step() {
+    local log="$work/run.log"
+    if grep -q '^Checking that the new release answers\.' "$log" 2>/dev/null; then echo health
+    elif grep '^Updating ' "$log" 2>/dev/null | grep -qv '^Updating to '; then echo restart
+    elif grep -q '^Backup verified\. Pulling' "$log" 2>/dev/null; then echo download
+    else echo backup; fi
 }
 
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
@@ -202,7 +212,7 @@ run_request() {
     installed=$(tr -d '\r\n' < "$install_dir/version" 2>/dev/null || true)
     FROM_VERSION=''
     [[ "$installed" =~ $version_pattern ]] && FROM_VERSION="$installed"
-    REQUESTED_VERSION='' STARTED=$(now) REQUESTED_BY='' RECOVERY_BACKUP='' MESSAGE=''
+    REQUESTED_VERSION='' STARTED=$(now) REQUESTED_BY='' RECOVERY_BACKUP='' MESSAGE='' STEP=''
     if ! reason=$(validate_request "$installed" 2>&1 >"$work/parsed.txt"); then
         rm -rf -- "$request" "$work/parsed.txt"
         case "$reason" in "The update request is invalid."|"The requested version"*) ;; *) reason='The update request is invalid.' ;; esac
@@ -225,13 +235,18 @@ run_request() {
     mv -T -- "$request" "$work/request.json" 2>/dev/null || rm -rf -- "$request"
     rm -rf -- "$work/request.json"
 
+    STEP=backup
     write_status running
     local arguments=(--install-dir "$install_dir")
     [[ "$REQUESTED_VERSION" == latest ]] || arguments+=(--version "$REQUESTED_VERSION")
     [[ "$allow" != true ]] || arguments+=(--allow-downgrade)
     bash "$install_dir/update.sh" "${arguments[@]}" > "$work/run.log" 2>&1 < /dev/null &
     local updater=$!
-    while kill -0 "$updater" 2>/dev/null; do sleep 3; publish_log; done
+    while kill -0 "$updater" 2>/dev/null; do
+        sleep 3; publish_log
+        local step; step=$(current_step)
+        if [[ "$step" != "$STEP" ]]; then STEP="$step"; write_status running; fi
+    done
     wait "$updater"
     local code=$?
     publish_log
@@ -240,6 +255,7 @@ run_request() {
     to_version=$(tr -d '\r\n' < "$install_dir/version" 2>/dev/null || true)
     [[ "$to_version" =~ $version_pattern ]] || to_version=''
     if ((code == 0)); then
+        STEP=''
         write_status succeeded 0 "$to_version" "$(now)"
     else
         local reason

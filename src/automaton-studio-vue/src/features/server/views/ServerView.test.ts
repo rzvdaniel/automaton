@@ -92,7 +92,7 @@ describe('ServerView', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="cleanup-line"]').text()).toContain('nightly at 05:00')
     expect(wrapper.get('[data-testid="cleanup-last"]').text()).toBe('last run freed 1.8 GB')
-    expect(wrapper.find('[data-testid="cleanup-line"]').classes()).not.toContain('text-red-500')
+    expect(wrapper.find('[data-testid="cleanup-line"]').classes()).not.toContain('health-row__bad')
     expect(wrapper.find('[data-testid="cleanup-run"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="cleanup-save"]').exists()).toBe(false)
     wrapper.unmount()
@@ -113,7 +113,7 @@ describe('ServerView', () => {
     vi.mocked(serverCleanupService.get).mockResolvedValue(body)
     const wrapper = mountView(['SysAdmin'])
     await flushPromises()
-    expect(wrapper.get('[data-testid="cleanup-line"]').classes()).toContain('text-red-500')
+    expect(wrapper.get('[data-testid="cleanup-line"]').classes()).toContain('health-row__bad')
     expect(wrapper.get('[data-testid="cleanup-last"]').text()).toContain('Runner too old')
     wrapper.unmount()
   })
@@ -132,7 +132,7 @@ describe('ServerView', () => {
     const wrapper = mountView()
     await flushPromises()
     expect(wrapper.get('[data-testid="version-card"]').text()).toContain('server-v1')
-    expect(wrapper.get('[data-testid="version-card"]').text()).toContain('up to date')
+    expect(wrapper.get('[data-testid="version-card"]').text()).toContain('Up to date')
     expect(wrapper.find('[data-testid="update-available"]').exists()).toBe(false)
     wrapper.unmount()
   })
@@ -143,7 +143,7 @@ describe('ServerView', () => {
       vi.mocked(serverHealthService.get).mockResolvedValue(health(true))
       const wrapper = mountView()
       await flushPromises()
-      await wrapper.get('[data-testid="update-available"]').findAll('button').find((b) => b.text() === 'Update')!.trigger('click')
+      await wrapper.get('[data-testid="update-available"]').findAll('button').find((b) => b.text().startsWith('Update to'))!.trigger('click')
       await wrapper.findAll('button').find((b) => b.text().includes('Update now'))!.trigger('click')
       await flushPromises()
       expect(wrapper.find('[data-testid="update-running"]').exists()).toBe(true)
@@ -189,14 +189,14 @@ describe('ServerView', () => {
   it('links a system administrator to Server Console, or says how to install it', async () => {
     const missing = mountView(['SysAdmin'])
     await flushPromises()
-    expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('not installed')
+    expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('Install Server Console')
     expect(serverConsoleService.install).not.toHaveBeenCalled()
     vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1', running: false })
     await missing.get('[data-testid="server-console-install"]').trigger('click')
     await flushPromises()
     expect(serverConsoleService.install).toHaveBeenCalledTimes(1)
     expect(missing.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
-    expect(missing.find('[data-testid="server-console-notice"]').exists()).toBe(false)
+    expect(missing.find('[data-testid="server-console-install"]').exists()).toBe(false)
     missing.unmount()
     vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: null, running: false })
 
@@ -204,7 +204,7 @@ describe('ServerView', () => {
     const installed = mountView(['SysAdmin'])
     await flushPromises()
     expect(installed.get('[data-testid="server-console-open"]').attributes('href')).toBe('/apps/sc1')
-    expect(installed.find('[data-testid="server-console-notice"]').exists()).toBe(false)
+    expect(installed.find('[data-testid="server-console-install"]').exists()).toBe(false)
     installed.unmount()
   })
 
@@ -223,10 +223,12 @@ describe('ServerView', () => {
     const wrapper = mountView()
     await flushPromises()
     const banner = wrapper.get('[data-testid="update-available"]')
-    expect(banner.text()).toContain('server-v2')
-    expect(banner.text()).toContain('server-v1')
+    expect(banner.text()).toContain('Update to server-v2')
+    expect(banner.text()).toContain('about 2 minutes')
+    expect(wrapper.get('[data-testid="version-card"]').text()).toContain('server-v1')
+    expect(wrapper.get('[data-testid="update-available-pill"]').text()).toBe('server-v2 available')
 
-    await banner.findAll('button').find((button) => button.text() === 'Update')!.trigger('click')
+    await banner.findAll('button').find((button) => button.text().startsWith('Update to'))!.trigger('click')
     expect(installService.startUpdate).not.toHaveBeenCalled()
     await wrapper.findAll('button').find((button) => button.text().includes('Update now'))!.trigger('click')
     await flushPromises()
@@ -252,5 +254,98 @@ describe('ServerView', () => {
     await wrapper.get('[data-testid="add-runner"]').trigger('click')
     expect(wrapper.get('[data-testid="install-dialog"]').attributes('data-visible')).toBe('true')
     wrapper.unmount()
+  })
+
+  const runStatus = (run: object, extra = {}) => ({
+    currentVersion: 'server-v1', triggerAvailable: true, stale: false, requestPending: false, requestAgeSeconds: null, hint: null, log: 'line',
+    run: { requestedVersion: 'latest', fromVersion: 'server-v1', toVersion: null, startedAtUtc: new Date().toISOString(), finishedAtUtc: null, exitCode: null, recoveryBackup: null, requestedBy: 'admin@example.com', message: null, ...run },
+    ...extra,
+  })
+
+  it('shows the update steps advancing, who started it, and a progress bar, without error boxes', async () => {
+    vi.mocked(serverHealthService.get).mockResolvedValue(health(true))
+    vi.mocked(installService.getUpdate).mockResolvedValue(runStatus({ state: 'running', step: 'restart' }) as never)
+    const wrapper = mountView()
+    await flushPromises()
+    const steps = wrapper.findAll('[data-testid="update-steps"] li')
+    expect(steps.map((step) => step.text())).toEqual(['Backup', 'Download', 'Restart services', 'Health check'])
+    expect(steps[2]!.classes()).toContain('is-current')
+    expect(steps[0]!.classes()).toContain('is-done')
+    expect(wrapper.get('[data-testid="update-running"]').text()).toContain('Started by admin@example.com')
+    expect(wrapper.text()).not.toContain('could not be loaded')
+    wrapper.unmount()
+  })
+
+  it('names the step where a failed update stopped and offers Try again', async () => {
+    vi.mocked(serverHealthService.get).mockResolvedValue(health(true))
+    vi.mocked(installService.getUpdate).mockResolvedValue(runStatus({ state: 'failed', step: 'health', message: 'Reason: no answer' }) as never)
+    const wrapper = mountView()
+    await flushPromises()
+    const failed = wrapper.get('[data-testid="update-failed"]')
+    expect(failed.text()).toContain('Stopped at Health check')
+    expect(failed.text()).toContain('Reason: no answer')
+    expect(failed.text()).toContain('still runs server-v1')
+    await wrapper.get('[data-testid="update-retry"]').trigger('click')
+    await flushPromises()
+    expect(installService.startUpdate).toHaveBeenCalledWith('latest')
+    wrapper.unmount()
+  })
+
+  it('does not show an old finished update as "Updated" when the page opens', async () => {
+    vi.mocked(installService.getUpdate).mockResolvedValue(runStatus({ state: 'succeeded', finishedAtUtc: new Date().toISOString() }) as never)
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="update-succeeded"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps the last values and shows one line with Retry when the API does not answer', async () => {
+    const wrapper = mountView(['SysAdmin'])
+    await flushPromises()
+    vi.mocked(serverHealthService.get).mockRejectedValue(new Error('down'))
+    vi.mocked(runnersService.list).mockRejectedValue(new Error('down'))
+    await wrapper.get('[data-testid="check-now"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="server-notice"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="server-notice"]').text()).toContain('showing')
+    expect(wrapper.get('[data-testid="health-paused"]').text()).toContain('could not refresh')
+    expect(wrapper.text()).not.toContain('could not be loaded')
+    expect(wrapper.findAll('[data-testid="runner-row"]')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  const fleet = () => [
+    runner({ id: 'a', name: 'alpha', upgradeAvailable: true }),
+    runner({ id: 'b', name: 'bravo', status: 'Offline' }),
+    runner({ id: 'c', name: 'charlie', upgradeAvailable: true }),
+  ]
+
+  it('summarises Runners and filters and searches them when there is more than one', async () => {
+    vi.mocked(runnersService.list).mockResolvedValue(fleet() as never)
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="runners-summary"]').text()).toBe('3 runners · 2 online · 1 offline · 2 need upgrade')
+    expect(wrapper.findAll('[data-testid="runner-row"]').map((row) => row.text().split(' ')[0])).toEqual(['alpha', 'bravo', 'charlie'])
+    await wrapper.get('[data-testid="runners-filter-offline"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="runner-row"]')).toHaveLength(1)
+    await wrapper.get('[data-testid="runners-filter-all"]').trigger('click')
+    await wrapper.get('[data-testid="runners-search"]').setValue('char')
+    expect(wrapper.findAll('[data-testid="runner-row"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="runner-state"]').text()).toBe('Needs upgrade')
+    wrapper.unmount()
+  })
+
+  it('shows no filters for a single Runner and offers Upgrade N runners only for two or more', async () => {
+    const single = mountView()
+    await flushPromises()
+    expect(single.find('[data-testid="runners-search"]').exists()).toBe(false)
+    expect(single.find('[data-testid="runners-upgrade-all"]').exists()).toBe(false)
+    single.unmount()
+    vi.mocked(runnersService.list).mockResolvedValue(fleet() as never)
+    const many = mountView()
+    await flushPromises()
+    expect(many.get('[data-testid="runners-upgrade-all"]').text()).toBe('Upgrade 2 runners')
+    expect(many.findAll('[data-testid="runner-upgrade-button"]')).toHaveLength(2)
+    many.unmount()
   })
 })

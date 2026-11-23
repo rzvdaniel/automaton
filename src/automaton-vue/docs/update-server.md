@@ -30,11 +30,11 @@ The `automaton` commands run from your own machine, signed in to the server; onl
 
    Pin a release with `--version server-vX.Y.Z`. The API restarts during the update; `--wait` follows it, then checks `/health` and the installed version, and exits nonzero on failure, printing the cause (the last line of `update.log`), the log tail and the recovery backup. The full log is on the server at `/var/lib/automaton/update/status/update.log`. `--timeout SECONDS` defaults to 1800.
 
-2. In Studio instead: **Admin → Installation → Update** (the **Update to the latest release** button).
+2. In Studio instead: open **Server**. The version card is always there; when a newer release exists it shows **Update to X**. While it runs the card shows the four steps (Backup, Download, Restart services, Health check) with the current one outlined, who started it and the elapsed time; Studio can be briefly unavailable and the page keeps its last values. It then says **Updated to X at HH:MM, took …**. If it fails, the card names the step where it stopped, says the server still runs the old release, and offers **Try again** and **Download log**.
 
 3. Upgrade the Runners (separate: the update is already complete without this step). A server update does not change installed Runners; each keeps its old image until upgraded. From the CLI, `automaton server update --runners` waits for the update, names every Runner with its state and upgrades the ones on an old image (with only `--wait`, it lists them with the command to upgrade each; `automaton runners upgrade RUNNER --wait` needs a Developer API key).
 
-   In Studio, open **Runners**: a Runner on an old image shows **Update available**; select **Upgrade → Upgrade now**, and Studio says whether it reconnected or rolled back. An offline Runner, or one busy with a deploy or an Action, cannot upgrade; retry when idle, or use **Run it manually** (shown there) for a Runner too old to upgrade itself.
+   In Studio, open **Server**: in the Runners table a Runner on an old image shows **Needs upgrade**; select **Upgrade → Upgrade now** (with two or more Runners, **Upgrade N runners** upgrades all that need it), and Studio says whether it reconnected or rolled back. An offline Runner, or one busy with a deploy or an Action, cannot upgrade; retry when idle, or use **Run it manually** (shown there) for a Runner too old to upgrade itself.
 
 4. Check the last run any time.
 

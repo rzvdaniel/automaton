@@ -92,6 +92,8 @@ export interface InstallationUpdateRun {
   recoveryBackup: string | null
   requestedBy: string | null
   message: string | null
+  /** While running or after a failure: backup, download, restart or health. */
+  step?: 'backup' | 'download' | 'restart' | 'health' | null
 }
 
 export interface InstallationUpdateStatus {

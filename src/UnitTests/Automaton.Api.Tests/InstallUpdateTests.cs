@@ -69,6 +69,17 @@ public sealed class InstallUpdateTests
     }
 
     [Test]
+    public async Task GetReturnsTheStepTheUpdaterReached()
+    {
+        await File.WriteAllTextAsync(Path.Combine(status, "status.json"),
+            JsonSerializer.Serialize(new { state = "running", step = "download", startedAtUtc = DateTimeOffset.UtcNow }));
+
+        var result = (await Controller(new RecordingAudit(), Guid.NewGuid(), null).Get(default)).Result as OkObjectResult;
+
+        Assert.That(((InstallationUpdateStatus)result!.Value!).Run!.Step, Is.EqualTo("download"));
+    }
+
+    [Test]
     public async Task PostReturnsConflictWhileAnUpdateRuns()
     {
         await File.WriteAllTextAsync(Path.Combine(status, "status.json"),
