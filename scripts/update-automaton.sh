@@ -276,8 +276,25 @@ infrastructure = ('postgres', 'rabbitmq', 'traefik')
 old_services, new_services = old.get('services', {}), new.get('services', {})
 if not set(old_services) <= set(new_services):
     raise SystemExit('This release removes a service. A reviewed migration is required.')
+# Reviewed Traefik changes. Each entry names environment variables a release may add; they must be new
+# (absent in the installed release) and nothing else in the service may differ.
+#  - HTTPREQ_* (#893): hand DNS challenges to the acme-responder; used only in delegated TLS mode.
+reviewed_traefik_environment = ('HTTPREQ_ENDPOINT', 'HTTPREQ_USERNAME', 'HTTPREQ_PASSWORD')
+def comparable(name, service):
+    if name != 'traefik' or not isinstance(service, dict):
+        return service
+    service = dict(service)
+    environment = dict(service.get('environment') or {})
+    service['environment'] = {key: value for key, value in environment.items() if key not in reviewed_traefik_environment}
+    return service
 for name in infrastructure:
-    if old_services.get(name) != new_services.get(name):
+    old_service, new_service = old_services.get(name), new_services.get(name)
+    if name == 'traefik' and isinstance(old_service, dict):
+        old_environment = old_service.get('environment') or {}
+        for key in reviewed_traefik_environment:
+            if key in old_environment and old_environment[key] != (new_service or {}).get('environment', {}).get(key):
+                raise SystemExit(f'This release changes {name}. A reviewed infrastructure migration is required.')
+    if comparable(name, old_service) != comparable(name, new_service):
         raise SystemExit(f'This release changes {name}. A reviewed infrastructure migration is required.')
 for section in ('volumes', 'secrets', 'networks'):
     if old.get(section) != new.get(section):
