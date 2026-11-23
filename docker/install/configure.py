@@ -377,7 +377,6 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         'Logging': {'File': {'RetainedFileCountLimit': 14, 'FileSizeLimitBytes': 10485760}},
         'EmailConfig': {'EmailHost': '', 'EmailAccount': '', 'EmailPassword': ''},
         'GitHub': {'ClientId': '', 'ClientSecret': '', 'ApiBaseUrl': api, 'FrontendUrl': studio},
-        'Stripe': {'SecretKey': '', 'PublishableKey': '', 'WebhookSecret': ''},
     }
     # Mark the configuration only after all persistent credentials exist, so a
     # failed initial prompt can be retried without appearing to be a lost backup.
