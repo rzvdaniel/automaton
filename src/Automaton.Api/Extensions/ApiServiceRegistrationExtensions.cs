@@ -239,6 +239,7 @@ internal static class ApiAuthorizationRegistration
 {
     internal static IServiceCollection AddApiAuthorization(this IServiceCollection services)
     {
+        services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler, PermissionsAdminForbiddenHandler>();
         services.AddAuthorization(options =>
         {
             // Default policy for web users (Blazor UI) - only Identity and JW
