@@ -146,6 +146,38 @@ public sealed class RunnerExecutionOperationService(
         finally { if (scrub) await ScrubAsync(id, CancellationToken.None); }
     }
 
+    /// <summary>
+    /// Empties every stored <c>host-exec</c> request that still holds a script or input, as when the API restarted while one was waiting.
+    /// A request that never finished is also ended, so the Runner does not run it later. Returns how many were emptied.
+    /// </summary>
+    public async Task<int> SweepHostExecAsync(CancellationToken token)
+    {
+        var rows = await db.RunnerExecutionOperations.AsNoTracking()
+            .Select(o => new { o.Id, o.ProtectedRequest }).ToListAsync(token);
+        var leftover = rows.Where(row => HoldsHostExecRequest(row.ProtectedRequest)).Select(row => row.Id).ToList();
+        foreach (var id in leftover)
+        {
+            await ScrubAsync(id, token);
+            var operation = await db.RunnerExecutionOperations.SingleAsync(o => o.Id == id, token);
+            if (operation.CompletedAtUtc.HasValue) continue;
+            operation.ResultJson = protector.Protect(JsonSerializer.Serialize(
+                RunnerExecutionResult.Interrupted("The server restarted before the command finished."), JsonOptions));
+            operation.CompletedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(token);
+        }
+        return leftover.Count;
+    }
+
+    private bool HoldsHostExecRequest(string protectedRequest)
+    {
+        try
+        {
+            var action = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(protectedRequest), JsonOptions)?.Action;
+            return action is { Kind: "host-exec" } && action.Payload.ValueKind == JsonValueKind.Object && action.Payload.EnumerateObject().Any();
+        }
+        catch (Exception error) when (error is System.Security.Cryptography.CryptographicException or JsonException) { return false; }
+    }
+
     private async Task ScrubAsync(Guid id, CancellationToken token)
     {
         var emptyRequest = protector.Protect(JsonSerializer.Serialize(

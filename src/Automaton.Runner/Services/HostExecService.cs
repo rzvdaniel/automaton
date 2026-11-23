@@ -6,7 +6,7 @@ namespace Automaton.Runner.Console.Services;
 
 /// <summary>
 /// Runs a script the server sent as root on this machine (<c>host-exec</c>), through a short-lived privileged container in the host's
-/// namespaces like the other host commands. The script is an argument; stdin carries secrets, so they never appear in arguments or the
+/// namespaces like the other host commands. The script is an argument (so it shows in <c>ps</c> and <c>docker inspect</c> on the machine while it runs); stdin carries secrets, so they never appear in arguments or the
 /// environment (<c>ps</c>), nothing is written to disk, and output that repeats an input line is redacted before it leaves the Runner.
 /// </summary>
 internal sealed class HostExecService(HostExecService.ProcessRunner? process = null)
