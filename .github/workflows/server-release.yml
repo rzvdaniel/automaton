@@ -220,10 +220,17 @@ jobs:
                 # The first PostgreSQL release follows a MySQL release, whose manifest has no PostgreSQL image.
                 resolve POSTGRES_IMAGE postgres:16
               fi
+              # The ACME responder image stays pinned too; the first release that has it resolves it once.
+              if grep -q '^RESPONDER_IMAGE=' previous-release/automaton-server/release.env; then
+                grep '^RESPONDER_IMAGE=' previous-release/automaton-server/release.env
+              else
+                resolve RESPONDER_IMAGE python:3-alpine
+              fi
             else
               resolve POSTGRES_IMAGE postgres:16
               resolve RABBITMQ_IMAGE rabbitmq:4-management
               resolve TRAEFIK_IMAGE traefik:v3
+              resolve RESPONDER_IMAGE python:3-alpine
             fi
             # New Runners install the Runner image built from this commit. That workflow only runs when Runner code
             # changed, so with no run for this commit the unchanged :latest image is the right one.

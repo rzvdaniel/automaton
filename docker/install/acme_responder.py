@@ -22,13 +22,15 @@ RCODE_NOERROR, RCODE_FORMERR, RCODE_REFUSED = 0, 1, 5
 
 
 class Responder:
-    def __init__(self, zone, ns_name, rate=20, burst=40):
+    def __init__(self, zone, ns_name, rate=20, burst=40, global_rate=500):
         self.zone = zone.lower().rstrip('.')
         self.ns_name = ns_name.lower().rstrip('.')
         self.values = []
         self.lock = threading.Lock()
         self.rate, self.burst = rate, burst
         self.buckets = {}
+        self.global_rate = global_rate
+        self.global_tokens, self.global_last = float(global_rate), time.monotonic()
 
     def set_value(self, fqdn, value, present):
         if fqdn.lower().rstrip('.') != self.zone:
@@ -43,6 +45,12 @@ class Responder:
     def allow(self, source):
         now = time.monotonic()
         with self.lock:
+            # Global ceiling on replies per second: spoofed sources never share a per-source bucket.
+            self.global_tokens = min(self.global_rate, self.global_tokens + (now - self.global_last) * self.global_rate)
+            self.global_last = now
+            if self.global_tokens < 1:
+                return False
+            self.global_tokens -= 1
             tokens, last = self.buckets.get(source, (self.burst, now))
             tokens = min(self.burst, tokens + (now - last) * self.rate)
             if len(self.buckets) > 10000:
@@ -123,9 +131,11 @@ def serve_udp(responder, host, port):
             sock.sendto(response, source)
 
 
-def serve_tcp(responder, host, port):
+def serve_tcp(responder, host, port, max_connections=64):
     class Handler(StreamRequestHandler):
         def handle(self):
+            if not slots.acquire(blocking=False):  # too many open connections: drop
+                return
             self.request.settimeout(5)
             try:
                 size = struct.unpack('!H', self.rfile.read(2))[0]
@@ -134,6 +144,9 @@ def serve_tcp(responder, host, port):
                     self.wfile.write(struct.pack('!H', len(response)) + response)
             except (OSError, struct.error):
                 pass
+            finally:
+                slots.release()
+    slots = threading.BoundedSemaphore(max_connections)
     ThreadingTCPServer.allow_reuse_address = True
     ThreadingTCPServer.daemon_threads = True
     ThreadingTCPServer((host, port), Handler).serve_forever()

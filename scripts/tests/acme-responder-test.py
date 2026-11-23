@@ -59,6 +59,13 @@ class ResponderTests(unittest.TestCase):
         self.assertEqual([r is not None for r in results], [True, True, True, False, False])
         self.assertIsNotNone(responder.handle(query(ZONE, 16), '8.8.8.8'))
 
+    def test_global_reply_cap_across_spoofed_sources(self):
+        responder = module.Responder(ZONE, 'api.example.com', global_rate=0)
+        self.assertIsNone(responder.handle(query(ZONE, 16), '1.1.1.1'))
+        responder = module.Responder(ZONE, 'api.example.com', global_rate=3)
+        results = [responder.handle(query(ZONE, 16), f'10.0.0.{i}') for i in range(6)]
+        self.assertEqual([r is not None for r in results], [True, True, True, False, False, False])
+
     def test_oversized_udp_answer_is_truncated(self):
         for i in range(10):
             self.responder.set_value(ZONE, 'v' * 200 + str(i), True)

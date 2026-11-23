@@ -241,8 +241,9 @@ import re, sys
 def read(path):
     entries = dict(line.strip().split('=', 1) for line in open(path) if line.strip())
     required = {'API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'POSTGRES_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE', 'RUNNER_IMAGE'}
-    # STORE_IMAGE and AGE_IMAGE were added after the first releases.
-    if set(entries) not in (required, required | {'STORE_IMAGE'}, required | {'AGE_IMAGE'}, required | {'STORE_IMAGE', 'AGE_IMAGE'}) or any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
+    # STORE_IMAGE, AGE_IMAGE and RESPONDER_IMAGE were added after the first releases.
+    optional = {'STORE_IMAGE', 'AGE_IMAGE', 'RESPONDER_IMAGE'}
+    if not required <= set(entries) or set(entries) - required - optional or any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
         raise SystemExit('Invalid release image manifest.')
     return entries
 old, new = read(sys.argv[1]), read(sys.argv[2])
