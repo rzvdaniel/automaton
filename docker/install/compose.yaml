@@ -123,9 +123,10 @@ services:
       retries: 30
   # Delegated TLS mode only (COMPOSE_PROFILES=delegated in .env): answers Let's Encrypt's DNS challenge for
   # _acme-challenge.apps.<domain> and nothing else. Port 53 is published only when this service runs.
+  # RESPONDER_IMAGE comes from release.env; the default is pinned too so older release.env files still render.
   acme-responder:
     profiles: [delegated]
-    image: ${RESPONDER_IMAGE:?}
+    image: ${RESPONDER_IMAGE:-python:3-alpine@sha256:0f9552bb28711333da16915ec146f5e6bb44a7fdac9ced15dc17c2e0206346dd}
     restart: unless-stopped
     logging: *logging
     environment:

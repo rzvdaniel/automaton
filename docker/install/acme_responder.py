@@ -45,18 +45,23 @@ class Responder:
     def allow(self, source):
         now = time.monotonic()
         with self.lock:
-            # Global ceiling on replies per second: spoofed sources never share a per-source bucket.
-            self.global_tokens = min(self.global_rate, self.global_tokens + (now - self.global_last) * self.global_rate)
-            self.global_last = now
-            if self.global_tokens < 1:
-                return False
-            self.global_tokens -= 1
             tokens, last = self.buckets.get(source, (self.burst, now))
             tokens = min(self.burst, tokens + (now - last) * self.rate)
             if len(self.buckets) > 10000:
                 self.buckets.clear()
+            if tokens < 1:
+                self.buckets[source] = (tokens, now)
+                return False
+            # Global ceiling on replies per second: spoofed sources never share a per-source bucket.
+            # Only sources inside their own limit draw from it.
+            self.global_tokens = min(self.global_rate, self.global_tokens + (now - self.global_last) * self.global_rate)
+            self.global_last = now
+            if self.global_tokens < 1:
+                self.buckets[source] = (tokens, now)
+                return False
+            self.global_tokens -= 1
             self.buckets[source] = (tokens - 1, now)
-            return tokens >= 1
+            return True
 
     def handle(self, data, source, limit=None):
         """Return the response bytes for a query, or None to stay silent (dropped or malformed)."""
