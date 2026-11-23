@@ -138,7 +138,7 @@ It restarts Traefik and API, waits for the HTTPS checks, never touches credentia
 | --- | --- | --- |
 | `NS` | `_acme-challenge.apps.<domain>` | `api.<domain>` |
 
-`api.<domain>` already has an address record. The record hands only the Let's Encrypt challenge name to a small DNS responder on your server (Compose service `acme-responder`), which answers that one name and refuses everything else (no recursion), limits queries per source address, and exists only in this mode. Traefik gets and renews one wildcard certificate for `*.apps.<domain>` through it, with no token to store.
+`api.<domain>` already has an address record. The record hands only the Let's Encrypt challenge name to a small DNS responder on your server (Compose service `acme-responder`), which answers that one name and refuses everything else (no recursion), limits queries per source address, and exists only in this mode. Traefik gets and renews one wildcard certificate for `*.apps.<domain>` through it, with no token to store. Studio, API and store hosts keep getting their certificates through HTTP-01, as in the default mode; only `apps.<domain>` and `*.apps.<domain>` use the responder.
 
 ```bash
 sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode delegated   # or --tls-mode delegated on a fresh install
