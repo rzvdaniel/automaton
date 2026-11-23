@@ -22,8 +22,8 @@ Never fill a row from memory of the session. Each row comes from one of these, a
 | Closed as live | `gh issue list --state closed --search "closed:>=<day>"` |
 | Filed | `gh issue list --state all --search "created:>=<day>"`, grouped by parent issue |
 | Waiting | open PRs (skip dependency bumps) and `python .agents/tools/merge-gate.py <pr>`: say what each needs |
-| Agents now | agent board items with Status `Ready for agents`, `Running` or `In review` (`gh project item-list <board>`); runner-01 picks up `Ready for agents` through the GitHub agent runner |
-| Overnight (Morning) | agent-runner workflow runs since 20:00 the day before (`gh run list`) with their result, board items moved to `In review`/`Done`, and the newest morning report |
+| Agents now | agent board items with Status `Ready for agents`, `Running` or `In review` (`gh project item-list 17 --owner rzvdaniel`); runner-01 picks up `Ready for agents` through the GitHub agent runner |
+| Overnight (Morning) | `Agent issue` runs since 20:00 the day before (`gh run list -R rzvdaniel/automaton --workflow "Agent issue" --created ">=<yesterday>T20:00:00Z"`) with their result, board items moved to `In review`/`Done`, and the newest morning report |
 | Inbox (Morning) | board items with Status `Inbox` on the agent board in the config, newest first |
 | Health | test server and production answer (`/api/install/status`), versions from `automaton installation-status` |
 | Needs you | owner actions, gate results that wait on the owner, and anything blocked on a decision |
