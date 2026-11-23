@@ -377,12 +377,12 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
         delegated = {'CF_DNS_API_TOKEN_FILE': '/run/secrets/cloudflare_token', 'HTTPREQ_ENDPOINT': 'http://acme-responder:8053',
                      'HTTPREQ_USERNAME': 'acme', 'HTTPREQ_PASSWORD': ''}
         (self.install / 'compose.yaml').write_text(compose(store=False, traefik_environment={'CF_DNS_API_TOKEN_FILE': '/run/secrets/cloudflare_token'}))
-        accepted = self.update(*self.bundle(compose_file=compose(traefik_environment=delegated)))
-        self.assertNotIn('changes traefik', accepted.stderr)
         other = dict(delegated, EXTRA='1')
         refused = self.update(*self.bundle(compose_file=compose(traefik_environment=other)))
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn('changes traefik', refused.stderr)
+        accepted = self.update(*self.bundle(compose_file=compose(traefik_environment=delegated)))
+        self.assertNotIn('changes traefik', accepted.stderr)
 
     def old_backups(self, count):
         backups = self.install / 'backups'
