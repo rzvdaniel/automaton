@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio Server page: update states</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F4F3EF;--card:#FFFFFF;--inset:#F4F3EF;--line:#E6E4DE;--ink:#1A1A1A;--mute:#5F5E5A;--soft:#8A8880;--bar:#3F3E3A;--or:#EA580C;--orink:#C2410C;--orsoft:#FFF7ED;--orline:#FDBA74;--ok:#5F5E5A;--okbg:#F4F3EF;--bad:#C2410C;--badbg:#FFF7ED;--red:#B42318;--info:#5F5E5A;--infobg:#F4F3EF}
+*{box-sizing:border-box}
+body{margin:0;background:#E9E7E1;font-family:Inter,system-ui,sans-serif;color:var(--ink)}
+.intro{max-width:1180px;margin:0 auto;padding:32px 24px 8px}
+.intro h1{font-size:22px;margin:0 0 6px}
+.intro p{margin:0;color:var(--mute);font-size:14px;line-height:1.5;max-width:760px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 0}
+.tabs button{font:500 13px Inter,sans-serif;border:1px solid #d6d3ca;background:#fff;border-radius:999px;padding:7px 14px;cursor:pointer;color:var(--ink)}
+.tabs button[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.frame{max-width:1180px;margin:16px auto 48px;display:flex;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.08);min-height:640px}
+.side{width:200px;background:#17181c;color:#c9cad0;padding:18px 14px;font-size:14px;flex:none}
+.brand{display:flex;align-items:center;gap:10px;color:#fff;font-weight:600;font-size:17px;margin-bottom:22px}
+.side a{display:block;padding:8px 10px;border-radius:8px;color:#c9cad0;text-decoration:none}
+.side a.on{background:#24252c;color:#F97316}
+main{flex:1;background:var(--bg);padding:32px 40px}
+h2.page{margin:0;font-size:26px}
+.sub{color:var(--mute);font-size:13px;margin-top:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-top:18px}
+.vrow{display:flex;align-items:center;gap:18px}
+.vbig{font:600 28px Inter;letter-spacing:-.01em}
+.chip{font-size:12px;font-weight:600;border-radius:999px;padding:4px 10px;display:inline-flex;align-items:center;gap:6px}
+.chip.ok{background:transparent;color:var(--mute);padding-left:0}
+.chip.new{background:var(--orsoft);color:var(--orink);box-shadow:inset 0 0 0 1px var(--orline)}.chip.new .dot{background:var(--or)}
+.chip.run{background:var(--inset);color:var(--ink)}.chip.run .dot{background:var(--or);animation:bl 1s infinite}@keyframes bl{50%{opacity:.3}}
+.chip.bad{background:var(--badbg);color:var(--bad)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--soft)}.chip.bad .dot{background:var(--or)}.chip.bad{box-shadow:inset 0 0 0 1px var(--orline)}
+.grow{flex:1}
+.meta{font-size:13px;color:var(--mute);margin-top:4px}
+.btn{font:600 14px Inter;border-radius:10px;padding:10px 16px;border:1px solid #d6d3ca;background:#fff;color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--or);border-color:var(--or);color:#17171A}
+a.link{color:var(--orink);font-size:13px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}
+.step{border-radius:10px;padding:10px 12px;font-size:13px;background:#f1efe9;color:var(--soft)}
+.step b{display:block;font-size:12px;font-weight:600;margin-bottom:2px}
+.step.done{background:var(--inset);color:var(--mute)}
+.step.now{background:var(--orsoft);color:var(--orink);box-shadow:inset 0 0 0 1.5px var(--orline)}
+.bar{height:6px;background:#e6e3da;border-radius:4px;overflow:hidden;margin-top:14px}
+.bar span{display:block;height:6px;background:var(--bar);border-radius:4px}
+.note{font-size:12.5px;color:var(--mute);margin-top:10px}
+.banner{border-radius:12px;padding:12px 16px;font-size:14px;display:flex;align-items:center;gap:12px;margin-top:14px}
+.banner.ok{background:var(--card);border:1px solid var(--line);color:var(--ink)}
+.banner.bad{background:var(--orsoft);color:var(--ink);border:1px solid var(--orline);align-items:flex-start}
+.x{margin-left:auto;background:none;border:0;color:inherit;font-size:16px;cursor:pointer}
+pre.reason{margin:8px 0 0;background:var(--card);color:var(--ink);border:1px solid var(--orline);border-radius:8px;padding:10px 12px;font:12.5px 'JetBrains Mono',monospace;white-space:pre-wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid2 .card{margin-top:18px}
+h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px}
+.kv{display:grid;grid-template-columns:110px 1fr;row-gap:8px;font-size:13.5px}
+.kv span:nth-child(odd){color:var(--mute)}
+.dim{opacity:.5;filter:saturate(.5)}
+.pause{font-size:11px;font-weight:600;color:var(--mute);background:var(--inset);border-radius:999px;padding:3px 9px}
+.runner{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13.5px;background:#fff}
+.runner .grow b{font-weight:600}
+.small{font-size:12px;color:var(--soft)}
+.empty{font-size:13.5px;color:var(--mute);line-height:1.5}
+.hrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.hrow div{background:var(--inset);border-color:transparent;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.hrow span{display:block;color:var(--mute);font-size:12px;margin-bottom:3px}
+.mini{display:block;height:4px;background:#e6e3da;border-radius:3px;margin-top:6px;overflow:hidden}.mini u{display:block;height:4px;background:var(--bar)}
+.rt{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.rr{display:grid;grid-template-columns:1.6fr 140px 1fr 50px 1.2fr 150px;align-items:center;gap:12px;padding:10px 14px;font-size:13.5px;border-top:1px solid #efece5}
+.rr:first-child{border-top:0}.rr.head{font-size:11.5px;color:var(--soft);font-weight:600;letter-spacing:.04em;text-transform:uppercase;background:#faf9f5}
+.rr b{font-weight:600}.rr.off{background:#FCFBF9}
+.mono{font:12.5px 'JetBrains Mono',monospace;color:var(--mute)}
+.act{display:flex;gap:6px;justify-content:flex-end}
+.ib{border:1px solid var(--line);background:#fff;border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--mute)}
+.filters{display:flex;gap:6px;align-items:center;margin-bottom:12px}
+.f{font:500 12.5px Inter;border:1px solid #d6d3ca;background:#fff;border-radius:999px;padding:5px 11px;cursor:pointer}.f.on{background:var(--inset);color:var(--ink);border-color:var(--line);font-weight:600}
+.search{font:13px Inter;border:1px solid #d6d3ca;border-radius:8px;padding:7px 10px;width:180px}
+.sum{font-size:12.5px;font-weight:500;color:var(--mute)}
+.stale{font-size:11px;font-weight:600;color:var(--orink);background:var(--orsoft);border-radius:999px;padding:3px 9px}
+.err{border:1px solid var(--orline);background:var(--badbg);color:var(--bad);border-radius:10px;padding:14px;font-size:13.5px;display:flex;gap:10px;align-items:center}
+.apidown{display:none;background:var(--orsoft);border:1px solid var(--orline);color:var(--ink);border-radius:12px;padding:12px 16px;font-size:14px;margin-top:14px}
+.hl div{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:14px}
+.hl div:first-child{border-top:0}
+.hl .d{width:7px;height:7px;border-radius:50%;background:var(--soft)}
+.hl b{margin-left:auto;font-weight:400;color:var(--mute)}
+.rt{border:0;border-radius:0;background:transparent}
+.rr{border-top:1px solid var(--line);padding:12px 10px}
+.rr.head{background:transparent;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:500;color:var(--mute);border-top:0;border-bottom:1px solid var(--line)}
+.rr.head + .rr{border-top:0}
+.rr:not(.head):hover{background:#FAF9F6}
+.rr.off{background:transparent}
+.rr .chip.ok{padding-left:0}
+.st{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;color:var(--mute)}
+.st .dot{width:7px;height:7px;border-radius:50%}
+.st.need{color:var(--orink)}.st.need .dot{background:var(--or)}
+.st.run{color:var(--ink)}.st.run .dot{background:var(--or);animation:bl 1s infinite}
+.step,.step.done{background:transparent;border:1px solid var(--line)}
+.step.now{background:transparent;border:1.5px solid var(--or)}
+.f.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+[hidden]{display:none!important}.mono{white-space:nowrap}.rr>span:nth-child(4){text-align:right;padding-right:14px}
+.ptabs{display:flex;gap:4px;margin-top:18px;border-bottom:1px solid var(--line)}
+.pt{font:500 14px Inter;background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;margin-bottom:-1px;color:var(--mute);cursor:pointer}
+.pt[aria-selected=true]{color:var(--ink);border-bottom-color:var(--or)}
+.cnt{font-size:12px;color:var(--soft);margin-left:4px}
+.vlab{font-weight:500;color:var(--mute);font-size:18px;margin-right:6px}
+.state{display:none}.state.on{display:block}
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>Studio › Server: Automaton and Runners tabs</h1>
+  <p>Two page tabs. <b>Automaton</b>: the version and update card (five states) and a short health list that links to Server Keeper for details. <b>Runners</b>: the Runners table at the top. While Automaton updates, health and Runners keep their last values instead of showing error boxes. The pills above switch the state shown.</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-s="uptodate" aria-selected="true">Up to date</button>
+    <button role="tab" data-s="available" aria-selected="false">Update available</button>
+    <button role="tab" data-s="updating" aria-selected="false">Updating</button>
+    <button role="tab" data-s="done" aria-selected="false">Updated</button>
+    <button role="tab" data-s="failed" aria-selected="false">Failed</button>
+    <button role="tab" data-s="many" aria-selected="false">Runners tab</button>
+    <button role="tab" data-s="stale" aria-selected="false">Can’t refresh</button>
+    <button role="tab" data-s="down" aria-selected="false">API down</button>
+  </div>
+</div>
+
+<div class="frame">
+  <nav class="side" aria-label="Studio">
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#f26a1b"/><path d="M10 15l5 4-5 4M30 15l-5 4 5 4M17 27h6" fill="none" stroke="#17181c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Studio</div>
+    <a href="#">Home</a><a href="#">Apps</a><a href="#">Catalog</a><a href="#">People</a><a href="#" class="on">Server</a><a href="#">Backups</a><a href="#">Admin</a><a href="#">Settings</a>
+  </nav>
+  <main>
+    <h2 class="page">Server</h2>
+    <div class="sub">automaton.monster · Debian 13</div>
+    <div class="ptabs" role="tablist" aria-label="Server"><button role="tab" class="pt" data-p="auto" aria-selected="true">Automaton</button><button role="tab" class="pt" data-p="run" aria-selected="false">Runners <span class="cnt">7</span></button></div>
+    <div class="apidown" id="apidown"><b>Studio can’t reach the server API.</b> Retrying every 10 s · last answer 20:14. Nothing is lost; the page fills in again when the API answers.</div>
+
+    <!-- 1 up to date -->
+    <section class="state on" id="uptodate">
+      <div class="card"><div class="vrow">
+        <div><div class="vbig"><span class="vlab">Automaton</span> 0.2.185</div><div class="meta">Released 23 Nov · last checked 2 min ago</div></div>
+        <span class="chip ok"><span class="dot"></span>Up to date</span>
+        <div class="grow"></div><a class="link" href="#">Release notes</a><button class="btn">Check now</button>
+      </div></div>
+    </section>
+
+    <!-- 2 available -->
+    <section class="state" id="available">
+      <div class="card"><div class="vrow">
+        <div><div class="vbig"><span class="vlab">Automaton</span> 0.2.184</div><div class="meta">0.2.185 released 23 Nov</div></div>
+        <span class="chip new"><span class="dot"></span>0.2.185 available</span>
+        <div class="grow"></div><a class="link" href="#">What's new</a><button class="btn primary">Update Automaton to 0.2.185</button>
+      </div>
+      <div class="note">Takes about 2 minutes. A recovery backup is made first; apps keep running, Studio is briefly unavailable.</div></div>
+    </section>
+
+    <!-- 3 updating -->
+    <section class="state" id="updating">
+      <div class="card"><div class="vrow">
+        <div><div class="vbig"><span class="vlab">Updating Automaton</span> 0.2.184 → 0.2.185</div><div class="meta">Started 20:31 by Razvan · 1 min 10 s</div></div>
+        <span class="chip run"><span class="dot"></span>Updating</span><div class="grow"></div>
+      </div>
+      <div class="steps">
+        <div class="step done"><b>✓ Backup</b>recovery backup saved</div>
+        <div class="step done"><b>✓ Download</b>release verified</div>
+        <div class="step now"><b>● Restart services</b>API, Studio, Worker</div>
+        <div class="step"><b>Health check</b>waiting</div>
+      </div>
+      <div class="bar"><span style="width:62%"></span></div>
+      <div class="note">Apps keep running. This page reconnects by itself when Studio is back.</div></div>
+    </section>
+
+    <!-- 4 done -->
+    <section class="state" id="done">
+      <div class="banner ok"><b>Automaton updated to 0.2.185</b>&nbsp;at 20:32, took 1 min 42 s. Recovery backup kept for 7 days. <a class="link" href="#" style="color:inherit">What changed</a><button class="x" aria-label="Dismiss">×</button></div>
+      <div class="card"><div class="vrow">
+        <div><div class="vbig"><span class="vlab">Automaton</span> 0.2.185</div><div class="meta">Released 23 Nov · last checked just now</div></div>
+        <span class="chip ok"><span class="dot"></span>Up to date</span><div class="grow"></div><button class="btn">Check now</button>
+      </div></div>
+    </section>
+
+    <!-- 5 failed -->
+    <section class="state" id="failed">
+      <div class="card" style="border-color:var(--orline)"><div class="vrow">
+        <div><div class="vbig"><span class="vlab">Automaton</span> 0.2.182</div><div class="meta">Update to 0.2.183 stopped at 16:08 · nothing changed</div></div>
+        <span class="chip bad"><span class="dot"></span>Update failed</span>
+        <div class="grow"></div><button class="btn">Download log</button><button class="btn primary">Try again</button>
+      </div>
+      <div class="steps">
+        <div class="step done"><b>✓ Backup</b>recovery backup saved</div>
+        <div class="step done"><b>✓ Download</b>release verified</div>
+        <div class="step" style="background:var(--badbg);color:var(--bad)"><b>✕ Safety check</b>refused</div>
+        <div class="step"><b>Health check</b>skipped</div>
+      </div>
+      <div class="banner bad"><div><b>Why it stopped</b>
+        <pre class="reason">This release changes traefik. A reviewed infrastructure migration is required.</pre>
+        <div class="note">The server still runs 0.2.182 and is healthy. The recovery backup is kept.</div></div></div>
+      </div>
+    </section>
+
+    <div class="card" id="health"><h3>Health <span class="pause" hidden>paused while updating</span><span class="stale" hidden>could not refresh · showing 20:14 values</span><span class="grow"></span><button class="btn retry" hidden style="padding:6px 12px;font-size:13px">Retry</button></h3>
+      <div class="hl">
+        <div><span class="d"></span>CPU<b>12 % · 2 cores</b></div>
+        <div><span class="d"></span>Memory<b>3.1 of 8 GB</b></div>
+        <div><span class="d"></span>Disk<b>11.8 GB free of 37 GB</b></div>
+        <div><span class="d"></span>Cleanup<b>05:00 · freed 32 MB</b></div>
+      </div>
+      <div class="note">Graphs, OS updates, certificates and maintenance: <a class="link" href="#">open Server Keeper</a>.</div></div>
+
+    <div class="card" id="runners"><h3>Runners <span class="pause" hidden>paused while updating</span><span class="stale" hidden>could not refresh · showing 20:14 list</span>
+      <span class="sum" id="sum1">1 runner · online</span><span class="grow"></span><button class="btn retry" hidden style="padding:6px 12px;font-size:13px">Retry</button><button class="btn" style="padding:6px 12px;font-size:13px">Add a Runner</button></h3>
+      <div id="r-one"><div class="rt"><div class="rr"><div><b>Server Machine Management</b><div class="small">this server</div></div><span class="st"><span class="dot"></span>Online</span><span>Debian 13</span><span>12 apps</span><span class="mono">1.0.20261123</span><span class="act"><button class="ib" aria-label="More">⋯</button></span></div></div></div>
+      <div id="r-many" hidden>
+        <div class="filters"><button class="f on">All 7</button><button class="f">Online 5</button><button class="f">Offline 1</button><button class="f">Needs upgrade 2</button><span class="grow"></span><input class="search" placeholder="Search runners" aria-label="Search runners"><button class="btn primary" style="padding:7px 12px;font-size:13px">Upgrade 2 runners</button></div>
+        <div class="rt">
+          <div class="rr head"><span>Name ↑</span><span>State</span><span>OS</span><span style="text-align:right">Apps</span><span>Version</span><span></span></div>
+          <div class="rr"><div><b>Server Machine Management</b><div class="small">this server</div></div><span class="st"><span class="dot"></span>Online</span><span>Debian 13</span><span>12</span><span class="mono">1.0.20261123</span><span class="act"><button class="ib">⋯</button></span></div>
+          <div class="rr"><div><b>build-box</b><div class="small">home lab</div></div><span class="st"><span class="dot"></span>Online</span><span>Ubuntu 26.04</span><span>4</span><span class="mono">1.0.20261123</span><span class="act"><button class="ib">⋯</button></span></div>
+          <div class="rr"><div><b>edge-fra-1</b><div class="small">restarting Runner · 40 s</div></div><span class="st run"><span class="dot"></span>Upgrading</span><span>Debian 13</span><span>6</span><span class="mono">→ 1.0.20261123</span><span class="act"></span></div>
+          <div class="rr"><div><b>edge-ams-1</b><div class="small">1.0.20261123 available</div></div><span class="st need"><span class="dot"></span>Needs upgrade</span><span>Debian 13</span><span>5</span><span class="mono">1.0.20261117</span><span class="act"><button class="btn" style="padding:5px 10px;font-size:12px">Upgrade</button><button class="ib">⋯</button></span></div>
+          <div class="rr"><div><b>pi-garage</b><div class="small">1.0.20261123 available</div></div><span class="st need"><span class="dot"></span>Needs upgrade</span><span>Raspberry Pi OS</span><span>2</span><span class="mono">1.0.20261110</span><span class="act"><button class="btn" style="padding:5px 10px;font-size:12px">Upgrade</button><button class="ib">⋯</button></span></div>
+          <div class="rr"><div><b>gpu-1</b><div class="small">home lab</div></div><span class="st"><span class="dot"></span>Online</span><span>Ubuntu 24.04</span><span>1</span><span class="mono">1.0.20261123</span><span class="act"><button class="ib">⋯</button></span></div>
+          <div class="rr off"><div><b>old-test-box</b><div class="small">last seen 6 days ago</div></div><span class="st need"><span class="dot"></span>Offline</span><span>Debian 13</span><span>1</span><span class="mono">1.0.20261117</span><span class="act"><button class="btn" style="padding:5px 10px;font-size:12px;color:var(--red);border-color:var(--red)">Remove…</button></span></div>
+        </div>
+        <div class="note">Offline Runners can’t be upgraded. Remove one only when its machine is gone; its apps are listed before you confirm.</div>
+      </div>
+      <div class="err" hidden><b>Runners could not be loaded.</b> The API did not answer (timeout after 10 s). <button class="btn" style="padding:5px 10px;font-size:12px">Retry</button></div>
+    </div>
+  </main>
+</div>
+<script>
+const tabs=[...document.querySelectorAll('[role=tab]')];
+const $=id=>document.getElementById(id);
+function show(k){
+  tabs.forEach(x=>x.setAttribute('aria-selected',x.dataset.s===k));
+  const top={many:'uptodate',stale:'uptodate',down:'uptodate'}[k]||k;
+  document.querySelectorAll('.state').forEach(s=>s.classList.toggle('on',s.id===top));
+  const many=k==='many'; $('r-many').hidden=!many;
+  $('r-one').hidden=many||k==='down';
+  $('sum1').textContent=many?'7 runners · 5 online · 1 offline · 2 need upgrade':'1 runner · online';
+  ['health','runners'].forEach(id=>{const c=$(id);
+    c.classList.toggle('dim',k==='updating');
+    c.querySelector('.pause').hidden=k!=='updating';
+    c.querySelector('.stale').hidden=k!=='stale';
+    c.querySelector('.retry').hidden=k!=='stale';});
+  $('health').classList.toggle('dim',k==='updating'||k==='down');
+  $('apidown').style.display=k==='down'?'block':'none';
+  $('runners').querySelector('.err').hidden=k!=='down';
+}
+tabs.forEach(t=>t.onclick=()=>{show(t.dataset.s);page(t.dataset.s==='many'?'run':'auto')});
+const pts=[...document.querySelectorAll('.pt')];
+function page(k){pts.forEach(x=>x.setAttribute('aria-selected',x.dataset.p===k));
+  document.querySelectorAll('.state').forEach(x=>{if(k==='run')x.style.display='none';else x.style.display=''});
+  $('health').style.display=k==='run'?'none':'';$('runners').style.display=k==='run'?'':'none';
+  if(k==='run'){$('r-many').hidden=false;$('r-one').hidden=true;$('sum1').textContent='7 runners · 5 online · 1 offline · 2 need upgrade';}}
+pts.forEach(x=>x.onclick=()=>page(x.dataset.p));
+page('auto');
+</script>
+</body>
+</html>

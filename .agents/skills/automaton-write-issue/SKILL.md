@@ -73,6 +73,12 @@ fresh server), say so; the issue then gets `verified-partial` until someone runs
 
 Keep it short. Link related issues and PRs by number. No credentials, hostnames from secrets, or customer data.
 
+## UI changes: attach the mock
+
+Agents cannot open private claude.ai artifacts. For any issue that changes a screen, commit the mock to the repo and
+link it from **Example**: the HTML under `docs/design/mocks/<slug>.html` and a screenshot of each main state next to it
+(`<slug>-<state>.png`). The issue text still describes every state, so it stands without the mock.
+
 ## Formatting
 
 So issues read well for people and agents alike:
