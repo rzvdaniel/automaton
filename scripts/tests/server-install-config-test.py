@@ -309,6 +309,14 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertEqual(settings['PublishedApps']['CertificateResolver'], 'delegated')
         self.assertEqual(json.loads((self.root / 'dynamic/installation.yml').read_text())['http']['routers']['studio']['tls']['certResolver'], 'letsencrypt')
         self.assertFalse(module.switch_tls(self.root, 'delegated'))
+        # A server installed before #1583 had DNS-01 on every host; switching delegated to delegated repairs it.
+        edge_path = self.root / 'dynamic/installation.yml'
+        edge = json.loads(edge_path.read_text())
+        edge['http']['routers']['studio']['tls']['certResolver'] = 'delegated'
+        edge_path.write_text(json.dumps(edge))
+        self.assertTrue(module.switch_tls(self.root, 'delegated'))
+        self.assertEqual(json.loads(edge_path.read_text())['http']['routers']['studio']['tls']['certResolver'], 'letsencrypt')
+        self.assertFalse(module.switch_tls(self.root, 'delegated'))
         self.assertTrue(module.switch_tls(self.root, 'http'))
         self.assertNotIn('tls', json.loads((self.root / 'dynamic/installation.yml').read_text()))
 

@@ -289,7 +289,8 @@ def switch_tls(root, tls_mode, token_file=None):
     domain, email, current = state['domain'], state['email'], state.get('tls_mode', 'http')
     token_path = root / 'secrets' / 'cloudflare-token'
     have_token = token_path.is_file() and token_path.read_text().strip() != ''
-    if tls_mode == current and not (tls_mode == 'cloudflare' and (token_file or not have_token)):
+    # Delegated is re-applied on itself: servers installed before #1583 have DNS-01 on every host.
+    if tls_mode == current and tls_mode != 'delegated' and not (tls_mode == 'cloudflare' and (token_file or not have_token)):
         return False
     resolver, apps_resolver = host_resolver(tls_mode), resolver_for(tls_mode)
     token = ''
@@ -329,9 +330,13 @@ def switch_tls(root, tls_mode, token_file=None):
     updates[settings_path] = json.dumps(settings, indent=2)
     updates[token_path] = token
     updates[state_path] = json.dumps(dict(state, tls_mode=tls_mode), indent=2)
+    changed = False
     for path, content in updates.items():  # installation.json last: it records the completed switch.
+        if tls_mode == current and path.is_file() and path.read_text() == content:
+            continue
         replace_text(path, content, 0o600 if path == token_path else None)
-    return True
+        changed = True
+    return changed
 
 
 def secret(root, name, length=32):
