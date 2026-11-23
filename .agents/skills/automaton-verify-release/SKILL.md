@@ -107,6 +107,10 @@ publish it on the **issue** the PR closes with the helper, then comment its link
 python3 .agents/skills/automaton-verify-release/proof.py <issue> proof.html
 ```
 
+The default repo is `rzvdaniel/automaton`. For an issue in another repo (for example `automaton-apps`) add
+`--repo rzvdaniel/automaton-apps`, and check the issue is open in that repo first: a same-numbered issue in the
+wrong repo gets the proof and loses any earlier one.
+
 The page lists each done criterion from the issue, the evidence for it (the command and what came back, or a
 screenshot) and pass, fail or not checked with the reason. Keep it plain: one `<table>` (criterion, result,
 evidence), inline `<style>` only, no scripts. Running `proof.py` again replaces the issue's `proof`.
