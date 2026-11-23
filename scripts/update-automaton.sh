@@ -474,9 +474,11 @@ install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"
 install -m 0644 "$bundle/version" "$install_dir/version"
 install -m 0700 "$bundle/update.sh" "$install_dir/update.sh"
 install -m 0700 "$bundle/install.sh" "$install_dir/install.sh"
-for tool in configure.py explain_certificate_failure.py acme_responder.py check_dns.py fail2ban.sh watchdog.py; do
+for tool in configure.py explain_certificate_failure.py check_dns.py fail2ban.sh watchdog.py; do
     [[ ! -f "$bundle/$tool" ]] || install -m 0700 "$bundle/$tool" "$install_dir/$tool"
 done
+# The responder container runs as an unprivileged user and bind-mounts this script, so it must be world-readable.
+[[ ! -f "$bundle/acme_responder.py" ]] || install -m 0644 "$bundle/acme_responder.py" "$install_dir/acme_responder.py"
 if [[ -d "$bundle/fail2ban" ]]; then
     { rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"; } \
         || echo 'Warning: the fail2ban files could not be copied.' >&2

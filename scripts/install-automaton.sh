@@ -317,9 +317,11 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh os-update-from-request.sh fail2ban.sh watchdog.py configure.py explain_certificate_failure.py acme_responder.py check_dns.py; do
+for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh os-update-from-request.sh fail2ban.sh watchdog.py configure.py explain_certificate_failure.py check_dns.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
+# The responder container runs as an unprivileged user and bind-mounts this script, so it must be world-readable.
+if [[ -f "$bundle_dir/acme_responder.py" ]]; then install -m 0644 "$bundle_dir/acme_responder.py" "$install_dir/acme_responder.py"; fi
 if ! $configure_only && [[ -d "$bundle_dir/fail2ban" ]]; then
     { rm -rf -- "$install_dir/fail2ban" && cp -r "$bundle_dir/fail2ban" "$install_dir/fail2ban" && chmod -R go-w "$install_dir/fail2ban"; } \
         || echo 'Warning: the fail2ban files could not be copied.' >&2

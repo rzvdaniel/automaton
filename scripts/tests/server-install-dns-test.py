@@ -58,7 +58,10 @@ class InstallDirLayoutTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         for script in ('scripts/install-automaton.sh', 'scripts/update-automaton.sh'):
             text = (root / script).read_text()
-            self.assertIn('acme_responder.py check_dns.py', text, script)
+            self.assertIn('check_dns.py', text, script)
+            # The responder container runs as uid 65534 and bind-mounts the script: it must be world-readable (#1583).
+            self.assertRegex(text, r'install -m 0644 "\$\{?bundle(_dir)?\}?/acme_responder\.py"', script)
+            self.assertNotRegex(text, r'0700[^\n]*acme_responder|acme_responder\.py[^\n]*; do', script)
 
 
 if __name__ == '__main__':
