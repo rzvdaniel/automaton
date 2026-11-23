@@ -37,6 +37,9 @@ vi.mock('@/features/runners/components/SelfHostedRunnerInstallDialog.vue', () =>
   default: { props: ['visible'], template: '<div data-testid="install-dialog" :data-visible="visible" />' },
 }))
 
+const route = vi.hoisted(() => ({ params: {} as Record<string, string> }))
+vi.mock('vue-router', () => ({ useRoute: () => route }))
+
 const GIB = 1024 ** 3
 const health = (updateAvailable: boolean): ServerHealth => ({
   generatedAtUtc: '2026-11-08T10:00:00Z',
@@ -54,7 +57,8 @@ const runner = (overrides = {}) => ({
   operatingSystem: 'Ubuntu 24.04', appCount: 3, version: '0.2.6', upgradeAvailable: false, ...overrides,
 })
 
-const mountView = (roles: string[] = ['User']) => {
+const mountView = (roles: string[] = ['User'], tab?: 'runners') => {
+  route.params = tab ? { tab } : {}
   const pinia = createPinia()
   setActivePinia(pinia)
   useAuthStore().user = { roles } as never
@@ -66,6 +70,7 @@ const mountView = (roles: string[] = ['User']) => {
 
 describe('ServerView', () => {
   beforeEach(() => {
+    route.params = {}
     vi.mocked(runnersService.list).mockReset().mockResolvedValue([runner()] as never)
     vi.mocked(serverConsoleService.install).mockReset().mockResolvedValue({ appId: 'sc1', running: false })
     vi.mocked(serverConsoleService.get).mockReset().mockResolvedValue({ appId: null, running: false })
@@ -124,8 +129,25 @@ describe('ServerView', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="cleanup-manage"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="cleanup-install"]').exists()).toBe(false)
-    expect(wrapper.findAll('button').filter((button) => button.text() === 'Install Server Console')).toHaveLength(1)
+    expect(wrapper.findAll('button').filter((button) => button.text() === 'Install Server Keeper')).toHaveLength(1)
     wrapper.unmount()
+  })
+
+  it('opens the Automaton tab at /server and the Runners tab at /server/runners, with the count in the label', async () => {
+    const automaton = mountView()
+    await flushPromises()
+    expect(automaton.find('[data-testid="version-card"]').exists()).toBe(true)
+    expect(automaton.find('[data-testid="runner-row"]').exists()).toBe(false)
+    expect(automaton.get('[data-testid="tab-automaton"]').attributes('href')).toBe('/server')
+    expect(automaton.get('[data-testid="tab-runners"]').attributes('href')).toBe('/server/runners')
+    expect(automaton.get('[data-testid="tab-runners"]').text()).toBe('Runners1')
+    expect(automaton.text()).toContain('Automaton server-v1')
+    automaton.unmount()
+    const runners = mountView([], 'runners')
+    await flushPromises()
+    expect(runners.find('[data-testid="version-card"]').exists()).toBe(false)
+    expect(runners.findAll('[data-testid="runner-row"]')).toHaveLength(1)
+    runners.unmount()
   })
 
   it('always shows the version card, and says up to date', async () => {
@@ -143,7 +165,7 @@ describe('ServerView', () => {
       vi.mocked(serverHealthService.get).mockResolvedValue(health(true))
       const wrapper = mountView()
       await flushPromises()
-      await wrapper.get('[data-testid="update-available"]').findAll('button').find((b) => b.text().startsWith('Update to'))!.trigger('click')
+      await wrapper.get('[data-testid="update-available"]').findAll('button').find((b) => b.text().startsWith('Update Automaton to'))!.trigger('click')
       await wrapper.findAll('button').find((b) => b.text().includes('Update now'))!.trigger('click')
       await flushPromises()
       expect(wrapper.find('[data-testid="update-running"]').exists()).toBe(true)
@@ -153,7 +175,6 @@ describe('ServerView', () => {
       await vi.advanceTimersByTimeAsync(15000)
       expect(wrapper.text()).not.toContain('could not be loaded')
       expect(wrapper.text()).toContain('server-v1')
-      expect(wrapper.text()).toContain('runner-01')
 
       vi.mocked(serverHealthService.get).mockResolvedValue({ ...health(false), server: { version: 'server-v2', latestVersion: 'server-v2', updateAvailable: false } })
       vi.mocked(runnersService.list).mockResolvedValue([runner()] as never)
@@ -163,7 +184,7 @@ describe('ServerView', () => {
       })
       await vi.advanceTimersByTimeAsync(3000)
       await flushPromises()
-      expect(wrapper.get('[data-testid="update-succeeded"]').text()).toContain('Updated to server-v2')
+      expect(wrapper.get('[data-testid="update-succeeded"]').text()).toContain('Automaton updated to server-v2')
       expect(wrapper.find('[data-testid="runners-updating"]').exists()).toBe(false)
       wrapper.unmount()
     } finally {
@@ -172,11 +193,10 @@ describe('ServerView', () => {
   })
 
   it('shows each Runner with OS, apps and version and no health cards', async () => {
-    const wrapper = mountView()
+    const wrapper = mountView([], 'runners')
     await flushPromises()
     expect(wrapper.find('[data-testid="health-tiles"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="host-os"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Automaton server-v1')
     expect(wrapper.get('[data-testid="runner-os"]').text()).toBe('Ubuntu 24.04')
     expect(wrapper.get('[data-testid="runner-apps"]').text()).toBe('3')
     expect(wrapper.get('[data-testid="runner-version"]').text()).toBe('0.2.6')
@@ -189,7 +209,7 @@ describe('ServerView', () => {
   it('links a system administrator to Server Console, or says how to install it', async () => {
     const missing = mountView(['SysAdmin'])
     await flushPromises()
-    expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('Install Server Console')
+    expect(missing.get('[data-testid="server-console-notice"]').text()).toContain('Install Server Keeper')
     expect(serverConsoleService.install).not.toHaveBeenCalled()
     vi.mocked(serverConsoleService.get).mockResolvedValue({ appId: 'sc1', running: false })
     await missing.get('[data-testid="server-console-install"]').trigger('click')
@@ -223,12 +243,12 @@ describe('ServerView', () => {
     const wrapper = mountView()
     await flushPromises()
     const banner = wrapper.get('[data-testid="update-available"]')
-    expect(banner.text()).toContain('Update to server-v2')
+    expect(banner.text()).toContain('Update Automaton to server-v2')
     expect(banner.text()).toContain('about 2 minutes')
     expect(wrapper.get('[data-testid="version-card"]').text()).toContain('server-v1')
     expect(wrapper.get('[data-testid="update-available-pill"]').text()).toBe('server-v2 available')
 
-    await banner.findAll('button').find((button) => button.text().startsWith('Update to'))!.trigger('click')
+    await banner.findAll('button').find((button) => button.text().startsWith('Update Automaton to'))!.trigger('click')
     expect(installService.startUpdate).not.toHaveBeenCalled()
     await wrapper.findAll('button').find((button) => button.text().includes('Update now'))!.trigger('click')
     await flushPromises()
@@ -239,16 +259,20 @@ describe('ServerView', () => {
 
   it('still lists Runners for an administrator who cannot read server health', async () => {
     vi.mocked(serverHealthService.get).mockRejectedValue({ isAxiosError: true, response: { status: 403 } })
-    const wrapper = mountView()
+    const wrapper = mountView([], 'runners')
     await flushPromises()
-    expect(wrapper.find('[data-testid="health-denied"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="health-denied"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="runner-row"]')).toHaveLength(1)
     wrapper.unmount()
+    const automaton = mountView()
+    await flushPromises()
+    expect(automaton.find('[data-testid="health-denied"]').exists()).toBe(true)
+    automaton.unmount()
   })
 
   it('shows Add a Runner and an empty message when there are no Runners', async () => {
     vi.mocked(runnersService.list).mockResolvedValue([])
-    const wrapper = mountView()
+    const wrapper = mountView([], 'runners')
     await flushPromises()
     expect(wrapper.find('[data-testid="runners-empty"]').exists()).toBe(true)
     await wrapper.get('[data-testid="add-runner"]').trigger('click')
@@ -310,7 +334,6 @@ describe('ServerView', () => {
     expect(wrapper.get('[data-testid="server-notice"]').text()).toContain('showing')
     expect(wrapper.get('[data-testid="health-paused"]').text()).toContain('could not refresh')
     expect(wrapper.text()).not.toContain('could not be loaded')
-    expect(wrapper.findAll('[data-testid="runner-row"]')).toHaveLength(1)
     wrapper.unmount()
   })
 
@@ -322,7 +345,7 @@ describe('ServerView', () => {
 
   it('summarises Runners and filters and searches them when there is more than one', async () => {
     vi.mocked(runnersService.list).mockResolvedValue(fleet() as never)
-    const wrapper = mountView()
+    const wrapper = mountView([], 'runners')
     await flushPromises()
     expect(wrapper.get('[data-testid="runners-summary"]').text()).toBe('3 runners · 2 online · 1 offline · 2 need upgrade')
     expect(wrapper.findAll('[data-testid="runner-row"]').map((row) => row.text().split(' ')[0])).toEqual(['alpha', 'bravo', 'charlie'])
@@ -336,13 +359,13 @@ describe('ServerView', () => {
   })
 
   it('shows no filters for a single Runner and offers Upgrade N runners only for two or more', async () => {
-    const single = mountView()
+    const single = mountView([], 'runners')
     await flushPromises()
     expect(single.find('[data-testid="runners-search"]').exists()).toBe(false)
     expect(single.find('[data-testid="runners-upgrade-all"]').exists()).toBe(false)
     single.unmount()
     vi.mocked(runnersService.list).mockResolvedValue(fleet() as never)
-    const many = mountView()
+    const many = mountView([], 'runners')
     await flushPromises()
     expect(many.get('[data-testid="runners-upgrade-all"]').text()).toBe('Upgrade 2 runners')
     expect(many.findAll('[data-testid="runner-upgrade-button"]')).toHaveLength(2)

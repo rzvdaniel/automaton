@@ -140,7 +140,7 @@ public class HomeNeedsYouService(
         var latest = await releases.GetLatestVersionAsync(token);
         if (InstallationUpdate.Parse(configuration["Installation:Version"]) is not { } current
             || InstallationUpdate.Parse(latest) is not { } newest || newest <= current) return null;
-        return new(HomeCardKeys.ServerUpdate, HomeCardKeys.ServerUpdate, "warn", "Update the server",
+        return new(HomeCardKeys.ServerUpdate, HomeCardKeys.ServerUpdate, "warn", "Update Automaton",
             $"{latest} is available. This server runs {configuration["Installation:Version"]}.", "Open server", "/server", false);
     }
 

@@ -41,12 +41,12 @@ const disk = computed(() => usage(host.value?.diskTotalBytes, host.value?.diskAv
       <CleanupSection :console-id="consoleId" />
     </ul>
     <p v-if="showConsole" class="m-0 studio-muted" data-testid="server-console-notice">
-      <RouterLink v-if="consoleId" :to="`/apps/${consoleId}`" data-testid="server-console-open">Open Server Console</RouterLink>
+      Graphs, OS updates, certificates and maintenance:
+      <RouterLink v-if="consoleId" :to="`/apps/${consoleId}`" data-testid="server-console-open">open Server Keeper</RouterLink>
       <Button
-        v-else label="Install Server Console" text class="btn-small" :loading="installing"
+        v-else label="Install Server Keeper" text class="btn-small" :loading="installing"
         data-testid="server-console-install" @click="emit('install')"
       />
-      <span v-if="!consoleId"> for more resources and OS updates.</span>
     </p>
     <p v-if="installError" class="m-0" data-testid="server-console-install-error">{{ installError }}</p>
   </section>

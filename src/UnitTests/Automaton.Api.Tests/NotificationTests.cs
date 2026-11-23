@@ -25,7 +25,7 @@ public sealed class NotificationTests
         public override Task<List<HomeCard>> ServerCardsAsync(Guid userId, CancellationToken token)
             => Task.FromResult(new List<HomeCard>
             {
-                new(HomeCardKeys.ServerUpdate, HomeCardKeys.ServerUpdate, "warn", "Update the server", "9.9.9 is available.", "Open server", "/server", false),
+                new(HomeCardKeys.ServerUpdate, HomeCardKeys.ServerUpdate, "warn", "Update Automaton", "9.9.9 is available.", "Open server", "/server", false),
                 new(HomeCardKeys.NoSmtp, HomeCardKeys.NoSmtp, "info", "Set up email", "x", "Open", "/settings", true),
             });
     }

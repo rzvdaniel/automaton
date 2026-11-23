@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import { isAxiosError } from 'axios'
@@ -18,6 +19,8 @@ import type { ServerHealth } from '../types/server.types'
 const refreshMilliseconds = 15000
 
 
+const route = useRoute()
+const onRunners = computed(() => route.params.tab === 'runners')
 const authStore = useAuthStore()
 const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 const loading = ref(true)
@@ -104,13 +107,21 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <template>
   <div class="server-view studio-page">
-    <PageHead title="Server" :line="health?.server.version ? `Automaton ${health.server.version}` : 'Version, health and Runners.'" />
+    <PageHead title="Server" :line="'Automaton version, health and Runners.'" />
 
     <p v-if="unreachable" class="server-notice" data-testid="server-notice">
       The server did not answer<template v-if="shownAt"> &middot; showing {{ shownAt }} values</template>.
       <Button label="Retry" text class="btn-small" @click="refresh" />
     </p>
 
+    <nav class="server-tabs" aria-label="Server">
+      <RouterLink to="/server" :aria-current="!onRunners ? 'page' : undefined" class="server-tab" data-testid="tab-automaton">Automaton</RouterLink>
+      <RouterLink to="/server/runners" :aria-current="onRunners ? 'page' : undefined" class="server-tab" data-testid="tab-runners">
+        Runners<span v-if="!loading" class="server-tab__count" data-testid="runners-count">{{ visibleRunners.length }}</span>
+      </RouterLink>
+    </nav>
+
+    <template v-if="!onRunners">
     <ServerVersionCard
       v-if="health" :current="health.server.version" :latest="health.server.latestVersion" :update-available="updateAvailable"
       :checked-at="health.generatedAtUtc" @updated="refresh" @updating="onUpdating" @check="refresh"
@@ -123,7 +134,9 @@ onBeforeUnmount(() => clearInterval(timer))
       @retry="refresh" @install="installServerConsole"
     />
 
-    <section>
+    </template>
+
+    <section v-else>
       <div class="flex align-items-center justify-content-between flex-wrap gap-2">
         <h2 class="studio-section">Runners<span v-if="updating" class="studio-muted" data-testid="runners-updating"> &middot; paused while updating</span>
           <span v-else-if="runnersFailed && shownAt" class="studio-muted"> &middot; could not refresh &middot; showing {{ shownAt }} values</span></h2>
@@ -146,5 +159,9 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <style scoped>
 .server-notice { margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
+.server-tabs { display: flex; gap: 4px; margin: 0 0 16px; border-bottom: 1px solid var(--line); }
+a.server-tab { padding: 8px 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--ink-soft); text-decoration: none; font-weight: 500; }
+a.server-tab[aria-current='page'] { color: var(--ink); border-bottom-color: var(--signal); }
+.server-tab__count { margin-left: 6px; font-size: 12px; color: var(--ink-soft); }
 .server-view { max-width: 1400px; margin: 0 auto; }
 </style>
