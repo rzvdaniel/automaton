@@ -50,7 +50,7 @@ const updatedLine = computed(() => {
   const finished = run.value?.finishedAtUtc
   const time = finished ? new Date(finished).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
   const took = finished ? duration(run.value?.startedAtUtc, new Date(finished).getTime()) : null
-  return `Updated to ${updatedTo.value}${time ? ` at ${time}` : ''}${took ? `, took ${took}` : ''}`
+  return `Automaton updated to ${updatedTo.value}${time ? ` at ${time}` : ''}${took ? `, took ${took}` : ''}`
 })
 
 watch(updating, (value) => emit('updating', value))
@@ -115,7 +115,7 @@ function downloadLog() {
   <section class="studio-card version-card" data-testid="version-card">
     <div class="version-card__head">
       <div class="version-card__title">
-        <strong class="version-card__version">{{ updating && run ? `${run.fromVersion ?? props.current ?? 'Unknown'} → ${target ?? 'latest'}` : (props.current ?? 'Unknown version') }}</strong>
+        <strong class="version-card__version">{{ updating && run ? `Updating Automaton ${run.fromVersion ?? props.current ?? 'Unknown'} → ${target ?? 'latest'}` : `Automaton ${props.current ?? 'Unknown version'}` }}</strong>
         <span v-if="updating" class="studio-pill version-card__pill--progress" data-testid="update-running-pill">Updating</span>
         <span v-else-if="failed" class="studio-pill studio-pill--warn">Update failed</span>
         <span v-else-if="!done && props.updateAvailable" class="studio-pill studio-pill--warn" data-testid="update-available-pill">{{ props.latest }} available</span>
@@ -158,7 +158,7 @@ function downloadLog() {
     </p>
 
     <div v-else-if="!done && props.updateAvailable" data-testid="update-available">
-      <Button :label="`Update to ${props.latest}`" icon="pi pi-download" class="btn-small" :loading="starting" @click="confirming = true" />
+      <Button :label="`Update Automaton to ${props.latest}`" icon="pi pi-download" class="btn-small" :loading="starting" @click="confirming = true" />
       <p class="studio-muted mt-2 mb-0">Takes about 2 minutes. A backup is taken first and apps keep running.</p>
     </div>
 
@@ -169,7 +169,7 @@ function downloadLog() {
     <p v-if="error" class="m-0" data-testid="update-start-error">{{ error }}</p>
     <p v-if="status?.hint" class="m-0">{{ status.hint }}</p>
 
-    <Dialog v-model:visible="confirming" modal header="Update the server?" append-to="self" :style="{ width: '32rem', maxWidth: '95vw' }">
+    <Dialog v-model:visible="confirming" modal header="Update Automaton?" append-to="self" :style="{ width: '32rem', maxWidth: '95vw' }">
       <p class="mt-0">
         Automaton takes a recovery backup, then updates to {{ props.latest }}. Studio and the API can be briefly
         unavailable. If the update fails, the previous release is kept.
