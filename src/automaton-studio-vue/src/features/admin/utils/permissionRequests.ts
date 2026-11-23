@@ -17,6 +17,7 @@ const words: Record<string, { wants: string; allows: string }> = {
   'security:read': { wants: 'read fail2ban bans', allows: 'Lets the app see which addresses fail2ban banned on this server. It gets no firewall access.' },
   'security:manage': { wants: 'unban and allowlist addresses', allows: 'Lets the app lift a fail2ban ban or allowlist an address on this server when a system administrator asks it to. It gets no firewall or shell access.' },
   'server:cleanup': { wants: 'clean up the server', allows: 'Lets the app free disk space on this server.' },
+  'runner:host-exec': { wants: 'run any command as root on a machine', allows: 'Lets an app you own run any command as root on the machines you approve. Off until you turn host access on.' },
   'runner:maintain': { wants: 'maintain Runners', allows: 'Lets the app run maintenance on the Runners you approve.' },
   'logs:receive': { wants: 'receive the server logs', allows: 'Lets the Automaton API, Worker and Runners send their logs to the app. Logs can contain addresses and user names; they go to the Runner that hosts the app, over the private network of the server.' },
 }

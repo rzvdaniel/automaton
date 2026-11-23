@@ -128,8 +128,45 @@ public sealed class RunnerExecutionOperationService(
     /// </summary>
     public async Task<RunnerExecutionResult> QueueAndWaitAsync(
         Guid runnerId, Guid actor, RunnerExecutionRequest request, TimeSpan timeout, CancellationToken token)
+        => await QueueAndWaitAsync(runnerId, actor, request, timeout, scrub: false, token);
+
+    /// <summary>
+    /// Like <see cref="QueueAndWaitAsync(Guid, Guid, RunnerExecutionRequest, TimeSpan, CancellationToken)"/> for a request that carries secrets:
+    /// when the wait ends, the stored request and result are emptied, so nothing of the script, its input or its output stays in the database.
+    /// </summary>
+    public async Task<RunnerExecutionResult> QueueAndWaitScrubbedAsync(
+        Guid runnerId, Guid actor, RunnerExecutionRequest request, TimeSpan timeout, CancellationToken token)
+        => await QueueAndWaitAsync(runnerId, actor, request, timeout, scrub: true, token);
+
+    private async Task<RunnerExecutionResult> QueueAndWaitAsync(
+        Guid runnerId, Guid actor, RunnerExecutionRequest request, TimeSpan timeout, bool scrub, CancellationToken token)
     {
         var id = await QueueAsync(runnerId, actor, request, token);
+        try { return await WaitForAnswerAsync(id, timeout); }
+        finally { if (scrub) await ScrubAsync(id, CancellationToken.None); }
+    }
+
+    private async Task ScrubAsync(Guid id, CancellationToken token)
+    {
+        var emptyRequest = protector.Protect(JsonSerializer.Serialize(
+            new RunnerExecutionRequest(AppActionCommand.Create("host-exec", new { })), JsonOptions));
+        var operation = await db.RunnerExecutionOperations.SingleOrDefaultAsync(o => o.Id == id, token);
+        if (operation is null) return;
+        operation.ProtectedRequest = emptyRequest;
+        if (operation.ResultJson is not null)
+        {
+            var result = JsonSerializer.Deserialize<RunnerExecutionResult>(protector.Unprotect(operation.ResultJson), JsonOptions);
+            if (result is not null)
+            {
+                result.ActionResult = null;
+                operation.ResultJson = protector.Protect(JsonSerializer.Serialize(result, JsonOptions));
+            }
+        }
+        await db.SaveChangesAsync(token);
+    }
+
+    private async Task<RunnerExecutionResult> WaitForAnswerAsync(Guid id, TimeSpan timeout)
+    {
         // Only the deadline ends the wait: a caller that disconnects must not cancel the operation midway.
         using var limit = new CancellationTokenSource(timeout);
         RunnerExecutionResult result;
@@ -151,7 +188,7 @@ public sealed class RunnerExecutionOperationService(
             // Cleanup and runtime restarts wait for typed Docker work on the management queue.
             // They must leave that queue's single consumer free to run its nested operations.
             || request.Action is not null && request.Action.Kind is not
-                ("execute" or "cleanup-app-resources" or "cleanup-target-resources" or "cleanup-app" or "cleanup-target"
+                ("execute" or "host-exec" or "cleanup-app-resources" or "cleanup-target-resources" or "cleanup-app" or "cleanup-target"
                 or AppRuntimeRestarter.CommandKind or AppPauseService.PauseCommandKind or AppPauseService.ResumeCommandKind);
 
     public async Task<RunnerExecutionResult> WaitAsync(Guid operationId, CancellationToken token)

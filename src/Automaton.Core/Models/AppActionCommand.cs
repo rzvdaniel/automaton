@@ -45,3 +45,15 @@ public sealed record Fail2BanAddressRequest(string Ip);
 
 /// <summary>What the Runner did about an address; <c>Jails</c> are the jails it was changed in.</summary>
 public sealed record Fail2BanActionResult(string Ip, IReadOnlyList<string> Jails);
+
+/// <summary>A script for the Runner to run as root on its machine. The script is the one place app text reaches a shell; <paramref name="Stdin"/> carries secrets and is never put in arguments or the environment.</summary>
+public sealed record HostExecRequest(string Script, string? Stdin, int TimeoutSeconds)
+{
+    public const int DefaultTimeoutSeconds = 30 * 60;
+    public const int MaximumTimeoutSeconds = 2 * 60 * 60;
+    public const int MaximumScriptLength = 100_000;
+    public const int MaximumStdinLength = 64 * 1024;
+}
+
+/// <summary>What the script did: its exit code (-1 when it was stopped at the timeout) and its output with every input line that looks like a secret replaced by <c>***</c>.</summary>
+public sealed record HostExecResult(int ExitCode, bool TimedOut, string Output, string Error, DateTime StartedUtc, DateTime EndedUtc);

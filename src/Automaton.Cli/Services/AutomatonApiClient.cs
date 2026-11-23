@@ -474,17 +474,17 @@ public class AutomatonApiClient : IDisposable
     }
 
     /// <summary>The machines an app may maintain (runner:maintain) as an administrator sees them.</summary>
-    public async Task<JsonElement> GetRunnerPermissionsAsync(string appId, CancellationToken ct = default)
+    public async Task<JsonElement> GetRunnerPermissionsAsync(string appId, string permission = "runner:maintain", CancellationToken ct = default)
     {
-        using var resp = await _http.GetAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions", ct);
+        using var resp = await _http.GetAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions?permission={Uri.EscapeDataString(permission)}", ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }
 
-    public async Task<JsonElement> SetRunnerPermissionApprovalAsync(string appId, string runnerId, bool approved, CancellationToken ct = default)
+    public async Task<JsonElement> SetRunnerPermissionApprovalAsync(string appId, string runnerId, bool approved, string permission = "runner:maintain", CancellationToken ct = default)
     {
         var content = new StringContent(JsonSerializer.Serialize(new { approved }, JsonOptions), Encoding.UTF8, "application/json");
-        using var resp = await _http.PutAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions/{Uri.EscapeDataString(runnerId)}", content, ct);
+        using var resp = await _http.PutAsync($"api/admin/apps/{Uri.EscapeDataString(appId)}/runner-permissions/{Uri.EscapeDataString(runnerId)}?permission={Uri.EscapeDataString(permission)}", content, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }

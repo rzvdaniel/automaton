@@ -9,7 +9,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
     MachineStaticSitePublisher? staticSites = null,
     MachineApplicationStorageCleanup? storageCleanup = null,
     RunnerSelfUpgradeService? selfUpgrade = null,
-    HostCleanupService? hostCleanup = null)
+    HostCleanupService? hostCleanup = null,
+    HostExecService? hostExec = null)
 {
     public async Task<RunnerExecutionResult> ExecuteAsync(AppActionCommand command, CancellationToken token)
     {
@@ -42,6 +43,7 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
                 .Fail2BanUnbanAsync(command.Read<Fail2BanAddressRequest>(), token),
             "fail2ban-allowlist" => await (hostCleanup ?? throw new InvalidOperationException("Host maintenance is unavailable."))
                 .Fail2BanAllowlistAsync(command.Read<Fail2BanAddressRequest>(), token),
+            "host-exec" => await (hostExec ?? throw new InvalidOperationException("Host commands are unavailable.")).RunAsync(command.Read<HostExecRequest>(), token),
             "disk-report" => await (hostCleanup ?? throw new InvalidOperationException("Host cleanup is unavailable."))
                 .DiskReportAsync(token),
             _ => throw new InvalidDataException("Unknown App Action command.")

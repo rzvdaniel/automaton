@@ -1092,6 +1092,14 @@ namespace Automaton.Infrastructure.Migrations
                     b.Property<DateTime>("ApprovedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ApprovedFor")
+                        .HasMaxLength(200)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("CodeFingerprint")
+                        .HasMaxLength(400)
+                        .HasColumnType("citext");
+
                     b.Property<string>("Permission")
                         .IsRequired()
                         .HasMaxLength(100)
