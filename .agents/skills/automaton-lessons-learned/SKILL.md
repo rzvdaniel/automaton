@@ -34,6 +34,10 @@ Last run = date of the newest inbox comment starting `Lessons run` (all agents s
 
 Never edit `AGENTS.md` or the merge-gate rules.
 
+## Finishing a PR
+
+Every PR this run opens is finished before the run ends: description per [write-PR](../automaton-write-pr/SKILL.md) (How verified, Risk, How to revert, Docs), independent review per [PR review](../pr-review/SKILL.md) posted with `gh pr review`, then `python3 .agents/tools/merge-gate.py <n> --merge`. If the gate fails, comment why on the PR. List the PR in the reply.
+
 ## 4. Reply
 
 One comment on the inbox, starting `Lessons run YYYY-MM-DD`: each change with its link, what was skipped and why (one line each), and the owner list. Reply even when nothing changed, so the next run has its date.
