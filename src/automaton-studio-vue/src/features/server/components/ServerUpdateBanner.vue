@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import { installService } from '@/features/install/services/install.service'
 import type { InstallationUpdateStatus } from '@/features/install/types/install.types'
 
-const props = defineProps<{ current: string | null; latest: string | null }>()
-const emit = defineEmits<{ updated: [] }>()
+const props = defineProps<{ current: string | null; latest: string | null; updateAvailable: boolean }>()
+const emit = defineEmits<{ updated: []; updating: [value: boolean] }>()
 
 const pollMilliseconds = 3000
 const confirming = ref(false)
 const starting = ref(false)
 const error = ref<string | null>(null)
+const dismissed = ref(false)
 const done = ref(false) // the update finished; hide the banner even if health still reports the old version
 const status = ref<InstallationUpdateStatus | null>(null)
 // Set from the click until the host reports a run that started later than the one seen before.
@@ -24,6 +25,10 @@ const updating = computed(() => waitingForRun.value !== undefined
   || ((run.value?.state === 'running' || run.value?.state === 'starting') && !status.value?.stale))
 const failed = computed(() => !updating.value && run.value?.state === 'failed' ? run.value : null)
 
+const updatedTo = computed(() => run.value?.toVersion ?? props.latest ?? props.current)
+const updatedAt = computed(() => run.value?.finishedAtUtc ? new Date(run.value.finishedAtUtc).toLocaleString() : null)
+
+watch(updating, (value) => emit('updating', value))
 onBeforeUnmount(() => clearTimeout(timer))
 
 async function poll() {
@@ -69,7 +74,12 @@ async function start() {
     <Message v-if="updating" severity="info" :closable="false" data-testid="update-running">
       Updating to {{ props.latest ?? 'the latest release' }}. Studio can be unavailable for a few minutes; this page keeps checking.
     </Message>
-    <Message v-else-if="!done" severity="warn" :closable="false" data-testid="update-available">
+    <Message
+      v-else-if="done && !dismissed" severity="success" data-testid="update-succeeded" @close="dismissed = true"
+    >
+      Updated to {{ updatedTo }}<template v-if="updatedAt"> at {{ updatedAt }}</template>.
+    </Message>
+    <Message v-else-if="!done && props.updateAvailable" severity="warn" :closable="false" data-testid="update-available">
       <div class="flex align-items-center justify-content-between gap-3 flex-wrap w-full">
         <span>
           <strong>{{ props.latest }}</strong> is available. This server runs {{ props.current ?? 'an unknown version' }}.
@@ -77,6 +87,10 @@ async function start() {
         <Button label="Update" icon="pi pi-download" size="small" :loading="starting" @click="confirming = true" />
       </div>
     </Message>
+    <div v-else class="studio-card" data-testid="version-card">
+      <strong>{{ done ? updatedTo : (props.current ?? 'Unknown version') }}</strong>
+      <span class="studio-muted"> &middot; {{ done || !props.latest || props.latest === props.current ? 'up to date' : `latest is ${props.latest}` }}</span>
+    </div>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="status?.hint" severity="warn" :closable="false">{{ status.hint }}</Message>
     <Message v-if="failed" severity="error" :closable="false" data-testid="update-failed">

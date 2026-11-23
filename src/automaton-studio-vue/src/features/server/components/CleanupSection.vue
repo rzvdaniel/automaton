@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { serverCleanupService } from '../services/server-cleanup.service'
 import { formatGiB } from '../utils/format'
@@ -8,8 +7,7 @@ import type { ServerCleanup } from '../types/server.types'
 
 const cleanup = ref<ServerCleanup | null>(null)
 const loadError = ref<string | null>(null)
-defineProps<{ consoleId: string | null; installing?: boolean }>()
-const emit = defineEmits<{ install: [] }>()
+defineProps<{ consoleId: string | null }>()
 
 const lastRun = computed(() => cleanup.value?.runs[0] ?? null)
 const failed = computed(() => lastRun.value?.result.toLowerCase() === 'failed')
@@ -40,12 +38,9 @@ onMounted(load)
         &middot; <span data-testid="cleanup-last">{{ failed ? `last run failed: ${lastRun.message ?? lastRun.result}` : `last run freed ${freed(lastRun.bytesFreed)}` }}</span>
       </template>
       <template v-else> &middot; <span data-testid="cleanup-last">no run yet</span></template>
-      &middot;
-      <RouterLink v-if="consoleId" :to="`/apps/${consoleId}`" data-testid="cleanup-manage">Manage in Server Console</RouterLink>
-      <Button
-        v-else label="Install Server Console" class="btn-small" :loading="installing"
-        data-testid="cleanup-install" @click="emit('install')"
-      />
+      <template v-if="consoleId">
+        &middot; <RouterLink :to="`/apps/${consoleId}`" data-testid="cleanup-manage">Manage in Server Console</RouterLink>
+      </template>
     </p>
   </section>
 </template>

@@ -118,15 +118,57 @@ describe('ServerView', () => {
     wrapper.unmount()
   })
 
-  it('offers to install Server Console from the cleanup line when it is missing', async () => {
+  it('offers Install Server Console once, not on the cleanup line', async () => {
     vi.mocked(serverConsoleService.get).mockRejectedValue(new Error('none'))
     const wrapper = mountView(['SysAdmin'])
     await flushPromises()
     expect(wrapper.find('[data-testid="cleanup-manage"]').exists()).toBe(false)
-    await wrapper.get('[data-testid="cleanup-install"]').trigger('click')
-    await flushPromises()
-    expect(serverConsoleService.install).toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="cleanup-install"]').exists()).toBe(false)
+    expect(wrapper.findAll('button').filter((button) => button.text() === 'Install Server Console')).toHaveLength(1)
     wrapper.unmount()
+  })
+
+  it('always shows the version card, and says up to date', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="version-card"]').text()).toContain('server-v1')
+    expect(wrapper.get('[data-testid="version-card"]').text()).toContain('up to date')
+    expect(wrapper.find('[data-testid="update-available"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('shows no error boxes while updating and a success message afterwards', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(serverHealthService.get).mockResolvedValue(health(true))
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-testid="update-available"]').findAll('button').find((b) => b.text() === 'Update')!.trigger('click')
+      await wrapper.findAll('button').find((b) => b.text().includes('Update now'))!.trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="update-running"]').exists()).toBe(true)
+
+      vi.mocked(serverHealthService.get).mockRejectedValue(new Error('restarting'))
+      vi.mocked(runnersService.list).mockRejectedValue(new Error('restarting'))
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(wrapper.text()).not.toContain('could not be loaded')
+      expect(wrapper.text()).toContain('server-v1')
+      expect(wrapper.text()).toContain('runner-01')
+
+      vi.mocked(serverHealthService.get).mockResolvedValue({ ...health(false), server: { version: 'server-v2', latestVersion: 'server-v2', updateAvailable: false } })
+      vi.mocked(runnersService.list).mockResolvedValue([runner()] as never)
+      vi.mocked(installService.getUpdate).mockResolvedValue({
+        currentVersion: 'server-v2', triggerAvailable: true, stale: false, requestPending: false, requestAgeSeconds: null, hint: null, log: null,
+        run: { state: 'succeeded', requestedVersion: 'latest', fromVersion: 'server-v1', toVersion: 'server-v2', startedAtUtc: '2026-11-08T10:00:00Z', finishedAtUtc: '2026-11-08T10:05:00Z', exitCode: 0, recoveryBackup: null, requestedBy: null, message: null },
+      })
+      await vi.advanceTimersByTimeAsync(3000)
+      await flushPromises()
+      expect(wrapper.get('[data-testid="update-succeeded"]').text()).toContain('Updated to server-v2')
+      expect(wrapper.find('[data-testid="runners-updating"]').exists()).toBe(false)
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows each Runner with OS, apps and version and no health cards', async () => {
