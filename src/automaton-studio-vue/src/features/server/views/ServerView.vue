@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
 import { isAxiosError } from 'axios'
 import SelfHostedRunnerInstallDialog from '@/features/runners/components/SelfHostedRunnerInstallDialog.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
@@ -9,9 +8,9 @@ import { isVisibleApplicationRunner } from '@/features/runners/utils/runner-clas
 import type { Runner } from '@/features/runners/types/runners.types'
 import PageHead from '@/shared/components/PageHead.vue'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
-import CleanupSection from '../components/CleanupSection.vue'
+import ServerHealthCard from '../components/ServerHealthCard.vue'
 import RunnersList from '../components/RunnersList.vue'
-import ServerUpdateBanner from '../components/ServerUpdateBanner.vue'
+import ServerVersionCard from '../components/ServerVersionCard.vue'
 import { serverHealthService } from '../services/server-health.service'
 import { serverConsoleService } from '../services/server-console.service'
 import type { ServerHealth } from '../types/server.types'
@@ -23,11 +22,12 @@ const authStore = useAuthStore()
 const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 const loading = ref(true)
 const runners = ref<Runner[]>([])
-const runnersError = ref<string | null>(null)
+const runnersFailed = ref(false)
 const health = ref<ServerHealth | null>(null)
 // Server health and updates are for system administrators; a plain administrator still gets the Runners.
 const healthDenied = ref(false)
-const healthError = ref<string | null>(null)
+const healthFailed = ref(false)
+const valuesFrom = ref<Date | null>(null)
 // While the update replaces the API, loads fail on purpose: keep the last data and retry quietly.
 const updating = ref(false)
 const showInstall = ref(false)
@@ -42,19 +42,20 @@ const updateAvailable = computed(() => health.value?.server.updateAvailable === 
 async function loadRunners() {
   try {
     runners.value = await runnersService.list()
-    runnersError.value = null
+    runnersFailed.value = false
+    valuesFrom.value = new Date()
   } catch {
-    if (!updating.value) runnersError.value = 'Runners could not be loaded.'
+    runnersFailed.value = true
   }
 }
 
 async function loadHealth() {
   try {
     health.value = await serverHealthService.get()
-    healthError.value = null
+    healthFailed.value = false
   } catch (error) {
     if (isAxiosError(error) && error.response?.status === 403) healthDenied.value = true
-    else if (!updating.value) healthError.value = 'Server health could not be loaded.'
+    else healthFailed.value = true
   }
 }
 
@@ -82,8 +83,12 @@ async function installServerConsole() {
 
 function onUpdating(value: boolean) {
   updating.value = value
-  if (value) { runnersError.value = null; healthError.value = null }
 }
+
+// The API did not answer (and no update explains it): one line, with the time of the values still shown.
+const unreachable = computed(() => !updating.value && (healthFailed.value || runnersFailed.value))
+const shownAt = computed(() => valuesFrom.value ? valuesFrom.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null)
+const healthPaused = computed(() => updating.value ? 'updating' as const : healthFailed.value ? 'unreachable' as const : null)
 
 async function refresh() {
   await Promise.all([loadRunners(), healthDenied.value ? Promise.resolve() : loadHealth()])
@@ -99,44 +104,32 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <template>
   <div class="server-view studio-page">
-    <PageHead title="Server" :line="health?.server.version ? `Automaton ${health.server.version}` : 'Runners, updates and cleanup.'" />
+    <PageHead title="Server" :line="health?.server.version ? `Automaton ${health.server.version}` : 'Version, health and Runners.'" />
 
-    <ServerUpdateBanner
-      v-if="health" class="mb-4" :current="health.server.version" :latest="health.server.latestVersion" :update-available="updateAvailable"
-      @updated="refresh" @updating="onUpdating"
-    />
-
-    <Message v-if="healthDenied" severity="info" :closable="false" class="mb-4" data-testid="health-denied">
-      Updates are shown to system administrators.
-    </Message>
-    <Message v-else-if="healthError" severity="warn" :closable="false" class="mb-4">{{ healthError }}</Message>
-
-    <p v-if="isSystemAdministrator && serverConsole" class="mb-4" data-testid="server-console-link">
-      <template v-if="serverConsole">
-        Server health, resources and OS updates:
-        <RouterLink :to="`/apps/${serverConsole}`" data-testid="server-console-open">open Server Console</RouterLink>.
-      </template>
+    <p v-if="unreachable" class="server-notice" data-testid="server-notice">
+      The server did not answer<template v-if="shownAt"> &middot; showing {{ shownAt }} values</template>.
+      <Button label="Retry" text class="btn-small" @click="refresh" />
     </p>
-    <Message v-if="isSystemAdministrator && !serverConsole && !loading" severity="info" :closable="false" class="mb-4" data-testid="server-console-notice">
-      <div class="flex align-items-center justify-content-between flex-wrap gap-2">
-        <span>Server health, resources and OS updates are shown by the Server Console app. It is not installed yet.</span>
-        <Button
-          label="Install Server Console" class="btn-small" :loading="installingConsole"
-          data-testid="server-console-install" @click="installServerConsole"
-        />
-      </div>
-      <p v-if="installConsoleError" class="mt-2 mb-0" data-testid="server-console-install-error">{{ installConsoleError }}</p>
-    </Message>
 
-    <CleanupSection v-if="isSystemAdministrator" :console-id="serverConsole" />
+    <ServerVersionCard
+      v-if="health" :current="health.server.version" :latest="health.server.latestVersion" :update-available="updateAvailable"
+      :checked-at="health.generatedAtUtc" @updated="refresh" @updating="onUpdating" @check="refresh"
+    />
+    <p v-if="healthDenied" class="studio-muted" data-testid="health-denied">Updates are shown to system administrators.</p>
+
+    <ServerHealthCard
+      v-if="isSystemAdministrator && health" :health="health" :console-id="serverConsole" :paused="healthPaused" :shown-at="shownAt"
+      :show-console="!loading" :installing="installingConsole" :install-error="installConsoleError"
+      @retry="refresh" @install="installServerConsole"
+    />
 
     <section>
       <div class="flex align-items-center justify-content-between flex-wrap gap-2">
-        <h2 class="studio-section">Runners<span v-if="updating" class="studio-muted" data-testid="runners-updating"> &middot; updating...</span></h2>
+        <h2 class="studio-section">Runners<span v-if="updating" class="studio-muted" data-testid="runners-updating"> &middot; paused while updating</span>
+          <span v-else-if="runnersFailed && shownAt" class="studio-muted"> &middot; could not refresh &middot; showing {{ shownAt }} values</span></h2>
         <Button label="Add a Runner" outlined class="btn-small" data-testid="add-runner" @click="showInstall = true" />
       </div>
-      <Message v-if="runnersError" severity="error" :closable="false">{{ runnersError }}</Message>
-      <div v-else-if="loading" class="studio-muted">Loading Runners...</div>
+      <div v-if="loading" class="studio-muted">Loading Runners...</div>
       <div
         v-else-if="visibleRunners.length === 0" class="studio-card text-center studio-muted"
         data-testid="runners-empty"
@@ -152,5 +145,6 @@ onBeforeUnmount(() => clearInterval(timer))
 </template>
 
 <style scoped>
+.server-notice { margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
 .server-view { max-width: 1400px; margin: 0 auto; }
 </style>

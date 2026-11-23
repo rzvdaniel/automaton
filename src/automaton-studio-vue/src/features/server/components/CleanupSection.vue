@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import Message from 'primevue/message'
 import { serverCleanupService } from '../services/server-cleanup.service'
 import { formatGiB } from '../utils/format'
 import type { ServerCleanup } from '../types/server.types'
@@ -22,7 +21,7 @@ async function load() {
     cleanup.value = next
     loadError.value = null
   } catch {
-    loadError.value = 'The cleanup could not be loaded.'
+    loadError.value = 'unavailable'
   }
 }
 
@@ -30,10 +29,11 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="mb-4" data-testid="cleanup-section">
-    <Message v-if="loadError" severity="warn" :closable="false">{{ loadError }}</Message>
-    <p v-else-if="cleanup" class="m-0" :class="{ 'text-red-500': failed }" data-testid="cleanup-line">
-      <strong>Cleanup:</strong> nightly at {{ cleanup.settings.timeUtc }}
+  <li class="health-row" data-testid="cleanup-section">
+    <span>Cleanup</span>
+    <span v-if="loadError" class="studio-muted">Not available right now</span>
+    <span v-else-if="cleanup" :class="failed ? 'health-row__bad' : 'studio-muted'" data-testid="cleanup-line">
+      nightly at {{ cleanup.settings.timeUtc }}
       <template v-if="lastRun">
         &middot; <span data-testid="cleanup-last">{{ failed ? `last run failed: ${lastRun.message ?? lastRun.result}` : `last run freed ${freed(lastRun.bytesFreed)}` }}</span>
       </template>
@@ -41,6 +41,6 @@ onMounted(load)
       <template v-if="consoleId">
         &middot; <RouterLink :to="`/apps/${consoleId}`" data-testid="cleanup-manage">Manage in Server Console</RouterLink>
       </template>
-    </p>
-  </section>
+    </span>
+  </li>
 </template>

@@ -179,6 +179,21 @@ class UpdateFromRequestTests(unittest.TestCase):
         # The updater runs after the request was moved aside, and status then says running (starting came first).
         self.assertEqual(json.loads(seen.read_text())['state'], 'running')
         self.assertFalse(Path(str(seen) + '.request').exists())
+        self.assertEqual(json.loads(seen.read_text())['step'], 'backup')
+
+    def test_the_status_names_the_step_the_updater_reached(self):
+        self.request({'version': 'latest', 'requestedBy': 'admin@example.com'})
+        script = ('echo "Creating protected recovery backup at /opt/x"; echo "Backup verified. Pulling release images."; '
+                  'echo "Updating api worker."; sleep 4; echo "Checking that the new release answers."; sleep 4; '
+                  '[[ -z "$FAIL_HERE" ]] || exit 3; echo server-v0.2.0 > "$(dirname "$0")/version"')
+        (self.install / 'update.sh').write_text('#!/usr/bin/env bash\n' + script + '\n')
+        failed = self.run_script(extra={'FAIL_HERE': '1'})
+        self.assertEqual(failed.returncode, 3)
+        self.assertEqual(self.status()['state'], 'failed')
+        self.assertEqual(self.status()['step'], 'health')
+        self.request({'version': 'latest', 'requestedBy': 'admin@example.com'})
+        self.assertEqual(self.run_script().returncode, 0)
+        self.assertIsNone(self.status()['step'])
 
     def test_directory_as_request_is_removed_and_reported(self):
         directory = self.update / 'requests/request.json'

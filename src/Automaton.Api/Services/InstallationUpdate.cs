@@ -14,7 +14,8 @@ public sealed record InstallationUpdateRun(
     int? ExitCode,
     string? RecoveryBackup,
     string? RequestedBy,
-    string? Message);
+    string? Message,
+    string? Step = null);
 
 /// <param name="Stale">The last run still says starting/running but began long ago (for example the host rebooted).</param>
 /// <param name="RequestPending">A request file is waiting for the host to pick it up.</param>

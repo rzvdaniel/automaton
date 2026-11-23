@@ -476,6 +476,7 @@ rollback() {
 if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${application_services[@]}"; then
     rollback 'services did not become healthy'
 fi
+echo 'Checking that the new release answers.'
 if [[ "$restart_traefik" == true ]]; then
     echo 'Restarting Traefik to load the new certificate resolver.'
     "${new_compose[@]}" restart traefik || rollback 'Traefik did not restart'
