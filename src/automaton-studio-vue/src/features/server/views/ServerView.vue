@@ -28,6 +28,8 @@ const health = ref<ServerHealth | null>(null)
 // Server health and updates are for system administrators; a plain administrator still gets the Runners.
 const healthDenied = ref(false)
 const healthError = ref<string | null>(null)
+// While the update replaces the API, loads fail on purpose: keep the last data and retry quietly.
+const updating = ref(false)
 const showInstall = ref(false)
 const serverConsole = ref<string | null>(null)
 const installingConsole = ref(false)
@@ -42,7 +44,7 @@ async function loadRunners() {
     runners.value = await runnersService.list()
     runnersError.value = null
   } catch {
-    runnersError.value = 'Runners could not be loaded.'
+    if (!updating.value) runnersError.value = 'Runners could not be loaded.'
   }
 }
 
@@ -52,7 +54,7 @@ async function loadHealth() {
     healthError.value = null
   } catch (error) {
     if (isAxiosError(error) && error.response?.status === 403) healthDenied.value = true
-    else healthError.value = 'Server health could not be loaded.'
+    else if (!updating.value) healthError.value = 'Server health could not be loaded.'
   }
 }
 
@@ -78,6 +80,11 @@ async function installServerConsole() {
   }
 }
 
+function onUpdating(value: boolean) {
+  updating.value = value
+  if (value) { runnersError.value = null; healthError.value = null }
+}
+
 async function refresh() {
   await Promise.all([loadRunners(), healthDenied.value ? Promise.resolve() : loadHealth()])
 }
@@ -95,8 +102,8 @@ onBeforeUnmount(() => clearInterval(timer))
     <PageHead title="Server" :line="health?.server.version ? `Automaton ${health.server.version}` : 'Runners, updates and cleanup.'" />
 
     <ServerUpdateBanner
-      v-if="updateAvailable" class="mb-4" :current="health!.server.version" :latest="health!.server.latestVersion"
-      @updated="refresh"
+      v-if="health" class="mb-4" :current="health.server.version" :latest="health.server.latestVersion" :update-available="updateAvailable"
+      @updated="refresh" @updating="onUpdating"
     />
 
     <Message v-if="healthDenied" severity="info" :closable="false" class="mb-4" data-testid="health-denied">
@@ -121,11 +128,11 @@ onBeforeUnmount(() => clearInterval(timer))
       <p v-if="installConsoleError" class="mt-2 mb-0" data-testid="server-console-install-error">{{ installConsoleError }}</p>
     </Message>
 
-    <CleanupSection v-if="isSystemAdministrator" :console-id="serverConsole" :installing="installingConsole" @install="installServerConsole" />
+    <CleanupSection v-if="isSystemAdministrator" :console-id="serverConsole" />
 
     <section>
       <div class="flex align-items-center justify-content-between flex-wrap gap-2">
-        <h2 class="studio-section">Runners</h2>
+        <h2 class="studio-section">Runners<span v-if="updating" class="studio-muted" data-testid="runners-updating"> &middot; updating...</span></h2>
         <Button label="Add a Runner" outlined class="btn-small" data-testid="add-runner" @click="showInstall = true" />
       </div>
       <Message v-if="runnersError" severity="error" :closable="false">{{ runnersError }}</Message>
