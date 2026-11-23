@@ -78,12 +78,12 @@ tr:last-child td{border-bottom:0}
 <div class="wrap">
   <header>
     <h1>One look for Studio, the website and every own app</h1>
-    <p class="lead">Quiet paper and ink; orange only when something needs you or is happening; red only when something failed or will be destroyed. Never green, never blue.</p>
+    <p class="lead">Quiet paper and ink; orange when something needs you, failed or is happening; red only for destructive actions. Never green, never blue.</p>
   </header>
 
   <section>
     <h2>Colours</h2>
-    <p class="hint">Token names as in Studio's <span class="mono">tokens.css</span>. Switch dark mode at the top to see the dark values.</p>
+    <p class="hint">Studio token names (<span class="mono">tokens.css</span>). Apps use the UI kit names and their own dark values and fonts (<span class="mono">app.css</span>); see THEME.md.</p>
     <div class="sw" id="sw"></div>
   </section>
 
@@ -95,10 +95,10 @@ tr:last-child td{border-bottom:0}
         <thead><tr><th>State</th><th>Pill</th><th>Bar</th><th>Examples</th></tr></thead>
         <tbody>
           <tr><td><b>Fine</b></td><td><span class="pill p-ok"><span class="d"></span>Online</span></td><td><div class="meter"><u style="width:62%"></u><em style="left:80%"></em></div></td><td>up to date, passed, live, online, all good</td></tr>
-          <tr><td><b>Needs you</b></td><td><span class="pill p-need"><span class="d"></span>0.2.185 available</span></td><td><div class="meter need"><u style="width:86%"></u><em style="left:80%"></em></div></td><td>update available, waiting for approval, disk past warning, failed check that you must act on</td></tr>
+          <tr><td><b>Needs you</b></td><td><span class="pill p-need"><span class="d"></span>0.2.185 available</span></td><td><div class="meter need"><u style="width:86%"></u><em style="left:80%"></em></div></td><td>update available, update failed, waiting for approval, disk past warning</td></tr>
           <tr><td><b>In progress</b></td><td><span class="pill p-run"><span class="d"></span>Updating</span></td><td><div class="meter run"><u style="width:55%"></u></div></td><td>updating, upgrading, deploying, restoring (outline, not a fill)</td></tr>
           <tr><td><b>No data yet</b></td><td><span class="pill p-none"><span class="d"></span>Not checked</span></td><td><div class="meter"></div></td><td>first check pending, never run</td></tr>
-          <tr><td><b>Failed / destructive</b></td><td><span class="pill p-bad"><span class="d"></span>Update failed</span></td><td>–</td><td>update failed, offline for good, delete, data loss</td></tr>
+          <tr><td><b>Destructive</b></td><td><span class="pill p-bad"><span class="d"></span>Deletes 3 apps</span></td><td>–</td><td>delete, remove for good, data loss</td></tr>
         </tbody>
       </table>
     </div>
@@ -111,8 +111,8 @@ tr:last-child td{border-bottom:0}
       <p class="hint" style="margin:0">One orange primary per view. Destructive actions are outlined red and always confirm.</p>
       <div class="strip need"><div class="t"><b>Update Automaton</b><span>0.2.185 is available. This server runs 0.2.182.</span></div><button class="btn primary">Update</button></div>
       <div class="strip info"><div class="t"><b>Server Console is not installed</b><span>It shows OS updates and detailed graphs.</span></div><button class="btn">Install</button></div>
-      <div class="strip bad"><div class="t"><b>The update stopped</b><span>This release changes traefik. The server still runs 0.2.182 and is healthy.</span></div><button class="btn">Try again</button></div>
-      <p class="hint" style="margin:0">Strips sit at the top of a page, most urgent first. Calm information is a plain paper strip, not a blue one. Never stack several errors: one line, with the reason and a retry.</p>
+      <div class="strip need"><div class="t"><b>The update stopped</b><span>This release changes traefik. The server still runs 0.2.182 and is healthy.</span></div><button class="btn">Try again</button></div>
+      <p class="hint" style="margin:0">Strips sit at the top of a page, most urgent first. A failure is an orange strip with the reason and a retry. Calm information is a plain paper strip, not a blue one. Never stack several errors.</p>
     </div>
   </section>
 
@@ -145,7 +145,7 @@ tr:last-child td{border-bottom:0}
       <li>Check every screen in dark mode.</li>
     </ul></div>
     <div class="card"><h3>Don't</h3><ul>
-      <li>Green or blue anywhere, including "success".</li>
+      <li>Green or blue anywhere, including "success".</li><li>Red for anything but destructive actions.</li>
       <li>Coloured left borders or tinted whole cards for status.</li>
       <li>Colour without words.</li>
       <li>New tokens without adding them here and to <span class="mono">tokens.css</span>.</li>
@@ -153,7 +153,7 @@ tr:last-child td{border-bottom:0}
   </section>
 </div>
 <script>
-const toks=[['--paper','Cards, inputs'],['--panel','Page background, insets'],['--ink','Text, fine-state bars'],['--ink-soft','Secondary text, fine dots'],['--line','Borders, empty bars'],['--signal','Needs you, in progress, primary button'],['--signal-ink','Orange text on soft orange'],['--signal-soft','Needs-you strips and pills'],['--bad','Failed, destructive'],['--bad-soft','Failure strips and pills'],['--rail','Sidebar and app headers'],['--rail-active-ink','Active item in the rail']];
+const toks=[['--paper','Cards, inputs'],['--panel','Page background, insets'],['--ink','Text, fine-state bars'],['--ink-soft','Secondary text, fine dots'],['--line','Borders, empty bars'],['--signal','Needs you, in progress, primary button'],['--signal-ink','Orange text on soft orange'],['--signal-soft','Needs-you strips (not yet a Studio token)'],['--bad','Destructive only (not yet a Studio token)'],['--rail','Sidebar and app headers'],['--rail-active-ink','Active item in the rail']];
 const sw=document.getElementById('sw');
 function draw(){const cs=getComputedStyle(document.documentElement);sw.innerHTML=toks.map(([t,u])=>{const v=cs.getPropertyValue(t).trim();return `<div class="s"><i style="background:var(${t})"></i><div><b>${t}</b><code>${v}</code><span>${u}</span></div></div>`}).join('')}
 draw();

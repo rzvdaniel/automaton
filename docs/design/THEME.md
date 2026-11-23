@@ -1,43 +1,45 @@
 # Automaton theme
 
-One look for Studio, the website and every own app. Open `theme.html` (next to this file) in a browser for the
-swatches, components and dark mode. The same page is kept in automaton, automaton-apps and automaton-monster; change
-all three together.
+One look for Studio, the website and every own app. Open `theme.html` (next to this file) for swatches and
+components. The same two files are kept in automaton (`docs/design/`), automaton-apps and automaton-monster
+(`design/`); change all three together.
 
 ## Colours
 
-| Studio token (`tokens.css`) | App UI kit (`app.css`) | Light | Dark | Use |
-|---|---|---|---|---|
-| `--paper` | `--surface` | `#fdfdfb` | `#121316` | cards, inputs |
-| `--panel`, `--app-bg` | `--bg` | `#f3f2ee` | `#1b1c20` | page background, insets |
-| `--ink` | `--text` | `#17181c` | `#f1f0eb` | text, bars for "fine" |
-| `--ink-soft` | `--muted` | `#55565e` | `#a9aab1` | secondary text, "fine" dots |
-| `--line` | `--border` | `#e2e0da` | `#2c2d33` | borders, empty bars |
-| `--signal` | `--accent` | `#f26a1b` | `#ff7a2e` | needs you, in progress, primary button |
-| `--signal-ink` | `--orange-ink` | `#a23d05` | `#ffa36b` | orange text |
-| `--signal-soft` (not yet a token) | `--orange-soft` | `#ffe6d6` | `#2e1b10` | needs-you strips and pills |
-| `--bad` (not yet a token) | `--danger` | `#b42318` | `#f87171` | failed, destructive |
-| `--rail` | `--rail` | `#17181c` | `#0b0c0e` | sidebar, app headers |
+The values live in code: Studio `src/automaton-studio-vue/src/assets/styles/tokens.css`, apps
+`design/automaton-app-ui/app.css` (the Automaton look). Dark values are there too. Light values:
 
-Fonts: Bricolage Grotesque (headings), Instrument Sans (body), IBM Plex Mono (versions, ids, logs).
+| Studio token | App UI kit | Light | Use |
+|---|---|---|---|
+| `--paper` | `--surface` | `#fdfdfb` | cards, inputs |
+| `--panel` | `--bg` | `#f3f2ee` | page background, insets |
+| `--ink` | `--text` | `#17181c` | text, bars for "fine" |
+| `--ink-soft` | `--muted` | `#55565e` | secondary text, "fine" dots |
+| `--line` | `--border` | `#e2e0da` | borders, empty bars |
+| `--signal` | `--accent` | `#f26a1b` | needs you, failed, in progress, primary button |
+| `--signal-ink` | `--orange-ink` | `#a23d05` | orange text |
+| none yet | `--orange-soft` | `#ffe6d6` | needs-you strips and pills |
+| none yet | `--danger` | `#b42318` | destructive actions only |
+| `--rail` | `--rail` | `#17181c` | sidebar, app headers |
 
-Studio still defines `--ok` (green); it is legacy, do not use it for new UI.
+Studio still defines a green `--ok`; it is legacy, do not use it for new UI. Fonts: Studio and the website use
+Bricolage Grotesque, Instrument Sans and IBM Plex Mono; apps keep the UI kit's own fonts.
 
 ## Status
 
 | State | Look | Examples |
 |---|---|---|
 | Fine | grey dot and words, dark bar | up to date, passed, online |
-| Needs you | soft orange pill, orange bar | update available, waiting for approval |
+| Needs you, failed | soft orange pill, orange bar | update available, update failed, waiting for approval |
 | In progress | orange outline, not a fill | updating, deploying |
 | No data yet | line-coloured dot or empty bar | not checked yet |
-| Failed or destructive | red, the only place for red | update failed, delete |
+| Destructive | red, the only place for red | delete, data loss |
 
 - Never green, never blue, including for success and information.
 - Status is a pill or bar with words, never colour alone; no coloured left borders or tinted whole cards.
 - One orange primary button per view. Destructive buttons are outlined red and always confirm.
-- While refreshing or updating, keep the last values and mark them; show one error line with the reason and a retry,
-  never a stack of error boxes.
+- While refreshing or updating, keep the last values and mark them; show one line with the reason and a retry, never
+  a stack of error boxes.
 
 ## The mark
 
