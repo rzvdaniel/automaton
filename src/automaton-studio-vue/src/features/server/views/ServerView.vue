@@ -114,9 +114,9 @@ onBeforeUnmount(() => clearInterval(timer))
       <Button label="Retry" text class="btn-small" @click="refresh" />
     </p>
 
-    <nav class="server-tabs" role="tablist" aria-label="Server">
-      <RouterLink to="/server" role="tab" :aria-selected="!onRunners" class="server-tab" data-testid="tab-automaton">Automaton</RouterLink>
-      <RouterLink to="/server/runners" role="tab" :aria-selected="onRunners" class="server-tab" data-testid="tab-runners">
+    <nav class="server-tabs" aria-label="Server">
+      <RouterLink to="/server" :aria-current="!onRunners ? 'page' : undefined" class="server-tab" data-testid="tab-automaton">Automaton</RouterLink>
+      <RouterLink to="/server/runners" :aria-current="onRunners ? 'page' : undefined" class="server-tab" data-testid="tab-runners">
         Runners<span v-if="!loading" class="server-tab__count" data-testid="runners-count">{{ visibleRunners.length }}</span>
       </RouterLink>
     </nav>
@@ -161,7 +161,7 @@ onBeforeUnmount(() => clearInterval(timer))
 .server-notice { margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
 .server-tabs { display: flex; gap: 4px; margin: 0 0 16px; border-bottom: 1px solid var(--line); }
 a.server-tab { padding: 8px 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--ink-soft); text-decoration: none; font-weight: 500; }
-a.server-tab[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--signal); }
+a.server-tab[aria-current='page'] { color: var(--ink); border-bottom-color: var(--signal); }
 .server-tab__count { margin-left: 6px; font-size: 12px; color: var(--ink-soft); }
 .server-view { max-width: 1400px; margin: 0 auto; }
 </style>
