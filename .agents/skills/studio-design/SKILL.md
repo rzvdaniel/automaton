@@ -229,7 +229,7 @@ The Studio Home language, for Studio and every own app:
 | No data yet | the light line colour |
 | Destructive (delete, data loss) | the only place for red |
 
-- Status is always a pill or bar **with words**, never colour alone.
+- Status always has **words**, never colour alone: a pill or bar in cards and strips, a coloured dot and words in table rows.
 - **History belongs to its item.** Runs, checks or deployments of one plan, site or job sit under that item, newest
   first (the last 10, then "Show older"). Never one list that mixes items. The last 10 also show as small bars in the
   item's row; clicking a bar opens that run.

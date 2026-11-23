@@ -12,7 +12,7 @@ The values live in code: Studio `src/automaton-studio-vue/src/assets/styles/toke
 | Studio token | App UI kit | Light | Use |
 |---|---|---|---|
 | `--paper` | `--surface` | `#fdfdfb` | cards, inputs |
-| `--panel` | `--bg` | `#f3f2ee` | page background, insets |
+| `--panel` | `--bg` | `#f3f2ee` | page background |
 | `--ink` | `--text` | `#17181c` | text, bars for "fine" |
 | `--ink-soft` | `--muted` | `#55565e` | secondary text, "fine" dots |
 | `--line` | `--border` | `#e2e0da` | borders, empty bars |
@@ -36,7 +36,8 @@ Bricolage Grotesque, Instrument Sans and IBM Plex Mono; apps keep the UI kit's o
 | Destructive | red, the only place for red | delete, data loss |
 
 - Never green, never blue, including for success and information.
-- Status is a pill or bar with words, never colour alone; no coloured left borders or tinted whole cards.
+- Status always has words, never colour alone: a pill or bar in cards and strips, a coloured dot and words in table
+  rows; no coloured left borders or tinted whole cards.
 - One orange primary button per view. Destructive buttons are outlined red and always confirm.
 - While refreshing or updating, keep the last values and mark them; show one line with the reason and a retry, never
   a stack of error boxes.
@@ -47,7 +48,7 @@ Bricolage Grotesque, Instrument Sans and IBM Plex Mono; apps keep the UI kit's o
   separate items with a 1 px line instead (like Server Keeper's Health list).
 - Tables as in Server Keeper's "Apps on this machine": no outer box and no header band; the header is small muted text
   in normal case with a sort arrow on the sorted column; rows split by 1 px lines; the name first; numbers right-aligned;
-  state as a dot and words, not a pill.
+  state as a dot and words in the state colour (grey, orange, red), not a pill.
 
 ## The mark
 
