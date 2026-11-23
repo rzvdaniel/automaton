@@ -44,10 +44,13 @@ pick() {
       local flast; flast=$("$GH" issue view "$num" -R "$repo" --json comments --jq '[.comments[]|select(.body|startswith("Agent run failed"))|.createdAt]|last // "none"')
       if [[ $flast != none && $last != none && $last > $flast ]]; then "$GH" issue edit "$num" -R "$repo" --remove-label agent:failed >/dev/null || true; else continue; fi
     fi
+    # agent:go starts agent-issue.yml only in automaton. Elsewhere dispatch the run first (the runner's login is the
+    # allowlisted bot); only then mark the issue taken, so a failed dispatch never leaves agent:go blocking the queue.
+    if [[ $repo != "$OWNER/automaton" ]]; then
+      "$GH" workflow run agent-issue.yml -R "$OWNER/automaton" -f repo="$repo" -f number="$num" >/dev/null         || { echo "could not start $repo#$num" >&2; return 1; }
+    fi
     "$GH" issue edit "$num" -R "$repo" --add-label agent:go >/dev/null
     move "$repo" "$num" Running || true
-    # agent:go starts agent-issue.yml only in automaton; elsewhere it marks the issue as taken and we dispatch the run
-    [[ $repo == "$OWNER/automaton" ]] || "$GH" workflow run agent-issue.yml -R "$OWNER/automaton" -f repo="$repo" -f number="$num" >/dev/null
     echo "picked $repo#$num"; return 0
   done < <(items)
   echo "no Ready card"

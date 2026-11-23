@@ -8,7 +8,11 @@ unset CLAUDE_CONFIG_DIR
 # The shared checkout stays on main: it holds this script and agent-board.sh. Each run works in its own worktree.
 base="${AGENT_WORKDIR:-$HOME/automaton}"
 prompt_base="$base"
-repo_name="${AGENT_REPO:-}"; repo_name="${repo_name##*/}"; [ -n "$repo_name" ] && [ "$repo_name" != automaton ] && [ -d "$HOME/$repo_name/.git" ] && base="$HOME/$repo_name"
+repo_name="${AGENT_REPO:-}"; repo_name="${repo_name##*/}"
+if [ -n "$repo_name" ] && [ "$repo_name" != automaton ]; then
+  [[ $repo_name =~ ^[A-Za-z0-9._-]+$ && $repo_name != .* && -d "$HOME/$repo_name/.git" ]]     || { echo "agent-run: no checkout ~/$repo_name for $AGENT_REPO" >&2; exit 1; }
+  base="$HOME/$repo_name"
+fi
 work_root="${AGENT_WORK_ROOT:-$HOME/agent-work}"
 cd "$base"
 git fetch -q origin main
