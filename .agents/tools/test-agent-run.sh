@@ -16,4 +16,10 @@ HOME="$t/home" PATH="$t/bin:$PATH" AGENT_WORKDIR="$t/base" AGENT_WORK_ROOT="$t/w
 [ "$(git -C "$t/base" branch --show-current)" = main ] || { echo "FAIL: shared checkout not on main"; exit 1; }
 [ -z "$(ls "$t/work")" ] || { echo "FAIL: leftover worktree"; exit 1; }
 [ "$(git -C "$t/base" worktree list | wc -l)" = 1 ] || { echo "FAIL: worktree registered"; exit 1; }
+# an issue from another repository runs in a worktree of ~/<repo>, with the prompt from the automaton checkout
+git clone -q "$t/origin.git" "$t/home/other" 2>/dev/null; git -C "$t/home/other" checkout -q main
+HOME="$t/home" PATH="$t/bin:$PATH" AGENT_WORKDIR="$t/base" AGENT_WORK_ROOT="$t/work" PROMPT_FILE=prompt.md AGENT_REPO=o/other GITHUB_RUN_ID=8 bash "$tools/agent-run.sh"
+[ "$(cat "$t/cwd")" = "$t/work/8-1" ] || { echo "FAIL: other repo ran in $(cat "$t/cwd")"; exit 1; }
+[ "$(git -C "$t/home/other" worktree list | wc -l)" = 1 ] || { echo "FAIL: other repo worktree left"; exit 1; }
+[ "$(git -C "$t/base" worktree list | wc -l)" = 1 ] || { echo "FAIL: automaton worktree used for other repo"; exit 1; }
 echo "PASS"

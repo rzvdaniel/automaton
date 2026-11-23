@@ -7,6 +7,9 @@
 set -euo pipefail
 GH=${AGENT_GH:-gh}
 BOARD=${AGENT_BOARD:-rzvdaniel/17}
+# Repositories whose Ready cards are picked. The runner and agent-issue.yml live in automaton; other repos are started
+# with a workflow_dispatch of agent-issue.yml there.
+REPOS=${AGENT_REPOS:-automaton automaton-apps}
 OWNER=${BOARD%%/*}; NUM=${BOARD##*/}
 
 items() { "$GH" project item-list "$NUM" --owner "$OWNER" --format json -L 200 \
@@ -24,11 +27,11 @@ move() { # repo number status
 
 pick() {
   local id repo num st info nsl done_ failed last
-  for repo in "$OWNER/automaton"; do
+  local r; for r in $REPOS; do repo="$OWNER/$r"
     [[ -n $("$GH" issue list -R "$repo" -l agent:go -s open --json number --jq '.[].number') ]] && { echo "an agent:go issue is open in $repo; nothing to pick"; return 0; }
   done
   while IFS=$'\t' read -r id repo num st; do
-    [[ $st == "Ready for agents" && $repo == "$OWNER/automaton" ]] || continue   # agent-issue.yml exists only here
+    [[ $st == "Ready for agents" && " $REPOS " == *" ${repo#*/} "* ]] || continue
     info=$("$GH" issue view "$num" -R "$repo" --json labels,body,comments --jq \
       '[([.labels[].name]|index("needs-shape")!=null), (.body|test("(^|\\n)\\W*Done when";"i")), ([.labels[].name]|index("agent:failed")!=null), ((.comments|map(select(.author.login=="'"$OWNER"'"))|map(.createdAt)|last) // "none")]|@tsv') || continue
     IFS=$'\t' read -r nsl done_ failed last <<< "$info"
@@ -43,6 +46,8 @@ pick() {
     fi
     "$GH" issue edit "$num" -R "$repo" --add-label agent:go >/dev/null
     move "$repo" "$num" Running || true
+    # agent:go starts agent-issue.yml only in automaton; elsewhere it marks the issue as taken and we dispatch the run
+    [[ $repo == "$OWNER/automaton" ]] || "$GH" workflow run agent-issue.yml -R "$OWNER/automaton" -f repo="$repo" -f number="$num" >/dev/null
     echo "picked $repo#$num"; return 0
   done < <(items)
   echo "no Ready card"
