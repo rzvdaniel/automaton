@@ -41,6 +41,14 @@ Bricolage Grotesque, Instrument Sans and IBM Plex Mono; apps keep the UI kit's o
 - While refreshing or updating, keep the last values and mark them; show one line with the reason and a retry, never
   a stack of error boxes.
 
+## Surfaces and tables
+
+- White (`--paper` / `--surface`) cards on the panel background. No grey filled cells, tiles or insets inside a card;
+  separate items with a 1 px line instead (like Server Keeper's Health list).
+- Tables as in Server Keeper's "Apps on this machine": no outer box and no header band; the header is small muted text
+  in normal case with a sort arrow on the sorted column; rows split by 1 px lines; the name first; numbers right-aligned;
+  state as a dot and words, not a pill.
+
 ## The mark
 
 Orange tile with a dark `>_<` (`resources/logo/` in automaton), 32 px beside the app name in every header. The dark
