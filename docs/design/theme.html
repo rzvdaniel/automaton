@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automaton theme</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--paper:#fdfdfb;--panel:#f3f2ee;--ink:#17181c;--ink-soft:#55565e;--line:#e2e0da;--row-line:#ecebe6;--signal:#f26a1b;--signal-ink:#a23d05;--signal-soft:#ffe6d6;--on-signal:#17181c;--bad:#b42318;--bad-soft:#fdecea;--bar:#17181c;--app-bg:#f3f2ee;--rail:#17181c;--rail-ink:#f1f0eb;--rail-ink-soft:#a9aab1;--rail-active:#23242a;--rail-active-ink:#ff7a2e;--display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;--body:'Instrument Sans','Segoe UI',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;color-scheme:light}
+:root[data-theme=dark]{--paper:#121316;--panel:#1b1c20;--ink:#f1f0eb;--ink-soft:#a9aab1;--line:#2c2d33;--row-line:#2c2d33;--signal:#ff7a2e;--signal-ink:#ffa36b;--signal-soft:#2e1b10;--bad:#f87171;--bad-soft:#2a1616;--bar:#d6d3cb;--app-bg:#121316;--rail:#0b0c0e;--rail-active:#23242a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--app-bg);color:var(--ink);font:15px/1.5 var(--body)}
+.top{background:var(--rail);color:var(--rail-ink);padding:14px 28px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}
+.top b{font:600 18px var(--display)}
+.top .grow{flex:1}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 24px 64px;display:flex;flex-direction:column;gap:36px}
+h1{font:600 34px/1.1 var(--display);margin:0;letter-spacing:-.01em}
+h2{font:600 22px var(--display);margin:0 0 6px}
+p.lead{margin:6px 0 0;color:var(--ink-soft);max-width:720px}
+.hint{color:var(--ink-soft);font-size:14px;margin:0 0 14px;max-width:760px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:20px}
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.s{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper)}
+.s i{display:block;height:64px;border-bottom:1px solid var(--line)}
+.s div{padding:10px 12px;font-size:13px}
+.s b{display:block;font:500 13px var(--mono)}
+.s code{font:12px var(--mono);color:var(--ink-soft)}
+.s span{display:block;color:var(--ink-soft);font-size:12.5px;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:12px 10px;border-bottom:1px solid var(--row-line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.pill .d{width:7px;height:7px;border-radius:50%}
+.p-ok{color:var(--ink-soft)}.p-ok .d{background:var(--ink-soft)}
+.p-need{background:var(--signal-soft);color:var(--signal-ink)}.p-need .d{background:var(--signal)}
+.p-run{box-shadow:inset 0 0 0 1.5px var(--signal);color:var(--signal-ink)}.p-run .d{background:var(--signal);animation:bl 1.1s infinite}
+@keyframes bl{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.p-run .d{animation:none}}
+.p-none{color:var(--ink-soft)}.p-none .d{background:var(--line)}
+.p-bad{background:var(--bad-soft);color:var(--bad)}.p-bad .d{background:var(--bad)}
+.meter{height:8px;border-radius:4px;background:var(--line);position:relative;min-width:140px}
+.meter u{position:absolute;inset:0 auto 0 0;border-radius:4px;background:var(--bar)}
+.meter.need u{background:var(--signal)}
+.meter.run{background:transparent;box-shadow:inset 0 0 0 1.5px var(--signal)}
+.meter.run u{background:var(--signal);opacity:.35}
+.meter em{position:absolute;top:-4px;width:2px;height:16px;background:var(--signal)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{font:500 14px var(--body);min-height:38px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--signal);border-color:var(--signal);color:var(--on-signal);font-weight:600}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--ink-soft)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.strip{border-radius:14px;padding:14px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.strip .t{flex:1 1 260px}.strip b{display:block}.strip span{font-size:13.5px;color:var(--ink-soft)}
+.strip.need{background:var(--signal-soft);border:1px solid color-mix(in srgb,var(--signal) 45%,transparent)}
+.strip.info{background:var(--paper);border:1px solid var(--line)}
+.strip.bad{background:var(--bad-soft);border:1px solid color-mix(in srgb,var(--bad) 35%,transparent)}
+.type div{padding:10px 0;border-bottom:1px solid var(--row-line);display:flex;gap:18px;align-items:baseline}
+.type div:last-child{border:0}
+.type code{font:12px var(--mono);color:var(--ink-soft);width:220px;flex:none}
+.marks{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+.marks figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft)}
+.do{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.do ul{margin:6px 0 0;padding-left:18px;font-size:14px}.do li{margin:4px 0}
+.do h3{margin:0;font:600 15px var(--body)}
+.mono{font:13px var(--mono)}
+.tbtn{background:var(--rail-active);color:var(--rail-ink);border:1px solid #3a3b42;border-radius:10px;padding:7px 12px;font:500 13px var(--body);cursor:pointer}
+@media (max-width:700px){.do{grid-template-columns:1fr}.type code{width:130px}}
+</style>
+</head>
+<body>
+<div class="top">
+  <svg width="30" height="30" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#f26a1b"/><path d="M10 15l5 4-5 4M30 15l-5 4 5 4M17 27h6" fill="none" stroke="#17181c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <b>Automaton theme</b><span class="grow"></span>
+  <button class="tbtn" id="tt" aria-pressed="false">Dark mode</button>
+</div>
+<div class="wrap">
+  <header>
+    <h1>One look for Studio, the website and every own app</h1>
+    <p class="lead">Quiet paper and ink; orange only when something needs you or is happening; red only when something failed or will be destroyed. Never green, never blue.</p>
+  </header>
+
+  <section>
+    <h2>Colours</h2>
+    <p class="hint">Token names as in Studio's <span class="mono">tokens.css</span>. Switch dark mode at the top to see the dark values.</p>
+    <div class="sw" id="sw"></div>
+  </section>
+
+  <section>
+    <h2>Status</h2>
+    <p class="hint">Status is always a pill or bar <b>with words</b>, never colour alone.</p>
+    <div class="card" style="padding:6px 14px">
+      <table>
+        <thead><tr><th>State</th><th>Pill</th><th>Bar</th><th>Examples</th></tr></thead>
+        <tbody>
+          <tr><td><b>Fine</b></td><td><span class="pill p-ok"><span class="d"></span>Online</span></td><td><div class="meter"><u style="width:62%"></u><em style="left:80%"></em></div></td><td>up to date, passed, live, online, all good</td></tr>
+          <tr><td><b>Needs you</b></td><td><span class="pill p-need"><span class="d"></span>0.2.185 available</span></td><td><div class="meter need"><u style="width:86%"></u><em style="left:80%"></em></div></td><td>update available, waiting for approval, disk past warning, failed check that you must act on</td></tr>
+          <tr><td><b>In progress</b></td><td><span class="pill p-run"><span class="d"></span>Updating</span></td><td><div class="meter run"><u style="width:55%"></u></div></td><td>updating, upgrading, deploying, restoring (outline, not a fill)</td></tr>
+          <tr><td><b>No data yet</b></td><td><span class="pill p-none"><span class="d"></span>Not checked</span></td><td><div class="meter"></div></td><td>first check pending, never run</td></tr>
+          <tr><td><b>Failed / destructive</b></td><td><span class="pill p-bad"><span class="d"></span>Update failed</span></td><td>–</td><td>update failed, offline for good, delete, data loss</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Components</h2>
+    <div class="card" style="display:flex;flex-direction:column;gap:16px">
+      <div class="row"><button class="btn primary">Update to 0.2.185</button><button class="btn">Run now</button><button class="btn ghost">Dismiss</button><button class="btn danger">Delete app…</button></div>
+      <p class="hint" style="margin:0">One orange primary per view. Destructive actions are outlined red and always confirm.</p>
+      <div class="strip need"><div class="t"><b>Update Automaton</b><span>0.2.185 is available. This server runs 0.2.182.</span></div><button class="btn primary">Update</button></div>
+      <div class="strip info"><div class="t"><b>Server Console is not installed</b><span>It shows OS updates and detailed graphs.</span></div><button class="btn">Install</button></div>
+      <div class="strip bad"><div class="t"><b>The update stopped</b><span>This release changes traefik. The server still runs 0.2.182 and is healthy.</span></div><button class="btn">Try again</button></div>
+      <p class="hint" style="margin:0">Strips sit at the top of a page, most urgent first. Calm information is a plain paper strip, not a blue one. Never stack several errors: one line, with the reason and a retry.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Type</h2>
+    <div class="card type">
+      <div><code>--display · 34 / 600</code><span style="font:600 34px var(--display)">Server</span></div>
+      <div><code>--display · 22 / 600</code><span style="font:600 22px var(--display)">Runners</span></div>
+      <div><code>--body · 15 / 400</code><span>Studio can be unavailable for a minute while the API restarts.</span></div>
+      <div><code>--body · 12 / 600 caps</code><span style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)">Last backup</span></div>
+      <div><code>--mono · 13</code><span class="mono">1.0.20261123.101805</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The mark</h2>
+    <div class="card marks">
+      <figure><svg width="72" height="72" viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#f26a1b"/><path d="M10 15l5 4-5 4M30 15l-5 4 5 4M17 27h6" fill="none" stroke="#17181c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Default, on any background</figure>
+      <figure><svg width="72" height="72" viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#17181c"/><path d="M10 15l5 4-5 4M30 15l-5 4 5 4M17 27h6" fill="none" stroke="#f26a1b" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Dark, when orange is already busy</figure>
+      <figure><svg width="24" height="24" viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#f26a1b"/><path d="M10 15l5 4-5 4M30 15l-5 4 5 4M17 27h6" fill="none" stroke="#17181c" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Favicon (stroke 3.4)</figure>
+      <p class="hint" style="margin:0;flex:1 1 240px">Files: <span class="mono">resources/logo/</span> in automaton. Beside the app name in every header, 32 px.</p>
+    </div>
+  </section>
+
+  <section class="do">
+    <div class="card"><h3>Do</h3><ul>
+      <li>Paper cards on the panel background, 16 px radius, a 1 px line.</li>
+      <li>Keep last known values while refreshing; mark them, don't blank them.</li>
+      <li>History under its own item, newest first.</li>
+      <li>Check every screen in dark mode.</li>
+    </ul></div>
+    <div class="card"><h3>Don't</h3><ul>
+      <li>Green or blue anywhere, including "success".</li>
+      <li>Coloured left borders or tinted whole cards for status.</li>
+      <li>Colour without words.</li>
+      <li>New tokens without adding them here and to <span class="mono">tokens.css</span>.</li>
+    </ul></div>
+  </section>
+</div>
+<script>
+const toks=[['--paper','Cards, inputs'],['--panel','Page background, insets'],['--ink','Text, fine-state bars'],['--ink-soft','Secondary text, fine dots'],['--line','Borders, empty bars'],['--signal','Needs you, in progress, primary button'],['--signal-ink','Orange text on soft orange'],['--signal-soft','Needs-you strips and pills'],['--bad','Failed, destructive'],['--bad-soft','Failure strips and pills'],['--rail','Sidebar and app headers'],['--rail-active-ink','Active item in the rail']];
+const sw=document.getElementById('sw');
+function draw(){const cs=getComputedStyle(document.documentElement);sw.innerHTML=toks.map(([t,u])=>{const v=cs.getPropertyValue(t).trim();return `<div class="s"><i style="background:var(${t})"></i><div><b>${t}</b><code>${v}</code><span>${u}</span></div></div>`}).join('')}
+draw();
+const tt=document.getElementById('tt');
+tt.onclick=()=>{const d=document.documentElement.dataset.theme!=='dark';document.documentElement.dataset.theme=d?'dark':'light';tt.setAttribute('aria-pressed',d);tt.textContent=d?'Light mode':'Dark mode';draw()};
+</script>
+</body>
+</html>
