@@ -27,7 +27,7 @@ public sealed class NotifyEmailException(NotifyEmailFailure failure, string mess
 /// members of its project and addresses on the administrators' allowed list, through the server's SMTP. The app never
 /// receives an address it did not type.
 /// </summary>
-public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsService smtp, IMemoryCache memory, IAuditEventService audit)
+public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsService smtp, IMemoryCache memory, IAuditEventService audit, ConfigurationService configuration)
 {
     public const string AllowedSettingKey = "Notify.AllowedRecipients";
     public const string Owner = "owner", Administrators = "administrators", Project = "project";
@@ -50,8 +50,11 @@ public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsServ
         if (!SmtpSettingsService.IsConfigured(config))
             throw new NotifyEmailException(NotifyEmailFailure.SmtpNotConfigured, new SmtpNotConfiguredException().Message);
 
-        var prefixed = $"[{app.Name.ReplaceLineEndings(" ").Trim()}] {subject}";
-        try { await smtp.SendPlainAsync(addresses.ToList(), prefixed, text, token); }
+        var name = app.Name.ReplaceLineEndings(" ").Trim();
+        var host = ServerHost(configuration.WebsiteUrl);
+        var prefixed = $"[{name}] {subject} ({host})";
+        var body = $"{text.TrimEnd()}\n\n-- \nSent by {name} on {host}";
+        try { await smtp.SendPlainAsync(addresses.ToList(), prefixed, body, token); }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             await AuditAsync(appId, app.Name, AuditEventTypes.AppEmailRefused, "Failure", subject, targets.Count, 0, "the SMTP server did not accept the message");
@@ -62,6 +65,10 @@ public sealed class NotifyEmailService(ApplicationDbContext db, SmtpSettingsServ
         catch (Exception) when (!token.IsCancellationRequested) { }
         return new(addresses.Count);
     }
+
+    /// <summary>The server's own host (from its public website address), added so a test server's mail is never mistaken for production's.</summary>
+    internal static string ServerHost(string? websiteUrl)
+        => Uri.TryCreate(websiteUrl, UriKind.Absolute, out var uri) ? uri.Host : "unknown server";
 
     private static (List<string> Targets, string Subject, string Text) Validate(NotifyEmailRequest request)
     {

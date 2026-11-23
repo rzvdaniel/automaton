@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -65,7 +66,10 @@ public sealed class NotifyEmailTests
         return id;
     }
 
-    private NotifyEmailService Service() => new(db, smtp, memory, audit);
+    private NotifyEmailService Service() => new(db, smtp, memory, audit, Config());
+
+    private static ConfigurationService Config() => new(new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["AppConfig:WebsiteUrl"] = "https://runner-01.automaton.monster" }).Build());
 
     private static NotifyEmailRequest Request(params string[] to) => new(to, "Disk almost full", "Only 2 GB left.");
 
@@ -75,7 +79,8 @@ public sealed class NotifyEmailTests
         await Service().SendAsync(appId, Request("owner", "administrators", "project"), default);
 
         Assert.That(smtp.Recipients, Is.EquivalentTo(new[] { "owner@example.test", "admin@example.test", "member@example.test" }));
-        Assert.That(smtp.Subject, Is.EqualTo("[Server Console] Disk almost full"));
+        Assert.That(smtp.Subject, Is.EqualTo("[Server Console] Disk almost full (runner-01.automaton.monster)"));
+        Assert.That(smtp.Text, Does.EndWith("Sent by Server Console on runner-01.automaton.monster"));
     }
 
     [Test]
@@ -162,7 +167,7 @@ public sealed class NotifyEmailTests
     public async Task LineBreaksInTheSubjectAreRemovedAndListsOrNamesAreNotAddresses()
     {
         await Service().SendAsync(appId, new(["owner"], "Hi\r\nBcc: x@example.test", "t"), default);
-        Assert.That(smtp.Subject, Is.EqualTo("[Server Console] Hi Bcc: x@example.test"));
+        Assert.That(smtp.Subject, Is.EqualTo("[Server Console] Hi Bcc: x@example.test (runner-01.automaton.monster)"));
         foreach (var tricky in new[] { "owner,administrators", "Bob <owner@example.test>", "owner@example.test, admin@example.test" })
             Assert.That(Assert.ThrowsAsync<NotifyEmailException>(() => Service().SendAsync(appId, Request(tricky), default))!.Failure,
                 Is.EqualTo(NotifyEmailFailure.NotAllowed), tricky);
@@ -248,11 +253,13 @@ public sealed class NotifyEmailTests
         public bool Configured { get => config!.EmailHost.Length > 0; set => config!.EmailHost = value ? "smtp.example.test" : ""; }
         public IReadOnlyCollection<string> Recipients { get; set; } = [];
         public string? Subject { get; private set; }
+        public string? Text { get; private set; }
 
         public override Task SendPlainAsync(IReadOnlyCollection<string> recipients, string subject, string text, CancellationToken token)
         {
             Recipients = recipients;
             Subject = subject;
+            Text = text;
             return Task.CompletedTask;
         }
     }
