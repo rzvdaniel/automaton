@@ -23,10 +23,12 @@ def manifest(app_digit, infrastructure_digit='0', store=True, age=True):
                    for name in names)
 
 
-def compose(store=True, postgres_image='postgres', update_mounts=False):
+def compose(store=True, postgres_image='postgres', update_mounts=False, traefik_environment=None):
     # JSON is valid YAML; the fake docker prints it for `compose config --format json`.
     services = {name: {'image': name} for name in ('postgres', 'rabbitmq', 'api', 'worker', 'studio', 'traefik')}
     services['postgres']['image'] = postgres_image
+    if traefik_environment is not None:
+        services['traefik']['environment'] = traefik_environment
     if update_mounts:
         services['api']['volumes'] = [
             {'type': 'bind', 'source': '/var/lib/automaton/update/requests', 'target': '/app/update-requests'},
@@ -370,6 +372,17 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
         self.assertIn('changes postgres', result.stderr)
         self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False, age=False))
         self.assertFalse((self.install / 'backups').exists())
+
+    def test_reviewed_traefik_environment_is_accepted_but_other_changes_are_not(self):
+        delegated = {'CF_DNS_API_TOKEN_FILE': '/run/secrets/cloudflare_token', 'HTTPREQ_ENDPOINT': 'http://acme-responder:8053',
+                     'HTTPREQ_USERNAME': 'acme', 'HTTPREQ_PASSWORD': ''}
+        (self.install / 'compose.yaml').write_text(compose(store=False, traefik_environment={'CF_DNS_API_TOKEN_FILE': '/run/secrets/cloudflare_token'}))
+        other = dict(delegated, EXTRA='1')
+        refused = self.update(*self.bundle(compose_file=compose(traefik_environment=other)))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('changes traefik', refused.stderr)
+        accepted = self.update(*self.bundle(compose_file=compose(traefik_environment=delegated)))
+        self.assertNotIn('changes traefik', accepted.stderr)
 
     def old_backups(self, count):
         backups = self.install / 'backups'

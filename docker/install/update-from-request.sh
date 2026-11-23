@@ -242,7 +242,10 @@ run_request() {
     if ((code == 0)); then
         write_status succeeded 0 "$to_version" "$(now)"
     else
-        MESSAGE="The update did not finish (exit code $code). The previous release and the recovery backup are kept; see update.log."
+        local reason
+        reason=$(grep -v '^[[:space:]]*$' "$status_dir/update.log" 2>/dev/null | tail -n 1 | cut -c1-300 || true)
+        MESSAGE="The update did not finish (exit code $code). The previous release and the recovery backup are kept."
+        [[ -z "$reason" ]] || MESSAGE+=" Reason: $reason"
         write_status failed "$code" "$to_version" "$(now)"
     fi
     return "$code"

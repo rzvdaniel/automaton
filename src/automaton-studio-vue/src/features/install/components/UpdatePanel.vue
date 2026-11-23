@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
+import Tag from 'primevue/tag'
 import { installService } from '../services/install.service'
 import { runnersService } from '@/features/runners/services/runners.service'
 import type { InstallationUpdateStatus } from '../types/install.types'
@@ -86,7 +87,15 @@ function stateLabel(state: string) {
     </p>
     <Message v-if="loadError" severity="error" :closable="false">{{ loadError }}</Message>
     <template v-else-if="!loading && status">
-      <div>Current version: <strong>{{ status.currentVersion ?? 'Unknown' }}</strong></div>
+      <div class="flex align-items-center justify-content-between flex-wrap gap-3 p-3 border-1 surface-border border-round" data-testid="version-card">
+        <div>
+          <div class="text-color-secondary text-sm">Current version</div>
+          <strong class="text-xl">{{ status.currentVersion ?? 'Unknown' }}</strong>
+        </div>
+        <Tag v-if="running" severity="info" value="Updating" data-testid="update-state" />
+        <Tag v-else-if="run?.state === 'succeeded'" severity="success" value="Updated" data-testid="update-state" />
+        <Tag v-else-if="run?.state === 'failed'" severity="danger" value="Update failed" data-testid="update-state" />
+      </div>
       <Message v-if="runnersToUpgrade > 0" severity="warn" :closable="false" data-testid="runners-need-upgrade">
         {{ runnersToUpgrade }} {{ runnersToUpgrade === 1 ? 'Runner needs' : 'Runners need' }} an upgrade.
         <a href="/server">Open Server</a> and click Upgrade, or run <code>automaton runners upgrade &lt;runner&gt; --wait</code>.
