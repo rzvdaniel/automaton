@@ -41,6 +41,24 @@ public sealed class PermissionsAdminKeyAccessTests
     public async Task Policy_DecidesByRoleAndKeyScope(string? scope, string role, bool allowed)
         => Assert.That(await PolicyAllowsAsync(PermissionsAdminKey.PolicyName, Principal(scope, role)), Is.EqualTo(allowed));
 
+    [TestCase("PermissionsAdmin", true, 403, TestName = "CLI key approving root access is refused")]
+    [TestCase("PermissionsAdmin", false, 404, TestName = "CLI key rejecting root access still reaches the service")]
+    [TestCase(null, true, 404, TestName = "Studio session approving root access reaches the service")]
+    public async Task HostExecApprovalIsRefusedForAKey(string? scope, bool approved, int expected)
+    {
+        var controller = new AdminAppRunnerPermissionsController(null!, null!, null!)
+        {
+            ControllerContext = new() { HttpContext = new DefaultHttpContext { User = Principal(scope, "SysAdmin") } }
+        };
+        if (expected == 403)
+        {
+            var result = await controller.Set(Guid.NewGuid(), Guid.NewGuid(), new(approved), "runner:host-exec", default);
+            Assert.That(((ObjectResult)result).StatusCode, Is.EqualTo(403));
+        }
+        else Assert.ThrowsAsync<NullReferenceException>(() => controller.Set(Guid.NewGuid(), Guid.NewGuid(), new(approved), "runner:host-exec", default),
+            "the guard let the call through to the service (null here)");
+    }
+
     [Test]
     public void TheDefaultPolicyStillExcludesApiKeys_SoOtherAdminEndpointsStay401ForEveryKey()
     {

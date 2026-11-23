@@ -50,6 +50,27 @@ public sealed class HostExecServiceTests
     }
 
     [Test]
+    public async Task ABackgroundedChildIsGoneAfterATimeout()
+    {
+        const string image = "python:3.12-slim";
+        if (await Docker("image", "inspect", image) != 0) Assert.Ignore("Docker or " + image + " is not available.");
+        const string name = "automaton-host-exec-test-setsid";
+        var args = HostExecService.Arguments(image, name, "setsid nohup sleep 4343 >/dev/null 2>&1 & sleep 600");
+        var result = await HostExecService.RunProcessAsync("docker", args, "", TimeSpan.FromSeconds(4),
+            () => HostExecService.RunProcessAsync("docker", ["kill", name], "", TimeSpan.FromSeconds(30), () => Task.CompletedTask, default), default);
+        Assert.That(result.TimedOut, Is.True);
+        await Task.Delay(2000);
+        var left = await HostExecService.RunProcessAsync("pgrep", ["-x", "sleep", "-a"], "", TimeSpan.FromSeconds(10), () => Task.CompletedTask, default);
+        Assert.That(left.Output, Does.Not.Contain("4343"));
+    }
+
+    private static async Task<int> Docker(params string[] args)
+    {
+        try { return (await HostExecService.RunProcessAsync("docker", args, "", TimeSpan.FromSeconds(30), () => Task.CompletedTask, default)).ExitCode; }
+        catch (System.ComponentModel.Win32Exception) { return -1; }
+    }
+
+    [Test]
     public async Task ARealProcessIsStoppedAtItsTimeout()
     {
         var result = await HostExecService.RunProcessAsync("sleep", ["30"], "", TimeSpan.FromMilliseconds(300), () => Task.CompletedTask, default);

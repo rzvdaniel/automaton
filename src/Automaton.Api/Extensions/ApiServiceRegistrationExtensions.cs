@@ -357,6 +357,7 @@ internal static class ApiMessagingRegistration
         services.AddScoped<AdminUserProvisioningService>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
         services.AddSupervisedHostedService<SecretGrantCleanupService>();
+        services.AddSupervisedHostedService<HostExecSweepService>();
         services.AddScoped<ServerMaintenanceHistory>();
         services.AddSupervisedHostedService<ServerMaintenanceHistoryRecorder>();
         services.AddScoped<Automaton.Api.ServerCleanup.ServerCleanupService>();

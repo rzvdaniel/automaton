@@ -45,6 +45,24 @@ public sealed class RunnerExecutionOperationTests
     }
 
     [Test]
+    public async Task SweepEmptiesLeftoverHostExecRequestsAndEndsUnfinishedOnes()
+    {
+        await using var db = Db();
+        var service = RunnerExecutionTestServices.Operations(db, new Publisher());
+        var runner = Guid.NewGuid();
+        var leftover = await service.QueueAsync(runner, Guid.NewGuid(), new(
+            AppActionCommand.Create("host-exec", new HostExecRequest("echo private-script", "private-input", 60))), CancellationToken.None);
+        var other = await service.QueueAsync(runner, Guid.NewGuid(), new(AppActionCommand.Create("read-logs", new { })), CancellationToken.None);
+        var before = (await db.RunnerExecutionOperations.AsNoTracking().SingleAsync(o => o.Id == other)).ProtectedRequest;
+
+        Assert.That(await service.SweepHostExecAsync(CancellationToken.None), Is.EqualTo(1));
+        var swept = await db.RunnerExecutionOperations.AsNoTracking().SingleAsync(o => o.Id == leftover);
+        Assert.That(swept.CompletedAtUtc, Is.Not.Null);
+        Assert.That((await db.RunnerExecutionOperations.AsNoTracking().SingleAsync(o => o.Id == other)).ProtectedRequest, Is.EqualTo(before));
+        Assert.That(await service.SweepHostExecAsync(CancellationToken.None), Is.EqualTo(0), "a swept request is not swept again");
+    }
+
+    [Test]
     public async Task PayloadIsProtectedAndCommandContainsOnlyStableIdentities()
     {
         var queued = await QueueWorkflowOperationAsync();

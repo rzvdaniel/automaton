@@ -29,6 +29,9 @@ public sealed class AdminAppRunnerPermissionsController(RunnerMaintenanceService
     [HttpPut("{runnerId:guid}")]
     public async Task<IActionResult> Set(Guid appId, Guid runnerId, [FromBody] SetAppPermissionRequest request, [FromQuery] string? permission, CancellationToken token)
     {
+        // Root access on a machine is approved only by an administrator signed in to Studio, never by a (up to 90 days) CLI key. Rejecting stays open to the key.
+        if (permission == AppPermissionApproval.RunnerHostExec && request.Approved && User.FindFirst("api_key_scope") is not null)
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Root access (runner:host-exec) can be approved only in Studio, signed in as a system administrator, not with a CLI key. Rejecting it still works from the CLI." });
         try
         {
             return permission == AppPermissionApproval.RunnerHostExec
