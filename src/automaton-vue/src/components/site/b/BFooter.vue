@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import logoUrl from '@/assets/logo.svg'
 import { publicAppConfig } from '@/config/publicAppConfig'
 </script>
 
@@ -7,7 +8,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
   <footer>
     <div class="wrap">
       <div>
-        <span class="logo"><i>&gt;_</i>Automaton</span>
+        <span class="logo"><img class="logo-mark" :src="logoUrl" alt="" width="28" height="28" />Automaton</span>
         <p style="margin-top: 10px">Open-source app platform for the apps your AI builds. Apache 2.0.</p>
       </div>
       <div>
