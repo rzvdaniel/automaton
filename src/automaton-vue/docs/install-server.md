@@ -132,6 +132,20 @@ sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode http         
 
 It restarts Traefik and API, waits for the HTTPS checks, never touches credentials or data, and is safe to repeat. It refuses a hand-written `traefik.yml` (adopted installation).
 
+**Wildcard certificates without a Cloudflare token (`delegated`).** For another DNS host, or Cloudflare as a plain DNS host with no token on the server, use `--tls-mode delegated`. It is optional; the default install is unchanged. You add **one** DNS record, once:
+
+| Type | Name | Value |
+| --- | --- | --- |
+| `NS` | `_acme-challenge.apps.<domain>` | `api.<domain>` |
+
+`api.<domain>` already has an address record. The record hands only the Let's Encrypt challenge name to a small DNS responder on your server (Compose service `acme-responder`), which answers that one name and refuses everything else (no recursion), limits queries per source address, and exists only in this mode. Traefik gets and renews one wildcard certificate for `*.apps.<domain>` through it, with no token to store.
+
+```bash
+sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode delegated   # or --tls-mode delegated on a fresh install
+```
+
+The command checks that UDP and TCP port 53 can be bound, starts the responder, then checks through public DNS, and by querying the responder over UDP and TCP at `api.<domain>`, that the record and port work. If a step fails it restores the previous TLS configuration (a failed HTTPS check afterwards keeps the new mode so you can run the same command again). **Open inbound UDP and TCP port 53** (also in a cloud security group); it is opened only in this mode. If another service already listens on port 53 (for example `systemd-resolved` on all addresses), free it first. The responder runs from a `python:3-alpine` image pinned by digest in the release (`RESPONDER_IMAGE` in `release.env`), as an unprivileged user. Switch back with `--tls-mode http` or `cloudflare`; the responder is then removed and port 53 is no longer used.
+
 **Apps' own domains.** The owner of a public app adds a domain on the app's Domain tab. Studio shows a TXT record (`_automaton-challenge.<domain>`, proves ownership) and a CNAME to the apps domain or an A record to this server; Check DNS reports which step failed. Traefik then requests a certificate over HTTP-01. `PublishedApps:AllowedCustomDomains` limits the allowed domains; domains under the server's apps domain are refused.
 
 **Adopted installations.** A reviewed migration can adopt an existing server into this layout (the installer does not do it). A root-owned `compose.override.yaml` beside `compose.yaml` keeps external volumes, networks and pinned infrastructure images; the updater applies it to the installed and candidate release and preserves it. Include `-f compose.override.yaml` in manual Compose commands and review the effective configuration with `docker compose ... config` (its output can contain secrets). Never attach an existing database volume to a newer database image.
