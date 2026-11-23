@@ -5,8 +5,26 @@
 set -euo pipefail
 export PATH=$HOME/.local/bin:$HOME/.dotnet/tools:$PATH DOTNET_ROOT=$HOME/.dotnet
 unset CLAUDE_CONFIG_DIR
-cd "${AGENT_WORKDIR:-$HOME/automaton}"
-git fetch -q origin main && git checkout -q main && git merge -q --ff-only origin/main || echo "agent-run: staying on $(git rev-parse --short HEAD)" >&2
+# The shared checkout stays on main: it holds this script and agent-board.sh. Each run works in its own worktree.
+base="${AGENT_WORKDIR:-$HOME/automaton}"
+work_root="${AGENT_WORK_ROOT:-$HOME/agent-work}"
+cd "$base"
+git fetch -q origin main
+# put the shared checkout back on main and fast-forward it, only when it is clean
+if [ -z "$(git status --porcelain --untracked-files=no)" ]; then
+  git checkout -q main && git merge -q --ff-only origin/main || echo "agent-run: could not fast-forward main" >&2
+else
+  echo "agent-run: shared checkout is not a clean main; leaving it alone" >&2
+fi
+# prune stale worktrees from earlier runs (the agent queue runs one job at a time)
+mkdir -p "$work_root"
+for d in "$work_root"/*/; do [ -d "$d" ] && { git worktree remove --force "$d" 2>/dev/null || rm -rf "$d"; }; done
+git worktree prune
+wt="$work_root/${GITHUB_RUN_ID:-$$}-${GITHUB_RUN_ATTEMPT:-1}"
+git worktree add -q --detach "$wt" origin/main
+cleanup() { cd "$base" && { git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"; git worktree prune; }; }
+trap cleanup EXIT
+cd "$wt"
 prompt=$(cat "$PROMPT_FILE"); prompt=${prompt//ISSUE_URL/${ISSUE_URL:-}}
 set +e
 timeout -k 30 "${AGENT_TASK_TIMEOUT:-3h}" claude -p "$prompt" --model "${AGENT_MODEL:-sonnet}" --effort "${AGENT_EFFORT:-low}" --dangerously-skip-permissions < /dev/null
