@@ -12,6 +12,8 @@ namespace Automaton.Cli.Commands;
 internal static class PermissionsAdminCommands
 {
     internal const string RunnerMaintain = "runner:maintain";
+    internal const string RunnerHostExec = "runner:host-exec";
+    private static bool IsPerMachine(string permission) => permission is RunnerMaintain or RunnerHostExec;
 
     internal static Command BuildList(ConfigService config)
     {
@@ -40,7 +42,7 @@ internal static class PermissionsAdminCommands
         var verb = approve ? "approve" : "reject";
         var app = new Argument<string>("app", "App id, or the exact app name of an app with permissions waiting");
         var permission = new Argument<string>("permission", "The permission, e.g. runner:maintain");
-        var runner = new Option<string?>("--runner", "Machine name or id; required for runner:maintain, which is decided one machine at a time");
+        var runner = new Option<string?>("--runner", "Machine name or id; required for runner:maintain and runner:host-exec, which are decided one machine at a time");
         var json = new Option<bool>("--json", "Print the result as JSON");
         var command = new Command(verb, approve
             ? "Approve an app permission (system administrator)\nExample: automaton permissions approve harbour runner:maintain --runner build-1"
@@ -59,11 +61,13 @@ internal static class PermissionsAdminCommands
                 CheckRunnerOption(permissionName, runnerReference);
 
                 JsonElement result;
-                if (permissionName == RunnerMaintain)
+                if (IsPerMachine(permissionName))
                 {
-                    var machines = await client.GetRunnerPermissionsAsync(appId);
+                    var machines = await client.GetRunnerPermissionsAsync(appId, permissionName);
                     var runnerId = RunnerReferenceResolver.Pick(machines, runnerReference!.Trim(), "runnerId", "name");
-                    result = await client.SetRunnerPermissionApprovalAsync(appId, runnerId, approve);
+                    if (approve && permissionName == RunnerHostExec)
+                        Console.Error.WriteLine($"Warning: this app can run any command as root on {runnerReference.Trim()}.");
+                    result = await client.SetRunnerPermissionApprovalAsync(appId, runnerId, approve, permissionName);
                 }
                 else result = await client.SetAppPermissionApprovalAsync(appId, permissionName, approve);
 
@@ -76,10 +80,10 @@ internal static class PermissionsAdminCommands
 
     internal static void CheckRunnerOption(string permission, string? runner)
     {
-        if (permission == RunnerMaintain && string.IsNullOrWhiteSpace(runner))
-            throw new InvalidOperationException("runner:maintain is decided one machine at a time: add --runner <machine>.");
-        if (permission != RunnerMaintain && !string.IsNullOrWhiteSpace(runner))
-            throw new InvalidOperationException("--runner applies only to runner:maintain.");
+        if (IsPerMachine(permission) && string.IsNullOrWhiteSpace(runner))
+            throw new InvalidOperationException($"{permission} is decided one machine at a time: add --runner <machine>.");
+        if (!IsPerMachine(permission) && !string.IsNullOrWhiteSpace(runner))
+            throw new InvalidOperationException("--runner applies only to runner:maintain and runner:host-exec.");
     }
 
     /// <summary>The admin-scoped key cannot list apps, so a name is looked up in the pending list.</summary>

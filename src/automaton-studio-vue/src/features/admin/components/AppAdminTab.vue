@@ -9,7 +9,7 @@ import { appsService } from '@/features/apps/services/apps.service'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { AdminAppDetails } from '../types/admin.types'
 import { adminAppsService } from '../services/adminAppsService'
-import type { AdminAppPermissionStatus, RunnerMaintenancePermission } from '../services/adminAppsService'
+import type { AdminAppPermissionStatus, HostExecPermission, RunnerMaintenancePermission } from '../services/adminAppsService'
 
 const props = defineProps<{ appId: string; appName: string; paused: boolean }>()
 const emit = defineEmits<{ 'paused-changed': []; 'permissions-changed': [] }>()
@@ -21,7 +21,10 @@ const canApprove = computed(() => useAuthStore().user?.roles?.includes('SysAdmin
 const details = ref<AdminAppDetails | null>(null)
 const permissions = ref<AdminAppPermissionStatus[]>([])
 const machines = ref<RunnerMaintenancePermission[]>([])
+const hostMachines = ref<HostExecPermission[]>([])
+const hostEnabled = ref(false)
 const saving = ref<string | null>(null)
+const hostExecRequested = computed(() => permissions.value.some((item) => item.permission === 'runner:host-exec'))
 const maintainApproved = computed(() => permissions.value.some((item) => item.permission === 'runner:maintain' && item.approved))
 
 const reviewStatus = ref('approved')
@@ -40,6 +43,41 @@ async function loadMachines() {
   machines.value = maintainApproved.value ? await adminAppsService.getRunnerPermissions(props.appId).catch(() => []) : []
 }
 
+async function loadHostExec() {
+  if (!hostExecRequested.value) { hostMachines.value = []; return }
+  hostEnabled.value = await adminAppsService.getHostExecEnabled().catch(() => false)
+  hostMachines.value = await adminAppsService.getHostExecPermissions(props.appId).catch(() => [])
+}
+
+async function toggleHostExec() {
+  const turningOn = !hostEnabled.value
+  if (turningOn && !window.confirm('Apps owned by a system administrator will be able to run ANY command as root on the machines you approve. Turn host access on?')) return
+  saving.value = 'host-exec-switch'
+  try {
+    hostEnabled.value = await adminAppsService.setHostExecEnabled(turningOn)
+    await loadHostExec()
+    toast.add({ severity: 'success', summary: turningOn ? 'Host access turned on' : 'Host access turned off; approvals revoked', life: 3000 })
+  } catch {
+    fail('Host access switch failed')
+  } finally {
+    saving.value = null
+  }
+}
+
+async function decideHostMachine(machine: HostExecPermission, approved: boolean) {
+  if (approved && !window.confirm(`${props.appName} will be able to run any command as root on ${machine.name}. Approve for ${machine.currentCode}?`)) return
+  saving.value = machine.runnerId
+  try {
+    hostMachines.value = await adminAppsService.setHostExecPermission(props.appId, machine.runnerId, approved)
+    toast.add({ severity: 'success', summary: approved ? 'Machine approved' : 'Machine revoked', life: 2500 })
+  } catch (error) {
+    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message
+    toast.add({ severity: 'error', summary: 'Machine update failed', detail: message, life: 5000 })
+  } finally {
+    saving.value = null
+  }
+}
+
 async function load() {
   try {
     details.value = await adminAppsService.getApp(props.appId)
@@ -53,6 +91,7 @@ async function load() {
   try {
     permissions.value = await adminAppsService.getPermissions(props.appId)
     await loadMachines()
+    await loadHostExec()
   } catch {
     fail('Failed to load app permissions')
   }
@@ -67,6 +106,7 @@ async function decide(item: AdminAppPermissionStatus, approved: boolean) {
     permissions.value = await adminAppsService.setPermission(props.appId, item.permission, approved)
     emit('permissions-changed')
     await loadMachines()
+    await loadHostExec()
     toast.add({ severity: 'success', summary: approved ? 'Permission approved' : item.approved ? 'Permission revoked' : 'Permission rejected', life: 2500 })
   } catch {
     fail('Permission update failed')
@@ -153,6 +193,23 @@ function askPause() {
           <span class="spacer"></span>
           <Button v-if="machine.approved" label="Revoke" :aria-label="`Revoke maintenance on ${machine.name}`" severity="danger" outlined size="small" :loading="saving === machine.runnerId" :disabled="saving !== null" @click="decideMachine(machine, false)" />
           <Button v-else label="Approve" :aria-label="`Approve maintenance on ${machine.name}`" size="small" :loading="saving === machine.runnerId" :disabled="saving !== null" @click="decideMachine(machine, true)" />
+        </div>
+      </div>
+      <div v-if="hostExecRequested" class="machines" data-testid="host-exec">
+        <div class="row">
+          <strong>Host access (runner:host-exec)</strong>
+          <Tag :value="hostEnabled ? 'On for this server' : 'Off for this server'" :severity="hostEnabled ? 'danger' : 'secondary'" rounded />
+          <span class="spacer"></span>
+          <Button :label="hostEnabled ? 'Turn off' : 'Turn on…'" :severity="hostEnabled ? 'secondary' : 'danger'" outlined size="small" :loading="saving === 'host-exec-switch'" :disabled="saving !== null" data-testid="host-exec-switch" @click="toggleHostExec" />
+        </div>
+        <p class="hint">Warning: this app can run any command as root on a machine you approve. It works only for apps owned by a system administrator, and an approval ends when the app's code or owner changes. Turning the switch off revokes every approval.</p>
+        <div v-for="machine in hostMachines" :key="machine.runnerId" class="row">
+          <code>{{ machine.name }}</code>
+          <Tag :value="machine.suspended ? 'Suspended: app changed' : machine.approved ? 'Approved' : 'Not approved'" :severity="machine.suspended ? 'warn' : machine.approved ? 'success' : 'secondary'" rounded />
+          <span v-if="machine.suspended" class="hint">Approved for {{ machine.approvedFor }}; now {{ machine.currentCode }}</span>
+          <span class="spacer"></span>
+          <Button v-if="machine.approved" label="Revoke" :aria-label="`Revoke host commands on ${machine.name}`" severity="danger" outlined size="small" :disabled="saving !== null" @click="decideHostMachine(machine, false)" />
+          <Button v-if="!machine.approved || machine.suspended" :label="machine.suspended ? 'Approve again' : 'Approve'" :aria-label="`Approve host commands on ${machine.name}`" size="small" :loading="saving === machine.runnerId" :disabled="saving !== null || !hostEnabled" @click="decideHostMachine(machine, true)" />
         </div>
       </div>
     </section>

@@ -306,6 +306,8 @@ internal static class ApiAuthorizationRegistration
             AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.RunnerMaintainPolicy, AppPermissionApproval.RunnerMaintain);
             AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
+                AppPermissionAuthenticationOptions.RunnerHostExecPolicy, AppPermissionApproval.RunnerHostExec);
+            AppPermissionAuthenticationOptions.AddAppOnlyPermissionPolicy(options,
                 AppPermissionAuthenticationOptions.NotifyEmailPolicy, AppPermissionApproval.NotifyEmail);
 
             // Project-based authorization policies
@@ -358,6 +360,8 @@ internal static class ApiMessagingRegistration
         services.AddSupervisedHostedService<ServerMaintenanceHistoryRecorder>();
         services.AddScoped<Automaton.Api.ServerCleanup.ServerCleanupService>();
         services.AddScoped<Automaton.Api.ServerCleanup.RunnerMaintenanceService>();
+        services.AddScoped<Automaton.Api.ServerCleanup.HostExecService>();
+        services.AddScoped<Automaton.Api.ServerCleanup.IHostExecCommands, Automaton.Api.ServerCleanup.HostExecCommands>();
         services.AddScoped<Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands, Automaton.Api.ServerCleanup.RunnerMaintenanceCommands>();
         services.AddSupervisedHostedService<Automaton.Api.ServerCleanup.ServerCleanupScheduler>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();

@@ -94,6 +94,39 @@ class AdminAppsService {
       `/api/admin/apps/${appId}/runner-permissions/${runnerId}`, { approved })
     return data
   }
+
+  /** Machines where the app may run any command as root (runner:host-exec), with whether the approval still matches its code. */
+  async getHostExecPermissions(appId: string): Promise<HostExecPermission[]> {
+    const { data } = await apiClient.get<HostExecPermission[]>(`/api/admin/apps/${appId}/runner-permissions`, { params: { permission: 'runner:host-exec' } })
+    return data
+  }
+
+  async setHostExecPermission(appId: string, runnerId: string, approved: boolean): Promise<HostExecPermission[]> {
+    const { data } = await apiClient.put<HostExecPermission[]>(
+      `/api/admin/apps/${appId}/runner-permissions/${runnerId}`, { approved }, { params: { permission: 'runner:host-exec' } })
+    return data
+  }
+
+  /** The server-wide switch for runner:host-exec; turning it off revokes every approval. */
+  async getHostExecEnabled(): Promise<boolean> {
+    const { data } = await apiClient.get<{ enabled: boolean }>('/api/admin/host-exec')
+    return data.enabled
+  }
+
+  async setHostExecEnabled(enabled: boolean): Promise<boolean> {
+    const { data } = await apiClient.put<{ enabled: boolean }>('/api/admin/host-exec', { enabled })
+    return data.enabled
+  }
+}
+
+export interface HostExecPermission {
+  runnerId: string
+  name: string
+  approved: boolean
+  /** Approved, but the app's code or owner changed since: it must be approved again. */
+  suspended: boolean
+  approvedFor: string | null
+  currentCode: string
 }
 
 export interface RunnerMaintenancePermission {

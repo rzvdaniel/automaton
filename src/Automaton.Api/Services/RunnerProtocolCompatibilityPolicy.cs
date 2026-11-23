@@ -55,4 +55,9 @@ public static class RunnerProtocolCompatibilityPolicy
     public static bool SupportsAppTunnelOverHttp2(string? apiCompatibilityVersion)
         => int.TryParse(apiCompatibilityVersion, out var version)
             && version >= int.Parse(RunnerApiCompatibilityVersions.AppTunnelOverHttp2);
+
+    /// <summary>The <c>host-exec</c> command exists from compatibility version 7; an older Runner would answer "Unknown App Action command".</summary>
+    public static bool SupportsHostExec(string? apiCompatibilityVersion)
+        => int.TryParse(apiCompatibilityVersion, out var version)
+            && version >= int.Parse(RunnerApiCompatibilityVersions.HostExec);
 }
