@@ -202,6 +202,16 @@ public class RuntimeTunnelPolicyTests
             Is.EqualTo(expected));
     }
 
+    [TestCase("api-old", "api-new", true, true)]
+    [TestCase(null, "api-new", true, true)]
+    [TestCase("api-old", "api-new", false, false)]
+    [TestCase("api-new", "api-new", false, true)]
+    public void RuntimeTunnel_AcceptsStaleInstanceIdWhenTunnelIsHere(
+        string? runnerApiInstanceId, string current, bool hasTunnel, bool expected)
+    {
+        Assert.That(RuntimeTunnelService.IsServedByThisApi(runnerApiInstanceId, current, hasTunnel), Is.EqualTo(expected));
+    }
+
     [Test]
     public async Task ResolveAsync_AllowsGenericRuntimeDeploymentWithoutLegacyMarker()
     {

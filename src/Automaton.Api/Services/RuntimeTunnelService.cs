@@ -96,7 +96,7 @@ public sealed class RuntimeTunnelService(
             return new ResolvedTunnelTarget(null, false, TunnelFailure.Text(StatusCodes.Status404NotFound, "The deployed app target was not found."));
         }
 
-        if (!IsCurrentApiInstance(runner.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId))
+        if (!IsServedByThisApi(runner.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId, tunnels.IsConnected(runner.Id)))
         {
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason} RunnerApiInstanceId={RunnerApiInstanceId} CurrentApiInstanceId={CurrentApiInstanceId}",
@@ -187,6 +187,11 @@ public sealed class RuntimeTunnelService(
         return string.Equals(host, publicHost, StringComparison.OrdinalIgnoreCase) ||
             (verifiedDomains?.Contains(host, StringComparer.OrdinalIgnoreCase) ?? false);
     }
+
+    // The tunnel registry is in memory, so a Runner with a tunnel here is connected to this API even when its row
+    // still names an older instance (everything restarted at once and the row was not refreshed).
+    internal static bool IsServedByThisApi(string? runnerApiInstanceId, string currentApiInstanceId, bool hasTunnelHere)
+        => hasTunnelHere || IsCurrentApiInstance(runnerApiInstanceId, currentApiInstanceId);
 
     internal static bool IsCurrentApiInstance(string? runnerApiInstanceId, string currentApiInstanceId)
         => !string.IsNullOrWhiteSpace(runnerApiInstanceId) &&
