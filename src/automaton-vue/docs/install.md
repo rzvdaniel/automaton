@@ -39,7 +39,7 @@ You should see `"status":"ok"`.
 
 ## 3. Create the first administrator
 
-Run this on the server. It asks for your email and a password at a hidden prompt (12 or more characters with upper and lower case, a number and a symbol). The email you type is your sign-in; it is not the certificate email.
+Run this on the server in Bash. It asks for your email and a password at a hidden prompt (12 or more characters with upper and lower case, a number and a symbol). The email you type is your sign-in; it is not the certificate email.
 
 ```bash
 API=https://api.example.com
@@ -52,7 +52,7 @@ jq -n --arg name "Administrator" --arg email "$EMAIL" --arg password "$PASSWORD"
     -H 'Content-Type: application/json' --data-binary @-
 ```
 
-The last line must say `HTTP 200`. Keep `EMAIL` and `PASSWORD` in this shell for the next step.
+The last line must say `HTTP 200`. Then run `unset PASSWORD`.
 
 ## 4. Sign in the CLI
 
@@ -62,7 +62,7 @@ export PATH="$HOME/.local/bin:$PATH"
 automaton login --device --server "$API"
 ```
 
-Open the address it prints in a browser, sign in with the administrator account and approve. Then `unset PASSWORD`. `automaton whoami` should name your server. Other ways to sign in: [CLI login](./automaton-cli#log-in-without-a-browser).
+Open the address it prints in a browser, sign in with the administrator account and approve. `automaton whoami` should name your server. Other ways to sign in: [CLI login](./automaton-cli#log-in-without-a-browser).
 
 ## 5. Add a Runner
 
