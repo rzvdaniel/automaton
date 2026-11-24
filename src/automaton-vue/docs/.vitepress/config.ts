@@ -34,6 +34,7 @@ export default defineConfig({
       {
         text: 'Start here',
         items: [
+          { text: 'What is Automaton', link: '/what-is-automaton' },
           { text: 'Work with AI', link: '/work-with-ai' },
           { text: 'Install with your AI agent', link: '/install-with-ai' },
           { text: 'Your first app', link: '/getting-started' },
@@ -42,8 +43,6 @@ export default defineConfig({
       {
         text: 'Tasks',
         items: [
-          { text: 'Is Automaton for you?', link: '/is-automaton-for-you' },
-          { text: 'Automaton by the numbers', link: '/numbers' },
           { text: 'Install the server', link: '/install-server' },
           { text: 'Create the first administrator', link: '/first-admin' },
           { text: 'Add a Runner', link: '/deploy-runner' },
@@ -62,7 +61,6 @@ export default defineConfig({
           { text: 'automaton.json', link: '/automaton-json' },
           { text: 'Troubleshooting', link: '/troubleshooting' },
           { text: 'Security overview', link: '/security' },
-          { text: 'Current limitations', link: '/limitations' },
           { text: 'FAQ', link: '/faq' },
         ],
       },

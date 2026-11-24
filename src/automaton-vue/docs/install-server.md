@@ -10,7 +10,7 @@ This page installs your own Automaton server on one x86_64 Linux machine. **Want
 
 Already have a team server? Ask its administrator for the API URL and go to [Your first app](./getting-started).
 
-Measured times, memory and cost are in [Automaton by the numbers](./numbers): about 94 seconds for the installer on Debian 12, 2-3 minutes from the first command to a working server on Ubuntu 24.04. These are observations, not guarantees or minimum requirements.
+Measured times, memory and cost are in [What is Automaton](./what-is-automaton): about 94 seconds for the installer on Debian 12, 2-3 minutes from the first command to a working server on Ubuntu 24.04. These are observations, not guarantees or minimum requirements.
 
 ## Prerequisites
 
