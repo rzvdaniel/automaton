@@ -135,7 +135,7 @@ An app gets no access to the server by default. To read server health, list back
 
 Deploy, then run `automaton permissions status`. A system administrator approves each request in Studio (the Home page lists them with Approve and Reject; the command prints the link). The app then receives a scoped key as `APP_AUTOMATON_API_KEY` at its next start. Nothing is granted before that, and revoking stops the next call. Permissions the platform knows include `server:read`, `backups:read`, `backups:run`, `server:restart`, `server:update-os`, `server:cleanup`, `security:read`, `security:manage` and `notify:email`; each is described in the [automaton.json reference](./automaton-json#platform-permissions).
 
-### Email people with `notify:email`
+### Email people from an app
 
 With `notify:email` approved, the app asks the server to send mail through the server's own SMTP and never sees its credentials.
 

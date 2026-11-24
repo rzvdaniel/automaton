@@ -1,6 +1,7 @@
 ---
 title: Build an Automaton app
 description: Moved to Build an app.
+llms: false
 head:
   - - meta
     - http-equiv: refresh
