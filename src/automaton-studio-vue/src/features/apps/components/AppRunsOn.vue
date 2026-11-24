@@ -11,10 +11,10 @@ import type { App, AppDeploymentTarget } from '../types/apps.types'
 import { getDeploymentTargetRunnerOptions, getDeploymentTargetRunnerProjectId } from '../utils/deployment-target-runner'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { formatWhen } from '../utils/app-overview'
-import AppDefinitionDialog from './AppDefinitionDialog.vue'
+import type { AppViewKey } from '../app-navigation'
 
-const props = defineProps<{ app: App; targets: ReadonlyArray<AppDeploymentTarget> }>()
-const emit = defineEmits<{ changed: [] }>()
+const props = defineProps<{ app: App; targets: ReadonlyArray<AppDeploymentTarget>; origin?: string }>()
+const emit = defineEmits<{ changed: []; navigate: [view: AppViewKey] }>()
 const toast = useToast()
 
 const canEdit = computed(() => props.app.canUpdate !== false)
@@ -23,6 +23,9 @@ const runnerText = computed(() => {
   const runner = liveTarget.value?.runner
   return runner ? `${runner.name} · ${runner.isOnline ? 'online' : 'offline'}` : 'none assigned'
 })
+const INSTALLED = 'Installed from '
+const originLabel = computed(() => props.origin?.startsWith(INSTALLED) ? 'Installed from' : 'Origin')
+const originValue = computed(() => props.origin?.startsWith(INSTALLED) ? props.origin.slice(INSTALLED.length) : props.origin)
 const hasActions = computed(() => !props.app.application?.isStaticSite)
 
 function fail(summary: string, error: unknown) {
@@ -74,8 +77,6 @@ async function cancelDeploy() {
   }
 }
 
-const definitionDialog = ref(false)
-
 // Earlier version (Runner-local Action versions)
 interface ActionVersions { key: string; versions: AppActionVersion[] }
 const versionsDialog = ref(false)
@@ -110,26 +111,30 @@ async function restore(actionKey: string, version: string) {
 
 <template>
   <section class="card" aria-labelledby="runs-on-title" data-testid="runs-on">
-    <h2 id="runs-on-title">Runs on</h2>
+    <h2 id="runs-on-title">Running</h2>
     <div class="row">
       <span>Runner</span>
-      <span class="value mono">{{ runnerText }}</span>
-      <Button v-if="canEdit && liveTarget" label="Change…" size="small" text @click="openRunner" />
+      <span class="value"><span class="dot" :class="{ off: !liveTarget?.runner?.isOnline }" aria-hidden="true"></span>{{ runnerText }}</span>
+      <Button v-if="canEdit && liveTarget" label="Change…" size="small" severity="secondary" outlined @click="openRunner" />
     </div>
     <div v-if="canEdit && isDeploying" class="row" data-testid="cancel-deploy">
       <span>Deploying</span>
       <span class="value hint">Stuck? Cancel it to redeploy or delete.</span>
       <Button label="Cancel deploy" size="small" severity="danger" text :loading="cancelling" @click="cancelDeploy" />
     </div>
-    <div v-if="canEdit && hasActions" class="row">
+    <div v-if="liveTarget?.lastSuccessfulDeploymentAt || (canEdit && hasActions)" class="row">
       <span>Version</span>
-      <span class="value hint">Go back to an earlier version</span>
-      <Button label="Choose…" size="small" text @click="openVersions" />
+      <span class="value"><span v-if="liveTarget?.lastSuccessfulDeploymentAt" class="hint">deployed {{ formatWhen(liveTarget.lastSuccessfulDeploymentAt) }}</span></span>
+      <Button v-if="canEdit && hasActions" label="Earlier versions…" size="small" severity="secondary" outlined @click="openVersions" />
     </div>
     <div class="row">
       <span>Definition</span>
       <span class="value mono">automaton.json</span>
-      <Button label="View" size="small" text @click="definitionDialog = true" />
+      <Button label="View in Source" size="small" text @click="emit('navigate', 'source')" />
+    </div>
+    <div v-if="origin" class="row" data-testid="installed-from">
+      <span>{{ originLabel }}</span>
+      <span class="value mono">{{ originValue }}</span>
     </div>
   </section>
 
@@ -144,8 +149,6 @@ async function restore(actionKey: string, version: string) {
       <Button label="Save" :loading="savingRunner" :disabled="!runnerId" @click="saveRunner" />
     </template>
   </Dialog>
-
-  <AppDefinitionDialog v-model:visible="definitionDialog" :app="app" />
 
   <Dialog v-model:visible="versionsDialog" modal header="Earlier versions" :style="{ width: 'min(36rem, 94vw)' }">
     <p v-if="versionsError" class="hint">{{ versionsError }}</p>
@@ -168,6 +171,8 @@ h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--row-line); }
 .row:last-child { border-bottom: 0; }
 .row > :first-child { width: 90px; color: var(--ink-soft); font-size: 13px; }
+.dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ink-soft); }
+.dot.off { background: var(--line); }
 .value { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
 .hint { color: var(--ink-soft); font-size: 13px; }
 .mono, code { font-family: var(--mono); font-size: 12px; }

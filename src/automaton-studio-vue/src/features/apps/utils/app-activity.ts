@@ -121,3 +121,86 @@ export function formatActivityTime(iso: string, now = new Date()): string {
   if (days === 1) return `yesterday ${time}`
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
+
+/** One line of the grouped list: a single item, or a run of the same successful action folded into one line. */
+export type ActivityEntry =
+  | { kind: 'item'; item: ActivityItem }
+  | { kind: 'folded'; id: string; subject: string; count: number; everyMinutes: number | null; at: string; items: ActivityItem[] }
+
+export interface ActivityDay { key: string; label: string; entries: ActivityEntry[] }
+
+/** At least this many successful runs of one action in a row fold into one line. */
+export const FOLD_AFTER = 3
+
+const dayKey = (iso: string) => {
+  const date = new Date(iso)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** Today, Yesterday, or "Mon 17 Nov". */
+export function formatDayHeading(iso: string, now = new Date()): string {
+  const date = new Date(iso)
+  const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime()
+  const days = Math.round((startOfDay(now) - startOfDay(date)) / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  return date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/** Groups newest-first items by day and folds repeated successful runs ("home-card ran 55 times, every 15 min"). Failures never fold. */
+export function groupActivity(items: ReadonlyArray<ActivityItem>, now = new Date()): ActivityDay[] {
+  const days: ActivityDay[] = []
+  for (const item of items) {
+    if (Number.isNaN(new Date(item.at).getTime())) continue
+    const key = dayKey(item.at)
+    let day = days[days.length - 1]
+    if (!day || day.key !== key) {
+      day = { key, label: formatDayHeading(item.at, now), entries: [] }
+      days.push(day)
+    }
+    day.entries.push({ kind: 'item', item })
+  }
+  for (const day of days) day.entries = foldRuns(day.entries)
+  return days
+}
+
+const foldable = (item: ActivityItem) => item.kind === 'run' && item.tone === 'ok'
+
+function foldRuns(entries: ActivityEntry[]): ActivityEntry[] {
+  const out: ActivityEntry[] = []
+  let index = 0
+  while (index < entries.length) {
+    const first = entries[index]!
+    if (first.kind !== 'item' || !foldable(first.item)) { out.push(first); index++; continue }
+    const run: ActivityItem[] = [first.item]
+    let next = index + 1
+    while (next < entries.length) {
+      const candidate = entries[next]!
+      if (candidate.kind !== 'item' || !foldable(candidate.item) || candidate.item.subject !== first.item.subject) break
+      run.push(candidate.item)
+      next++
+    }
+    if (run.length >= FOLD_AFTER) {
+      const span = new Date(run[0]!.at).getTime() - new Date(run[run.length - 1]!.at).getTime()
+      const every = Math.round(span / (run.length - 1) / 60_000)
+      out.push({ kind: 'folded', id: `fold-${run[0]!.id}`, subject: first.item.subject, count: run.length, everyMinutes: every > 0 ? every : null, at: run[0]!.at, items: run })
+    } else {
+      run.forEach((item) => out.push({ kind: 'item', item }))
+    }
+    index = next
+  }
+  return out
+}
+
+/** "every 15 min", "every 2 h" (rounded; blank when the runs have no steady gap). */
+export function describeEvery(minutes: number | null): string {
+  if (!minutes) return ''
+  if (minutes >= 120) return `every ${Math.round(minutes / 60)} h`
+  return `every ${minutes} min`
+}
+
+/** The clock time inside a day group (the day is the heading). */
+export function formatClock(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+}

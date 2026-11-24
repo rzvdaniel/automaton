@@ -26,20 +26,24 @@ const mountOverview = (extra: Partial<App>, more: Record<string, unknown> = {}) 
   global: { plugins: [PrimeVue, ToastService], stubs: { RouterLink: true } },
 })
 
-describe('AppOverview restart', () => {
-  it('offers Restart for an app with a container', async () => {
+describe('AppOverview layout', () => {
+  it('no longer carries the Restart/Pause card, Addresses, Permissions or What it needs', async () => {
     const wrapper = mountOverview({})
     await flushPromises()
-    expect(wrapper.find('[data-testid="restart-app"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="pause-card"]').text()).toContain('Restart loads changed settings')
+    expect(wrapper.find('[data-testid="restart-app"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pause-card"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="addresses"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="permissions-card"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('What it needs')
+    expect(wrapper.get('[data-testid="installed-from"]').text()).toContain('Deployed with the CLI')
   })
 
-  it('offers no Restart for an Actions-only app but keeps Pause', async () => {
-    const wrapper = mountOverview({ actionsOnly: true })
+  it('shows the Disk card with the app total and the disk it lives on', async () => {
+    vi.mocked(appsService.getDisk).mockResolvedValue({ appId: 'app-1', totalBytes: 244 * 1024 ** 2, imageBytes: 143 * 1024 ** 2, filesBytes: 101 * 1024 ** 2, hostDiskTotalBytes: 39 * 1024 ** 3, hostDiskAvailableBytes: 32 * 1024 ** 3 } as never)
+    const wrapper = mountOverview({})
     await flushPromises()
-    expect(wrapper.find('[data-testid="restart-app"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="pause-card"]').text()).toContain('apply on the next run')
-    expect(wrapper.get('[data-testid="pause-card"]').text()).toContain('Pause')
+    expect(wrapper.get('[data-testid="disk-total"]').text()).toBe('244 MB')
+    expect(wrapper.get('[data-testid="host-disk"]').text()).toContain('warning at 80%')
   })
 })
 

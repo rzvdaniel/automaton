@@ -152,7 +152,7 @@ For actions that need an administrator (`server:cleanup`, `backups:run`, `server
 
 ## Give the app its own docs
 
-Put a `docs/` folder next to `automaton.json` with `docs/README.md` as the entry page. Other `.md` pages link with relative links, and images (png, jpg, svg, webp, up to 5 MB) show with `![Alt](plans.png)`. `automaton deploy` uploads it with the source, so each version shows its own docs in the app's **Docs** tab and through `automaton docs <app>`. The catalog's install page shows the same README before someone installs. Update it in the same change as the app.
+Put a `docs/` folder next to `automaton.json` with `docs/README.md` as the entry page (the Docs tab opens a `README.md` in the app folder first, if there is one). Other `.md` pages link with relative links, and images (png, jpg, svg, webp, up to 5 MB) show with `![Alt](plans.png)`. `automaton deploy` uploads it with the source, so each version shows its own docs in the app's **Docs** tab and through `automaton docs <app>`. The catalog's install page shows the same README before someone installs. Update it in the same change as the app.
 
 ## Put it in an apps repository
 

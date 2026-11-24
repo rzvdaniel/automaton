@@ -4,22 +4,18 @@ import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import type { ActionModule, ActionSchedule } from '../services/action-schedules.service'
 import { appsService, type AppActionExecution, type CatalogUpdate } from '../services/apps.service'
-import type { App, AppDeploymentTarget, AppPermissionStatus, AppSharing } from '../types/apps.types'
+import type { App, AppDeploymentTarget, AppSharing } from '../types/apps.types'
 import type { AppViewKey } from '../app-navigation'
 import {
   appKindOf,
-  audienceLabel,
   appOriginLabel,
   describeSchedule,
-  secretsPill,
   statusSentence,
   type Segment,
 } from '../utils/app-overview'
-import { describeDisk } from '../utils/app-disk'
 import type { AppDiskUsage } from '../types/apps.types'
-import AppRestartButton from './AppRestartButton.vue'
+import AppDiskCard from './AppDiskCard.vue'
 import AppRunsOn from './AppRunsOn.vue'
-import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
 import PublisherBadge from './PublisherBadge.vue'
 import { usePublishers } from '../composables/usePublishers'
 import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
@@ -34,33 +30,23 @@ const props = defineProps<{
   actions: ReadonlyArray<ActionModule>
   /** The address people open the app at (the public one once published); empty when it is not live. */
   address: string
-  /** The public address, set only while the app is published. */
-  publicAddress: string
-  /** The sign-in address, for people the app is shared with. */
-  privateAddress: string
   sharing: AppSharing | null
   /** Permission requests waiting on this app; only given to system administrators, who can decide them. */
   waitingPermissions?: ReadonlyArray<string>
-  /** Changes after a permission is decided, so the Permissions card reloads. */
-  permissionsVersion?: number
   deciding?: boolean
 }>()
-const emit = defineEmits<{ navigate: [view: AppViewKey]; share: []; 'paused-changed': []; 'targets-changed': []; 'decide-permission': [permission: string, approved: boolean] }>()
+const emit = defineEmits<{ navigate: [view: AppViewKey]; 'paused-changed': []; 'targets-changed': []; 'decide-permission': [permission: string, approved: boolean] }>()
 const toast = useToast()
 const { publisherOf } = usePublishers()
 const publisher = computed(() => publisherOf(props.app.id))
 
-const secretNames = ref<string[] | null>(null)
 const update = ref<CatalogUpdate | null>(null)
 const retryOnly = computed(() => !!update.value && isRetryOnly(update.value))
 const showDetails = ref(false)
 const updateBusy = ref(false)
-const permissions = ref<AppPermissionStatus[]>([])
 const disk = ref<AppDiskUsage | null>(null)
 
 watch(() => props.app.id, async (id) => {
-  secretNames.value = null
-  permissions.value = []
   update.value = null
   disk.value = null
   if (props.app.canUpdate !== false) {
@@ -70,23 +56,7 @@ watch(() => props.app.id, async (id) => {
   if (props.app.canUpdate !== false) {
     appsService.getCatalogUpdate(id).then((result) => { if (props.app.id === id && result.available) update.value = result }).catch(() => {})
   }
-  const [secrets, perms] = await Promise.allSettled([
-    appsService.listSecrets(id),
-    appsService.getPermissions(id),
-  ])
-  if (props.app.id !== id) return
-  if (secrets.status === 'fulfilled') secretNames.value = secrets.value.map((secret) => secret.name)
-  if (perms.status === 'fulfilled') permissions.value = perms.value?.permissions ?? []
 }, { immediate: true })
-
-watch(() => props.permissionsVersion, async () => {
-  const id = props.app.id
-  const perms = await appsService.getPermissions(id).catch(() => null)
-  if (perms && props.app.id === id) permissions.value = perms.permissions ?? []
-})
-
-/** Only people who can change the app change who opens it. */
-const canShare = computed(() => props.app.canUpdate !== false)
 
 /** Replaces the app with the catalog's newer commit and redeploys it; asks first when the owner edited the files. */
 async function applyUpdate() {
@@ -103,22 +73,6 @@ async function applyUpdate() {
   }
 }
 
-const pauseBusy = ref(false)
-/** Pauses or resumes the app, then asks the page to reload it. */
-async function togglePaused() {
-  const pause = !props.app.isPaused
-  pauseBusy.value = true
-  if (!pause) toast.add({ severity: 'info', summary: 'Resuming', detail: APP_START_PROGRESS, life: 6000 })
-  try {
-    const state = await appsService.setPaused(props.app.id, pause)
-    toast.add({ severity: state.warnings.length > 0 ? 'warn' : 'success', summary: pause ? 'Paused' : 'Resumed', detail: state.warnings[0] ?? (pause ? 'The app is paused.' : 'The app is running again.'), life: 4000 })
-    emit('paused-changed')
-  } catch (err: unknown) {
-    toast.add({ severity: 'error', summary: 'Error', detail: appActionErrorMessage(err, err instanceof Error ? err.message : 'Could not change the app'), life: 12000 })
-  } finally {
-    pauseBusy.value = false
-  }
-}
 const kind = computed(() => appKindOf(props.app))
 const liveTarget = computed(() => getLiveTarget([...props.targets]))
 const host = computed(() => (props.address ? new URL(props.address).host : ''))
@@ -141,50 +95,18 @@ const scheduleFor = (actionKey: string) => {
   return schedule ? describeSchedule(schedule) : 'on demand'
 }
 
-const declaredSecrets = computed(() => props.app.application?.secrets ?? [])
-const pill = computed(() => secretNames.value === null ? null : secretsPill(declaredSecrets.value, secretNames.value))
-const settingNames = computed(() => (props.app.application?.settings ?? []).map((item) => item.name))
-/** Settings are saved like secrets, so saved names that are declared settings do not count as secrets. */
-const secretCount = computed(() => Math.max(declaredSecrets.value.length, (secretNames.value ?? []).filter((name) => !settingNames.value.includes(name)).length))
-const settingCount = computed(() => settingNames.value.length)
-const dataDirectory = computed(() => props.app.application?.storage?.dataDirectory ?? '')
 const pageUrl = (path: string) => new URL(path, props.address).toString()
 
-async function copy(url: string) {
-  try {
-    await navigator.clipboard.writeText(url)
-    toast.add({ severity: 'success', summary: 'Address copied', life: 2000 })
-  } catch {
-    toast.add({ severity: 'warn', summary: 'Copy this address', detail: url, life: 6000 })
-  }
-}
 const pages = computed(() => props.app.application?.pages ?? [])
 const healthPath = computed(() => props.app.application?.health?.path ?? '')
-const whoLabel = computed(() => kind.value === 'api' ? 'Who can call it' : 'Who can open it')
-const whoValue = computed(() => kind.value === 'api' && props.sharing?.audience !== 'internet'
-  ? 'Callers with an API key'
-  : audienceLabel(props.sharing?.audience, peopleCount.value))
-
-const source = computed(() => {
-  const runner = liveTarget.value?.runner?.name
-  return { origin: appOriginLabel(props.app), runner }
-})
+const origin = computed(() => appOriginLabel(props.app))
+const dataDirectory = computed(() => props.app.application?.storage?.dataDirectory ?? '')
 </script>
+
 
 <template>
   <div class="overview">
-    <section v-if="waitingPermissions?.length" class="card notice" aria-label="Permission requests" data-testid="permission-notice">
-      <h2>Waiting for your approval</h2>
-      <div v-for="permission in waitingPermissions" :key="permission" class="row">
-        <span><span class="mono">{{ permission }}</span> <span class="hint">· this app asks for it</span></span>
-        <span class="notice__actions">
-          <Button label="Approve" size="small" :aria-label="`Approve ${permission}`" :disabled="deciding" @click="emit('decide-permission', permission, true)" />
-          <Button label="Deny" size="small" severity="secondary" outlined :aria-label="`Deny ${permission}`" :disabled="deciding" @click="emit('decide-permission', permission, false)" />
-        </span>
-      </div>
-    </section>
-
-    <section class="card" aria-label="Status">
+    <section class="line" aria-label="Status">
       <p class="status" data-testid="status-sentence">
         <template v-for="(part, index) in sentence" :key="index">
           <strong v-if="part.strong">{{ part.text }}</strong>
@@ -195,10 +117,25 @@ const source = computed(() => {
       <p v-if="publisher" class="status__publisher"><PublisherBadge :publisher="publisher" /></p>
     </section>
 
-    <section v-if="update" class="card" aria-label="Update available" data-testid="update-card">
+    <section v-if="app.isPaused" class="strip" aria-label="Paused" data-testid="pause-card">
+      <span><strong class="needs">Paused</strong> <span class="hint">· stopped, its schedules are off and its address shows a paused page. Resume it from the ⋯ menu.</span>
+        <span v-if="app.pausedReason" class="hint" data-testid="paused-reason"><br>Reason: {{ app.pausedReason }}</span></span>
+    </section>
+
+    <section v-if="waitingPermissions?.length" class="strip" aria-label="Permission requests" data-testid="permission-notice">
+      <div v-for="permission in waitingPermissions" :key="permission" class="strip-row">
+        <span><strong class="needs">Waiting for your approval</strong> <span class="mono">{{ permission }}</span> <span class="hint">· this app asks for it</span></span>
+        <span class="notice__actions">
+          <Button label="Approve" size="small" :aria-label="`Approve ${permission}`" :disabled="deciding" @click="emit('decide-permission', permission, true)" />
+          <Button label="Deny" size="small" severity="secondary" outlined :aria-label="`Deny ${permission}`" :disabled="deciding" @click="emit('decide-permission', permission, false)" />
+        </span>
+      </div>
+    </section>
+
+    <section v-if="update" class="strip" aria-label="Needs you" data-testid="update-card">
       <div class="row">
         <span>
-          <span class="pill pill--bad">{{ retryOnly ? 'Last deploy failed' : 'Update available' }}</span>
+          <strong class="needs">{{ retryOnly ? 'Last deploy failed' : 'Update available' }}</strong>
           <span v-if="update.deployFailed" class="hint" data-testid="update-deploy-error"> · {{ shortReason(update.deployError).replace(/\.$/, '') }}.<template v-if="update.runningCommit"> Still running {{ update.runningCommit.slice(0, 7) }}.</template><template v-else-if="update.hasPreviousVersion"> Still running the previous version.</template></span>
           <span v-if="!retryOnly" class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
           <button v-if="update.deployError && update.deployError !== shortReason(update.deployError)" type="button" class="link link--button" data-testid="update-deploy-details-toggle" :aria-expanded="showDetails" @click="showDetails = !showDetails"> {{ showDetails ? 'Hide details' : 'Show details' }}</button>
@@ -218,39 +155,13 @@ const source = computed(() => {
       </div>
     </section>
 
-    <section v-if="app.isPaused || canShare" class="card" aria-label="Pause" data-testid="pause-card">
-      <div class="row">
-        <span v-if="app.isPaused"><span class="pill pill--bad">Paused</span> <span class="hint">· stopped, its schedules are off and its address shows a paused page</span>
-          <span v-if="app.pausedReason" class="hint" data-testid="paused-reason"><br>Reason: {{ app.pausedReason }}</span></span>
-        <span v-else-if="app.actionsOnly" class="hint" data-testid="pause-hint">Changes to settings and secrets apply on the next run. Pause turns its schedules off; its data, secrets, settings and address are kept.</span>
-        <span v-else class="hint">Restart loads changed settings and secrets. Pause stops the app and its schedules; its data, secrets, settings and address are kept.</span>
-        <AppRestartButton v-if="canShare && !app.isPaused && !app.actionsOnly" :app-id="app.id" />
-        <Button
-          v-if="canShare"
-          :label="app.isPaused ? 'Resume' : 'Pause'"
-          :icon="app.isPaused ? 'pi pi-play' : 'pi pi-pause'"
-          size="small"
-          severity="secondary"
-          outlined
-          :loading="pauseBusy"
-          @click="togglePaused"
-        />
-      </div>
-    </section>
 
-    <section v-if="privateAddress && kind !== 'tool'" class="card" aria-labelledby="addresses-title" data-testid="addresses">
-      <h2 id="addresses-title">Addresses</h2>
-      <div v-if="publicAddress" class="row">
-        <span><strong>Public</strong> <span class="hint">· anyone with the link</span><br><span class="mono">{{ publicAddress }}</span></span>
-        <Button label="Copy" icon="pi pi-copy" size="small" severity="secondary" outlined @click="copy(publicAddress)" />
-      </div>
-      <div class="row">
-        <span><strong>Private</strong> <span class="hint">· sign-in, for people it is shared with</span><br><span class="mono">{{ privateAddress }}</span></span>
-        <Button label="Copy" icon="pi pi-copy" size="small" severity="secondary" outlined @click="copy(privateAddress)" />
-      </div>
-    </section>
+    <div class="cards">
+      <AppRunsOn :app="app" :targets="targets" :origin="origin" @changed="emit('targets-changed')" @navigate="emit('navigate', $event)" />
+      <AppDiskCard v-if="disk && typeof disk.totalBytes === 'number'" :disk="disk" :data-directory="kind !== 'site' && kind !== 'tool' ? dataDirectory : ''" />
+    </div>
 
-    <div class="grid">
+    <div class="wide">
       <section class="card" aria-labelledby="does-title">
         <div class="card-head">
           <h2 id="does-title">What it does</h2>
@@ -278,73 +189,33 @@ const source = computed(() => {
         <p v-if="kind === 'tool' && actions.length === 0" class="hint">No actions are listed. They show once the app is deployed and its Runner is online.</p>
       </section>
 
-      <section class="card" aria-labelledby="needs-title">
-        <div class="card-head">
-          <h2 id="needs-title">What it needs</h2>
-          <Button label="Settings ›" size="small" severity="secondary" outlined @click="emit('navigate', 'settings')" />
-        </div>
-        <div v-if="dataDirectory && kind !== 'site' && kind !== 'tool'" class="row"><span>Data folder</span><span class="mono hint">{{ dataDirectory }}</span></div>
-        <div v-if="disk" class="row" data-testid="disk-use"><span>Disk</span><span class="mono hint">{{ describeDisk(disk) }}</span></div>
-        <button v-if="secretCount > 0" type="button" class="row row--link" @click="emit('navigate', 'secrets')">
-          <span>{{ secretCount }} {{ secretCount === 1 ? 'secret' : 'secrets' }}</span>
-          <span class="end">
-            <span v-if="pill" class="pill" :class="pill.bad ? 'pill--bad' : 'pill--ok'">{{ pill.text }}</span>
-            <i class="pi pi-chevron-right chevron" aria-hidden="true"></i>
-          </span>
-        </button>
-        <button v-if="settingCount > 0" type="button" class="row row--link" data-testid="setting-count" @click="emit('navigate', 'settings')">
-          <span>{{ settingCount }} {{ settingCount === 1 ? 'setting' : 'settings' }}</span>
-          <i class="pi pi-chevron-right chevron" aria-hidden="true"></i>
-        </button>
-        <p v-if="kind === 'tool' && secretCount === 0 && settingCount === 0" class="hint">Nothing to set up.</p>
-        <div v-if="kind !== 'tool'" class="row">
-          <span>{{ whoLabel }}<br><span class="hint">{{ whoValue }}</span></span>
-          <Button v-if="canShare" label="Change" size="small" severity="secondary" outlined @click="emit('share')" />
-        </div>
-      </section>
     </div>
-
-    <div class="grid">
-      <AppRunsOn :app="app" :targets="targets" @changed="emit('targets-changed')" />
-      <section v-if="permissions.length > 0" class="card" aria-labelledby="permissions-title" data-testid="permissions-card">
-        <h2 id="permissions-title">Permissions</h2>
-        <div v-for="item in permissions" :key="item.permission" class="row">
-          <span class="mono">{{ item.permission }}</span>
-          <span class="pill" :class="item.approved ? 'pill--ok' : 'pill--bad'">{{ item.approved ? 'approved' : 'waiting for an administrator' }}</span>
-        </div>
-      </section>
-    </div>
-
-    <p class="source" data-testid="source-line">
-      {{ source.origin }}<template v-if="source.runner"> · runs on Runner <span class="mono">{{ source.runner }}</span></template>
-    </p>
   </div>
 </template>
 
 <style scoped>
 .overview { display: flex; flex-direction: column; gap: 18px; }
 .card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 h2 { margin: 0; font-size: 16px; font-weight: 600; }
-.status { margin: 0; font-size: 17px; line-height: 1.5; overflow-wrap: anywhere; }
+.status { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--row-line); }
 .row:last-of-type { border-bottom: 0; }
 .hint { color: var(--ink-soft); font-size: 13px; }
 p.hint { margin: 0; }
 .link { color: var(--signal-ink); text-decoration: underline; }
 .mono { font-family: var(--mono); font-size: 12px; }
-.status .mono { font-size: 15px; }
+.status .mono { font-size: 13px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .row--link { width: 100%; border-width: 0 0 1px; background: none; color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
 .row--link:hover { background: var(--row-line); }
 .chevron { color: var(--ink-soft); font-size: 12px; }
-.end { display: inline-flex; align-items: center; gap: 10px; }
+.strip { display: flex; flex-direction: column; gap: 8px; padding: 14px 18px; border-radius: 12px; background: color-mix(in srgb, var(--signal) 14%, var(--paper)); }
+.strip-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.needs { color: var(--signal-ink); }
 .pill { padding: 3px 10px; border-radius: 999px; font-family: var(--mono); font-size: 12px; }
-.pill--ok { border: 1px solid var(--ok); color: var(--ok); }
-.notice { border-color: var(--signal); }
 .notice__actions { display: flex; gap: 8px; }
 .pill--bad { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
 .link--button { margin-left: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; cursor: pointer; }
 .details { margin: 8px 0 0; padding: 10px 12px; max-height: 280px; overflow: auto; border: 1px solid var(--row-line); border-radius: 10px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.source { margin: 0; color: var(--ink-soft); font-size: 13px; }
 </style>

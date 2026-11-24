@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildActivity, deployActivity, filterActivity, formatActivityTime } from './app-activity'
+import { buildActivity, deployActivity, describeEvery, filterActivity, formatActivityTime, groupActivity, type ActivityItem } from './app-activity'
 import type { ApplicationEvent } from '@/shared/types/ai.types'
 import type { SecretAuditEntry } from '../types/apps.types'
 
@@ -66,5 +66,29 @@ describe('runs started by a webhook', () => {
       [], [],
     )
     expect(item!.text).toBe('ran (started by webhook Docs walk)')
+  })
+})
+
+describe('groupActivity', () => {
+  const run = (id: number, at: string, tone: ActivityItem['tone'] = 'ok'): ActivityItem => ({ id: `run-${id}`, kind: 'run', tone, subject: 'home-card', text: tone === 'ok' ? 'ran' : 'timed out', at, executionId: String(id) })
+  const now = new Date(2026, 10, 24, 12, 0)
+
+  it('groups by day and folds repeated successful runs into one line', () => {
+    const items = [0, 15, 30, 45].map((minute, index) => run(index, new Date(2026, 10, 24, 10, 45 - minute).toISOString()))
+    items.push({ id: 'c1', kind: 'change', tone: 'none', subject: '', text: 'Deployed', at: new Date(2026, 10, 23, 9, 0).toISOString() })
+    const days = groupActivity(items, now)
+    expect(days.map((day) => day.label)).toEqual(['Today', 'Yesterday'])
+    const folded = days[0]!.entries[0]!
+    expect(folded.kind).toBe('folded')
+    if (folded.kind === 'folded') {
+      expect(folded.count).toBe(4)
+      expect(describeEvery(folded.everyMinutes)).toBe('every 15 min')
+    }
+  })
+
+  it('never folds failures and leaves short runs alone', () => {
+    const items = [run(1, new Date(2026, 10, 24, 10, 30).toISOString()), run(2, new Date(2026, 10, 24, 10, 15).toISOString(), 'failed'), run(3, new Date(2026, 10, 24, 10, 0).toISOString())]
+    const [day] = groupActivity(items, now)
+    expect(day!.entries.every((entry) => entry.kind === 'item')).toBe(true)
   })
 })

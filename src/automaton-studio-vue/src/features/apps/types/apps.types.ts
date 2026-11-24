@@ -664,6 +664,9 @@ export interface AppDiskUsage {
   imageBytes?: number | null
   totalBytes: number
   measuredAtUtc?: string | null
+  /** The machine disk the app lives on. */
+  hostDiskTotalBytes?: number | null
+  hostDiskAvailableBytes?: number | null
 }
 
 /** The answer to pausing or resuming an app. */

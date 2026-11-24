@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
 import { createPinia, setActivePinia } from 'pinia'
 import AppAdminTab from './AppAdminTab.vue'
 import { adminAppsService } from '../services/adminAppsService'
-import { appsService } from '@/features/apps/services/apps.service'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 vi.mock('../services/adminAppsService', () => ({
@@ -22,15 +21,14 @@ vi.mock('../services/adminAppsService', () => ({
     updateModeration: vi.fn(),
   },
 }))
-vi.mock('@/features/apps/services/apps.service', () => ({ appsService: { setPaused: vi.fn() } }))
 
 const waiting = [{ permission: 'backups:run', approved: false, status: 'Pending' }]
 
-function open(role: string, paused = false) {
+function open(role: string) {
   setActivePinia(createPinia())
   useAuthStore().user = { roles: [role] } as never
   return mount(AppAdminTab, {
-    props: { appId: 'app-1', appName: 'Console', paused },
+    props: { appId: 'app-1', appName: 'Console' },
     global: { plugins: [PrimeVue, ToastService, ConfirmationService], stubs: { Dialog: true, Select: true, Textarea: true } },
   })
 }
@@ -56,35 +54,25 @@ describe('AppAdminTab', () => {
     expect(wrapper.text()).toContain('Approved')
   })
 
-  it('shows the owner and the Pause button, and leaves approvals to system administrators', async () => {
+  it('lists waiting requests first and folds long approved lists behind Show more', async () => {
+    const many = Array.from({ length: 8 }, (_, index) => ({ permission: `p${index}:use`, approved: true, status: 'Approved' }))
+    vi.mocked(adminAppsService.getPermissions).mockResolvedValue([...many, { permission: 'backups:run', approved: false, status: 'Pending' }] as never)
+    const wrapper = open('SysAdmin')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="admin-waiting"]').text()).toContain('backups:run')
+    expect(wrapper.get('[data-testid="admin-summary"]').text()).toContain('1 waiting · 8 approved')
+    expect(wrapper.text()).toContain('p4:use')
+    expect(wrapper.text()).not.toContain('p5:use')
+    await wrapper.get('[data-testid="admin-show-more"]').trigger('click')
+    expect(wrapper.text()).toContain('p7:use')
+  })
+
+  it('shows the owner without a Pause button, and leaves approvals to system administrators', async () => {
     const wrapper = open('Admin')
     await flushPromises()
     expect(wrapper.find('[data-testid="admin-permissions"]').exists()).toBe(false)
     expect(adminAppsService.getPermissions).not.toHaveBeenCalled()
     expect(wrapper.get('[data-testid="admin-moderation"]').text()).toContain('Ana')
-    expect(wrapper.get('[data-testid="pause-app"]').text()).toContain('Pause app')
-  })
-
-  it('resumes a paused app without asking', async () => {
-    vi.mocked(appsService.setPaused).mockResolvedValue({} as never)
-    const wrapper = open('SysAdmin', true)
-    await flushPromises()
-    await wrapper.get('[data-testid="pause-app"]').trigger('click')
-    await flushPromises()
-    expect(appsService.setPaused).toHaveBeenCalledWith('app-1', false, undefined)
-    expect(wrapper.emitted('paused-changed')).toHaveLength(1)
-  })
-
-  it('pauses with the reason the administrator typed', async () => {
-    vi.mocked(appsService.setPaused).mockResolvedValue({} as never)
-    const wrapper = open('SysAdmin')
-    await flushPromises()
-    await wrapper.get('[data-testid="pause-app"]').trigger('click');
-    (wrapper.findComponent('[data-testid="pause-reason"]') as VueWrapper).vm.$emit('update:modelValue', 'Sends spam')
-    await flushPromises()
-    await wrapper.get('[data-testid="pause-confirm"]').trigger('click')
-    await flushPromises()
-    expect(appsService.setPaused).toHaveBeenCalledWith('app-1', true, 'Sends spam')
-    expect(wrapper.emitted('paused-changed')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="pause-app"]').exists()).toBe(false)
   })
 })

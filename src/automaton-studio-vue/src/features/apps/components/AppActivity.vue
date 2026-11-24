@@ -10,7 +10,7 @@ import { actionSchedulesService } from '../services/action-schedules.service'
 import { appsService, type AppActionExecution } from '../services/apps.service'
 import type { AppDeploymentTarget, SecretAuditEntry } from '../types/apps.types'
 import type { ConsoleEntry } from '../types/console.types'
-import { buildActivity, deployActivity, filterActivity, formatActivityTime, type ActivityFilter } from '../utils/app-activity'
+import { buildActivity, deployActivity, describeEvery, filterActivity, formatClock, groupActivity, type ActivityFilter } from '../utils/app-activity'
 import { composeExecutionOutput } from '../utils/execution-output'
 
 const props = defineProps<{
@@ -56,6 +56,13 @@ watch(() => [props.appId, props.refreshKey], load, { immediate: true })
 
 const all = computed(() => buildActivity(props.executions, events.value, secretHistory.value, deployActivity(props.deployTarget ?? null), props.settingNames ?? []))
 const visible = computed(() => filterActivity(all.value, filter.value))
+const days = computed(() => groupActivity(visible.value))
+const expanded = ref<Set<string>>(new Set())
+function toggleFold(id: string) {
+  const next = new Set(expanded.value)
+  if (!next.delete(id)) next.add(id)
+  expanded.value = next
+}
 const problemCount = computed(() => filterActivity(all.value, 'problems').length)
 const hasRuns = computed(() => props.executions.length > 0)
 
@@ -119,39 +126,51 @@ async function copyOutput(executionId: string) {
       <p v-if="loading" class="hint">Loading…</p>
       <p v-else-if="failed && visible.length === 0" class="hint">Activity could not be loaded.</p>
       <p v-else-if="visible.length === 0" class="hint">{{ filter === 'problems' ? 'No problems.' : 'Nothing here yet.' }}</p>
-      <template v-for="item in visible" :key="item.id">
-        <div
-          class="row"
-          :class="{ 'row--run': item.executionId, open: openRun === item.executionId }"
-          data-testid="activity-row"
-          :role="item.executionId ? 'button' : undefined"
-          :tabindex="item.executionId ? 0 : undefined"
-          :aria-expanded="item.executionId ? openRun === item.executionId : undefined"
-          @click="item.executionId && toggleRun(item.executionId)"
-          @keydown.enter.prevent="item.executionId && toggleRun(item.executionId)"
-          @keydown.space.prevent="item.executionId && toggleRun(item.executionId)"
-        >
-          <span class="status" aria-hidden="true">
-            <i v-if="item.tone === 'ok'" class="pi pi-check-circle status--ok"></i>
-            <i v-else-if="item.tone === 'failed'" class="pi pi-times-circle status--bad"></i>
-            <i v-else-if="item.tone === 'running'" class="pi pi-clock status--wait"></i>
-          </span>
-          <span class="what" :class="{ muted: item.kind === 'change' }">
-            <strong v-if="item.subject">{{ item.subject }}</strong>{{ item.subject ? " " : "" }}{{ item.text }}
-            <span v-if="item.tone === 'failed' && item.kind === 'run'" class="sr-only"> (failed)</span>
-          </span>
-          <span class="mono hint">{{ formatActivityTime(item.at) }}</span>
-          <i v-if="item.executionId" class="pi pi-chevron-right chevron" :class="{ turned: openRun === item.executionId }" aria-hidden="true"></i>
-        </div>
-        <div v-if="item.executionId && openRun === item.executionId" class="output-box" data-testid="run-output-box">
-          <p v-if="loadingRun === item.executionId" class="hint loading"><ProgressSpinner style="width: 16px; height: 16px" stroke-width="6" /> Loading output…</p>
-          <p v-else-if="outputErrors[item.executionId]" class="hint bad">The output could not be loaded. Close this row and open it again to retry.</p>
-          <template v-else>
-            <pre class="output" data-testid="run-output">{{ outputs[item.executionId] || 'This run printed nothing.' }}</pre>
-            <Button label="Copy" icon="pi pi-copy" size="small" severity="secondary" outlined @click="copyOutput(item.executionId)" />
+      <div v-for="day in days" :key="day.key" class="day" data-testid="activity-day">
+        <h2 class="day-head">{{ day.label }}</h2>
+        <template v-for="entry in day.entries" :key="entry.kind === 'item' ? entry.item.id : entry.id">
+          <div v-if="entry.kind === 'folded'" class="row row--fold" data-testid="activity-folded">
+            <span class="status" aria-hidden="true"><i class="pi pi-check-circle status--ok"></i></span>
+            <span class="what"><strong>{{ entry.subject }}</strong> ran {{ entry.count }} times<template v-if="entry.everyMinutes">, {{ describeEvery(entry.everyMinutes) }}</template>
+              · <button type="button" class="link" :aria-expanded="expanded.has(entry.id)" @click="toggleFold(entry.id)">{{ expanded.has(entry.id) ? 'Hide' : 'Show all' }}</button></span>
+            <span class="mono hint">{{ formatClock(entry.at) }}</span>
+            <span></span>
+          </div>
+          <template v-for="item in (entry.kind === 'folded' ? (expanded.has(entry.id) ? entry.items : []) : [entry.item])" :key="item.id">
+          <div
+            class="row"
+            :class="{ 'row--run': item.executionId, open: openRun === item.executionId }"
+            data-testid="activity-row"
+            :role="item.executionId ? 'button' : undefined"
+            :tabindex="item.executionId ? 0 : undefined"
+            :aria-expanded="item.executionId ? openRun === item.executionId : undefined"
+            @click="item.executionId && toggleRun(item.executionId)"
+            @keydown.enter.prevent="item.executionId && toggleRun(item.executionId)"
+            @keydown.space.prevent="item.executionId && toggleRun(item.executionId)"
+          >
+            <span class="status" aria-hidden="true">
+              <i v-if="item.tone === 'ok'" class="pi pi-check-circle status--ok"></i>
+              <i v-else-if="item.tone === 'failed'" class="pi pi-times-circle status--bad"></i>
+              <i v-else-if="item.tone === 'running'" class="pi pi-clock status--wait"></i>
+            </span>
+            <span class="what" :class="{ muted: item.kind === 'change' }">
+              <strong v-if="item.subject">{{ item.subject }}</strong>{{ item.subject ? " " : "" }}{{ item.text }}
+              <span v-if="item.tone === 'failed' && item.kind === 'run'" class="sr-only"> (failed)</span>
+            </span>
+            <span class="mono hint">{{ formatClock(item.at) }}</span>
+            <i v-if="item.executionId" class="pi pi-chevron-right chevron" :class="{ turned: openRun === item.executionId }" aria-hidden="true"></i>
+          </div>
+          <div v-if="item.executionId && openRun === item.executionId" class="output-box" data-testid="run-output-box">
+            <p v-if="loadingRun === item.executionId" class="hint loading"><ProgressSpinner style="width: 16px; height: 16px" stroke-width="6" /> Loading output…</p>
+            <p v-else-if="outputErrors[item.executionId]" class="hint bad">The output could not be loaded. Close this row and open it again to retry.</p>
+            <template v-else>
+              <pre class="output" data-testid="run-output">{{ outputs[item.executionId] || 'This run printed nothing.' }}</pre>
+              <Button label="Copy" icon="pi pi-copy" size="small" severity="secondary" outlined @click="copyOutput(item.executionId)" />
+            </template>
+          </div>
           </template>
-        </div>
-      </template>
+        </template>
+      </div>
     </section>
 
     <Dialog v-model:visible="liveOpen" modal header="Live output" :style="{ width: 'min(48rem, 94vw)' }">
@@ -171,10 +190,13 @@ async function copyOutput(executionId: string) {
 .row--run { cursor: pointer; }
 .row--run:hover, .row--run:focus-visible { background: var(--row-line); }
 .status { text-align: center; font-size: 16px; }
-.status--ok { color: var(--ok); }
+.status--ok { color: var(--ink-soft); }
 .status--bad { color: var(--signal-ink); }
 .status--wait { color: var(--ink-soft); }
 .what { overflow-wrap: anywhere; }
+.day-head { margin: 14px 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.day:first-child .day-head { margin-top: 0; }
+.link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
 .chevron { color: var(--ink-soft); font-size: 12px; transition: transform 0.15s; }
 .chevron.turned { transform: rotate(90deg); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

@@ -9,12 +9,13 @@ namespace Automaton.Api.ServerHealth;
 /// <summary>Disk an app uses, as measured by a Runner, and its running containers' CPU and memory. Total is the sum of the disk parts that were measured.</summary>
 public sealed record AppDiskUsageResponse(
     Guid AppId, string? AppName, long? FilesBytes, long? DataBytes, long? LogsBytes, long? ContainerBytes, long? ImageBytes,
-    long TotalBytes, DateTime? MeasuredAtUtc, double? CpuPercent = null, long? MemoryBytes = null)
+    long TotalBytes, DateTime? MeasuredAtUtc, double? CpuPercent = null, long? MemoryBytes = null,
+    long? HostDiskTotalBytes = null, long? HostDiskAvailableBytes = null)
 {
-    public static AppDiskUsageResponse From(AppDiskUsage usage, string? name, DateTime? measuredAt) => new(
+    public static AppDiskUsageResponse From(AppDiskUsage usage, string? name, DateTime? measuredAt, long? hostTotal = null, long? hostAvailable = null) => new(
         usage.AppId, name, usage.FilesBytes, usage.DataBytes, usage.LogsBytes, usage.ContainerBytes, usage.ImageBytes,
         (usage.FilesBytes ?? 0) + (usage.DataBytes ?? 0) + (usage.LogsBytes ?? 0) + (usage.ContainerBytes ?? 0) + (usage.ImageBytes ?? 0),
-        measuredAt, usage.CpuPercent, usage.MemoryBytes);
+        measuredAt, usage.CpuPercent, usage.MemoryBytes, hostTotal, hostAvailable);
 }
 
 /// <summary>Reads the per-app disk figures the Machine Management Runners report with their host health.</summary>
@@ -40,6 +41,6 @@ public sealed class AppDiskUsageService(ApplicationDbContext db, ResourceAuthori
             .Select(host => (Host: host, Usage: host.AppDisk?.FirstOrDefault(item => item.AppId == appId)))
             .Where(item => item.Usage is not null)
             .OrderByDescending(item => AppDiskUsageResponse.From(item.Usage!, null, null).TotalBytes)
-            .Select(item => AppDiskUsageResponse.From(item.Usage!, app.Name, item.Host.MeasuredAtUtc)).FirstOrDefault();
+            .Select(item => AppDiskUsageResponse.From(item.Usage!, app.Name, item.Host.MeasuredAtUtc, item.Host.DiskTotalBytes, item.Host.DiskAvailableBytes)).FirstOrDefault();
     }
 }
