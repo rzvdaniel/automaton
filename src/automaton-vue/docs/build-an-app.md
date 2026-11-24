@@ -174,4 +174,4 @@ Push it to GitHub, wait for the `Catalog` workflow to write `catalog.json`, then
 - **Login does nothing.** The server address must be the API address, not Studio.
 - **Deploy works, app not `Running`.** Read `automaton logs`: the app must listen on `AUTOMATON_PORT` and answer its health path.
 - **Secret shows `missing`.** Set it in the right scope; `--project` needs `automaton project add-app` first.
-- More: [Troubleshooting](./troubleshooting). The complete field list is the [automaton.json reference](./automaton-json); deploying and publishing is in [Deploy and publish an app](./deploy).
+- More: [When something goes wrong](./when-something-goes-wrong). The complete field list is the [automaton.json reference](./automaton-json); deploying and publishing is in [Deploy and publish an app](./deploy).

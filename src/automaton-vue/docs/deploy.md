@@ -116,4 +116,4 @@ Give a reason when you pause: `automaton pause --reason "Sends spam"` (up to 500
 - **No Runner available.** Deploy can upload but cannot start the app. Add or start a Runner, then deploy again.
 - **Health check fails.** The app must listen on `AUTOMATON_PORT` and answer the path in `application.health.path`. Read `automaton logs`.
 - **Secrets missing.** See [Build an app](./build-an-app#secrets).
-- More: [Troubleshooting](./troubleshooting).
+- More: [When something goes wrong](./when-something-goes-wrong).
