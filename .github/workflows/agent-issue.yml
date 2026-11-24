@@ -3,7 +3,7 @@ name: Agent issue
 on:
   issues:
     types: [labeled]
-  # agent-board.sh pick starts issues from other repositories (automaton-apps, automaton-monster) this way; the runner lives here.
+  # agent-board.sh pick starts issues from other repositories (automaton-apps) this way; the runner lives here.
   workflow_dispatch:
     inputs:
       repo:
