@@ -47,3 +47,27 @@ describe('AppActivity run output', () => {
     expect(actionSchedulesService.getLogs).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('AppActivity copy for AI', () => {
+  it('copies a failed run with its log, and offers it only on failures', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    vi.mocked(actionSchedulesService.getLogs).mockResolvedValue({ available: true, content: 'step 1\nTOKEN=abc12345' } as never)
+    vi.mocked(actionSchedulesService.getResult).mockResolvedValue(null as never)
+    const wrapper = mount(AppActivity, {
+      props: { appId: 'a', appName: 'Home', version: 'abc1234', executions: runs, liveOutputAvailable: false, liveLogs: [] },
+      global: { plugins: [PrimeVue, ToastService] },
+    })
+    await flushPromises()
+    const buttons = wrapper.findAll('[data-testid="copy-for-ai"]')
+    expect(buttons).toHaveLength(1)
+    await buttons[0]!.trigger('click')
+    await flushPromises()
+    const text = writeText.mock.calls[0]![0] as string
+    expect(text).toContain('Run sync')
+    expect(text).toContain('Boom')
+    expect(text).toContain('step 1')
+    expect(text).not.toContain('abc12345')
+    expect(wrapper.find('[data-testid="run-output-box"]').exists()).toBe(false)
+  })
+})
