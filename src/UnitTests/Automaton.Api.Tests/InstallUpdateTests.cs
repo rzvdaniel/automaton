@@ -232,6 +232,25 @@ public sealed class InstallUpdateTests
         Assert.That(body.Log, Does.Contain("line two"));
     }
 
+    [TestCase("server-v0.1.2", false)]
+    [TestCase("server-v0.1.1", true)]
+    public async Task AFailedRunIsHiddenOnceTheServerRunsANewerRelease(string installed, bool shown)
+    {
+        await File.WriteAllTextAsync(Path.Combine(status, "status.json"), """
+            {"state":"failed","fromVersion":"server-v0.1.1","toVersion":"server-v0.1.1","exitCode":1}
+            """);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Installation:Version"] = installed,
+            ["Installation:UpdateRequestsDirectory"] = requests,
+            ["Installation:UpdateStatusDirectory"] = status
+        }).Build();
+
+        var result = await InstallationUpdate.ReadAsync(configuration, DateTimeOffset.UtcNow, default);
+
+        Assert.That(result.Run is not null, Is.EqualTo(shown));
+    }
+
     [Test]
     public async Task GetWithoutAnyRunHasNoStatus()
     {
