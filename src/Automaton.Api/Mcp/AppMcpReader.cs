@@ -53,6 +53,7 @@ public sealed class AppMcpReader(
         var app = (await apps.ListAsync(null, token)).FirstOrDefault(item => item.Id == appId) ?? throw new KeyNotFoundException(NotFound);
         var userId = users.GetUserId();
         object runs = Array.Empty<object>();
+        string? runsNote = null;
         try
         {
             runs = (await executions.ListAsync(appId, userId, token)).Take(MaxActivityItems).Select(run => new
@@ -61,11 +62,11 @@ public sealed class AppMcpReader(
                 run.FailureSummary, run.CreatedAtUtc, run.CompletedAtUtc,
             }).ToList();
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or KeyNotFoundException) { /* runs are not visible to this caller */ }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or KeyNotFoundException) { runsNote = "Runs are not visible to you."; }
         var recent = await events.GetEventsAsync(appId, new ApplicationEventQuery { Page = 1, PageSize = MaxActivityItems }, token);
         return new
         {
-            runs,
+            runs, runsNote,
             events = recent.Items.Select(e => new { e.Level, e.Category, e.EventType, e.Message, e.CreatedAtUtc }).ToList(),
             lastDeploymentError = app.LiveEnvironment?.LastDeploymentError,
             lastSuccessfulDeploymentAtUtc = app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc,

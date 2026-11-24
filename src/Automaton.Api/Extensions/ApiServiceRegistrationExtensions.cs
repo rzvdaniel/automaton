@@ -178,6 +178,9 @@ internal static class ApiIdentityRegistration
 
 internal static class ApiCookieRegistration
 {
+    /// <summary>Paths for machine clients, which get a status code instead of a redirect to the sign-in page.</summary>
+    internal static bool IsApiPath(PathString path) => path.StartsWithSegments("/api") || path.StartsWithSegments("/mcp");
+
     internal static IServiceCollection AddApiCookieAuthentication(this IServiceCollection services)
     {
         services.ConfigureApplicationCookie(options =>
@@ -185,7 +188,7 @@ internal static class ApiCookieRegistration
             options.Events.OnRedirectToLogin = context =>
             {
                 // For API requests (including SSE), return 401 instead of redirecting
-                if (context.Request.Path.StartsWithSegments("/api"))
+                if (IsApiPath(context.Request.Path))
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     return Task.CompletedTask;
@@ -196,7 +199,7 @@ internal static class ApiCookieRegistration
             options.Events.OnRedirectToAccessDenied = context =>
             {
                 // For API requests, return 403 instead of redirecting
-                if (context.Request.Path.StartsWithSegments("/api"))
+                if (IsApiPath(context.Request.Path))
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
                     return Task.CompletedTask;

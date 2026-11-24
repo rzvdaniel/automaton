@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using Automaton.Api.Data;
+using Automaton.Api.Extensions;
 using Automaton.Api.Mcp;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
@@ -88,8 +89,9 @@ public sealed class AppMcpReaderTests
             web.ConfigureServices(s =>
             {
                 s.AddRouting();
-                s.AddAuthentication("Test").AddScheme<AuthenticationSchemeOptions, NoUserHandler>("Test", _ => { });
-                s.AddAuthorization(o => o.AddPolicy("DeveloperApiAccess", p => p.AddAuthenticationSchemes("Test").RequireAuthenticatedUser()));
+                s.AddAuthentication("Test").AddScheme<AuthenticationSchemeOptions, NoUserHandler>("Test", _ => { }).AddCookie("Identity.Application");
+                s.AddApiCookieAuthentication();
+                s.AddAuthorization(o => o.AddPolicy("DeveloperApiAccess", p => p.AddAuthenticationSchemes("Test", "Identity.Application").RequireAuthenticatedUser()));
                 s.AddMcpServer().WithHttpTransport(o => o.Stateless = true).WithTools<AppMcpTools>();
                 s.AddScoped(_ => (AppMcpReader)null!);
             });
