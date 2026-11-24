@@ -272,7 +272,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
                 value => isReconnecting = value,
                 () => isReconnecting,
                 HubConnectionFailureReporter.GetFriendlyErrorMessage,
-                () => heartbeatService.SendAsync(cancellationToken));
+                () => ReportGatewayAndHeartbeatAsync(cancellationToken));
             await connection.StartAsync(cancellationToken);
             await heartbeatService.StartAsync(cancellationToken);
             await heartbeatService.SendAsync(cancellationToken);
@@ -289,6 +289,15 @@ public class HubService : IRuntimeTunnelReconnectRequester
                 hubUrl, ex.GetType().Name, ex.Message);
             throw; // Re-throw to let the retry policy handle it
         }
+    }
+
+    // After an automatic reconnect (the API restarted) the server's in-memory gateway registry is empty: report the gateway
+    // again before the heartbeat, or direct routes and the log receiver's address stay unusable until the next full connect.
+    private async Task ReportGatewayAndHeartbeatAsync(CancellationToken cancellationToken)
+    {
+        if (connection is { State: HubConnectionState.Connected } current)
+            await ReportRuntimeGatewayAsync(current, cancellationToken);
+        await heartbeatService.SendAsync(cancellationToken);
     }
 
     // Tells the server where its proxy can reach this Runner's gateway directly (#1181). A server that does not know
