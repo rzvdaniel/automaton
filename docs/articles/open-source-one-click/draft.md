@@ -6,11 +6,11 @@ TODO(owner): one sentence in your own voice about why you wanted a blog on your 
 
 ## The usual self-hosting pain
 
-You find a great open-source app. Then comes the afternoon: pick a container image, work out which port and which folder need to survive a restart, put a reverse proxy in front, get HTTPS, add a sign-in, remember backups, and keep it updated next month. The app took five minutes. Everything around it took the day.
+You find a great open-source app. Then comes the afternoon: pick a container image, work out which port and which folder need to survive a restart, put a reverse proxy in front, get HTTPS, add a sign-in, remember backups, and keep it updated next month. The app took five minutes. Everything around it took the day. And the day comes back every time something changes: a new version, a full disk, a certificate that expired while you were on holiday.
 
 ## What a package is
 
-In Automaton, an app is a folder with one file, `automaton.json`. For Ghost it names the upstream image (pinned by digest, so it never changes under you), the port it listens on, the folder where its data lives, and whether readers can open it without signing in. A few optional settings let you add Mailgun for newsletters. Next to it sits a small start script. That is the whole packaging.
+In Automaton, an app is a folder with one file, `automaton.json`. For Ghost it names the upstream image (pinned by digest, so it never changes under you), the port it listens on, the folder where its data lives, and whether readers can open it without signing in. A few optional settings let you add Mailgun for newsletters. Next to it sits a small start script. That is the whole packaging. Nobody had to rebuild Ghost or fork it: we point at the image its authors publish, and the license stays theirs.
 
 ![The idea: an upstream image plus automaton.json goes into the catalog, one click, live app](01-diagram.png)
 
@@ -28,7 +28,7 @@ Automaton adds the rest: HTTPS, sign-in, backups and updates.
 
 ![The install screen](03-install.png)
 
-**3. Open it.** The app page has two links: Blog for readers and Admin for you.
+**3. Open it.** The app page has two links: Blog for readers and Admin for you. New apps start private, so one more choice ("Who can open it" → "Anyone on the internet") makes the blog public.
 
 ![The app page with Blog and Admin links](04-app-page.png)
 
@@ -38,7 +38,7 @@ That is the blog you are reading, in its production form:
 
 ## A second example: our own logs
 
-VictoriaLogs, a log search tool, comes from the same catalog. Install it and it shows the server's own logs with nothing to connect.
+VictoriaLogs, a log search tool, comes from the same catalog. Install it and it shows the server's own logs with nothing to connect: no agent to configure, no address to paste. When something goes wrong on your server, you search the logs in the browser instead of logging in to read files.
 
 ![VictoriaLogs showing Automaton's logs](07-victorialogs.png)
 
