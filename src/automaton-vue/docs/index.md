@@ -1,34 +1,34 @@
 ---
 title: Docs
-description: Automaton documentation. Install a server, add a Runner, deploy and publish apps, update and back up, with the CLI.
+description: Automaton is the home for every app your AI builds, on a server you own. Start here.
 llms: false
 ---
 
-# Documentation
+# Automaton
 
-Automaton is open source and self-hosted: you run your own Studio, API and Runners. Each page below does one task. AI agents can start from [llms.txt](https://automaton.monster/llms.txt) (an index) or [llms-full.txt](https://automaton.monster/llms-full.txt) (all key pages in one file).
+**The home for every app your AI builds, on a server you own.**
 
-## Start here
+You care about the app. Your AI writes it, deploys it and fixes it. Automaton runs it, gives it an address, decides who can open it, keeps its secrets and backs it up. The tenth app is as easy as the first.
 
-1. [Install with your AI agent](/install-with-ai): a server, a domain and an email are all you provide.
-2. [Your first app](/getting-started): create, validate, deploy, publish.
+## How you work with it
 
-## More tasks
+1. **Tell your AI what you want.** "An app that checks my website every 5 minutes and emails me when it is down."
+2. **Look at the result in Studio.** Open it, try it, see if it is healthy.
+3. **Say what to change.** Your AI changes it and deploys again, until you are happy.
+4. **Share it when you are ready.** Only you, your team, or everyone.
 
-- [Is Automaton for you?](/is-automaton-for-you)
-- [Install the server](/install-server), [create the first administrator](/first-admin) and [add a Runner](/deploy-runner) by hand
-- [Build an Automaton app](/build-an-automaton-app)
-- [Deploy and publish an app](/deploy)
-- [Publish your own app catalog](/apps-repository)
-- [Update the server](/update-server)
-- [Back up and restore](/backup-restore)
-- [Secrets and permissions](/secrets-and-permissions)
+[Work with AI](./work-with-ai) shows the whole loop.
 
-## Reference
+## Start
 
-- [Automaton CLI](/automaton-cli)
-- [automaton.json](/automaton-json)
-- [Troubleshooting](/troubleshooting)
-- [Current limitations](/limitations)
-- [FAQ](/faq)
-- [Security overview](/security)
+| You want to | Read |
+|---|---|
+| Know if it fits you | [Is Automaton for you?](./is-automaton-for-you) |
+| Get a server running | [Install with your AI](./install-with-ai) (your AI does it) |
+| Build your first app | [Work with AI](./work-with-ai) |
+| Find your way in Studio | [Your first app](./getting-started) |
+| Fix something | [Troubleshooting](./troubleshooting) |
+
+## For AI agents
+
+Start from [llms.txt](https://automaton.monster/llms.txt) (index) or [llms-full.txt](https://automaton.monster/llms-full.txt) (every page in one file). The reference pages ([CLI](./automaton-cli), [automaton.json](./automaton-json), [Install the server](./install-server), [Add a Runner](./deploy-runner)) have exact commands and a check after each step.

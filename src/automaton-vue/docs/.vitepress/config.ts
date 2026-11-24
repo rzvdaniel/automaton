@@ -34,6 +34,7 @@ export default defineConfig({
       {
         text: 'Start here',
         items: [
+          { text: 'Work with AI', link: '/work-with-ai' },
           { text: 'Install with your AI agent', link: '/install-with-ai' },
           { text: 'Your first app', link: '/getting-started' },
         ],
