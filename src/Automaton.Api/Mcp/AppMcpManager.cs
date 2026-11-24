@@ -170,19 +170,25 @@ public sealed class AppMcpManager(
             await Task.Delay(TimeSpan.FromSeconds(1), token);
         }
         var app = (await apps.ListAsync(null, token)).FirstOrDefault(item => item.Id == appId);
-        var state = app is null ? "Unknown" : app.IsPaused ? "paused" : app.LiveEnvironment?.Status ?? "Unassigned";
+        var state = AppState(app);
         if (operation?.Status == "Succeeded" && operation.Result?.Success != false && state == "Running")
-            return new { appId, deployed = true, state, address = app!.PublicUrl, studio = StudioLink(appId) };
+            return new { appId, deployed = true, state, address = app?.PublicUrl, studio = StudioLink(appId) };
+        return await DescribeFailureAsync(appId, operation, app, state, token);
+    }
 
+    private static string AppState(AppListItemDto? app)
+        => app is null ? "Unknown" : app.IsPaused ? "paused" : app.LiveEnvironment?.Status ?? "Unassigned";
+
+    private async Task<object> DescribeFailureAsync(Guid appId, DeploymentOperationResponse? operation, AppListItemDto? app, string state, CancellationToken token)
+    {
         var failed = operation?.Status == "Failed" || operation?.Result?.Success == false;
-        var events = await EventTailAsync(appId, token);
         return new
         {
             appId, deployed = false, state,
             status = operation?.Status ?? "Unknown",
             timedOut = !failed && operation?.Status is not "Succeeded",
             error = operation?.Error ?? app?.LiveEnvironment?.LastDeploymentError,
-            logTail = events,
+            logTail = await EventTailAsync(appId, token),
             note = failed ? "The deploy failed. Fix the files and call deploy_app again." : "Not Running yet. Call app_status or app_logs to follow it.",
         };
     }
