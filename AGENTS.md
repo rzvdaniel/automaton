@@ -21,6 +21,7 @@ Read the matching skill before changing the related area:
 | Reviewing or merging any pull request (risk tier, review, security pass, merge gate) | [PR review](.agents/skills/pr-review/SKILL.md) and [`REVIEW.md`](REVIEW.md) |
 | Creating any GitHub issue | [Write issue](.agents/skills/automaton-write-issue/SKILL.md) |
 | Opening any pull request | [Write PR](.agents/skills/automaton-write-pr/SKILL.md) |
+| Planning or drafting an article | [Write article](.agents/skills/automaton-write-article/SKILL.md) |
 | Implementing an issue from claim to merged pull request, when the owner or orchestrator asks for it | [Automaton implement issue](.agents/skills/automaton-implement-issue/SKILL.md) |
 | Releasing merged work, checking it on the test server as real users, proofs and labels (one change or a batch) | [Automaton verify release](.agents/skills/automaton-verify-release/SKILL.md) |
 | Only when the owner makes you the orchestrator of the agents | [Automaton orchestrate](.agents/skills/automaton-orchestrate/SKILL.md) |
