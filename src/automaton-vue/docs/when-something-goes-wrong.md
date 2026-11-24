@@ -36,7 +36,7 @@ Starting an Action or reading its logs returns **503** "It may be offline" when 
 If the services or the public checks fail after an update, the updater goes back to the previous release by itself and, when a migration ran, restores the database from the update's recovery backup. Anything written during the failed update is lost.
 
 1. Run `automaton server update-status`. It shows the last line of `update.log`, which says whether the rollback worked.
-2. Check the server: `curl -fsS https://api.example.com/health` should print `{"status":"ok"}`.
+2. Check the server: `curl -fsS https://api.yourdomain.com/health` should print `{"status":"ok"}`.
 3. If it is healthy, you are on the previous release; fix the cause the log names and run the update again.
 4. If the rollback did not restore a healthy server, do not rerun blindly. Restore the database, configuration and keys together: [Back up and restore](./backup-restore).
 
@@ -71,7 +71,7 @@ Go to **Settings → AI Keys** and confirm that at least one valid AI provider k
 
 ## A banned address
 
-The server bans addresses that probe for junk paths or fail many sign-ins, for an hour. List bans with `sudo fail2ban-client status automaton-scanner` (or `sshd`, `automaton-signin`) and lift one with `sudo fail2ban-client unban <address>`. To never ban an address, see [Security overview](./security#scanners-and-password-guessing).
+The server bans addresses that probe for junk paths or fail many sign-ins, for an hour, longer each time it returns. List bans with `sudo fail2ban-client status automaton-scanner` (or `sshd`, `automaton-signin`) and lift one with `sudo fail2ban-client unban <address>`. To never ban an address, see [Security overview](./security#scanners-and-password-guessing).
 
 ## Installing failed
 
@@ -79,7 +79,7 @@ See the common errors in [Install the server](./install-server#common-errors): D
 
 ## Search server logs in the browser
 
-Install the VictoriaLogs app from the catalog and approve its `logs:receive` permission. Within about a minute the API, the Worker and the Runner that hosts the app send their logs to it. Filter by level (`severity_text:Error`) and watch live. It keeps 14 days and at most 2 GiB by default. Details, including Runners on other machines, are in [Install the server](./install-server#reference).
+Install the VictoriaLogs app from the catalog and approve its `logs:receive` permission (a system administrator can do it on the install page). Within about a minute the API, the Worker and the Runner that hosts the app send their logs to it, with no setting and no restart; they keep writing their log files too. Filter by level (`severity_text:Error`) and watch live. Pausing, uninstalling or revoking the permission stops it quietly. When a Runner cannot sync the receiver, or the server has no verified gateway host for it, the Runner or API log shows one warning (not one every 30 seconds). Only a Runner installed by Automaton (it publishes a gateway the server has verified) serves the automatic choice, and logs travel over plain `http` on the server's private network. With two such apps on different Runners, the first one to report keeps it. A Runner on another machine than the app sends nothing until you set `Logging__Otlp__Endpoint` to an `https` address of the app on that Runner (use `http` only on the same server or Docker network). The same setting on the API, the Worker or a Runner always wins over the app and turns the automatic choice off for that process; leave it empty for the automatic one. The app keeps 14 days and at most 2 GiB by default; change `RETENTION_PERIOD` or `MAX_DISK_SPACE_BYTES` in the app's settings. The Home card of the app says when nothing from Automaton arrives.
 
 ## Common questions
 
