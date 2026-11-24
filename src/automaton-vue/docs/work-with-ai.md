@@ -70,6 +70,16 @@ To show it off, publish it in your own app store with a cover and a description.
 
 Studio **Home** tells you what needs you: an update, a failed run, a permission to approve. Hand it to your AI: "The checker failed at 17:13, look at the logs and fix it." When a new Automaton version comes out, update from **Server** in one click; apps keep running.
 
+### Let Claude read your apps
+
+Your server has a read-only MCP endpoint at `/mcp`. In Claude Code, add it with your API key:
+
+```bash
+claude mcp add --transport http automaton https://api.your-domain.com/mcp --header "Authorization: Bearer <your API key>"
+```
+
+Claude can then list your apps and read one app's status, activity, logs (the last 500 lines at most) and README. It sees only the apps your key can see, never secret values, and cannot change anything. Without a key, or with a wrong one, the endpoint answers 401.
+
 ## Prompts that work well
 
 - "Deploy it and check it works before you tell me it's done."
