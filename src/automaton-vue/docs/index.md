@@ -8,7 +8,7 @@ llms: false
 
 **The home for every app your AI builds, on a server you own.**
 
-You care about the app. Your AI writes it, deploys it and fixes it. Automaton runs it, gives it an address, decides who can open it, keeps its secrets, backs it up and updates it safely. The tenth app is as easy as the first.
+You care about the app. Your AI writes it, deploys it and fixes it. Automaton runs it, gives it an address, decides who can open it, keeps its secrets and backs it up. The tenth app is as easy as the first.
 
 ## How you work with it
 

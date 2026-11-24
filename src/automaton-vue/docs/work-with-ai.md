@@ -45,13 +45,13 @@ Open Studio, then **Apps** and your app:
 
 - **Overview:** is it running, which version, how much disk it uses, and anything that needs you.
 - **Activity:** every run and deploy, and what went wrong.
-- **Open app:** the app itself, if it has pages.
+- **Open Application:** the app itself, if it has pages.
 
 Something not right? Tell your AI what you see, in your own words. It reads the logs, fixes the code and deploys again.
 
 ## Start from what exists
 
-Before asking for something big, look in **Catalog**. A blog, analytics, link checker or log viewer may already be there, tested and one click away. Install it, then ask your AI to adapt it: "Fork Goat Counter and add a weekly email with the top pages."
+Before asking for something big, look in **Catalog**. A blog, analytics, link checker or log viewer may already be there, tested and one click away. Install it, then ask your AI to adapt it: "Fork the link checker and email me a weekly summary."
 
 ## Share it when it is ready
 
@@ -60,8 +60,9 @@ Every app starts private. With **Share** (or by asking your AI) you choose:
 | Who can open it | For |
 |---|---|
 | Only you | trying things |
-| Signed-in members | your team or family |
-| Everyone with the link | anything public |
+| People I choose | a few people on your server |
+| Everyone on this server | your team or family |
+| Public | anyone with the link |
 
 To show it off, publish it in your own app store with a cover and a description.
 
@@ -82,7 +83,7 @@ Studio **Home** tells you what needs you: an update, a failed run, a permission 
 - **Your apps, your server.** Apps and their data stay on machines you choose. The cost is the server you rent.
 - **Secrets stay out of the chat.** You type keys and passwords in Studio or the CLI; your AI only names them.
 - **You approve what apps may do.** Sending email or reading the server needs an administrator's approval in Studio.
-- **Data survives new versions.** What an app keeps in its data folder stays across every deploy.
-- **A bad version does not go live.** A new version replaces the old one only after its health check passes.
+- **Data survives new versions** when the app keeps it in its data folder (`AUTOMATON_APP_DATA_DIR`); everything else is replaced on each deploy. Your AI knows this from `AGENTS.md`.
+- **A broken version is caught.** If a new version does not answer its health check, the deploy fails and your AI sees why in the logs.
 
 Next: [Build an app](./build-an-automaton-app) for what your AI writes, and the [CLI](./automaton-cli) for every command.
