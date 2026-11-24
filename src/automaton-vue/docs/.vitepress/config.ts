@@ -49,6 +49,7 @@ export default defineConfig({
           { text: 'Create the first administrator', link: '/first-admin' },
           { text: 'Add a Runner', link: '/deploy-runner' },
           { text: 'Build an Automaton app', link: '/build-an-automaton-app' },
+          { text: 'CLI recipes', link: '/cli' },
           { text: 'Deploy and publish an app', link: '/deploy' },
           { text: 'Publish your own app catalog', link: '/apps-repository' },
           { text: 'Update the server', link: '/update-server' },

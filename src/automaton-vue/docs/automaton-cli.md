@@ -6,6 +6,8 @@ order: 120
 
 # Automaton CLI
 
+Short copy-paste commands for common tasks are in [CLI recipes](./cli). This page is the full reference.
+
 The CLI manages the local project link and sends the configured application to
 Automaton. Read `automaton.json` and the generated local guidance before editing.
 
