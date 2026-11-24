@@ -36,6 +36,7 @@ export default defineConfig({
         items: [
           { text: 'What is Automaton', link: '/what-is-automaton' },
           { text: 'Work with AI', link: '/work-with-ai' },
+          { text: 'A tour of Studio', link: '/studio-tour' },
           { text: 'Install Automaton', link: '/install' },
           { text: 'Install with your AI agent', link: '/install-with-ai' },
           { text: 'Your first app', link: '/getting-started' },
