@@ -15,7 +15,7 @@ type NavLink = {
 }
 
 const navLinks: NavLink[] = [
-  { label: 'Install', href: '/docs/install-server', external: true },
+  { label: 'Install', href: '/docs/install', external: true },
   { label: 'How it works', href: '/product' },
   { label: 'Docs', href: '/docs/', external: true },
   { label: 'Open source', href: '/pricing' },

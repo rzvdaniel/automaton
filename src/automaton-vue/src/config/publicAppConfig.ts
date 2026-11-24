@@ -86,7 +86,7 @@ export function getDeployedAppUrl(appId?: string | null): string {
 }
 
 export const publicAppConfig = {
-  installUrl: '/docs/install-server',
+  installUrl: '/docs/install',
   githubUrl: 'https://github.com/rzvdaniel/automaton',
   exampleAppsUrl: 'https://github.com/rzvdaniel/automaton-apps',
   publicSiteUrl,
