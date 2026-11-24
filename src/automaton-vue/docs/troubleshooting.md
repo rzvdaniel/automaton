@@ -1,65 +1,16 @@
 ---
 title: Troubleshooting
-description: Fixes for apps that do not start after deploy, failing requests, login problems and blank pages.
-order: 140
+description: Moved to When something goes wrong.
+llms: false
+head:
+  - - meta
+    - http-equiv: refresh
+      content: 0; url=/docs/when-something-goes-wrong
+  - - link
+    - rel: canonical
+      href: https://automaton.monster/docs/when-something-goes-wrong
 ---
 
-# Troubleshooting
+# Moved
 
-Common problems and how to fix them. For install problems see [Install with your AI agent](./install-with-ai) and [Install the server](./install-server#common-errors).
-
----
-
-## App deployed but not running
-
-**Symptom:** `automaton deploy` printed `Deploy complete`, but the app does not answer or `automaton apps` does not say `Running`.
-
-- **Not finished yet** - `Deploy complete` only means the package was applied. Wait for `Running` in `automaton apps`.
-- **No Runner online** - Check `automaton runners` (or **Runners** in Studio). Add or start a Runner, then deploy again.
-- **Build or startup error** - Read `automaton logs` for the failing command and file or line.
-- **Health check failure** - The app must listen on `AUTOMATON_PORT` and answer the health path in `automaton.json`.
-- **Request to server code fails** - Deploy the changed code first; then check the route, method, body and the response status in the logs.
-
----
-
-## Runner shows as Offline or Unknown
-
-**Symptom:** `automaton runners` or the Runners page shows a Runner as offline after it started.
-
-- **Port 5671** - The Runner connects outbound to the `api` host on port 5671 (TLS). It must be reachable from the Runner machine; the `api` host must not be proxied.
-- **Runner stopped** - Check `docker ps` on the Runner host and the container's logs for startup errors.
-- **Enrollment expired** - Run `automaton runners install` again; each command is single use.
-
----
-
-## AI chat does not respond (App Editor)
-
-**Symptom:** Typing a prompt in the App Editor AI chat produces no response.
-
-**Fix:** Go to **Settings → AI Keys** and confirm that at least one valid AI provider key is saved. The editor will not make any AI requests until a key is configured.
-
----
-
-## `automaton deploy` fails with authentication error
-
-**Symptom:** `automaton deploy` exits with a 401 or 403 error.
-
-- Sign in again: `automaton login --server <api-url>` (on a server without a browser, `automaton login --device`, see [Log in without a browser](./automaton-cli#log-in-without-a-browser)).
-- Check which server is active with `automaton profiles` and `automaton whoami`.
-- A user without permission on the app gets 403; ask the app's owner.
-
----
-
-## The app loads but shows blank content
-
-**Symptom:** The app loads without an error but the page is empty.
-
-**Causes and fixes:**
-
-- **Entry point mismatch** — Confirm that the public target's configured output directory contains the entry file expected by the runtime.
-- **Build step not run** — Run the configured build command before deploying, or put that command and its output directory in `automaton.json` so the CLI can do it automatically.
-- **JavaScript error on load** — Open the browser console in the preview and look for errors.
-
-## Search server logs in the browser
-
-Install the VictoriaLogs app from the catalog and approve its `logs:receive` permission (a system administrator can do it on the install page). Within about a minute the API, the Worker and the Runner that hosts the app send their logs to it, with no setting and no restart; they keep writing their log files too. Filter by level (`severity_text:Error`) and watch live. Pausing, uninstalling or revoking the permission stops it quietly. When a Runner cannot sync the receiver, or the server has no verified gateway host for it, the Runner or API log shows one warning (not one every 30 seconds). Only a Runner installed by Automaton (it publishes a gateway the server has verified) serves the automatic choice, and logs travel over plain `http` on the server's private network. With two such apps on different Runners, the first one to report keeps it. A Runner on another machine than the app sends nothing until you set `Logging__Otlp__Endpoint` to an `https` address of the app on that Runner (use `http` only on the same server or Docker network). The same setting on the API, the Worker or a Runner always wins over the app and turns the automatic choice off for that process; leave it empty for the automatic one. The app keeps 14 days and at most 2 GiB by default; change `RETENTION_PERIOD` or `MAX_DISK_SPACE_BYTES` in the app's settings. The Home card of the app says when nothing from Automaton arrives.
+This page is now [When something goes wrong](./when-something-goes-wrong).

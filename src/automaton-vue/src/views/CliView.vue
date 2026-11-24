@@ -275,7 +275,7 @@ iss-tracker/
             </p>
 
             <div class="hero-actions">
-              <a class="button" href="/docs/troubleshooting">Learn about runners</a>
+              <a class="button" href="/docs/when-something-goes-wrong">Learn about runners</a>
             </div>
           </article>
 

@@ -86,7 +86,7 @@ automaton runners
 
 - Build your first app: [Work with AI](./work-with-ai).
 - Email for invitations and password resets: [Set up email](./install-server#set-up-email).
-- Something failed: [Troubleshooting](./troubleshooting), or the common errors in [Install the server](./install-server#common-errors).
+- Something failed: [When something goes wrong](./when-something-goes-wrong), or the common errors in [Install the server](./install-server#common-errors).
 - Later: [update](./update-server), [back up](./backup-restore), [uninstall](./install-server#uninstall).
 
 The full reference pages stay available: [Install the server](./install-server), [Create the first administrator](./first-admin), [Add a Runner](./deploy-runner).

@@ -54,4 +54,4 @@ Details are in [issue #561](https://github.com/rzvdaniel/automaton/issues/561).
 
 - [Install with your AI](./install-with-ai) or [install the server yourself](./install-server)
 - [Work with AI](./work-with-ai)
-- [FAQ](./faq)
+- [When something goes wrong](./when-something-goes-wrong)

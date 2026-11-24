@@ -44,4 +44,4 @@ For people who want to run or check the steps, and for agents:
 - [Create the first administrator](./first-admin)
 - [Add a Runner](./deploy-runner)
 - [llms.txt](https://automaton.monster/llms.txt) for agents
-- [Troubleshooting](./troubleshooting)
+- [When something goes wrong](./when-something-goes-wrong)

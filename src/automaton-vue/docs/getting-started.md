@@ -27,4 +27,4 @@ Later: *"Publish it to my app store."*
 - [Build an app](./build-an-app)
 - [Deploy and publish an app](./deploy)
 - [Automaton CLI reference](./automaton-cli)
-- [Troubleshooting](./troubleshooting)
+- [When something goes wrong](./when-something-goes-wrong)
