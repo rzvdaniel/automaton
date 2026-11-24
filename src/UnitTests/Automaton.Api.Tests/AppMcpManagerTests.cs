@@ -34,8 +34,8 @@ public sealed class AppMcpManagerTests
     [Test]
     public void ValidateFiles_RefusesOversizeAndUnsafeAndMissingConfig()
     {
-        var big = new string('x', (int)AppMcpManager.MaxDeployBytes + 1);
-        Assert.That(Assert.Throws<McpUserException>(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["automaton.json"] = "{}", ["big.txt"] = big }))!.Message, Does.Contain("limit"));
+        var big = new string('x', 1025);
+        Assert.That(Assert.Throws<McpUserException>(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["automaton.json"] = "{}", ["big.txt"] = big }, maxBytes: 1024))!.Message, Does.Contain("limit"));
         Assert.Throws<McpUserException>(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["automaton.json"] = "{}", ["../evil"] = "x" }));
         Assert.Throws<McpUserException>(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["automaton.json"] = "{}", ["/etc/passwd"] = "x" }));
         Assert.Throws<McpUserException>(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["app.py"] = "x" }));

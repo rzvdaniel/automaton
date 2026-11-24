@@ -29,6 +29,7 @@ public sealed class AppMcpManager(
     IHttpContextAccessor http)
 {
     public const long MaxDeployBytes = AppArchiveStorageBounds.MaximumUploadBytes;
+    public const long MaxRequestBytes = MaxDeployBytes * 2 + 1024 * 1024;
     public const int MaxFiles = 2000;
     public static readonly TimeSpan DefaultWait = TimeSpan.FromSeconds(120);
     private const int FailureEvents = 10;
@@ -142,7 +143,7 @@ public sealed class AppMcpManager(
         return pack.Files.Select(f => new { path = f.TargetPath, content = f.Content }).ToList();
     }
 
-    public static void ValidateFiles(IReadOnlyDictionary<string, string> files)
+    public static void ValidateFiles(IReadOnlyDictionary<string, string> files, long maxBytes = MaxDeployBytes)
     {
         if (files is null || files.Count == 0) throw new McpUserException("Send the app's files, including automaton.json.");
         if (files.Count > MaxFiles) throw new McpUserException($"At most {MaxFiles} files per deploy.");
@@ -154,7 +155,7 @@ public sealed class AppMcpManager(
                 throw new McpUserException($"Not a relative file path: {path}");
             total += Encoding.UTF8.GetByteCount(content ?? string.Empty);
         }
-        if (total > MaxDeployBytes) throw new McpUserException($"The files are {total / 1024 / 1024} MB; the limit is {MaxDeployBytes / 1024 / 1024} MB, the same as the CLI upload.");
+        if (total > maxBytes) throw new McpUserException($"The files are {total / 1024 / 1024} MB; the limit is {maxBytes / 1024 / 1024} MB, the same as the CLI upload.");
         if (!files.Keys.Any(p => p.Replace('\\', '/') == "automaton.json")) throw new McpUserException("automaton.json is missing. Call app_guidance for the format.");
     }
 
