@@ -2,7 +2,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import Menu from 'primevue/menu'
+import Textarea from 'primevue/textarea'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import AppActions from '../components/AppActions.vue'
@@ -34,6 +36,8 @@ import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getDeployedAppUrl, getPublishedAppUrl, getStudioApplicationUrl, withFirstPage } from '../utils/public-app-url'
 import { accessLabel, appKindOf, getAppHealth, isActiveRun } from '../utils/app-overview'
 import { useDeleteApp } from '../utils/use-delete-app'
+import { restartApp } from '../utils/restart-app'
+import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
 import { adminAppsService, type AdminAppPermissionStatus } from '@/features/admin/services/adminAppsService'
 import { notifyWaitingChanged } from '@/features/admin/composables/waitingApprovals'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -77,9 +81,7 @@ async function decidePermission(permission: string, approved: boolean) {
 async function permissionsChanged() {
   await loadWaitingPermissions()
   notifyWaitingChanged()
-  permissionsVersion.value++
 }
-const permissionsVersion = ref(0)
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const executions = ref<AppActionExecution[]>([])
 const schedules = ref<ActionSchedule[]>([])
@@ -108,9 +110,46 @@ const tabs = computed(() => appTabs({
 /** The tab shown: a link to a tab this app or person does not have shows Overview. */
 const shownView = computed<AppViewKey>(() => tabs.value.some((tab) => tab.key === activeView.value) ? activeView.value : 'overview')
 const { askDelete } = useDeleteApp(() => app.value!)
-const moreItems = computed(() => [
-  ...(canManage.value ? [{ label: 'Delete app…', icon: 'pi pi-trash', class: 'menu-danger', command: askDelete }] : []),
-])
+/** Pause stops the app, so it asks first and says what is kept; an administrator pausing someone else's app may leave a reason. */
+const pauseDialog = ref(false)
+const pauseReason = ref('')
+const pauseBusy = ref(false)
+const pauseExplanation = computed(() => app.value?.actionsOnly
+  ? 'Pause turns its schedules off; its data, secrets, settings and address are kept.'
+  : 'Pause stops the app and its schedules; its data, secrets, settings and address are kept.')
+async function setPaused(pause: boolean) {
+  if (!app.value) return
+  pauseBusy.value = true
+  if (!pause) toast.add({ severity: 'info', summary: 'Resuming', detail: APP_START_PROGRESS, life: 6000 })
+  try {
+    const state = await appsService.setPaused(app.value.id, pause, pause ? pauseReason.value.trim() || undefined : undefined)
+    toast.add({ severity: state.warnings.length > 0 ? 'warn' : 'success', summary: pause ? 'Paused' : 'Resumed', detail: state.warnings[0] ?? (pause ? 'The app is paused.' : 'The app is running again.'), life: 4000 })
+    pauseDialog.value = false
+    pauseReason.value = ''
+    await editorStore.refreshApp(appId.value)
+  } catch (err: unknown) {
+    toast.add({ severity: 'error', summary: 'Error', detail: appActionErrorMessage(err, err instanceof Error ? err.message : 'Could not change the app'), life: 12000 })
+  } finally {
+    pauseBusy.value = false
+  }
+}
+/** Owners and administrators can pause; only people who can change the app can restart or delete it. */
+const moreItems = computed(() => {
+  const item = app.value
+  if (!item) return []
+  const label = (text: string, hint: string) => ({ text, hint })
+  const entries = []
+  if (canManage.value && !item.isPaused && !item.actionsOnly) {
+    entries.push({ ...label('Restart', 'Loads changed settings and secrets'), icon: 'pi pi-refresh', command: () => void restartApp(item.id, toast) })
+  }
+  if (canManage.value || isAdministrator) {
+    entries.push(item.isPaused
+      ? { ...label('Resume', 'Starts the app and its schedules again'), icon: 'pi pi-play', command: () => void setPaused(false) }
+      : { ...label('Pause…', pauseExplanation.value), icon: 'pi pi-pause', command: () => { pauseDialog.value = true } })
+  }
+  if (canManage.value) entries.push({ separator: true }, { text: 'Delete app…', icon: 'pi pi-trash', class: 'menu-danger', command: askDelete })
+  return entries
+})
 const isPublicApp = computed(() => sharing.value?.audience === 'internet')
 const publicHost = computed(() => (app.value?.publicUrl ? new URL(getPublishedAppUrl(app.value.publicUrl)).host : ''))
 const kind = computed(() => (app.value ? appKindOf(app.value) : 'web'))
@@ -375,7 +414,7 @@ async function handleSharingChanged() {
           <div class="head-text">
             <div class="title-line">
               <h1>{{ app.name }}</h1>
-              <span class="pill" :class="`pill--${health}`" data-testid="app-health">{{ health }}</span>
+              <span class="health" :class="`health--${health}`" data-testid="app-health"><span class="dot" aria-hidden="true"></span>{{ health }}</span>
               <button v-if="access && app.canUpdate !== false" type="button" class="pill pill--access" title="Change who can open it" data-testid="app-access" @click="showShareDialog = true">{{ access }}</button>
               <span v-else-if="access" class="pill pill--access" data-testid="app-access">{{ access }}</span>
             </div>
@@ -386,8 +425,8 @@ async function handleSharingChanged() {
             <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" icon="pi pi-share-alt" outlined data-testid="share-app" @click="showShareDialog = true" />
             <template v-if="kind === 'tool'">
               <Button
-                label="Run now"
                 v-if="app.canUpdate !== false"
+                label="Run now"
                 icon="pi pi-play"
                 :loading="starting"
                 :disabled="actions.length === 0"
@@ -401,9 +440,16 @@ async function handleSharingChanged() {
               <Button v-if="apiReferenceUrl" as="a" :href="apiReferenceUrl" target="_blank" rel="noopener noreferrer" label="API reference" severity="secondary" outlined />
               <Button label="Copy address" icon="pi pi-copy" :disabled="!address" data-testid="copy-address" @click="copyAddress" />
             </template>
-            <Button v-else-if="openAppUrl" label="Open app" icon="pi pi-external-link" data-testid="open-app" @click="openApp" />
+            <Button v-else-if="openAppUrl" label="Open app" icon="pi pi-external-link" class="open-app" data-testid="open-app" @click="openApp" />
             <Button icon="pi pi-ellipsis-h" severity="secondary" outlined aria-label="More actions" aria-haspopup="true" data-testid="more-actions" @click="moreMenu?.toggle($event)" />
-            <Menu ref="moreMenu" :model="moreItems" popup />
+            <Menu ref="moreMenu" :model="moreItems" popup class="more-menu">
+              <template #item="{ item, props: itemProps }">
+                <a v-if="!item.separator" v-bind="itemProps.action" :style="item.class ? { color: 'var(--danger, #b42318)' } : undefined" :data-testid="`more-${String(item.text).toLowerCase().replace(/[^a-z]/g, '')}`">
+                  <span :class="item.icon" aria-hidden="true" />
+                  <span class="more-text"><span>{{ item.text }}</span><small v-if="item.hint">{{ item.hint }}</small></span>
+                </a>
+              </template>
+            </Menu>
           </div>
         </header>
 
@@ -428,15 +474,11 @@ async function handleSharingChanged() {
           :schedules="schedules"
           :actions="actions"
           :address="address"
-          :public-address="publicAppUrl"
-          :private-address="privateAppUrl"
           :sharing="sharing"
           :waiting-permissions="waitingPermissions"
-          :permissions-version="permissionsVersion"
           :deciding="approvingPermission"
           @decide-permission="decidePermission"
           @navigate="handleNavigation"
-          @share="showShareDialog = true"
           @paused-changed="editorStore.refreshApp(appId)"
           @targets-changed="refreshTargets"
         />
@@ -461,7 +503,7 @@ async function handleSharingChanged() {
           :deploy-target="kind === 'tool' ? null : liveTarget"
           :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
         />
-        <AppDocsTab v-else-if="shownView === 'docs'" :app-id="app.id" :description="app.description" />
+        <AppDocsTab v-else-if="shownView === 'docs'" :app-id="app.id" :description="app.description" :version="app.installedFromCommit?.slice(0, 7)" @navigate="handleNavigation" />
         <AppSourceTab v-else-if="shownView === 'source'" :app-id="app.id" :definition="app.application" />
         <AppSecrets
           v-else-if="shownView === 'secrets'"
@@ -489,11 +531,20 @@ async function handleSharingChanged() {
           v-else-if="shownView === 'admin'"
           :app-id="app.id"
           :app-name="app.name"
-          :paused="!!app.isPaused"
-          @paused-changed="editorStore.refreshApp(appId)"
           @permissions-changed="permissionsChanged"
         />
       </main>
+
+      <Dialog v-model:visible="pauseDialog" modal header="Pause this app?" :style="{ width: 'min(30rem, 94vw)' }">
+        <p class="pause-text" data-testid="pause-explanation">{{ pauseExplanation }} Visitors see a paused page until you resume it.</p>
+        <label v-if="isAdministrator" class="pause-reason">Reason (the owner sees it)
+          <Textarea v-model="pauseReason" rows="2" auto-resize maxlength="500" placeholder="Optional" data-testid="pause-reason" />
+        </label>
+        <template #footer>
+          <Button label="Cancel" severity="secondary" text @click="pauseDialog = false" />
+          <Button label="Pause app" icon="pi pi-pause" severity="danger" :loading="pauseBusy" data-testid="pause-confirm" @click="setPaused(true)" />
+        </template>
+      </Dialog>
 
       <ShareDialog
         v-model:visible="showShareDialog"
@@ -576,12 +627,19 @@ h1 {
   font-size: 12px;
 }
 
-.pill--healthy { border: 1px solid var(--ok); color: var(--ok); }
-.pill--failing { background: color-mix(in srgb, var(--signal) 18%, transparent); color: var(--signal-ink); }
+.health { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+.health .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); }
+.health--failing { color: var(--signal-ink); }
+.health--failing .dot { background: var(--signal); }
+.health--stopped .dot { background: var(--line); }
 .pill--access { border: 1px solid var(--line); background: none; color: var(--ink); }
 button.pill--access { cursor: pointer; }
 button.pill--access:hover { background: var(--row-line); }
-.pill--stopped { background: var(--row-line); color: var(--ink-soft); }
+.head-actions :deep(.open-app) { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.more-text { display: flex; flex-direction: column; max-width: 240px; }
+.more-text small { color: var(--ink-soft); font-size: 12px; white-space: normal; }
+.pause-text { margin: 0 0 12px; }
+.pause-reason { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 
 .tabs {
   display: flex;

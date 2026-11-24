@@ -16,3 +16,23 @@ export function describeDisk(disk: AppDiskUsage): string {
   const shown = parts.filter(([, bytes]) => bytes != null && bytes > 0).map(([name, bytes]) => `${name} ${formatBytes(bytes as number)}`)
   return `${formatBytes(disk.totalBytes)}${shown.length ? ` — ${shown.join(', ')}` : ''}`
 }
+
+export const HOST_DISK_WARNING = 80
+
+/** The parts of an app's disk use that were measured, largest first, for the split bar. */
+export function diskParts(disk: AppDiskUsage): Array<{ name: string; bytes: number }> {
+  const all: [string, number | null | undefined][] = [
+    ['image', disk.imageBytes], ['files', disk.filesBytes], ['data', disk.dataBytes],
+    ['container', disk.containerBytes], ['logs', disk.logsBytes],
+  ]
+  return all.filter(([, bytes]) => bytes != null && bytes > 0).map(([name, bytes]) => ({ name, bytes: bytes as number }))
+    .sort((a, b) => b.bytes - a.bytes)
+}
+
+/** The machine disk the app lives on, when its Runner reported it. */
+export function hostDiskUse(disk: AppDiskUsage): { used: number; total: number; free: number; percent: number } | null {
+  const total = disk.hostDiskTotalBytes
+  const free = disk.hostDiskAvailableBytes
+  if (!total || total <= 0 || free == null || free > total) return null
+  return { used: total - free, total, free, percent: Math.round(((total - free) / total) * 100) }
+}

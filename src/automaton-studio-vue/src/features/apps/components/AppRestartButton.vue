@@ -2,8 +2,8 @@
 import { ref } from 'vue'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
-import { appsService } from '../services/apps.service'
-import { APP_START_PROGRESS, appActionErrorMessage } from '../utils/app-action-error'
+import { restartApp } from '../utils/restart-app'
+import { APP_START_PROGRESS } from '../utils/app-action-error'
 
 const props = defineProps<{ appId: string }>()
 const toast = useToast()
@@ -13,17 +13,7 @@ const busy = ref(false)
 async function restart() {
   busy.value = true
   try {
-    const { restarted, confirmed } = await appsService.restart(props.appId)
-    toast.add({
-      severity: restarted > 0 && confirmed ? 'success' : 'info',
-      summary: restarted > 0 ? 'Restarting' : 'Nothing to restart',
-      detail: restarted > 0
-        ? (confirmed ? 'The app restarts with its current settings and secrets.' : 'The connection dropped before the answer. The server carries on with the restart; reload in a minute to check.')
-        : 'The app is not running. Settings and secrets apply the next time it starts.',
-      life: 4000,
-    })
-  } catch (failure) {
-    toast.add({ severity: 'error', summary: 'Could not restart', detail: appActionErrorMessage(failure, 'The app could not be restarted.'), life: 12000 })
+    await restartApp(props.appId, toast)
   } finally {
     busy.value = false
   }

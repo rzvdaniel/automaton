@@ -5,14 +5,13 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
-import { appsService } from '@/features/apps/services/apps.service'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { AdminAppDetails } from '../types/admin.types'
 import { adminAppsService } from '../services/adminAppsService'
 import type { AdminAppPermissionStatus, HostExecPermission, RunnerMaintenancePermission } from '../services/adminAppsService'
 
-const props = defineProps<{ appId: string; appName: string; paused: boolean }>()
-const emit = defineEmits<{ 'paused-changed': []; 'permissions-changed': [] }>()
+const props = defineProps<{ appId: string; appName: string }>()
+const emit = defineEmits<{ 'permissions-changed': [] }>()
 
 const toast = useToast()
 // Only system administrators approve permissions (the endpoint is SysAdmin-only).
@@ -31,7 +30,6 @@ const reviewStatus = ref('approved')
 const accessStatus = ref('active')
 const moderationReason = ref('')
 const savingModeration = ref(false)
-const pausing = ref(false)
 const REVIEW = [{ label: 'Approved', value: 'approved' }, { label: 'Flagged', value: 'flagged' }]
 const ACCESS = [{ label: 'Active', value: 'active' }, { label: 'Hidden', value: 'hidden' }, { label: 'Disabled', value: 'disabled' }]
 
@@ -98,7 +96,6 @@ async function load() {
 }
 onMounted(load)
 
-const severity = (status: string) => status === 'Approved' ? 'success' : status === 'Pending' ? 'warn' : status === 'Rejected' || status === 'Revoked' ? 'danger' : 'secondary'
 
 async function decide(item: AdminAppPermissionStatus, approved: boolean) {
   saving.value = item.permission
@@ -143,47 +140,52 @@ async function saveModeration() {
   }
 }
 
-const pauseReason = ref('')
-const askingReason = ref(false)
-
-async function setPaused(pause: boolean, reason?: string) {
-  pausing.value = true
-  try {
-    await appsService.setPaused(props.appId, pause, reason)
-    toast.add({ severity: 'success', summary: pause ? 'Paused' : 'Resumed', life: 3000 })
-    emit('paused-changed')
-  } catch (error) {
-    toast.add({ severity: 'error', summary: pause ? 'The app could not be paused' : 'The app could not be resumed', detail: error instanceof Error ? error.message : undefined, life: 5000 })
-  } finally {
-    pausing.value = false
-    askingReason.value = false
-    pauseReason.value = ''
-  }
-}
-
-function askPause() {
-  if (props.paused) return void setPaused(false)
-  askingReason.value = !askingReason.value
-}
+const waiting = computed(() => permissions.value.filter((item) => item.status === 'Pending'))
+const decided = computed(() => permissions.value.filter((item) => item.status !== 'Pending'))
+const find = ref('')
+const showAll = ref(false)
+const SHOWN = 5
+const matches = computed(() => {
+  const term = find.value.trim().toLowerCase()
+  return term ? decided.value.filter((item) => item.permission.toLowerCase().includes(term)) : decided.value
+})
+const listed = computed(() => showAll.value || find.value.trim() ? matches.value : matches.value.slice(0, SHOWN))
+const approvedCount = computed(() => permissions.value.filter((item) => item.approved).length)
+const summary = computed(() => [
+  { label: 'Owner', value: details.value?.ownerName || '…' },
+  { label: 'Review', value: REVIEW.find((item) => item.value === reviewStatus.value)?.label ?? reviewStatus.value },
+  { label: 'Access', value: ACCESS.find((item) => item.value === accessStatus.value)?.label ?? accessStatus.value },
+  ...(canApprove.value ? [{ label: 'Permissions', value: waiting.value.length ? `${waiting.value.length} waiting · ${approvedCount.value} approved` : `${approvedCount.value} approved` }] : []),
+])
 </script>
 
 <template>
   <div class="admin" data-testid="admin-tab">
-    <p class="hint">Only administrators see this tab. Admin → Apps lists every app on the server and opens this page.</p>
+    <dl class="summary" data-testid="admin-summary">
+      <div v-for="item in summary" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>
+    </dl>
 
+    <div class="columns">
     <section v-if="canApprove" class="card" aria-labelledby="perm-title" data-testid="admin-permissions">
-      <h2 id="perm-title">Permission requests</h2>
+      <h2 id="perm-title">Permissions</h2>
       <p v-if="permissions.length === 0" class="hint">This app has not requested any permissions.</p>
-      <div v-for="item in permissions" :key="item.permission" class="row">
-        <code>{{ item.permission }}</code>
-        <Tag :value="item.status" :severity="severity(item.status)" rounded />
-        <span class="spacer"></span>
-        <Button v-if="item.approved" label="Revoke" :aria-label="`Revoke ${item.permission}`" severity="danger" outlined size="small" :loading="saving === item.permission" :disabled="saving !== null" @click="decide(item, false)" />
-        <template v-else>
-          <Button v-if="item.status === 'Pending'" label="Deny" :aria-label="`Deny ${item.permission}`" severity="secondary" outlined size="small" :disabled="saving !== null" @click="decide(item, false)" />
+      <div v-if="waiting.length" class="waiting" data-testid="admin-waiting">
+        <div v-for="item in waiting" :key="item.permission" class="row">
+          <span><code>{{ item.permission }}</code> <span class="needs">waiting</span></span>
+          <span class="spacer"></span>
+          <Button label="Decline" :aria-label="`Deny ${item.permission}`" severity="secondary" outlined size="small" :disabled="saving !== null" @click="decide(item, false)" />
           <Button label="Approve" :aria-label="`Approve ${item.permission}`" size="small" :loading="saving === item.permission" :disabled="saving !== null" @click="decide(item, true)" />
-        </template>
+        </div>
       </div>
+      <input v-if="decided.length > SHOWN" v-model="find" class="find" type="search" placeholder="Find a permission" aria-label="Find a permission" data-testid="admin-find">
+      <div v-for="item in listed" :key="item.permission" class="row">
+        <code>{{ item.permission }}</code>
+        <span class="state">{{ item.status.toLowerCase() }}</span>
+        <span class="spacer"></span>
+        <Button v-if="item.approved" label="Revoke" :aria-label="`Revoke ${item.permission}`" class="revoke" text size="small" :loading="saving === item.permission" :disabled="saving !== null" @click="decide(item, false)" />
+        <Button v-else label="Approve" :aria-label="`Approve ${item.permission}`" size="small" :loading="saving === item.permission" :disabled="saving !== null" @click="decide(item, true)" />
+      </div>
+      <button v-if="!find.trim() && matches.length > SHOWN" type="button" class="more" data-testid="admin-show-more" @click="showAll = !showAll">{{ showAll ? 'Show fewer' : `Show ${matches.length - SHOWN} more` }}</button>
       <div v-if="maintainApproved" class="machines">
         <p class="hint">runner:maintain also needs an approval for each machine. Without it the app cannot run maintenance there.</p>
         <p v-if="machines.length === 0" class="hint">No machine with a Runner yet.</p>
@@ -215,20 +217,8 @@ function askPause() {
     </section>
 
     <section class="card" aria-labelledby="mod-title" data-testid="admin-moderation">
-      <div class="line">
-        <div>
-          <h2 id="mod-title">Moderation</h2>
-          <p class="hint">Owner: {{ details?.ownerName || '…' }}<template v-if="details?.ownerEmail"> ({{ details.ownerEmail }})</template>. Pausing stops the app and shows visitors a paused page.</p>
-        </div>
-        <Button :label="paused ? 'Resume app' : 'Pause app…'" :icon="paused ? 'pi pi-play' : 'pi pi-pause'" severity="secondary" outlined :loading="pausing" data-testid="pause-app" @click="askPause" />
-      </div>
-      <div v-if="askingReason && !paused" class="field" data-testid="pause-form">
-        <label>Reason (the owner sees it)<Textarea v-model="pauseReason" rows="2" auto-resize maxlength="500" placeholder="Why is this app being paused? Optional" data-testid="pause-reason" /></label>
-        <div class="line">
-          <Button label="Pause app" icon="pi pi-pause" severity="danger" :loading="pausing" data-testid="pause-confirm" @click="setPaused(true, pauseReason)" />
-          <Button label="Cancel" severity="secondary" text @click="askingReason = false" />
-        </div>
-      </div>
+      <h2 id="mod-title">Moderation</h2>
+      <p class="hint">Owner: {{ details?.ownerName || '…' }}<template v-if="details?.ownerEmail"> ({{ details.ownerEmail }})</template>. Pause the app from the ⋯ menu at the top of the page.</p>
       <div class="fields">
         <label>Review status<Select v-model="reviewStatus" :options="REVIEW" option-label="label" option-value="value" class="w-full" /></label>
         <label>Access status<Select v-model="accessStatus" :options="ACCESS" option-label="label" option-value="value" class="w-full" /></label>
@@ -237,6 +227,7 @@ function askPause() {
       <label class="field">Moderation note<Textarea v-model="moderationReason" rows="2" auto-resize placeholder="Optional moderation note" /></label>
       <div class="end"><Button label="Save moderation" icon="pi pi-save" outlined :loading="savingModeration" :disabled="!details" @click="saveModeration" /></div>
     </section>
+    </div>
   </div>
 </template>
 
@@ -248,6 +239,16 @@ h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .hint { margin: 0; color: var(--ink-soft); font-size: 13px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--row-line); }
 .spacer { flex: 1; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0; padding: 14px 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+.summary dt { color: var(--ink-soft); font-size: 12px; }
+.summary dd { margin: 0; font-weight: 600; }
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+.needs { color: var(--signal-ink); font-size: 13px; font-weight: 600; }
+.state { color: var(--ink-soft); font-size: 13px; }
+.waiting { padding: 4px 12px; border-radius: 12px; background: color-mix(in srgb, var(--signal) 14%, var(--paper)); }
+.find { min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; }
+.more { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+.revoke { color: var(--danger, #b42318); }
 code { font-family: var(--mono); font-size: 13px; }
 .machines { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
