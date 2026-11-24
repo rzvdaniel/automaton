@@ -38,6 +38,7 @@ const stepIndex = computed(() => Math.max(0, steps.findIndex((step) => step.key 
 const failedStep = computed(() => steps.find((step) => step.key === failed.value?.step)?.label ?? null)
 const updatedTo = computed(() => run.value?.toVersion ?? props.latest ?? props.current)
 const target = computed(() => run.value?.requestedVersion && run.value.requestedVersion !== 'latest' ? run.value.requestedVersion : props.latest)
+const plain = (version: string | null | undefined) => version?.replace(/^server-v/, '') ?? null
 const checked = computed(() => props.checkedAt ? new Date(props.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null)
 
 function duration(from: string | null | undefined, to: number): string | null {
@@ -50,7 +51,7 @@ const updatedLine = computed(() => {
   const finished = run.value?.finishedAtUtc
   const time = finished ? new Date(finished).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
   const took = finished ? duration(run.value?.startedAtUtc, new Date(finished).getTime()) : null
-  return `Automaton updated to ${updatedTo.value}${time ? ` at ${time}` : ''}${took ? `, took ${took}` : ''}`
+  return `Automaton updated to ${plain(updatedTo.value)}${time ? ` at ${time}` : ''}${took ? `, took ${took}` : ''}`
 })
 
 watch(updating, (value) => emit('updating', value))
@@ -115,7 +116,7 @@ function downloadLog() {
   <section class="studio-card version-card" data-testid="version-card">
     <div class="version-card__head">
       <div class="version-card__title">
-        <strong class="version-card__version">{{ updating && run ? `Updating Automaton ${run.fromVersion ?? props.current ?? 'Unknown'} → ${target ?? 'latest'}` : `Automaton ${props.current ?? 'Unknown version'}` }}</strong>
+        <strong class="version-card__version">{{ updating && run ? `Updating Automaton ${plain(run.fromVersion ?? props.current) ?? 'Unknown'} → ${plain(target) ?? 'latest'}` : `Automaton ${props.current ?? 'Unknown version'}` }}</strong>
         <span v-if="updating" class="studio-pill version-card__pill--progress" data-testid="update-running-pill">Updating</span>
         <span v-else-if="failed" class="studio-pill studio-pill--warn">Update failed</span>
         <span v-else-if="!done && props.updateAvailable" class="studio-pill studio-pill--warn" data-testid="update-available-pill">{{ props.latest }} available</span>
