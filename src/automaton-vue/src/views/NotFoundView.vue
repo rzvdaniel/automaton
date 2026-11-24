@@ -13,7 +13,7 @@ useSiteTheme()
   <div class="site b">
     <BHeader />
     <main>
-      <header class="hero">
+      <header class="hero slim">
         <div class="wrap">
           <div>
             <p class="eyebrow">404</p>
