@@ -184,7 +184,7 @@ describe('ServerView', () => {
       })
       await vi.advanceTimersByTimeAsync(3000)
       await flushPromises()
-      expect(wrapper.get('[data-testid="update-succeeded"]').text()).toContain('Automaton updated to server-v2')
+      expect(wrapper.get('[data-testid="update-succeeded"]').text()).toContain('Automaton updated to 2')
       expect(wrapper.find('[data-testid="runners-updating"]').exists()).toBe(false)
       wrapper.unmount()
     } finally {

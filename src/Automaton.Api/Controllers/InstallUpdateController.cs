@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Automaton.Api.Constants;
+using Automaton.Api.Data;
+using Microsoft.EntityFrameworkCore;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
@@ -20,8 +22,22 @@ namespace Automaton.Api.Controllers;
 public class InstallUpdateController(IConfiguration configuration, IAuditEventService auditEventService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<InstallationUpdateStatus>> Get(CancellationToken token)
-        => Ok(await InstallationUpdate.ReadAsync(configuration, DateTimeOffset.UtcNow, token));
+    public async Task<ActionResult<InstallationUpdateStatus>> Get(CancellationToken token, [FromServices] ApplicationDbContext? db = null)
+    {
+        var status = await InstallationUpdate.ReadAsync(configuration, DateTimeOffset.UtcNow, token);
+        if (db is null || status.Run?.RequestedBy is not { } label) return Ok(status);
+        return Ok(status with { Run = status.Run with { RequestedBy = await StarterNameAsync(db, label, token) } });
+    }
+
+    // The request file holds "email id" (or only the id); show the person's display name, falling back to the email.
+    private static async Task<string> StarterNameAsync(ApplicationDbContext db, string label, CancellationToken token)
+    {
+        var last = label.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        if (!Guid.TryParse(last, out var id)) return label;
+        var user = await db.Users.AsNoTracking().Where(u => u.Id == id).Select(u => new { u.DisplayName, u.Email }).FirstOrDefaultAsync(token);
+        if (user is null) return label.Contains(' ') ? label[..label.LastIndexOf(' ')] : label;
+        return !string.IsNullOrWhiteSpace(user.DisplayName) ? user.DisplayName : user.Email ?? label;
+    }
 
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] StartInstallationUpdateRequest? request, CancellationToken token)
