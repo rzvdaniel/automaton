@@ -6,7 +6,7 @@ order: 40
 
 # Install the server
 
-This page installs your own Automaton server on one x86_64 Linux machine. **Want an AI agent to do everything, from install to a link for your password? Use [Install with your AI agent](./install-with-ai).** This page is the reference for the installer. Next steps: [create the first administrator](./first-admin), then [add a Runner](./deploy-runner).
+The short path from a fresh server to a connected Runner is [Install Automaton](./install). This page installs your own Automaton server on one x86_64 Linux machine. **Want an AI agent to do everything, from install to a link for your password? Use [Install with your AI agent](./install-with-ai).** This page is the reference for the installer. Next steps: [create the first administrator](./first-admin), then [add a Runner](./deploy-runner).
 
 Already have a team server? Ask its administrator for the API URL and go to [Your first app](./getting-started).
 

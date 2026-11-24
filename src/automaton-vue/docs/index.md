@@ -24,7 +24,7 @@ You care about the app. Your AI writes it, deploys it and fixes it. Automaton ru
 | You want to | Read |
 |---|---|
 | Know if it fits you | [What is Automaton](./what-is-automaton) |
-| Get a server running | [Install with your AI](./install-with-ai) (your AI does it) |
+| Get a server running | [Install Automaton](./install), or [let your AI do it](./install-with-ai) |
 | Build your first app | [Work with AI](./work-with-ai) |
 | Find your way in Studio | [Your first app](./getting-started) |
 | Fix something | [Troubleshooting](./troubleshooting) |
