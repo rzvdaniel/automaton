@@ -638,6 +638,8 @@ internal static class ApiAppExecutionRegistration
         services.Configure<HostOptions>(o => o.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
         services.AddHostedService(sp => sp.GetRequiredService<DeploymentOperationDispatcher>());
         services.AddScoped<AppActionExecutionService>();
+        services.AddScoped<Automaton.Api.Mcp.AppMcpReader>();
+        services.AddMcpServer().WithHttpTransport(options => options.Stateless = true).WithTools<Automaton.Api.Mcp.AppMcpTools>();
         services.AddScoped<AppActionRunnerGateway>();
         services.AddScoped<IAppActionExecutionGateway>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<IRunnerActionCommands>(sp => sp.GetRequiredService<AppActionRunnerGateway>());

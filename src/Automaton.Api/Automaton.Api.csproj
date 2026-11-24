@@ -14,6 +14,7 @@
     <PackageReference Include="Destructurama.Attributed" Version="4.0.0" />
     <PackageReference Include="Destructurama.JsonNet" Version="3.0.0" />
     <PackageReference Include="DnsClient" Version="1.8.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
     <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageReference Include="DotNetCore.CAP" Version="10.0.1" />
     <PackageReference Include="DotNetCore.CAP.PostgreSql" Version="10.0.1" />

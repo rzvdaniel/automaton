@@ -39,6 +39,7 @@ internal static class ApiApplicationPipelineExtensions
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
         app.MapGet("/health", () => Results.Json(HealthResponse())).AllowAnonymous();
         app.MapControllers();
+        app.MapMcp("/mcp").RequireAuthorization("DeveloperApiAccess");
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
         app.MapRunnerTunnel();
