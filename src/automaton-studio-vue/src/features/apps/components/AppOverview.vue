@@ -135,7 +135,7 @@ const dataDirectory = computed(() => props.app.application?.storage?.dataDirecto
     <section v-if="update" class="strip" aria-label="Needs you" data-testid="update-card">
       <div class="row">
         <span>
-          <span class="pill pill--bad">{{ retryOnly ? 'Last deploy failed' : 'Update available' }}</span>
+          <strong class="needs">{{ retryOnly ? 'Last deploy failed' : 'Update available' }}</strong>
           <span v-if="update.deployFailed" class="hint" data-testid="update-deploy-error"> · {{ shortReason(update.deployError).replace(/\.$/, '') }}.<template v-if="update.runningCommit"> Still running {{ update.runningCommit.slice(0, 7) }}.</template><template v-else-if="update.hasPreviousVersion"> Still running the previous version.</template></span>
           <span v-if="!retryOnly" class="hint"> · {{ update.installedCommit?.slice(0, 7) }} → {{ update.latestCommit?.slice(0, 7) }}</span>
           <button v-if="update.deployError && update.deployError !== shortReason(update.deployError)" type="button" class="link link--button" data-testid="update-deploy-details-toggle" :aria-expanded="showDetails" @click="showDetails = !showDetails"> {{ showDetails ? 'Hide details' : 'Show details' }}</button>
@@ -156,7 +156,7 @@ const dataDirectory = computed(() => props.app.application?.storage?.dataDirecto
     </section>
 
 
-    <div class="grid">
+    <div class="cards">
       <AppRunsOn :app="app" :targets="targets" :origin="origin" @changed="emit('targets-changed')" @navigate="emit('navigate', $event)" />
       <AppDiskCard v-if="disk && typeof disk.totalBytes === 'number'" :disk="disk" :data-directory="kind !== 'site' && kind !== 'tool' ? dataDirectory : ''" />
     </div>
@@ -196,7 +196,7 @@ const dataDirectory = computed(() => props.app.application?.storage?.dataDirecto
 <style scoped>
 .overview { display: flex; flex-direction: column; gap: 18px; }
 .card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .status { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--row-line); }

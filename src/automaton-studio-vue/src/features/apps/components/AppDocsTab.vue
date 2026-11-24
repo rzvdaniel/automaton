@@ -28,7 +28,9 @@ async function open(target: string) {
   markdown.value = null
   for (const candidate of target === ENTRY ? ENTRIES : [target]) {
     try {
-      markdown.value = await appsService.readSourceFile(props.appId, candidate)
+      const text = await appsService.readSourceFile(props.appId, candidate)
+      if (text === null) continue
+      markdown.value = text
       path.value = candidate
       break
     } catch { /* try the next candidate */ }
@@ -125,7 +127,7 @@ onBeforeUnmount(revokeImages)
 .hint { margin: 0 0 8px; color: var(--ink-soft); font-size: 13px; }
 .mono { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
 .docs-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.docs-body { display: flex; flex-wrap: wrap-reverse; gap: 24px; align-items: flex-start; justify-content: center; }
+.docs-body { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
 .docs-main { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; }
 .outline { flex: 0 0 200px; position: sticky; top: 12px; display: flex; flex-direction: column; gap: 2px; align-self: flex-start; }
 .outline h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }

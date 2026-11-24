@@ -23,6 +23,9 @@ const runnerText = computed(() => {
   const runner = liveTarget.value?.runner
   return runner ? `${runner.name} · ${runner.isOnline ? 'online' : 'offline'}` : 'none assigned'
 })
+const INSTALLED = 'Installed from '
+const originLabel = computed(() => props.origin?.startsWith(INSTALLED) ? 'Installed from' : 'Origin')
+const originValue = computed(() => props.origin?.startsWith(INSTALLED) ? props.origin.slice(INSTALLED.length) : props.origin)
 const hasActions = computed(() => !props.app.application?.isStaticSite)
 
 function fail(summary: string, error: unknown) {
@@ -130,8 +133,8 @@ async function restore(actionKey: string, version: string) {
       <Button label="View in Source" size="small" text @click="emit('navigate', 'source')" />
     </div>
     <div v-if="origin" class="row" data-testid="installed-from">
-      <span>Installed from</span>
-      <span class="value mono">{{ origin }}</span>
+      <span>{{ originLabel }}</span>
+      <span class="value mono">{{ originValue }}</span>
     </div>
   </section>
 

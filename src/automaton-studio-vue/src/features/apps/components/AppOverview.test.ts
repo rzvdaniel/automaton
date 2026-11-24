@@ -35,7 +35,7 @@ describe('AppOverview layout', () => {
     expect(wrapper.find('[data-testid="addresses"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="permissions-card"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('What it needs')
-    expect(wrapper.get('[data-testid="runs-on"]').text()).toContain('Installed from')
+    expect(wrapper.get('[data-testid="installed-from"]').text()).toContain('Deployed with the CLI')
   })
 
   it('shows the Disk card with the app total and the disk it lives on', async () => {
