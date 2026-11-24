@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Overview mock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&amp;family=Instrument+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#f3f2ee}
+a{color:#a23d05}a:hover{color:#17181c}
+</style>
+</head>
+<body>
+<div style="background: #f3f2ee; color: #17181c; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; padding: 32px 24px 48px">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px">
+
+<div style="font-size: 13px; color: #55565e">Apps / Server Keeper</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+<div style="width: 56px; height: 56px; border-radius: 12px; background: #f26a1b; color: #17181c; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 18px">&gt;_&lt;</div>
+<div style="flex: 999 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 30px; font-weight: 700">Server Keeper</h1>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #55565e"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Healthy</span>
+<button type="button" style="min-height: 28px; padding: 0 10px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 14px; font: inherit; font-size: 13px; color: #55565e">Only you ▾</button>
+</div>
+<p style="margin: 0; color: #55565e; max-width: 640px; line-height: 1.5">A dashboard for your Automaton server: CPU, memory, disk, OS updates, certificates and backups, with 24 hours of history and warnings.</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" style="min-height: 40px; padding: 0 14px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 10px; font: inherit; font-weight: 500">Share</button>
+<button type="button" style="min-height: 40px; padding: 0 16px; border: 1px solid #17181c; background: #17181c; color: #fdfdfb; border-radius: 10px; font: inherit; font-weight: 600">Open app</button>
+<div style="position: relative">
+<button type="button" aria-label="More actions" aria-expanded="true" style="min-height: 40px; width: 40px; border: 1px solid #17181c; background: #fdfdfb; border-radius: 10px; font: inherit">⋯</button>
+<div role="menu" style="position: absolute; right: 0; top: 46px; z-index: 2; width: 260px; background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 12px; box-shadow: 0 8px 24px rgba(23,24,28,.12); padding: 6px; display: flex; flex-direction: column">
+<button type="button" role="menuitem" style="text-align: left; min-height: 40px; padding: 0 10px; border: 0; background: none; border-radius: 8px; font: inherit">Restart</button>
+<button type="button" role="menuitem" style="text-align: left; min-height: 40px; padding: 0 10px; border: 0; background: none; border-radius: 8px; font: inherit">Pause…</button>
+<div style="border-top: 1px solid #e2e0da; margin: 4px 0"></div>
+<button type="button" role="menuitem" style="text-align: left; min-height: 40px; padding: 0 10px; border: 0; background: none; border-radius: 8px; font: inherit; color: #b42318">Delete app…</button>
+</div>
+</div>
+</div>
+</div>
+
+<nav aria-label="App sections" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #e2e0da">
+<a href="#" style="padding: 10px 12px; color: #17181c; text-decoration: none; font-weight: 600; border-bottom: 2px solid #f26a1b">Overview</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Activity</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Actions</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Settings</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Secrets</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Domain</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Source</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Docs</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Store listing</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Admin</a>
+</nav>
+
+<section aria-label="Needs you" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; background: #ffe6d6; border-radius: 12px; padding: 14px 18px">
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+<div style="font-weight: 600; color: #a23d05">Update available · 53cd651 → 2da8f76</div>
+<div style="color: #55565e; font-size: 13px">Data, settings, secrets, sharing and schedules are kept. <a href="#">What changed</a></div>
+</div>
+<button type="button" style="min-height: 40px; padding: 0 18px; border: 0; background: #f26a1b; color: #17181c; border-radius: 10px; font: inherit; font-weight: 600">Update</button>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+<section style="background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px">Running</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0">
+<div style="padding: 4px 16px 4px 0; border-right: 1px solid #e2e0da; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; color: #55565e">CPU · 24 h</div>
+<div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 700">0.4%</div>
+<svg width="100%" height="36" viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="#17181c" stroke-width="1.5" points="0,32 20,30 40,31 60,26 80,30 100,29 120,22 140,30 160,31 180,28 200,30"></polyline></svg>
+</div>
+<div style="padding: 4px 16px; border-right: 1px solid #e2e0da; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; color: #55565e">Memory · 24 h</div>
+<div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 700">17.5 MiB</div>
+<svg width="100%" height="36" viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="#17181c" stroke-width="1.5" points="0,20 20,20 40,19 60,20 80,18 100,18 120,17 140,18 160,16 180,17 200,16"></polyline></svg>
+</div>
+<div style="padding: 4px 0 4px 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; color: #55565e">Requests · 24 h</div>
+<div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 700">1,284</div>
+<svg width="100%" height="36" viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="#17181c" stroke-width="1.5" points="0,28 20,24 40,26 60,18 80,22 100,12 120,16 140,20 160,14 180,22 200,18"></polyline></svg>
+</div>
+</div>
+<div style="font-size: 13px; color: #55565e">Live since 1 day ago · last deployed 1 day ago · restarted 0 times in 24 h</div>
+</section>
+
+<section style="background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px">Disk</h2>
+<div style="font-size: 13px; color: #55565e">on Docker data disk · 33 GB free</div>
+</div>
+<div style="display: flex; align-items: baseline; gap: 10px">
+<div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 34px; font-weight: 700">244 MB</div>
+<div style="font-size: 13px; color: #55565e">+3 MB in 7 days</div>
+</div>
+<div role="img" aria-label="Disk split: image 143 MB, files 101 MB, data 41 KB, container 20 KB" style="display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: #e2e0da">
+<div style="width: 58.6%; background: #17181c"></div>
+<div style="width: 41.2%; background: #8a8b93"></div>
+<div style="width: 0.6%; background: #f26a1b"></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #55565e"><span style="width: 10px; height: 10px; border-radius: 3px; background: #17181c"></span>Image</div><div style="font-family: 'IBM Plex Mono', monospace">143 MB</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #55565e"><span style="width: 10px; height: 10px; border-radius: 3px; background: #8a8b93"></span>Files</div><div style="font-family: 'IBM Plex Mono', monospace">101 MB</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #55565e"><span style="width: 10px; height: 10px; border-radius: 3px; background: #f26a1b"></span>Data</div><div style="font-family: 'IBM Plex Mono', monospace">41 KB</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #55565e"><span style="width: 10px; height: 10px; border-radius: 3px; background: #e2e0da; border: 1px solid #8a8b93"></span>Container</div><div style="font-family: 'IBM Plex Mono', monospace">20 KB</div></div>
+</div>
+<div style="border-top: 1px solid #e2e0da; padding-top: 12px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; color: #55565e">Data folder growth · 30 days</div>
+<svg width="100%" height="64" viewBox="0 0 600 64" preserveAspectRatio="none" aria-hidden="true"><polygon fill="#ffe6d6" points="0,64 0,56 100,54 200,52 300,48 400,44 500,40 600,36 600,64"></polygon><polyline fill="none" stroke="#f26a1b" stroke-width="2" points="0,56 100,54 200,52 300,48 400,44 500,40 600,36"></polyline></svg>
+</div>
+</section>
+
+</div>
+
+<section style="flex: 1 1 320px; min-width: 0; background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px"><h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px">Recent activity</h2><a href="#">All</a></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; padding: 10px 0; border-bottom: 1px solid #e2e0da"><span>Deployed 53cd651</span><span style="color: #55565e">1 day ago</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; padding: 10px 0; border-bottom: 1px solid #e2e0da"><span>Restarted by the server update</span><span style="color: #55565e">2 h ago</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; padding: 10px 0; border-bottom: 1px solid #e2e0da"><span>Home card refreshed</span><span style="color: #55565e">4 min ago</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; padding: 10px 0"><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f26a1b"></span>Update available</span><span style="color: #55565e">today</span></div>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

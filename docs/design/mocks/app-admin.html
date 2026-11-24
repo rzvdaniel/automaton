@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Admin mock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&amp;family=Instrument+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#f3f2ee}
+a{color:#a23d05}a:hover{color:#17181c}
+</style>
+</head>
+<body>
+<div style="background: #f3f2ee; color: #17181c; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; padding: 32px 24px 48px">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+<div style="width: 40px; height: 40px; border-radius: 10px; background: #f26a1b; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-weight: 500">&gt;_&lt;</div>
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 700">Server Keeper</h1>
+<span style="color: #55565e; font-size: 13px">Admin · only administrators see this tab</span>
+</div>
+
+<section aria-label="Summary" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 16px 0">
+<div style="padding: 0 20px; border-right: 1px solid #e2e0da"><div style="font-size: 12px; color: #55565e">Owner</div><div style="font-weight: 600">Razvan Predescu</div></div>
+<div style="padding: 0 20px; border-right: 1px solid #e2e0da"><div style="font-size: 12px; color: #55565e">Review</div><div style="display: flex; align-items: center; gap: 6px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Approved</div></div>
+<div style="padding: 0 20px; border-right: 1px solid #e2e0da"><div style="font-size: 12px; color: #55565e">Access</div><div style="display: flex; align-items: center; gap: 6px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Active</div></div>
+<div style="padding: 0 20px"><div style="font-size: 12px; color: #55565e">Permissions</div><div style="font-weight: 600">11 approved · <span style="color: #a23d05">1 waiting</span></div></div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<section style="flex: 999 1 560px; min-width: 0; background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px">Permissions</h2>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #55565e">Find<input type="search" placeholder="server:…" style="min-height: 36px; padding: 0 10px; border: 1px solid #e2e0da; border-radius: 8px; background: #fdfdfb; font: inherit; width: 160px"></label>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; background: #ffe6d6; border-radius: 10px; padding: 12px 14px">
+<div><div style="font-family: 'IBM Plex Mono', monospace; font-weight: 500">server:update-os</div><div style="font-size: 13px; color: #55565e">Install OS updates on the server. Requested 2 h ago.</div></div>
+<div style="display: flex; gap: 8px"><button type="button" style="min-height: 36px; padding: 0 12px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 8px; font: inherit">Decline</button><button type="button" style="min-height: 36px; padding: 0 14px; border: 0; background: #f26a1b; color: #17181c; border-radius: 8px; font: inherit; font-weight: 600">Approve</button></div>
+</div>
+
+<table style="width: 100%; border-collapse: collapse">
+<thead><tr><th scope="col" style="text-align: left; font-weight: 400; font-size: 12px; color: #55565e; padding: 6px 0">Permission</th><th scope="col" style="text-align: left; font-weight: 400; font-size: 12px; color: #55565e; padding: 6px 0">What it allows</th><th scope="col" style="text-align: left; font-weight: 400; font-size: 12px; color: #55565e; padding: 6px 0">State ↑</th><th scope="col" style="padding: 6px 0"><span style="position: absolute; left: -9999px">Actions</span></th></tr></thead>
+<tbody>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 9px 0; font-family: 'IBM Plex Mono', monospace">server:read</td><td style="color: #55565e">Read CPU, memory, disk</td><td><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Approved</span></td><td style="text-align: right"><button type="button" style="min-height: 32px; padding: 0 10px; border: 0; background: none; color: #b42318; font: inherit">Revoke</button></td></tr>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 9px 0; font-family: 'IBM Plex Mono', monospace">server:cleanup</td><td style="color: #55565e">Prune images and caches</td><td><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Approved</span></td><td style="text-align: right"><button type="button" style="min-height: 32px; padding: 0 10px; border: 0; background: none; color: #b42318; font: inherit">Revoke</button></td></tr>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 9px 0; font-family: 'IBM Plex Mono', monospace">server:restart</td><td style="color: #55565e">Restart the server</td><td><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Approved</span></td><td style="text-align: right"><button type="button" style="min-height: 32px; padding: 0 10px; border: 0; background: none; color: #b42318; font: inherit">Revoke</button></td></tr>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 9px 0; font-family: 'IBM Plex Mono', monospace">runner:maintain</td><td style="color: #55565e">Maintenance on <b style="font-weight: 600">Server Machine Management</b></td><td><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Approved</span></td><td style="text-align: right"><button type="button" style="min-height: 32px; padding: 0 10px; border: 0; background: none; color: #b42318; font: inherit">Revoke</button></td></tr>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 9px 0; font-family: 'IBM Plex Mono', monospace">backups:run</td><td style="color: #55565e">Start a backup</td><td><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span>Approved</span></td><td style="text-align: right"><button type="button" style="min-height: 32px; padding: 0 10px; border: 0; background: none; color: #b42318; font: inherit">Revoke</button></td></tr>
+</tbody>
+</table>
+<button type="button" style="align-self: flex-start; min-height: 36px; padding: 0 12px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 8px; font: inherit">Show 6 more approved</button>
+</section>
+
+<section style="flex: 1 1 320px; min-width: 0; background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px">Moderation</h2>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #55565e">Review status<select style="min-height: 40px; border: 1px solid #e2e0da; border-radius: 8px; background: #fdfdfb; font: inherit; color: #17181c; padding: 0 10px"><option>Approved</option><option>Pending</option><option>Rejected</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #55565e">Access status<select style="min-height: 40px; border: 1px solid #e2e0da; border-radius: 8px; background: #fdfdfb; font: inherit; color: #17181c; padding: 0 10px"><option>Active</option><option>Hidden</option><option>Disabled</option></select></label>
+<div style="font-size: 12px; color: #55565e; line-height: 1.5">Hidden removes it from the store and public access without blame. Disabled is for enforcement or safety blocks.</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #55565e">Note<textarea rows="3" placeholder="Optional" style="border: 1px solid #e2e0da; border-radius: 8px; background: #fdfdfb; font: inherit; padding: 8px 10px; resize: vertical"></textarea></label>
+<button type="button" style="min-height: 40px; border: 1px solid #17181c; background: #17181c; color: #fdfdfb; border-radius: 10px; font: inherit; font-weight: 600">Save moderation</button>
+</section>
+
+</div>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Server Keeper disks mock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&amp;family=Instrument+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#f3f2ee}
+a{color:#a23d05}a:hover{color:#17181c}
+</style>
+</head>
+<body>
+<div style="width: 720px; height: 560px; box-sizing: border-box; padding: 40px; background: #f3f2ee; color: #17181c; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px">
+<section style="background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px">Disks</h2>
+<a href="#">Details</a>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<div><span style="font-weight: 600">System disk</span> <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #55565e">/</span></div>
+<div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 22px; font-weight: 700">56%</div>
+</div>
+<div style="position: relative; height: 10px; border-radius: 5px; background: #e2e0da">
+<div style="width: 56%; height: 10px; border-radius: 5px; background: #17181c"></div>
+<div style="position: absolute; left: 80%; top: -3px; width: 2px; height: 16px; background: #f26a1b"></div>
+</div>
+<div style="font-size: 13px; color: #55565e">20 of 38 GB · 16 GB free · OS, Automaton, backups · updates need 10 GB free</div>
+</div>
+
+<div style="border-top: 1px solid #e2e0da"></div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<div><span style="font-weight: 600">Docker data</span> <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #55565e">/mnt/docker-data</span></div>
+<div style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 22px; font-weight: 700">17%</div>
+</div>
+<div style="position: relative; height: 10px; border-radius: 5px; background: #e2e0da">
+<div style="width: 17%; height: 10px; border-radius: 5px; background: #17181c"></div>
+<div style="position: absolute; left: 80%; top: -3px; width: 2px; height: 16px; background: #f26a1b"></div>
+</div>
+<div style="font-size: 13px; color: #55565e">6.7 of 39 GB · 32 GB free · apps, images, app data · volume</div>
+</div>
+
+<div style="border-top: 1px solid #e2e0da; padding-top: 12px; font-size: 13px; color: #55565e">Warning at 80% on any disk · up to 6.2 GB can be freed</div>
+</section>
+<p style="margin: 14px 0 0; font-size: 12px; color: #55565e; line-height: 1.5">One row per mounted disk that matters: the system disk always, plus Docker's data root when it is elsewhere. The Home card and the Overview number show the fullest disk.</p>
+</div>
+</body>
+</html>
