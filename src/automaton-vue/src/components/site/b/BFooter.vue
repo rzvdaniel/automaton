@@ -30,7 +30,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
         <a :href="publicAppConfig.docsUrl">Docs</a>
         <a :href="publicAppConfig.githubUrl" target="_blank" rel="noopener">GitHub</a>
         <a :href="`${publicAppConfig.githubUrl}/releases`" target="_blank" rel="noopener">Releases</a>
-        <a href="/docs/numbers">Numbers</a>
+        <a href="/docs/what-is-automaton">What is Automaton</a>
       </div>
     </div>
   </footer>

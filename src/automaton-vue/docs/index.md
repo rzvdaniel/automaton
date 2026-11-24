@@ -23,7 +23,7 @@ You care about the app. Your AI writes it, deploys it and fixes it. Automaton ru
 
 | You want to | Read |
 |---|---|
-| Know if it fits you | [Is Automaton for you?](./is-automaton-for-you) |
+| Know if it fits you | [What is Automaton](./what-is-automaton) |
 | Get a server running | [Install with your AI](./install-with-ai) (your AI does it) |
 | Build your first app | [Work with AI](./work-with-ai) |
 | Find your way in Studio | [Your first app](./getting-started) |
