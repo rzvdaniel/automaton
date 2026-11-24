@@ -23,7 +23,7 @@ Before registering a runner, the owner checks (nothing in the repo enforces it):
 "Require approval for all outside collaborators"; the runner sits in a runner group limited to the agent workflows
 (`agent-issue.yml`, `agent-pick-next.yml`, `agent-lessons.yml`); no other workflow uses `runs-on: self-hosted`.
 The agent runs with permissions skipped as the bot: the prompt treats text from other logins as untrusted, and only the owner's
-comments reopen a failed card. `pick` serves `rzvdaniel/automaton` only (`automaton-apps` needs its own workflow first).
+comments reopen a failed card. `pick` serves `rzvdaniel/automaton`, `automaton-apps` and `automaton-monster` (others dispatch `agent-issue.yml` here; each needs a `~/<repo>` clone and `agent:go` and `agent:failed` labels).
 
 ## Add an agent machine
 

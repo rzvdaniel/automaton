@@ -9,7 +9,7 @@ GH=${AGENT_GH:-gh}
 BOARD=${AGENT_BOARD:-rzvdaniel/17}
 # Repositories whose Ready cards are picked. The runner and agent-issue.yml live in automaton; other repos are started
 # with a workflow_dispatch of agent-issue.yml there.
-REPOS=${AGENT_REPOS:-automaton automaton-apps}
+REPOS=${AGENT_REPOS:-automaton automaton-apps automaton-monster}
 OWNER=${BOARD%%/*}; NUM=${BOARD##*/}
 
 items() { "$GH" project item-list "$NUM" --owner "$OWNER" --format json -L 200 \

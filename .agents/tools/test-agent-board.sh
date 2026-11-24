@@ -6,7 +6,7 @@ cat > "$t/gh" <<'F'
 #!/usr/bin/env bash
 echo "$*" >> "$T/calls"
 case "$1 $2" in
- "project item-list") printf 'i1\trzvdaniel/automaton\t1\tReady for agents\ni2\trzvdaniel/automaton\t2\tReady for agents\ni3\trzvdaniel/automaton\t3\tReady for agents\ni4\trzvdaniel/automaton-apps\t4\tReady for agents\n' ;;
+ "project item-list") printf 'i1\trzvdaniel/automaton\t1\tReady for agents\ni2\trzvdaniel/automaton\t2\tReady for agents\ni3\trzvdaniel/automaton\t3\tReady for agents\ni4\trzvdaniel/automaton-apps\t4\tReady for agents\ni5\trzvdaniel/automaton-monster\t5\tReady for agents\n' ;;
  "project view") echo PID ;;
  "project field-list") printf 'FID\tOPT\n' ;;
  "issue list") ;;
@@ -21,5 +21,5 @@ out=$(bash "$d/agent-board.sh" pick)
 [[ $out == "picked rzvdaniel/automaton#3" ]] || { echo "FAIL: $out"; exit 1; }
 grep -q 'issue comment 1 ' "$t/calls" || { echo "FAIL: unshaped card 1 not commented"; exit 1; }
 grep -q 'issue edit 3 .*--add-label agent:go' "$t/calls" || { echo "FAIL: card 3 not labelled"; exit 1; }
-! grep -q 'issue edit 2 \|issue edit 4 ' "$t/calls" || { echo "FAIL: failed or apps card touched"; exit 1; }
+! grep -q 'issue edit 2 \|issue edit 4 \|issue edit 5 ' "$t/calls" || { echo "FAIL: failed, apps or monster card touched"; exit 1; }
 echo "ok"
