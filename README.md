@@ -59,7 +59,7 @@ In our tests, the installer finished in about 2 minutes, and an AI agent went fr
 
 It fits if you build many small apps, tools or automations, often with an AI agent, and want them on servers you control. It does not fit if you need autoscaling, multi-region failover or a hosted service to sign up for.
 
-> **Early access.** Automaton runs our own production server and is ready to use, but it is still growing. Read the [limitations](https://automaton.monster/docs/limitations) and [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you) before you rely on it.
+> **Early access.** Automaton runs our own production server and is ready to use, but it is still growing. Read [What is Automaton](https://automaton.monster/docs/what-is-automaton) before you rely on it.
 
 ## For AI agents
 

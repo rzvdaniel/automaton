@@ -40,7 +40,7 @@ Nightly local backups of the database and keys are kept for 7 days. See [Back up
 Yes. Install a Runner on each machine. With one Runner, `automaton deploy` uses it automatically; with several, you pick one per app (`automaton set-runner`). There is no automatic balancing or failover.
 
 ## Is it production-ready?
-It runs on our own production server. Fresh-server installs, a restore onto a clean second server, and two-user isolation have been tested; see [What is Automaton](./what-is-automaton) and [the measured runs](./what-is-automaton).
+It runs on our own production server. Fresh-server installs, a restore onto a clean second server, and two-user isolation have been tested; see [What is Automaton](./what-is-automaton).
 
 ## How do I report a problem or ask a question?
 Open an issue on [GitHub](https://github.com/rzvdaniel/automaton/issues).

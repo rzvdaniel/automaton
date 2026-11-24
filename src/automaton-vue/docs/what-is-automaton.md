@@ -31,7 +31,7 @@ Choose a cloud provider instead if you need automatic scaling, multi-region fail
 
 Measured on a Hetzner CX23 (2 vCPU, 4 GB RAM, about €6.64 per month at the time), these are observations, not guarantees:
 
-- The server installer took about 90 seconds; from the first command to a working server took 2-3 minutes.
+- The server installer took 90 to 118 seconds; from the first command to a working server took 2-3 minutes.
 - A Runner (the agent that runs apps on a server) installs in about 30 seconds.
 - A server update took about 30 seconds.
 - An idle server uses about 1.1 GB of memory and 4 GB of disk.
@@ -47,6 +47,7 @@ Details are in [issue #561](https://github.com/rzvdaniel/automaton/issues/561).
 - **Updates cause brief interruptions** of the API, Studio and app store.
 - **Backups need an off-site copy.** Nightly backups stay on the server for 7 days; install the [off-site backup app](./backup-restore) or arrange your own.
 - **Built for people you trust.** It is not for hosting strangers' code. There is no self sign-up; an administrator adds users.
+- **The Runner is trusted.** It controls Docker on its machine, so treat Runner machines as part of your trusted base. See the [security overview](./security).
 - **There is no Automaton cloud.** It is software you install.
 
 ## Next
