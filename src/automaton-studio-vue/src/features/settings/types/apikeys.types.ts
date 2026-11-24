@@ -29,6 +29,7 @@ export const ApiKeySource = {
   Manual: 1,
   CliAuthorization: 2,
   RunnerProvisioning: 3,
+  McpConnector: 4,
 } as const
 
 export type ApiKeySource = (typeof ApiKeySource)[keyof typeof ApiKeySource]
@@ -115,6 +116,8 @@ export function getSourceDisplayName(source: ApiKeySource | string): string {
       return 'Automaton CLI authorization'
     case ApiKeySource.RunnerProvisioning:
       return 'Runner provisioning'
+    case ApiKeySource.McpConnector:
+      return 'Claude connector (MCP sign-in)'
     default:
       return 'Unknown'
   }
