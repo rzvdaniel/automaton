@@ -15,10 +15,10 @@ describe('app page navigation', () => {
   it('shows each tab only where it applies', () => {
     const labels = (options: Parameters<typeof appTabs>[0]) => appTabs(options).map((tab) => tab.label)
     expect(labels({ canManage: true, isPublishable: true, hasSecrets: true, hasActions: true, isAdmin: true }))
-      .toEqual(['Overview', 'Activity', 'Actions', 'Docs', 'Source', 'Secrets', 'Domain', 'Store listing', 'Settings', 'Admin'])
-    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Domain', 'Store listing', 'Settings'])
-    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Settings'])
-    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Docs', 'Source', 'Admin'])
+      .toEqual(['Overview', 'Activity', 'Actions', 'Settings', 'Secrets', 'Domain', 'Source', 'Docs', 'Store listing', 'Admin'])
+    expect(labels({ canManage: true, isPublishable: true })).toEqual(['Overview', 'Activity', 'Settings', 'Domain', 'Source', 'Docs', 'Store listing'])
+    expect(labels({ canManage: true })).toEqual(['Overview', 'Activity', 'Settings', 'Source', 'Docs'])
+    expect(labels({ isAdmin: true })).toEqual(['Overview', 'Activity', 'Source', 'Docs', 'Admin'])
   })
 
   it('badges the Admin tab with the waiting permission requests, only when there are some', () => {
@@ -32,7 +32,7 @@ describe('app page navigation', () => {
     for (const view of ['logs', 'deployments']) expect(resolveAppView(view)).toBe('activity')
     for (const view of ['runtime', 'targets', 'contract']) expect(resolveAppView(view)).toBe('overview')
     expect(resolveAppView('more')).toBe('settings')
-    for (const view of ['actions', 'source', 'secrets', 'domain', 'store', 'settings', 'admin']) expect(resolveAppView(view)).toBe(view)
+    for (const view of ['actions', 'docs', 'source', 'secrets', 'domain', 'store', 'settings', 'admin']) expect(resolveAppView(view)).toBe(view)
   })
 
   it('falls back to Overview for removed authoring views and unknown values', () => {

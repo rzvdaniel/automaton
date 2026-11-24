@@ -42,10 +42,11 @@ export interface AppTabOptions {
 export function appTabs({ hasActions = false, hasSecrets = false, canManage = false, isPublishable = false, isAdmin = false, waitingPermissions = 0 }: AppTabOptions = {}): ReadonlyArray<AppTab> {
   const keys: AppViewKey[] = ['overview', 'activity']
   if (hasActions) keys.push('actions')
-  if (canManage || isAdmin) keys.push('docs', 'source')
-  if (canManage && hasSecrets) keys.push('secrets')
-  if (canManage && isPublishable) keys.push('domain', 'store')
   if (canManage) keys.push('settings')
+  if (canManage && hasSecrets) keys.push('secrets')
+  if (canManage && isPublishable) keys.push('domain')
+  if (canManage || isAdmin) keys.push('source', 'docs')
+  if (canManage && isPublishable) keys.push('store')
   if (isAdmin) keys.push('admin')
   return keys.map((key) => key === 'admin' && waitingPermissions > 0 ? { key, label: LABELS[key], badge: waitingPermissions } : { key, label: LABELS[key] })
 }
