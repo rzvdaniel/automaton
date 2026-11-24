@@ -3,6 +3,15 @@ name: Agent issue
 on:
   issues:
     types: [labeled]
+  # agent-board.sh pick starts issues from other repositories (automaton-apps) this way; the runner lives here.
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'owner/repo of the issue'
+        required: true
+      number:
+        description: 'Issue number'
+        required: true
 
 permissions:
   contents: read
@@ -10,7 +19,7 @@ permissions:
 jobs:
   run:
     # Only the owner or the bot adding agent:go; never a pull_request trigger.
-    if: github.event.label.name == 'agent:go' && contains(fromJSON('["rzvdaniel","rzvdaniel-bot"]'), github.actor)
+    if: (github.event_name == 'workflow_dispatch' || github.event.label.name == 'agent:go') && contains(fromJSON('["rzvdaniel","rzvdaniel-bot"]'), github.actor)
     concurrency:
       group: agent
       cancel-in-progress: false
@@ -21,7 +30,8 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           PROMPT_FILE: .agents/jobs/implement-issue.md
-          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_URL: ${{ github.event.issue.html_url || format('https://github.com/{0}/issues/{1}', inputs.repo, inputs.number) }}
+          AGENT_REPO: ${{ inputs.repo || github.repository }}
           AGENT_TASK_TIMEOUT: 180m
         run: bash "$HOME/automaton/.agents/tools/agent-run.sh"
 
@@ -31,8 +41,8 @@ jobs:
     runs-on: [self-hosted, agent]
     timeout-minutes: 10
     env:
-      REPO: ${{ github.repository }}
-      NUMBER: ${{ github.event.issue.number }}
+      REPO: ${{ inputs.repo || github.repository }}
+      NUMBER: ${{ github.event.issue.number || inputs.number }}
       RESULT: ${{ needs.run.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
@@ -51,7 +61,7 @@ jobs:
 
   refuse:
     # agent:go added by anyone else: take it off again so the queue is not blocked
-    if: github.event.label.name == 'agent:go' && !contains(fromJSON('["rzvdaniel","rzvdaniel-bot"]'), github.actor)
+    if: github.event_name == 'issues' && github.event.label.name == 'agent:go' && !contains(fromJSON('["rzvdaniel","rzvdaniel-bot"]'), github.actor)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
