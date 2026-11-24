@@ -21,7 +21,7 @@ Every page below is one task with exact commands and a check after each step. Fo
 
 **Updating or backing up the server.** [Update the server](https://automaton.monster/docs/update-server) (then upgrade the Runners), [Back up and restore](https://automaton.monster/docs/backup-restore). An update takes its own recovery backup; ask the user before a restore, which replaces the database.
 
-**Starting an Automaton app.** Pages, in order: [Build an Automaton app](https://automaton.monster/docs/build-an-automaton-app), [Deploy and publish an app](https://automaton.monster/docs/deploy). Overview for the user: [Your first app](https://automaton.monster/docs/getting-started).
+**Starting an Automaton app.** Pages, in order: [Build an app](https://automaton.monster/docs/build-an-app), [Deploy and publish an app](https://automaton.monster/docs/deploy). Overview for the user: [Your first app](https://automaton.monster/docs/getting-started).
 
 - Wait until the app is `Running` before reporting; `deploy` has no `--yes` flag.
 - Ask for the app name and whether to publish it (apps are private until published); pick a Runner by name when there are several.

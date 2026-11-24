@@ -67,7 +67,7 @@ printf '%s' "the-value" | automaton secrets set MY_KEY
 automaton secrets list
 ```
 
-The value comes from standard input, never from an argument, so it stays out of your shell history. `secrets list` shows names only. A running app reads the new value after its next start; `automaton deploy` applies it now. `automaton secrets status` shows which secrets `automaton.json` declares and which are missing. See [Secrets and permissions](./secrets-and-permissions).
+The value comes from standard input, never from an argument, so it stays out of your shell history. `secrets list` shows names only. A running app reads the new value after its next start; `automaton deploy` applies it now. `automaton secrets status` shows which secrets `automaton.json` declares and which are missing. See [Build an app](./build-an-app#secrets).
 
 ## Update the server
 

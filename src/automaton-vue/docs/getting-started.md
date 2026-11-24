@@ -24,7 +24,7 @@ Later: *"Publish it to my app store."*
 
 ## Technical details
 
-- [Build an Automaton app](./build-an-automaton-app)
+- [Build an app](./build-an-app)
 - [Deploy and publish an app](./deploy)
 - [Automaton CLI reference](./automaton-cli)
 - [Troubleshooting](./troubleshooting)

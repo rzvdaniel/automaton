@@ -19,7 +19,7 @@ About 94 seconds for the installer on Debian 12, and 2-3 minutes from the first 
 No, but Automaton is designed around one. The CLI generates an `AGENTS.md` and checks so a coding agent can build, validate, deploy and verify an app. You can also write the app yourself.
 
 ## What can I run?
-Static sites, APIs and long-running servers in containers, and finite jobs called Actions. See [Build an Automaton app](./build-an-automaton-app).
+Static sites, APIs and long-running servers in containers, and finite jobs called Actions. See [Build an app](./build-an-app).
 
 ## What can I not run?
 Apps that need autoscaling or multi-region failover; see [What is Automaton](./what-is-automaton).
