@@ -86,4 +86,4 @@ Studio **Home** tells you what needs you: an update, a failed run, a permission 
 - **Data survives new versions** when the app keeps it in its data folder (`AUTOMATON_APP_DATA_DIR`); everything else is replaced on each deploy. Your AI knows this from `AGENTS.md`.
 - **A broken version is caught.** If a new version does not answer its health check, the deploy fails and your AI sees why in the logs.
 
-Next: [Build an app](./build-an-automaton-app) for what your AI writes, [CLI recipes](./cli) for the commands your AI runs, and the [CLI reference](./automaton-cli) for every command.
+Next: [Build an app](./build-an-app) for what your AI writes, [CLI recipes](./cli) for the commands your AI runs, and the [CLI reference](./automaton-cli) for every command.
