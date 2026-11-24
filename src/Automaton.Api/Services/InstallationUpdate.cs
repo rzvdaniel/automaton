@@ -76,6 +76,12 @@ public static partial class InstallationUpdate
             run = new("unknown", null, null, null, null, null, null, null, null, "The update status could not be read.");
         }
 
+        // A failed run is old news once the server runs a newer release than the one it started from
+        // (updated another way, for example update.sh). The status file stays on disk; only the report hides it.
+        var installed = configuration["Installation:Version"];
+        if (run?.State == "failed" && Parse(run.FromVersion) is { } from && Parse(installed) is { } running && running > from)
+            run = null;
+
         var requestPath = Path.Combine(RequestsDirectory(configuration), "request.json");
         var pending = File.Exists(requestPath) || Directory.Exists(requestPath);
         int? age = pending ? (int)Math.Max(0, (now - Directory.GetLastWriteTimeUtc(requestPath)).TotalSeconds) : null;
@@ -84,7 +90,7 @@ public static partial class InstallationUpdate
             ? "The server has not picked up the update request. On the server, check: systemctl status automaton-update.path"
             : null;
         var stale = IsActive(run) && now - (run!.StartedAtUtc ?? now) >= StaleRunningAfter;
-        return new(configuration["Installation:Version"], Directory.Exists(RequestsDirectory(configuration)),
+        return new(installed, Directory.Exists(RequestsDirectory(configuration)),
             run, log, stale, pending, age, hint);
     }
 
