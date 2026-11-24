@@ -36,12 +36,6 @@ That is the blog you are reading, in its production form:
 
 ![blog.automaton.monster](06-blog.png)
 
-## A second example: our own logs
-
-VictoriaLogs, a log search tool, comes from the same catalog. Install it and it shows the server's own logs with nothing to connect: no agent to configure, no address to paste. When something goes wrong on your server, you search the logs in the browser instead of logging in to read files.
-
-![VictoriaLogs showing Automaton's logs](07-victorialogs.png)
-
 ## Your own catalog
 
 The catalog is just a GitHub repository with folders like these. Point Automaton at any repository and its apps appear the same way.
