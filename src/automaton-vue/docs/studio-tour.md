@@ -10,7 +10,7 @@ Studio is the website of your own Automaton server. Your AI builds and deploys; 
 
 ## Apps
 
-![The Apps page lists every app on the server with its state](/studio/apps.png)
+![The Apps page lists every app on the server with its state](./studio/apps.png)
 
 Everything running on your server.
 
@@ -22,7 +22,7 @@ To add one, press **New app** or **From the catalog**, or just ask your AI.
 
 ## Catalog
 
-![The Catalog page lists apps you can install](/studio/catalog.png)
+![The Catalog page lists apps you can install](./studio/catalog.png)
 
 Ready-made apps you can install on this server.
 
@@ -32,7 +32,7 @@ Ready-made apps you can install on this server.
 
 ## People
 
-![The People page lists members and teams](/studio/people.png)
+![The People page lists members and teams](./studio/people.png)
 
 Who can use this server, and the teams they share apps in.
 
@@ -42,7 +42,7 @@ Who can use this server, and the teams they share apps in.
 
 ## Server
 
-![The Server page shows the version, health and Runners](/studio/server.png)
+![The Server page shows the version, health and Runners](./studio/server.png)
 
 The state of the machine your apps run on.
 
@@ -52,7 +52,7 @@ The state of the machine your apps run on.
 
 ## Backups
 
-![The Backups page shows the last, next and offsite backup](/studio/backups.png)
+![The Backups page shows the last, next and offsite backup](./studio/backups.png)
 
 Nightly copies of the database and the keys that decrypt it. Administrators only.
 
