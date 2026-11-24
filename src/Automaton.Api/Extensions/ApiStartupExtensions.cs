@@ -39,6 +39,13 @@ internal static class ApiApplicationPipelineExtensions
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
         app.MapGet("/health", () => Results.Json(HealthResponse())).AllowAnonymous();
         app.MapControllers();
+        app.UseWhen(context => context.Request.Path.StartsWithSegments("/mcp"), branch => branch.Use((context, next) =>
+        {
+            var limit = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+            if (limit is { IsReadOnly: false }) limit.MaxRequestBodySize = Automaton.Api.Mcp.AppMcpManager.MaxRequestBytes;
+            return next(context);
+        }));
+        // deploy_app carries up to 50 MB of file text inside JSON; the room above that covers JSON escaping.
         app.MapMcp("/mcp").RequireAuthorization("DeveloperApiAccess");
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
