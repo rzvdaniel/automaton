@@ -143,6 +143,10 @@ Run each "Check after release" step by following the user docs page the PR's `Do
 `verified`, confirm the page matches what you saw (commands, output, labels, steps). A mismatch is
 `verification-failed` plus a docs fix, even when the feature works.
 
+On a release that changes the CLI or Studio, also walk every page under `src/automaton-vue/docs` that mentions the
+changed commands or labels on the test server, and list each mismatch as a docs fix (the `Docs check` workflow warns
+on pull requests that change `src/Automaton.Cli` or `src/automaton-studio-vue` without a docs change).
+
 ## Labels and closing
 
 - `verified`: every "Done when" check passed end to end on the test server, with a proof artifact.

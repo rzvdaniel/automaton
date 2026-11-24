@@ -39,6 +39,10 @@ You need an Automaton server (your AI can [install it](./install-with-ai)) and a
 
 Your AI creates the app with `automaton new`. That also writes `AGENTS.md`: the instructions that teach your AI how to build, check and deploy an Automaton app, so you never explain it again.
 
+## Give your AI these docs
+
+Every page here has a **Copy for AI** button that copies its Markdown. To hand your AI the whole set, point it at [llms.txt](https://automaton.monster/llms.txt) (an index) or [llms-full.txt](https://automaton.monster/llms-full.txt) (every page in one file).
+
 ## Check it in Studio
 
 Open Studio, then **Apps** and your app:
