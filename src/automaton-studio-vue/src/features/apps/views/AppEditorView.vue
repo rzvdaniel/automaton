@@ -502,6 +502,9 @@ async function handleSharingChanged() {
           :refresh-key="activityRefresh"
           :deploy-target="kind === 'tool' ? null : liveTarget"
           :setting-names="(app.application?.settings ?? []).map((item) => item.name)"
+          :secret-names="(app.application?.secrets ?? []).map((item) => item.name)"
+          :app-name="app.name"
+          :version="app.installedFromCommit?.slice(0, 7)"
         />
         <AppDocsTab v-else-if="shownView === 'docs'" :app-id="app.id" :description="app.description" :version="app.installedFromCommit?.slice(0, 7)" @navigate="handleNavigation" />
         <AppSourceTab v-else-if="shownView === 'source'" :app-id="app.id" :definition="app.application" />

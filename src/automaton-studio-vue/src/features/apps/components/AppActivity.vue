@@ -10,8 +10,9 @@ import { actionSchedulesService } from '../services/action-schedules.service'
 import { appsService, type AppActionExecution } from '../services/apps.service'
 import type { AppDeploymentTarget, SecretAuditEntry } from '../types/apps.types'
 import type { ConsoleEntry } from '../types/console.types'
-import { buildActivity, deployActivity, describeEvery, filterActivity, formatClock, groupActivity, type ActivityFilter } from '../utils/app-activity'
+import { buildActivity, type ActivityItem, deployActivity, describeEvery, filterActivity, formatClock, groupActivity, type ActivityFilter } from '../utils/app-activity'
 import { composeExecutionOutput } from '../utils/execution-output'
+import { buildAiReport } from '../utils/ai-report'
 
 const props = defineProps<{
   appId: string
@@ -23,6 +24,10 @@ const props = defineProps<{
   deployTarget?: AppDeploymentTarget | null
   /** Names of the app's declared settings, which are saved like secrets but are not secrets. */
   settingNames?: ReadonlyArray<string>
+  secretNames?: ReadonlyArray<string>
+  appName?: string
+  /** Short commit of the installed version. */
+  version?: string
 }>()
 
 const events = ref<ApplicationEvent[]>([])
@@ -97,6 +102,41 @@ async function toggleRun(executionId: string) {
   }
 }
 
+async function loadOutput(executionId: string): Promise<string> {
+  if (outputs.value[executionId] !== undefined) return outputs.value[executionId]!
+  const [logs, result] = await Promise.all([
+    actionSchedulesService.getLogs(props.appId, executionId),
+    actionSchedulesService.getResult(props.appId, executionId).catch(() => null),
+  ])
+  return (outputs.value[executionId] = composeExecutionOutput(logs, result))
+}
+
+/** One click: the failed run or deploy, with its last log lines, as Markdown for an AI. */
+async function copyForAi(item: ActivityItem) {
+  let logs = ''
+  try {
+    if (item.executionId) logs = await loadOutput(item.executionId)
+  } catch { /* the report still has the error */ }
+  const text = buildAiReport({
+    appName: props.appName || props.appId,
+    appId: props.appId,
+    environment: props.deployTarget?.name,
+    version: props.version,
+    what: item.kind === 'run' ? `Run ${item.subject}` : 'Deploy',
+    at: item.at,
+    error: item.text,
+    logs,
+    settingNames: props.settingNames,
+    secretNames: props.secretNames,
+  })
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.add({ severity: 'success', summary: 'Copied for your AI', life: 2000 })
+  } catch {
+    toast.add({ severity: 'warn', summary: 'Could not copy', life: 3000 })
+  }
+}
+
 async function copyOutput(executionId: string) {
   try {
     await navigator.clipboard.writeText(outputs.value[executionId] ?? '')
@@ -156,6 +196,7 @@ async function copyOutput(executionId: string) {
             <span class="what" :class="{ muted: item.kind === 'change' }">
               <strong v-if="item.subject">{{ item.subject }}</strong>{{ item.subject ? " " : "" }}{{ item.text }}
               <span v-if="item.tone === 'failed' && item.kind === 'run'" class="sr-only"> (failed)</span>
+              <button v-if="item.tone === 'failed' && (item.kind === 'run' || item.id === 'deploy-failed' || /deploy/i.test(item.text))" type="button" class="link ai" data-testid="copy-for-ai" @click.stop="copyForAi(item)" @keydown.stop>Copy for AI</button>
             </span>
             <span class="mono hint">{{ formatClock(item.at) }}</span>
             <i v-if="item.executionId" class="pi pi-chevron-right chevron" :class="{ turned: openRun === item.executionId }" aria-hidden="true"></i>
@@ -197,6 +238,7 @@ async function copyOutput(executionId: string) {
 .day-head { margin: 14px 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .day:first-child .day-head { margin-top: 0; }
 .link { padding: 0; border: 0; background: none; color: var(--signal-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+.ai { margin-left: 8px; font-size: 13px; white-space: nowrap; }
 .chevron { color: var(--ink-soft); font-size: 12px; transition: transform 0.15s; }
 .chevron.turned { transform: rotate(90deg); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

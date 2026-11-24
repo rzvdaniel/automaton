@@ -44,7 +44,7 @@ Your AI creates the app with `automaton new`. That also writes `AGENTS.md`: the 
 Open Studio, then **Apps** and your app:
 
 - **Overview:** is it running, which version, how much disk it uses, and anything that needs you.
-- **Activity:** every run and deploy, and what went wrong.
+- **Activity:** every run and deploy, and what went wrong. On a failed run or deploy, **Copy for AI** copies the app, version, error and last 40 log lines as text (names of secrets, never their values) for you to paste into your AI.
 - **Open Application:** the app itself, if it has pages.
 
 Something not right? Tell your AI what you see, in your own words. It reads the logs, fixes the code and deploys again.
