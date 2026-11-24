@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Docs mock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&amp;family=Instrument+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#f3f2ee}
+a{color:#a23d05}a:hover{color:#17181c}
+</style>
+</head>
+<body>
+<div style="background: #f3f2ee; color: #17181c; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; padding: 32px 24px 48px">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+<div style="width: 40px; height: 40px; border-radius: 10px; background: #f26a1b; display: flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700">S</div>
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 700">Server Keeper</h1>
+</div>
+<nav aria-label="App sections" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #e2e0da">
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Overview</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Activity</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Actions</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Settings</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Secrets</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Domain</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Source</a>
+<a href="#" style="padding: 10px 12px; color: #17181c; text-decoration: none; font-weight: 600; border-bottom: 2px solid #f26a1b">Docs</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Store listing</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Admin</a>
+</nav>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<nav aria-label="On this page" style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px">
+<div style="font-size: 12px; color: #55565e; padding: 4px 8px 8px">On this page</div>
+<a href="#" style="padding: 6px 8px; border-radius: 8px; background: #fdfdfb; color: #17181c; text-decoration: none; font-weight: 600">Server Keeper</a>
+<a href="#" style="padding: 6px 8px 6px 18px; color: #55565e; text-decoration: none">Install and set up</a>
+<a href="#" style="padding: 6px 8px 6px 18px; color: #55565e; text-decoration: none">Run it on its own</a>
+<a href="#" style="padding: 6px 8px 6px 18px; color: #55565e; text-decoration: none">Tests</a>
+</nav>
+
+<article style="flex: 999 1 640px; min-width: 0; background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 32px 40px; line-height: 1.65; max-width: 820px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #55565e">README.md · version 53cd651</span><a href="#" style="font-size: 13px">View in Source</a></div>
+<h1 style="margin: 0 0 12px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 30px">Server Keeper</h1>
+<p style="margin: 0 0 14px">Live stats, alerts and one-click maintenance for this server. It was called Server Console, and it replaces Watchtower: the backup warnings Watchtower sent are here now. <b style="font-weight: 600">It needs an Automaton server</b>: it reads the server's own health, backups and apps.</p>
+<ul style="margin: 0 0 18px; padding-left: 20px">
+<li style="margin-bottom: 8px"><b style="font-weight: 600">Layout:</b> three tabs. <b style="font-weight: 600">Overview</b>, <b style="font-weight: 600">Maintenance</b> and <b style="font-weight: 600">Apps on this machine</b>.</li>
+<li style="margin-bottom: 8px"><b style="font-weight: 600">Home card:</b> Studio Home shows a card with the status, disk use, how old the last backup is, the Automaton version and the active alerts.</li>
+<li style="margin-bottom: 8px"><b style="font-weight: 600">fail2ban line:</b> with <code style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; background: #f3f2ee; padding: 1px 5px; border-radius: 5px">security:read</code> approved, the Home card shows "fail2ban: on · N banned in 24 h".</li>
+</ul>
+<h2 style="margin: 24px 0 10px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 22px; padding-top: 16px; border-top: 1px solid #e2e0da">Install and set up</h2>
+<ol style="margin: 0 0 16px; padding-left: 22px">
+<li style="margin-bottom: 6px">Install it from <b style="font-weight: 600">Apps → Catalog</b>.</li>
+<li style="margin-bottom: 6px">Fill in the settings and secrets below and deploy.</li>
+<li style="margin-bottom: 6px">An administrator approves the permissions in <b style="font-weight: 600">Admin → Apps → Permissions</b>.</li>
+</ol>
+<div style="overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 13px">
+<thead><tr><th scope="col" style="text-align: left; font-weight: 400; color: #55565e; padding: 6px 12px 6px 0">Name</th><th scope="col" style="text-align: left; font-weight: 400; color: #55565e; padding: 6px 12px 6px 0">Kind</th><th scope="col" style="text-align: left; font-weight: 400; color: #55565e; padding: 6px 0">Meaning</th></tr></thead>
+<tbody>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 8px 12px 8px 0; font-family: 'IBM Plex Mono', monospace">EMAIL_TO</td><td style="padding-right: 12px">setting</td><td>Who gets warning emails: administrators (default), owner, project or off.</td></tr>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 8px 12px 8px 0; font-family: 'IBM Plex Mono', monospace">WEBHOOK_URL</td><td style="padding-right: 12px">secret</td><td>Optional: a Slack, Discord or Telegram webhook.</td></tr>
+<tr style="border-top: 1px solid #e2e0da"><td style="padding: 8px 12px 8px 0; font-family: 'IBM Plex Mono', monospace">DISK_FREE_WARN_PERCENT</td><td style="padding-right: 12px">setting</td><td>Default 20 (warn when the disk is more than 80% full).</td></tr>
+</tbody>
+</table>
+</div>
+</article>
+
+</div>
+</div>
+</div>
+</body>
+</html>

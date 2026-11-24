@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Activity mock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&amp;family=Instrument+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#f3f2ee}
+a{color:#a23d05}a:hover{color:#17181c}
+</style>
+</head>
+<body>
+<div style="background: #f3f2ee; color: #17181c; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; padding: 32px 24px 48px">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+<div style="width: 40px; height: 40px; border-radius: 10px; background: #f26a1b; display: flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700">S</div>
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 700">Server Keeper</h1>
+</div>
+<nav aria-label="App sections" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #e2e0da">
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Overview</a>
+<a href="#" style="padding: 10px 12px; color: #17181c; text-decoration: none; font-weight: 600; border-bottom: 2px solid #f26a1b">Activity</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Actions</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Settings</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Secrets</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Domain</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Source</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Docs</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Store listing</a>
+<a href="#" style="padding: 10px 12px; color: #55565e; text-decoration: none">Admin</a>
+</nav>
+
+<div role="tablist" aria-label="Filter" style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" role="tab" aria-selected="true" style="min-height: 36px; padding: 0 14px; border: 1px solid #17181c; background: #17181c; color: #fdfdfb; border-radius: 18px; font: inherit">All</button>
+<button type="button" role="tab" style="min-height: 36px; padding: 0 14px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 18px; font: inherit">Runs</button>
+<button type="button" role="tab" style="min-height: 36px; padding: 0 14px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 18px; font: inherit">Changes</button>
+<button type="button" role="tab" style="min-height: 36px; padding: 0 14px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 18px; font: inherit">Problems <span style="color: #a23d05; font-weight: 600">3</span></button>
+<button type="button" role="tab" style="min-height: 36px; padding: 0 14px; border: 1px solid #e2e0da; background: #fdfdfb; border-radius: 18px; font: inherit">Live output</button>
+</div>
+
+<section style="background: #fdfdfb; border: 1px solid #e2e0da; border-radius: 14px; padding: 8px 22px; display: flex; flex-direction: column">
+<div style="font-size: 12px; color: #55565e; padding: 10px 0 4px">Today</div>
+<div style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid #e2e0da"><span style="width: 8px; height: 8px; border-radius: 50%; background: #55565e"></span><div><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px">home-card</span> ran <b style="font-weight: 600">55 times</b>, every 15 min <button type="button" style="border: 0; background: none; color: #a23d05; font: inherit; padding: 0 4px">Show all</button></div><span style="color: #55565e">04:23 – 18:08</span></div>
+<div style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid #e2e0da"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f26a1b"></span><div><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px">home-card</span> <span style="color: #a23d05">failed</span> · Server Keeper is not running, so there is no card to show. <span style="color: #55565e; font-size: 12px">(during the server update)</span></div><span style="color: #55565e">17:13</span></div>
+<div style="font-size: 12px; color: #55565e; padding: 14px 0 4px">22 Nov</div>
+<div style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid #e2e0da"><span style="width: 8px; height: 8px; border-radius: 50%; background: #17181c"></span><div><b style="font-weight: 600">Deployed</b> <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px">53cd651</span></div><span style="color: #55565e">22 Nov</span></div>
+<div style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid #e2e0da"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f26a1b"></span><div><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px">home-card</span> <span style="color: #a23d05">failed</span> · Server Keeper is not running, so there is no card to show.</div><span style="color: #55565e">22 Nov</span></div>
+<div style="font-size: 12px; color: #55565e; padding: 14px 0 4px">19 Nov</div>
+<div style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid #e2e0da"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f26a1b"></span><div><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px">home-card</span> <span style="color: #a23d05">failed</span> · Server Keeper is not running, so there is no card to show.</div><span style="color: #55565e">19 Nov</span></div>
+</section>
+
+</div>
+</div>
+</body>
+</html>
