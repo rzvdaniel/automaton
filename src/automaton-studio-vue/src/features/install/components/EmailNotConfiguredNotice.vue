@@ -5,7 +5,7 @@ import Button from 'primevue/button'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { installService } from '../services/install.service'
 
-const docsUrl = 'https://automaton.monster/docs/install-server#set-up-email'
+const docsUrl = 'https://automaton.monster/docs/install#set-up-email'
 
 const authStore = useAuthStore()
 const route = useRoute()

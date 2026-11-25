@@ -71,4 +71,4 @@ Write-Host "Traefik ping:       http://localhost:8082/ping"
 Write-Host ""
 Write-Host "[INFO] Runtime-local does not create a schedulable Runner Host." -ForegroundColor Yellow
 
-Write-Host "       Install a Machine Management Runner through Studio, assign the app explicitly, and follow src/automaton-vue/docs/deploy-runner.md."
+Write-Host "       Install a Machine Management Runner through Studio, assign the app explicitly, and follow src/automaton-vue/docs/install.md."

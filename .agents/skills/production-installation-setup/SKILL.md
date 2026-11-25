@@ -10,7 +10,7 @@ Use this skill when preparing or reviewing a fresh Automaton production installa
 
 ## Fresh server installer
 
-For a new standalone server, use [the public installation guide](../../../src/automaton-vue/docs/install-server.md), `scripts/install-automaton.sh`, and the release bundle under `docker/install/`. The supported target is x86_64 Linux with systemd and public DNS; the installer adds Docker from Docker's apt repository on Ubuntu and Debian, and elsewhere asks the person to install Docker first. The release workflow publishes prebuilt, digest-pinned server images and a checksum-verified bundle. A fresh install stores protected settings outside the checkout in `/etc/automaton`; Studio `/install` requires its generated setup token. Re-running preserves credentials. Existing installations need a reviewed adoption of their credentials, volumes, infrastructure versions and routing; the fresh installer does not migrate them.
+For a new standalone server, use [the public installation guide](../../../src/automaton-vue/docs/install.md), `scripts/install-automaton.sh`, and the release bundle under `docker/install/`. The supported target is x86_64 Linux with systemd and public DNS; the installer adds Docker from Docker's apt repository on Ubuntu and Debian, and elsewhere asks the person to install Docker first. The release workflow publishes prebuilt, digest-pinned server images and a checksum-verified bundle. A fresh install stores protected settings outside the checkout in `/etc/automaton`; Studio `/install` requires its generated setup token. Re-running preserves credentials. Existing installations need a reviewed adoption of their credentials, volumes, infrastructure versions and routing; the fresh installer does not migrate them.
 
 ## Find the authoritative settings
 
@@ -19,7 +19,7 @@ Do not use a live server's untracked settings file as the setup template. Read t
 - `.env.prod.example` and `docker-compose.prod.yml` for production services, domains, DNS/TLS, the database (MySQL on the existing host), RabbitMQ, runtime proxy authentication, image/network settings and retention.
 - `src/Automaton.Api/appsettings.Production.example.json` for shared API/Worker application settings and optional integrations.
 - `.env.runner.example` and `docker-compose.runner.yml` for independently installed Runners.
-- `docs/maintainers/production-docker-cheat-sheet.md` and `src/automaton-vue/docs/deploy-runner.md` for host prerequisites, persistent data and recovery notes.
+- `docs/maintainers/production-docker-cheat-sheet.md` and `src/automaton-vue/docs/install.md` for host prerequisites, persistent data and recovery notes.
 
 For each setting, identify its consumer and classify it as operator-provided, generated per installation, derived from another setting, or optional. Confirm required versus optional by checking Compose interpolation and application startup validation; do not infer that every example field is mandatory. Keep the checklist synchronized with the example files and consumers.
 

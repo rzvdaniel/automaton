@@ -24,11 +24,11 @@ You care about the app. Your AI writes it, deploys it and fixes it. Automaton ru
 | You want to | Read |
 |---|---|
 | Know if it fits you | [What is Automaton](./what-is-automaton) |
-| Get a server running | [Install Automaton](./install), or [let your AI do it](./install-with-ai) |
+| Get a server running | [Install Automaton](./install), or [let your AI do it](./work-with-ai) |
 | Build your first app | [Work with AI](./work-with-ai) |
-| Find your way in Studio | [Your first app](./getting-started) |
+| Find your way in Studio | [A tour of Studio](./studio-tour) |
 | Fix something | [When something goes wrong](./when-something-goes-wrong) |
 
 ## For AI agents
 
-Start from [llms.txt](https://automaton.monster/llms.txt) (index) or [llms-full.txt](https://automaton.monster/llms-full.txt) (every page in one file). The reference pages ([CLI](./automaton-cli), [automaton.json](./automaton-json), [Install the server](./install-server), [Add a Runner](./deploy-runner)) have exact commands and a check after each step.
+Start from [llms.txt](https://automaton.monster/llms.txt) (index) or [llms-full.txt](https://automaton.monster/llms-full.txt) (every page in one file). The reference pages ([CLI](./cli), [Build an app](./build-an-app), [Install Automaton](./install)) have exact commands and a check after each step.

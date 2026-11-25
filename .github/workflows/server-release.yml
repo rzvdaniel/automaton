@@ -192,7 +192,7 @@ jobs:
           cp -r docker/production-host automaton-server/production-host
           cp scripts/install-automaton.sh automaton-server/install.sh
           cp scripts/update-automaton.sh automaton-server/update.sh
-          cp src/automaton-vue/docs/install-server.md automaton-server/README.md
+          cp src/automaton-vue/docs/install.md automaton-server/README.md
           printf 'server-v%s\n' "$VERSION" > automaton-server/version
           previous=$(gh release list --limit 100 --json tagName --jq '[.[] | select(.tagName | startswith("server-v"))][0].tagName // empty')
           if [[ -n "$previous" ]]; then

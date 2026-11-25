@@ -13,7 +13,7 @@ Automaton is the home for every app your AI builds, on a server you own. Your AI
 - **Your own server.** Your apps and data stay on a machine you choose. The software is free (Apache 2.0); you pay only for the server and a domain.
 - **Apps built by you or your AI.** Describe an app and your AI builds it with the CLI. See [Work with AI](./work-with-ai).
 - **Studio.** The web page where you see every app: is it running, which version, who can open it, what went wrong.
-- **The CLI.** `automaton` creates, deploys and checks apps, for you or your AI. See the [CLI reference](./automaton-cli).
+- **The CLI.** `automaton` creates, deploys and checks apps, for you or your AI. See the [CLI reference](./cli).
 - **A catalog.** Install a blog, analytics or link checker in one click, then ask your AI to adapt it. You can also publish your own catalog.
 - **Sharing.** Every app is private until you choose: only you, people you choose, everyone on the server, or public.
 
@@ -52,6 +52,6 @@ Details are in [issue #561](https://github.com/rzvdaniel/automaton/issues/561).
 
 ## Next
 
-- [Install with your AI](./install-with-ai) or [install the server yourself](./install-server)
+- [Work with AI](./work-with-ai) or [install the server yourself](./install)
 - [Work with AI](./work-with-ai)
 - [When something goes wrong](./when-something-goes-wrong)
