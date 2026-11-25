@@ -58,7 +58,8 @@ public sealed class StoredSourceDeploymentService(
             ? scopeElement.Deserialize<DeployScopeConfig>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
             : null;
 
-        if (application.Runtime.Command is not null && application.Build.Command is null)
+        if (application.Runtime.Command is not null && application.Build.Command is null
+            && !string.IsNullOrWhiteSpace(application.Build.OutputDirectory))
             throw new InvalidDataException(
                 "This app deploys a prebuilt artifact that the server does not store. Deploy it with the CLI.");
 
