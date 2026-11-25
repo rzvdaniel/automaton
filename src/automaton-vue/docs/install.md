@@ -19,7 +19,7 @@ This page takes you from a fresh server to a Runner that shows as connected in S
 
 ## 1. Point your domain at the server
 
-Create two A records for the server's public IP, set to **DNS only** (no proxy): `example.com` and `*.example.com`. Use your own domain.
+Create these A records (or AAAA) for the server's public IP, set to **DNS only** (no proxy), with your own domain: `api.example.com`, `studio.example.com`, `store.example.com`, `apps.example.com` and `*.apps.example.com`. The installer checks exactly these names; the bare `example.com` is not needed. If you use Cloudflare or delegated certificates for published apps, the installer prints one more record for `_acme-challenge.apps`.
 
 ## 2. Install the server
 
@@ -119,7 +119,7 @@ Docker stays. Without `--delete-data` your volumes, backups and backup key are k
 
 ## For AI agents
 
-The rules at the top of this page apply to every step. Ask the user only for what they alone can give: root SSH access, the domain (A records for `domain` and `*.domain`, DNS only), the certificate email and the administrator's email. Run every step in one root shell. Install `jq curl python3 libicu-dev` first and check `jq --version`. Install the server with `--quiet`: the setup link is not printed and the backup key stays in `/etc/automaton/secrets/backup-key` (root-only, mode 0600) instead of the output.
+The rules at the top of this page apply to every step. Ask the user only for what they alone can give: root SSH access, the domain (DNS-only A records for `api.`, `studio.`, `store.` and `apps.` plus `*.apps.` under the domain), the certificate email and the administrator's email. Run every step in one root shell. Install `jq curl python3 libicu-dev` first and check `jq --version`. Install the server with `--quiet`: the setup link is not printed and the backup key stays in `/etc/automaton/secrets/backup-key` (root-only, mode 0600) instead of the output.
 
 Create the administrator with a password the agent generates and keeps only in a shell variable, then `unset`:
 

@@ -41,7 +41,7 @@ Details are in [issue #561](https://github.com/rzvdaniel/automaton/issues/561).
 ## Honest limits
 
 - **x86_64 Linux only.** Ubuntu and Debian 12 are supported. ARM and fully offline installs are not.
-- **Public DNS and HTTPS.** The server needs two DNS records and public ports 80, 443 and 5671.
+- **Public DNS and HTTPS.** The server needs five DNS-only records (`api`, `studio`, `store`, `apps` and `*.apps` under your domain) and public ports 80, 443 and 5671.
 - **No high availability.** The API, database and each Runner run on single machines. If one goes down, its apps are down until you restore it.
 - **No autoscaling or cross-region failover.** Each app runs on one Runner; you add Runners yourself.
 - **Updates cause brief interruptions** of the API, Studio and app store.
