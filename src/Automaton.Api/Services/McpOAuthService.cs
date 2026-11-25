@@ -122,11 +122,11 @@ public sealed class McpOAuthService
     /// <summary>Rotates the connection's key. A used or revoked refresh token fails.</summary>
     public async Task<TokenResult?> RefreshAsync(string? refreshToken, string? clientId)
     {
-        if (string.IsNullOrEmpty(refreshToken) || refreshToken.Length > 4000) return null;
+        if (string.IsNullOrEmpty(refreshToken) || refreshToken.Length > 4000 || string.IsNullOrEmpty(clientId)) return null;
         RefreshPayload? payload;
         try { payload = JsonSerializer.Deserialize<RefreshPayload>(refreshProtector.Unprotect(refreshToken)); }
         catch (Exception ex) when (ex is CryptographicException or JsonException) { return null; }
-        if (payload is null || payload.E <= DateTime.UtcNow || (clientId is not null && payload.C != clientId)) return null;
+        if (payload is null || payload.E <= DateTime.UtcNow || payload.C != clientId) return null;
 
         var rotated = await apiKeyService.RotateApiKeyAsync(payload.K, payload.F, DateTime.UtcNow.AddSeconds(AccessTokenSeconds));
         return rotated is null

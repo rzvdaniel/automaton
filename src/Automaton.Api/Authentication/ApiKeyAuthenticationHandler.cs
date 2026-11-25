@@ -86,6 +86,12 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             return AuthenticateResult.Fail("This API key works only for approving app permissions.");
         }
 
+        if (apiKeyEntity.Source == Automaton.Core.Enums.ApiKeySource.McpConnector && !IsMcpConnectorPath(Request.Path))
+        {
+            Logger.LogWarning("MCP connector API key {ApiKeyId} refused outside /mcp: {Method} {Path}", apiKeyEntity.Id, Request.Method, Request.Path);
+            return AuthenticateResult.Fail("This API key works only on the MCP endpoint.");
+        }
+
         var (userId, user) = await LoadApiKeyUserAsync(apiKeyEntity.Id);
         if (userId == Guid.Empty)
         {
@@ -111,6 +117,9 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 
         return result;
     }
+
+    /// <summary>A key issued by the connector sign-in (Claude) is valid on the MCP endpoint only, not on the REST API.</summary>
+    internal static bool IsMcpConnectorPath(PathString path) => path.StartsWithSegments("/mcp", StringComparison.OrdinalIgnoreCase);
 
     private async Task<(Guid UserId, ApplicationUser? User)> LoadApiKeyUserAsync(Guid apiKeyId)
     {

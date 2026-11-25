@@ -101,6 +101,7 @@ public sealed class McpOAuthServiceTests
         Assert.That(await db.ApiKeys.CountAsync(), Is.EqualTo(1), "one listed connection");
         Assert.That(await oauth.RefreshAsync(first.RefreshToken, clientId), Is.Null, "a used refresh token is refused");
         Assert.That(await oauth.RefreshAsync(second.RefreshToken, "other-client"), Is.Null);
+        Assert.That(await oauth.RefreshAsync(second.RefreshToken, null), Is.Null, "client_id is required");
 
         db.ApiKeys.Remove(await db.ApiKeys.SingleAsync());
         await db.SaveChangesAsync();
@@ -113,4 +114,12 @@ public sealed class McpOAuthServiceTests
         var (_, manual) = await keys.CreateApiKeyAsync(userId, "mine", ApiKeyScope.Developer);
         Assert.That(await keys.RotateApiKeyAsync(manual.Id, ApiKeyService.HashedKeyFingerprint(manual.HashedKey), DateTime.UtcNow.AddHours(1)), Is.Null);
     }
+
+    [TestCase("/mcp", true)]
+    [TestCase("/MCP", true)]
+    [TestCase("/api/apps/123", false)]
+    [TestCase("/api/mcp", false)]
+    [TestCase("/mcpx", false)]
+    public void ConnectorKeysAreValidOnlyOnTheMcpEndpoint(string path, bool allowed) =>
+        Assert.That(Automaton.Api.Authentication.ApiKeyAuthenticationHandler.IsMcpConnectorPath(path), Is.EqualTo(allowed));
 }
