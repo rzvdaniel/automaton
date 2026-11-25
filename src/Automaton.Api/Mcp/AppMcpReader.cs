@@ -39,6 +39,7 @@ public sealed class AppMcpReader(
     public async Task<object> StatusAsync(Guid appId, CancellationToken token)
     {
         var app = (await apps.ListAsync(null, token)).FirstOrDefault(item => item.Id == appId) ?? throw new KeyNotFoundException(NotFound);
+        var (previousVersionServing, deployNote) = PreviousVersion(app);
         return new
         {
             app.Id, app.Name, app.Summary,
@@ -46,12 +47,27 @@ public sealed class AppMcpReader(
             app.IsPaused, app.PausedReason,
             version = app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc,
             lastDeploymentError = app.LiveEnvironment?.LastDeploymentError,
+            previousVersionServing, deployNote,
             runner = app.Runner is null ? null : new { app.Runner.Name, online = app.LiveEnvironment?.RunnerOnline },
             address = app.PublicUrl,
             url = AppMcpUrls.For(publishedApps?.Value, app.Id, app.PublicUrl, app.IsPublished),
             whoCanOpen = app.IsPublished ? "anyone with the link (published)" : "the people the app is shared with",
             app.ActionsOnly, app.LastActionRun, app.NextActionRunAtUtc, app.CanUpdate,
         };
+    }
+
+    /// <summary>
+    /// True when the latest deploy failed (it has an error; a crashed app is Failed without one) but an earlier
+    /// successful one is still running.
+    /// </summary>
+    public static bool PreviousVersionServing(bool paused, string? status, string? lastDeploymentError, DateTime? lastSuccessfulDeploymentAtUtc)
+        => !paused && status == "Failed" && !string.IsNullOrEmpty(lastDeploymentError) && lastSuccessfulDeploymentAtUtc is not null;
+
+    private static (bool Serving, string? Note) PreviousVersion(AppListItemDto app)
+    {
+        var env = app.LiveEnvironment;
+        var serving = PreviousVersionServing(app.IsPaused, env?.Status, env?.LastDeploymentError, env?.LastSuccessfulDeploymentAtUtc);
+        return (serving, serving ? "The last deploy failed; the previous version (deployed " + env!.LastSuccessfulDeploymentAtUtc!.Value.ToString("u") + ") is still serving." : null);
     }
 
     public async Task<object> ActivityAsync(Guid appId, CancellationToken token)
