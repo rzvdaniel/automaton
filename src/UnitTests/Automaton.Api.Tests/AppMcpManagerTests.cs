@@ -10,7 +10,7 @@ public sealed class AppMcpManagerTests
     {
         var users = AppAuthorizationTestData.CreateUserContextService(userId);
         return new AppMcpManager(null!, null!, null!, null!, null!, null!, null!, null!, db,
-            new ResourceAuthorizationService(db, users), users, null!, null!);
+            new ResourceAuthorizationService(db, users), users, null!, null!, null!, null!);
     }
 
     [Test]
@@ -40,5 +40,34 @@ public sealed class AppMcpManagerTests
         Assert.Throws<McpUserException>(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["automaton.json"] = "{}", ["/etc/passwd"] = "x" }));
         Assert.Throws<McpUserException>(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["app.py"] = "x" }));
         Assert.DoesNotThrow(() => AppMcpManager.ValidateFiles(new Dictionary<string, string> { ["automaton.json"] = "{}", ["src/app.py"] = "x" }));
+    }
+
+    private static Models.RunnerDetails R(string name, bool online = true) => new()
+    {
+        Id = Guid.NewGuid(), Name = name, Status = online ? Core.Enums.RunnerStatus.Online : Core.Enums.RunnerStatus.Offline,
+        Purpose = Core.Enums.RunnerPurposes.Managed, ApplicationProfile = "MachineManagement", Capabilities = [Core.Enums.RunnerCapabilities.ApplicationHosting],
+    };
+
+    [Test]
+    public void SelectOnlyAvailableRunner_OneOnline_IsChosen()
+    {
+        var one = R("a");
+        Assert.That(AppMcpManager.SelectOnlyAvailableRunner([one, R("off", online: false)], null), Is.EqualTo(one.Id));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunner_NoneOrSeveral_AsksTheCaller()
+    {
+        Assert.That(Assert.Throws<McpUserException>(() => AppMcpManager.SelectOnlyAvailableRunner([R("off", false)], "https://s/apps/1"))!.Message, Does.Contain("no online"));
+        var several = Assert.Throws<McpUserException>(() => AppMcpManager.SelectOnlyAvailableRunner([R("one"), R("two")], null))!.Message;
+        Assert.That(several, Does.Contain("one").And.Contain("two"));
+    }
+
+    [Test]
+    public void StudioLink_UsesTheConfiguredStudioHost()
+    {
+        var id = Guid.NewGuid();
+        Assert.That(AppMcpManager.StudioLink("https://studio.example.test/", id), Is.EqualTo($"https://studio.example.test/apps/{id}"));
+        Assert.That(AppMcpManager.StudioLink("", id), Is.Null);
     }
 }

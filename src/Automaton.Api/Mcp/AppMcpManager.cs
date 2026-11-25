@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,9 @@ public sealed class AppMcpManager(
     ResourceAuthorizationService authorization,
     UserContextService users,
     ConfirmedEmailGuardService confirmedEmail,
-    IHttpContextAccessor http)
+    IHttpContextAccessor http,
+    RunnerService runners,
+    ConfigurationService configuration)
 {
     public const long MaxDeployBytes = AppArchiveStorageBounds.MaximumUploadBytes;
     public const long MaxRequestBytes = MaxDeployBytes * 2 + 1024 * 1024;
@@ -54,6 +57,7 @@ public sealed class AppMcpManager(
         if (!await authorization.CanUpdateAppAsync(appId, userId, token)) throw new McpUserException(AppMcpReader.NotFound);
         await RequireConfirmedEmailAsync(token);
         ValidateFiles(files);
+        await EnsureRunnerAsync(appId, token);
 
         var directory = Path.Combine(Path.GetTempPath(), "automaton-mcp-" + Guid.NewGuid().ToString("N"));
         DeploymentOperationResponse accepted;
@@ -203,11 +207,38 @@ public sealed class AppMcpManager(
             throw new McpUserException(ConfirmedEmailGuardService.SensitiveActionMessage);
     }
 
-    private string? StudioLink(Guid appId)
+    /// <summary>
+    /// An app with no Runner gets the only online Management Runner visible to it, as `automaton deploy` does. With none
+    /// or several, the caller is told what to do instead of a bare refusal.
+    /// </summary>
+    private async Task EnsureRunnerAsync(Guid appId, CancellationToken token)
     {
-        var request = http.HttpContext?.Request;
-        return request is null ? null : $"{request.Scheme}://{request.Host}/apps/{appId}";
+        var app = await db.WebApps.Include(a => a.DeploymentTargets).AsNoTracking().FirstOrDefaultAsync(a => a.Id == appId, token);
+        if (app is null) throw new McpUserException(AppMcpReader.NotFound);
+        if (app.DeploymentTargets?.SingleOrDefault(t => t.IsDefault)?.ExecutionRunnerId is not null) return;
+        var chosen = SelectOnlyAvailableRunner(await runners.List(app.ProjectId, token), StudioLink(appId));
+        try { await apps.UpdateRunner(appId, chosen); }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException) { throw new McpUserException(ex.Message); }
     }
+
+    internal static Guid SelectOnlyAvailableRunner(IEnumerable<RunnerDetails> candidates, string? studio)
+    {
+        var available = candidates.Where(r => r.Status == RunnerStatus.Online && !r.IsHostedRunner && r.CanExecuteApplications).ToList();
+        var where = studio is null ? "in Studio" : $"in Studio ({studio})";
+        return available.Count switch
+        {
+            1 => available[0].Id,
+            0 => throw new McpUserException($"This app has no Runner and no online Management Runner is available to it. Install or start one under Runners {where}, then call deploy_app again."),
+            _ => throw new McpUserException("This app has no Runner and several online Runners are available: " + string.Join(", ", available.Select(r => r.Name)) + $". Choose one {where} on the app's page, then call deploy_app again."),
+        };
+    }
+
+    private string? StudioLink(Guid appId) => StudioLink(configuration.WebsiteUrl, appId);
+
+    internal static string? StudioLink(string? websiteUrl, Guid appId)
+        => Uri.TryCreate(websiteUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
+            ? $"{uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.UriEscaped)}/apps/{appId}"
+            : null;
 }
 
 /// <summary>A refusal the caller should read: the message is safe to return to the AI.</summary>
