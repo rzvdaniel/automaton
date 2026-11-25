@@ -182,7 +182,8 @@ def check(pr: dict, patterns: list[str], security: list[str] = (), skip_ci: bool
     elif "medium" in raised and tier == "low":
         tier = "medium"
 
-    checks = pr.get("statusCheckRollup", [])
+    # The gate's own check never counts: it would otherwise wait for itself, or for its own old failures.
+    checks = [item for item in pr.get("checks", []) if item.get("name") != "merge-gate"]
     not_green = [item.get("name") or item.get("context") or "?" for item in checks
                  if (item.get("conclusion") or item.get("state") or "PENDING") not in GREEN]
     if skip_ci:
@@ -258,9 +259,13 @@ def main() -> int:
     if len(args) != 1:
         print(__doc__)
         return 2
-    fields = "number,headRefOid,baseRefName,author,body,reviews,statusCheckRollup,comments,commits"
+    fields = "number,headRefOid,baseRefName,author,body,reviews,comments,commits"
     pr = json.loads(gh("pr", "view", args[0], "--json", fields, *repo))
     slug = repo[1] if repo else "{owner}/{repo}"
+    # GitHub's own latest result per check (filter=latest): an older failed run of a check that passed since is gone.
+    pr["checks"] = json.loads(gh("api", f"repos/{slug}/commits/{pr['headRefOid']}/check-runs?filter=latest&per_page=100"))["check_runs"]
+    for item in pr["checks"]:
+        item["conclusion"] = (item.get("conclusion") or "").upper()
     # Every changed file, with the old path of a rename: a file moved out of a protected folder still counts.
     rows = gh("api", "--paginate", f"repos/{slug}/pulls/{pr['number']}/files?per_page=100",
               "-q", '.[] | [.filename, (.previous_filename // ""), .status, .deletions] | @tsv')
