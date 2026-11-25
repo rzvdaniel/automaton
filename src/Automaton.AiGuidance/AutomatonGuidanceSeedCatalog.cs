@@ -49,7 +49,7 @@ public static class AutomatonGuidanceSeedCatalog
             "Automaton MCP",
             "mcp",
             "Guidance",
-            "The boundary between Automaton MCP inspection and CLI delivery.",
+            "How Claude connects to an Automaton server over MCP, what the tools do and when to use the CLI.",
             "[\"mcp\",\"tools\"]",
             RequiredByDefault: false,
             IsModelLoadable: true,

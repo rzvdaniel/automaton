@@ -104,6 +104,11 @@ useSiteTheme()
 </div></section>
 
 <section class="band"><div class="wrap">
+  <div class="head"><p class="eyebrow">Claude</p><h2>Connect Claude to your server</h2><p>Add your server's /mcp address to Claude Code, or as a custom connector in Claude on the web or your phone. Claude can then create, deploy, share and pause your apps and read how they run. Secrets never pass through it.</p></div>
+  <p style="margin-top:24px"><a class="btn" href="/docs/work-with-ai#let-claude-read-and-manage-your-apps">How to connect Claude →</a></p>
+</div></section>
+
+<section class="band"><div class="wrap">
   <div class="head"><p class="eyebrow">Who it is for</p><h2>From one curious builder to a whole company</h2></div>
   <div class="tabs" role="tablist" aria-label="Audience">
     <button v-for="(a, i) in audiences" :key="a.h" class="tab" role="tab" type="button" :aria-selected="i === audience" @click="audience = i">{{ a.h }}</button>
