@@ -61,9 +61,11 @@ It does **not** write product code (exception: skills, docs and small chores the
   the configuration says there is capacity (for example, a server agent that takes one task at a time).
 - **Failures feed back.** When the release check fails, the fix-forward PR also fixes the step that should have
   caught it (a test, a line in `REVIEW.md`, a clearer skill).
-- **Every workaround gets a lessons line.** When something goes wrong (a stuck gate, a lost task, a manual rerun, a
-  check that failed for the wrong reason), comment on the open issue labelled `lessons`: what happened, what you did,
-  and whether it is fixed for good, patched or open. A few lines; the [lessons-learned run](../automaton-lessons-learned/SKILL.md) turns them into fixes.
+- **Every workaround gets a lesson issue.** When something goes wrong (a stuck gate, a lost task, a manual rerun, a
+  check that failed for the wrong reason), file one issue per root cause with the [write-issue skill](../automaton-write-issue/SKILL.md),
+  label `lesson`, on the agent board in **Inbox** (see the configuration). Example says what happened and what you did
+  (fixed for good, patched or open); Suggestion is the lasting fix. Search first: an existing issue gets a comment, not a twin.
+  The owner decides in Inbox whether it becomes next work.
 
 ## Delegating to an agent
 

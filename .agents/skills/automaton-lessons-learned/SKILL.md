@@ -1,47 +1,41 @@
 ---
 name: automaton-lessons-learned
-description: Use for the nightly (or on-demand) run that turns the lessons inbox, queue logs and failed gates into at most three concrete fixes, so the same problem never stops the agents twice.
+description: Use for the nightly (or on-demand) run that finds what went wrong (queue logs, failed gates and releases, stalled tasks) and files each new root cause as a lesson issue in the agent board's Inbox for the owner to triage.
 license: Apache-2.0
 ---
 
 # Automaton lessons learned
 
-Turns what went wrong into fixes. Works on Desktop and on a headless agent host; `gh` is the only hard requirement.
+Turns what went wrong into issues the owner can pick as next work. It files issues; it does not fix them.
+Works on Desktop and on a headless agent host; `gh` is the only hard requirement.
 
 ## 1. Collect (since the last run)
 
-Last run = date of the newest inbox comment starting `Lessons run` (all agents share one GitHub account, so go by the prefix; none yet means everything).
+Last run = the previous successful `agent-lessons.yml` run (`gh run list -w agent-lessons.yml --status success -L 1`);
+none means the last 7 days.
 
-- New comments on the inbox.
-- Queue logs, if `~/agent-queue/logs` exists: `grep -il "error\|failed\|cancel\|stall" ` on logs newer than the last run; read only the tails.
-- `gh run list --status failure --limit 30` for `Merge gate` and release runs; issues labelled `verification-failed`; tasks the orchestrator reported as stalled.
+- Queue logs, if `~/agent-queue/logs` exists: `grep -il "error\|failed\|cancel\|stall"` on logs newer than the last
+  run; read only the tails.
+- `gh run list --status failure --limit 30` for `Merge gate` and release runs; issues labelled `verification-failed`.
 
 ## 2. Decide
 
 - One root cause per incident; merge incidents that share one.
-- **Skip** one-offs, anything the inbox already marks "fixed for good", and anything an earlier "Lessons run" reply covers.
-- **Search first:** `gh issue list --state all --search "<keywords>"` and `grep -ri` in `.agents/` and `docs/`. An existing issue gets a comment, not a twin.
-- At most **3 changes** per run; take the ones that stopped agents longest. Leave the rest for the next run.
+- **Skip** one-offs with no lasting fix.
+- **Search first:** `gh issue list --state all --label lesson --search "<keywords>"` (and without the label). An
+  existing issue gets a comment with the new incident, not a twin.
 
-## 3. Route each fix
+## 3. File
 
-| Root cause | Where it goes |
-| --- | --- |
-| Skill or doc wording | small PR ([write-PR](../automaton-write-pr/SKILL.md)); the PR follows [PR review](../pr-review/SKILL.md) |
-| Product, gate code or tool change | issue ([write-issue](../automaton-write-issue/SKILL.md)) |
-| Owner-only rule (`AGENTS.md`, merge-gate rules, access, production) | listed in the reply for the owner; never edited here |
-| Installation fact (cron, sudo, paths, preamble of one host) | orchestrator config, noted in the reply |
+Each new root cause: one issue per [write-issue](../automaton-write-issue/SKILL.md), label `lesson`. Example = what
+happened, with links; Suggestion = the lasting fix and where it goes (skill or doc, gate or tool code, owner-only rule,
+installation fact). Put it on the agent board with Status **Inbox** (`gh project item-add <board> --owner <owner> --url <issue>`,
+then `.agents/tools/agent-board.sh move <repo> <n> Inbox`). Never move it to Ready: the owner decides.
 
-Never edit `AGENTS.md` or the merge-gate rules.
+## 4. Report
 
-## Finishing a PR
-
-Every PR this run opens is finished before the run ends: description per [write-PR](../automaton-write-pr/SKILL.md) (How verified, Risk, How to revert, Docs), independent review per [PR review](../pr-review/SKILL.md) posted with `gh pr review`, then `python3 .agents/tools/merge-gate.py <n> --merge`. If the gate fails, comment why on the PR. List the PR in the reply.
-
-## 4. Reply
-
-One comment on the inbox, starting `Lessons run YYYY-MM-DD`: each change with its link, what was skipped and why (one line each), and the owner list. Reply even when nothing changed, so the next run has its date.
+End with a short list in the job output: issues filed, issues commented, what was skipped and why (one line each).
 
 ## Schedule
 
-Nightly on the agent host (see `.agents/environment.md`): the agent user's crontab pipes a one-line prompt that says to follow this skill into `~/bin/agent-queue add lessons-$(date +\%Y\%m\%d)` (cron needs `\%`).
+Nightly via `agent-lessons.yml` (`.agents/jobs/lessons.md`), see `docs/maintainers/agent-machines.md`.
