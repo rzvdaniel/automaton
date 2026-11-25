@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import router from './index'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 describe('studio router', () => {
   it('makes Home the start page', () => {
@@ -89,5 +91,43 @@ describe('studio router', () => {
     const redirect = router.getRoutes().find((route) => route.name === name)?.redirect as { path: string; hash: string }
     expect(redirect.path).toBe('/settings')
     expect(['#agents', '#server']).toContain(redirect.hash)
+  })
+
+  describe('Claude connector consent page', () => {
+    const consent = '/mcp/authorize?client_id=abc&state=x%20y'
+
+    beforeEach(async () => {
+      setActivePinia(createPinia())
+      await router.replace('/login')
+    })
+
+    it('keeps a signed-in user on the page with its query', async () => {
+      const auth = useAuthStore()
+      auth.accessToken = 'token'
+      auth.user = { id: 'u1', email: 'a@b.c', name: 'A' } as typeof auth.user
+      auth.isInitialized = true
+      await router.push(consent)
+      expect(router.currentRoute.value.name).toBe('mcp-authorize')
+      expect(router.currentRoute.value.fullPath).toBe(consent)
+    })
+
+    it('sends a signed-out user to login and back to the page', async () => {
+      const auth = useAuthStore()
+      auth.isInitialized = true
+      await router.push(consent)
+      const current = router.currentRoute.value
+      expect(current.path).toBe('/login')
+      expect(current.query.redirect).toBe(consent)
+    })
+
+    it('still sends a signed-in user away from the login page', async () => {
+      const auth = useAuthStore()
+      auth.accessToken = 'token'
+      auth.user = { id: 'u1', email: 'a@b.c', name: 'A' } as typeof auth.user
+      auth.isInitialized = true
+      await router.push('/home')
+      await router.push('/login')
+      expect(router.currentRoute.value.path).not.toBe('/login')
+    })
   })
 })
