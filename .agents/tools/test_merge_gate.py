@@ -18,7 +18,7 @@ def review(body, commit="abc", state="COMMENTED", at="2026-01-01T00:00:00Z", who
 
 def pr(paths, reviews=(), labels=(), body=BODY, checks=GREEN):
     return {"headRefOid": "abc", "body": body, "paths": list(paths), "reviews": list(reviews),
-            "labels": [{"name": n} for n in labels], "statusCheckRollup": checks, "comments": [], "commits": []}
+            "labels": [{"name": n} for n in labels], "checks": checks, "comments": [], "commits": []}
 
 
 def failed(result):
@@ -141,6 +141,15 @@ class Gate(unittest.TestCase):
 
     def test_skip_ci_ignores_checks(self):
         self.assertEqual(failed(gate.check(pr(["README.md"], checks=[]), PATTERNS, skip_ci=True)), [])
+
+    def test_own_merge_gate_check_does_not_count(self):
+        own = GREEN + [{"name": "merge-gate", "status": "COMPLETED", "conclusion": "FAILURE"}]
+        self.assertEqual(failed(gate.check(pr(["README.md"], checks=own), PATTERNS)), [])
+        self.assertEqual(failed(gate.check(pr(["README.md"], checks=[own[1]]), PATTERNS)), ["ci"])
+
+    def test_latest_result_per_check_is_what_counts(self):
+        # The gate gets GitHub's filter=latest list: the older failed run of "tests" is not in it.
+        self.assertEqual(failed(gate.check(pr(["README.md"], checks=GREEN), PATTERNS)), [])
 
     def test_description_needs_docs_line(self):
         body = BODY.replace("\n**Docs:** none, because test", "")
