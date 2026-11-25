@@ -20,7 +20,7 @@ You never write a Dockerfile, open a port, buy a certificate or set up a domain 
 
 ## Set up once
 
-You need an Automaton server (your AI can [install it](./work-with-ai)) and an AI that can run commands on your computer, such as [Claude Code](https://claude.com/claude-code).
+You need an Automaton server (your AI can [install it](./install#for-ai-agents)) and an AI that can run commands on your computer, such as [Claude Code](https://claude.com/claude-code).
 
 1. Install the CLI. Linux or macOS:
 
