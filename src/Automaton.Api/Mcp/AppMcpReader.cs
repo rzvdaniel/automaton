@@ -46,6 +46,10 @@ public sealed class AppMcpReader(
             app.IsPaused, app.PausedReason,
             version = app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc,
             lastDeploymentError = app.LiveEnvironment?.LastDeploymentError,
+            previousVersionServing = PreviousVersionServing(app.IsPaused, app.LiveEnvironment?.Status, app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc),
+            deployNote = PreviousVersionServing(app.IsPaused, app.LiveEnvironment?.Status, app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc)
+                ? "The last deploy failed; the previous version (deployed " + app.LiveEnvironment!.LastSuccessfulDeploymentAtUtc!.Value.ToString("u") + ") is still serving."
+                : null,
             runner = app.Runner is null ? null : new { app.Runner.Name, online = app.LiveEnvironment?.RunnerOnline },
             address = app.PublicUrl,
             url = AppMcpUrls.For(publishedApps?.Value, app.Id, app.PublicUrl, app.IsPublished),
@@ -53,6 +57,10 @@ public sealed class AppMcpReader(
             app.ActionsOnly, app.LastActionRun, app.NextActionRunAtUtc, app.CanUpdate,
         };
     }
+
+    /// <summary>True when the last deploy failed but an earlier successful one is still running.</summary>
+    public static bool PreviousVersionServing(bool paused, string? status, DateTime? lastSuccessfulDeploymentAtUtc)
+        => !paused && status == "Failed" && lastSuccessfulDeploymentAtUtc is not null;
 
     public async Task<object> ActivityAsync(Guid appId, CancellationToken token)
     {
