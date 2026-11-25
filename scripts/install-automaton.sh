@@ -411,7 +411,7 @@ PYLINK
     if python3 "$install_dir/admin-link.py" "$domain" "$config_dir" "$admin_email" "$link_file"; then
         printf 'The administrator %s was created. The one-time password link is in %s (root only).\n' "$admin_email" "$link_file"
     else
-        echo "The administrator could not be created. Open https://studio.$domain/install and read the token with: sudo cat $config_dir/secrets/setup-token" >&2
+        echo "The administrator or the password link could not be made (an older release has no password link). If https://studio.$domain/install still asks for a setup token, read it with: sudo cat $config_dir/secrets/setup-token. Otherwise run again: sudo python3 $install_dir/admin-link.py $domain $config_dir $admin_email $link_file" >&2
     fi
 fi
 # Once the first administrator exists the file holds a new value that only root should use: never print it.
