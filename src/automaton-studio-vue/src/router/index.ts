@@ -98,8 +98,9 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  // If user is authenticated and tries to access auth pages (login/register)
-  if (authStore.isAuthenticated && to.meta.layout === 'auth' && to.name !== 'change-password') {
+  // If user is authenticated and tries to access auth pages (login/register).
+  // Auth-layout pages that need a signed-in user (change-password, mcp-authorize) are not for leaving.
+  if (authStore.isAuthenticated && to.meta.layout === 'auth' && to.meta.requiresAuth !== true) {
     // Redirect to the start page
     next({ path: '/' })
     return
