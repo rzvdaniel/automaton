@@ -19,6 +19,8 @@ You care about the app. Your AI writes it, deploys it and fixes it. Automaton ru
 
 [Work with AI](./work-with-ai) shows the whole loop.
 
+Claude can also connect to your server over MCP, from Claude Code or from Claude on the web and your phone, to create, deploy and share apps. See [Work with AI](./work-with-ai#let-claude-read-and-manage-your-apps).
+
 ## Start
 
 | You want to | Read |
