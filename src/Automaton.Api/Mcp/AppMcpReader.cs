@@ -18,7 +18,8 @@ public sealed class AppMcpReader(
     ApplicationDbContext db,
     ResourceAuthorizationService authorization,
     UserContextService users,
-    AppFileStorageService storage)
+    AppFileStorageService storage,
+    Microsoft.Extensions.Options.IOptions<Automaton.Api.Config.PublishedAppsConfig>? publishedApps = null)
 {
     public const int MaxLogLines = 500;
     public const int DefaultLogLines = 100;
@@ -29,7 +30,7 @@ public sealed class AppMcpReader(
     public const string NotFound = "App not found.";
 
     public async Task<object> ListAppsAsync(CancellationToken token)
-        => (await apps.ListAsync(null, token)).Select(Summarize).ToList();
+        => (await apps.ListAsync(null, token)).Select(app => Summarize(app, publishedApps?.Value)).ToList();
 
     public async Task<object> StatusAsync(Guid appId, CancellationToken token)
     {
@@ -43,6 +44,7 @@ public sealed class AppMcpReader(
             lastDeploymentError = app.LiveEnvironment?.LastDeploymentError,
             runner = app.Runner is null ? null : new { app.Runner.Name, online = app.LiveEnvironment?.RunnerOnline },
             address = app.PublicUrl,
+            url = AppMcpUrls.For(publishedApps?.Value, app.Id, app.PublicUrl, app.IsPublished),
             whoCanOpen = app.IsPublished ? "anyone with the link (published)" : "the people the app is shared with",
             app.ActionsOnly, app.LastActionRun, app.NextActionRunAtUtc, app.CanUpdate,
         };
@@ -106,10 +108,10 @@ public sealed class AppMcpReader(
         return new { available = true, readme = text.Length > MaxDocChars ? text[..MaxDocChars] : text };
     }
 
-    private static object Summarize(AppListItemDto app) => new
+    private static object Summarize(AppListItemDto app, Automaton.Api.Config.PublishedAppsConfig? config) => new
     {
         app.Id, app.Name, app.Summary,
         state = app.IsPaused ? "paused" : app.LiveEnvironment?.Status ?? "Unassigned",
-        address = app.PublicUrl, app.IsPublished, app.UpdatedAtUtc,
+        address = app.PublicUrl, url = AppMcpUrls.For(config, app.Id, app.PublicUrl, app.IsPublished), app.IsPublished, app.UpdatedAtUtc,
     };
 }

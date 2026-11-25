@@ -11,7 +11,7 @@ public sealed class AppMcpTools(AppMcpReader reader)
     [McpServerTool(Name = "list_apps", ReadOnly = true), Description("List the Automaton apps you can see, with state and address.")]
     public Task<object> ListApps(CancellationToken token) => Run(() => reader.ListAppsAsync(token));
 
-    [McpServerTool(Name = "app_status", ReadOnly = true), Description("State, version, Runner, address and who can open one app.")]
+    [McpServerTool(Name = "app_status", ReadOnly = true), Description("State, version, Runner, address, full url and who can open one app.")]
     public Task<object> AppStatus([Description("The app id from list_apps")] Guid appId, CancellationToken token)
         => Run(() => reader.StatusAsync(appId, token));
 

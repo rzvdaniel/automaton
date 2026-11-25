@@ -29,7 +29,8 @@ public sealed class AppMcpManager(
     ConfirmedEmailGuardService confirmedEmail,
     IHttpContextAccessor http,
     RunnerService runners,
-    ConfigurationService configuration)
+    ConfigurationService configuration,
+    Microsoft.Extensions.Options.IOptions<Automaton.Api.Config.PublishedAppsConfig>? publishedApps = null)
 {
     public const long MaxDeployBytes = AppArchiveStorageBounds.MaximumUploadBytes;
     public const long MaxRequestBytes = MaxDeployBytes * 2 + 1024 * 1024;
@@ -89,7 +90,7 @@ public sealed class AppMcpManager(
         try
         {
             var state = await sharing.SetAudienceAsync(appId, audience, publicUrl, null, null, token);
-            return new { appId, audience = state.Audience, publicUrl = state.PublicUrlSlug, people = state.People.Select(p => p.Email).ToList() };
+            return new { appId, audience = state.Audience, publicUrl = state.PublicUrlSlug, url = AppMcpUrls.For(publishedApps?.Value, appId, state.PublicUrlSlug, state.Audience == "internet"), people = state.People.Select(p => p.Email).ToList() };
         }
         catch (Exception ex) when (ex is KeyNotFoundException or UnauthorizedAccessException) { throw new McpUserException(AppMcpReader.NotFound); }
         catch (InvalidOperationException ex) { throw new McpUserException(ex.Message); }
@@ -176,7 +177,7 @@ public sealed class AppMcpManager(
         var app = (await apps.ListAsync(null, token)).FirstOrDefault(item => item.Id == appId);
         var state = AppState(app);
         if (operation?.Status == "Succeeded" && operation.Result?.Success != false && state == "Running")
-            return new { appId, deployed = true, state, address = app?.PublicUrl, studio = StudioLink(appId) };
+            return new { appId, deployed = true, state, address = app?.PublicUrl, url = app is null ? null : AppMcpUrls.For(publishedApps?.Value, appId, app.PublicUrl, app.IsPublished), studio = StudioLink(appId) };
         return await DescribeFailureAsync(appId, operation, app, state, token);
     }
 
