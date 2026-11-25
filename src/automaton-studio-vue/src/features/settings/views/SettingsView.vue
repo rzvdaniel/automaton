@@ -18,6 +18,7 @@ import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
 import CliSteps from '../components/CliSteps.vue'
+import ConnectAiSection from '../components/ConnectAiSection.vue'
 import SetupChecks from '@/features/install/components/SetupChecks.vue'
 import EmailNotConfiguredNotice from '@/features/install/components/EmailNotConfiguredNotice.vue'
 import SmtpSettingsForm from '@/features/install/components/SmtpSettingsForm.vue'
@@ -478,6 +479,10 @@ const passwordLoading = computed(() => passwordSaving.value)
             </p>
           </div>
           <CliSteps />
+          <div>
+            <h3 class="text-lg font-semibold m-0 mb-2">Connect your AI</h3>
+            <ConnectAiSection />
+          </div>
           <ApiKeysSection />
         </section>
 
