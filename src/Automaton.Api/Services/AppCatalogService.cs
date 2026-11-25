@@ -56,7 +56,7 @@ public sealed class AppCatalogService(
                 stale = true;
                 problems.Add($"{label}{failure} Showing the list from {entry.FetchedAt:u}.");
             }
-            apps.AddRange(entry.Document.Apps.Select(app => ToDto(app, entry.Document.Repo, installed, version, source, runnerVersions)));
+            apps.AddRange(entry.Document.Apps.Select(app => ToDto(app, entry.Document.Repo, installed, version, source, RawBase(), runnerVersions)));
         }
 
         if (loaded == 0 && enabled.Count > 0)
@@ -366,15 +366,34 @@ public sealed class AppCatalogService(
     private static (string Repo, string Folder) InstalledKey(string repo, string? folder) =>
         (repo.Trim().ToLowerInvariant(), (folder ?? "").Trim().Trim('/'));
 
-    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source, IReadOnlyList<string?>? runnerVersions = null)
+    private static CatalogEntryDto ToDto(CatalogApp app, string repo, Dictionary<(string Repo, string Folder), Guid> installed, Version? serverVersion, CatalogSourceStore.SourceRef source, string rawBase, IReadOnlyList<string?>? runnerVersions = null)
     {
         var minimum = ParseVersion(app.MinServerVersion);
         var needsNewer = serverVersion is not null && minimum is not null && serverVersion < minimum;
         Guid? installedId = installed.TryGetValue(InstalledKey(repo, app.Folder), out var id) ? id
             : app.MovedFrom is { } from && installed.TryGetValue(InstalledKey(from.Repo, from.Folder), out var previous) ? previous : null;
         return new CatalogEntryDto(app.Id, app.Name ?? "", app.Summary ?? "", app.Category ?? "", repo, app.Folder, app.Commit,
-            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), app.Icon, app.Recommended, app.RecommendedOrder, PublisherOf(app, source),
-            runnerVersions is { Count: > 0 } && runnerVersions.All(v => RunnerProtocolCompatibilityPolicy.PermissionsBeyondRunner(v, app.Permissions).Count > 0));
+            app.MinServerVersion, app.Permissions, needsNewer, installedId, source.Id, source.Name, !source.Official, app.Tags?.Where(tag => tag is not null).ToList(), AssetUrl(rawBase, repo, app, app.Icon), app.Recommended, app.RecommendedOrder, PublisherOf(app, source),
+            runnerVersions is { Count: > 0 } && runnerVersions.All(v => RunnerProtocolCompatibilityPolicy.PermissionsBeyondRunner(v, app.Permissions).Count > 0),
+            (app.Screenshots ?? []).Select(path => AssetUrl(rawBase, repo, app, path)).OfType<string>().Take(8).ToList());
+    }
+
+    private string RawBase() => (configuration["Catalog:RawBaseUrl"] is { Length: > 0 } r ? r : "https://raw.githubusercontent.com").TrimEnd('/');
+
+    private static readonly System.Text.RegularExpressions.Regex AssetPath = new(@"^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// The address of an icon or screenshot. The catalog lists a path inside the app folder; it is loaded from the pinned commit,
+    /// so the image matches the listed version. A full https:// address is kept; anything else unsafe is dropped.
+    /// </summary>
+    internal static string? AssetUrl(string rawBase, string repo, CatalogApp app, string? path)
+    {
+        path = path?.Trim();
+        if (string.IsNullOrEmpty(path)) return null;
+        if (path.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return path;
+        static bool Safe(string? value) => !string.IsNullOrEmpty(value) && AssetPath.IsMatch(value) && value.Split('/').All(part => part is not ("." or ".."));
+        if (!Safe(path) || !Safe(app.Folder.Trim('/')) || !Safe(repo) || app.Commit is not { Length: 40 } commit || !commit.All(Uri.IsHexDigit) || commit.Any(char.IsUpper)) return null;
+        return $"{rawBase}/{repo}/{app.Commit}/{app.Folder.Trim('/')}/{path}";
     }
 
     internal const string AutomatonPublisher = "Automaton";
@@ -432,6 +451,7 @@ public sealed class AppCatalogService(
         public List<string> Permissions { get; set; } = [];
         public List<string> Tags { get; set; } = [];
         public string? Icon { get; set; }
+        public List<string>? Screenshots { get; set; }
         public CatalogPublisher? Publisher { get; set; }
         /// <summary>Set when the app used to live in the official catalog: servers that installed it there update it from here.</summary>
         public MovedFromRef? MovedFrom { get; set; }

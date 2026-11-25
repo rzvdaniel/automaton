@@ -239,7 +239,7 @@ my-apps/
 { "repo": "owner/name", "apps": [ { "folder": "apps/hello", "category": "Examples", "minServerVersion": "0.2.32" } ] }
 ```
 
-`folder` (path from the repository root), `category` and `minServerVersion` (older servers show the entry without Install) are required. Optional: `repo` (defaults to the GitHub Actions repository), `publisher` (`{ "name": "Acme", "logo": "https://…" }`) and `movedFrom` (`{ "repo": "...", "folder": "..." }` for an app that left another catalog). The workflow writes `catalog.json` from these and from each app's `name`, `summary` and `permissions`. Manage sources from a terminal with `automaton catalog --help`. Run `automaton validate` in each app folder first.
+`folder` (path from the repository root), `category` and `minServerVersion` (older servers show the entry without Install) are required. Optional: `repo` (defaults to the GitHub Actions repository), `publisher` (`{ "name": "Acme", "logo": "https://…" }`) and `movedFrom` (`{ "repo": "...", "folder": "..." }` for an app that left another catalog). The workflow writes `catalog.json` from these and from each app's `name`, `summary` and `permissions`. Manage sources from a terminal with `automaton catalog --help`. A catalog entry may also carry an `icon` and up to eight `screenshots`, as paths inside the app folder (png, jpg, webp or svg, up to 512 KB each) that the server loads from the commit the entry is pinned to; Studio's catalog shows the icon, or a letter when there is none. The official apps repository's generator reads them from each app's `automaton.json` (`"icon": "icon.svg"`); the `catalog init` workflow does not add them yet. Run `automaton validate` in each app folder first.
 
 ## Related
 
