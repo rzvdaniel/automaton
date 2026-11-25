@@ -66,6 +66,42 @@ public sealed class AppMcpReaderTests
         Assert.ThrowsAsync<KeyNotFoundException>(() => stranger.DocsAsync(appId, default));
     }
 
+    private sealed class FakeRunner(Guid expectedRunner) : Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands
+    {
+        public List<Automaton.Core.Models.AppActionCommand> Sent { get; } = [];
+        public Task<System.Text.Json.JsonElement> SendAsync(Guid runnerId, Guid actor, Automaton.Core.Models.AppActionCommand command, TimeSpan timeout, CancellationToken token)
+        {
+            Assert.That(runnerId, Is.EqualTo(expectedRunner));
+            Sent.Add(command);
+            return Task.FromResult(System.Text.Json.JsonSerializer.SerializeToElement(
+                new Automaton.Core.Models.ReadAppLogsResult(Guid.Empty, Guid.Empty, true, "beat 1\nbeat 2\n")));
+        }
+    }
+
+    [Test]
+    public async Task Logs_OfALongRunningApp_ReturnItsOwnRecentOutput()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        using var tempRoot = new AppAuthorizationTestData.TemporaryDirectory();
+        await using var db = AppAuthorizationTestData.CreateDbContext();
+        AppAuthorizationTestData.SeedApp(db, appId, ownerId, "heartbeat");
+        db.Runners.Add(new() { Id = runnerId, Name = "runner", RunnerUsers = [] });
+        db.AppDeploymentTargets.Add(new() { Id = Guid.NewGuid(), WebAppId = appId, Name = "live", Slug = "live", ExecutionRunnerId = runnerId, GenericRuntimeDeployed = true });
+        await db.SaveChangesAsync();
+        var apps = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path, out var storage);
+        var users = AppAuthorizationTestData.CreateUserContextService(ownerId);
+        var runner = new FakeRunner(runnerId);
+        var reader = new AppMcpReader(apps, AppAuthorizationActionExecutionTestFactory.Create(db, ownerId), new NoEvents(),
+            db, new ResourceAuthorizationService(db, users), users, storage, null, runner);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(await reader.LogsAsync(appId, null, 50, default));
+
+        Assert.That(json, Does.Contain("beat 1").And.Contain("beat 2"));
+        Assert.That(runner.Sent.Select(c => c.Kind), Is.EqualTo(new[] { "app-logs" }));
+    }
+
     [Test]
     public async Task Status_ForUnknownApp_IsNotFound()
     {

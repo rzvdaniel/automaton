@@ -3,6 +3,7 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
+using System.Text.Json;
 
 namespace Automaton.Api.Mcp;
 
@@ -19,8 +20,11 @@ public sealed class AppMcpReader(
     ResourceAuthorizationService authorization,
     UserContextService users,
     AppFileStorageService storage,
-    Microsoft.Extensions.Options.IOptions<Automaton.Api.Config.PublishedAppsConfig>? publishedApps = null)
+    Microsoft.Extensions.Options.IOptions<Automaton.Api.Config.PublishedAppsConfig>? publishedApps = null,
+    Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands? runnerCommands = null)
 {
+    private const int MaxRunnerLogLines = 200;
+    private static readonly TimeSpan RunnerLogTimeout = TimeSpan.FromSeconds(20);
     public const int MaxLogLines = 500;
     public const int DefaultLogLines = 100;
     private const int MaxLineChars = 2000;
@@ -80,17 +84,47 @@ public sealed class AppMcpReader(
         _ = (await apps.ListAsync(null, token)).FirstOrDefault(item => item.Id == appId) ?? throw new KeyNotFoundException(NotFound);
         var count = Math.Clamp(lines ?? DefaultLogLines, 1, MaxLogLines);
         var userId = users.GetUserId();
+        // A long-running app has no runs; its own output is the same container output Studio shows.
+        var output = runId is null ? await AppOutputAsync(appId, userId, count, token) : null;
         try
         {
             var id = runId ?? (await executions.ListAsync(appId, userId, token)).FirstOrDefault()?.Id;
-            if (id is null) return new { available = false, message = "This app has no runs with logs yet." };
+            if (id is null)
+                return output is { available: true }
+                    ? (object)new { available = true, message = "This app has no runs; appOutput is its own output.", appOutput = output }
+                    : new { available = false, message = "This app has no runs with logs yet.", appOutput = output };
             var artifact = await executions.ReadArtifactAsync(appId, id.Value, userId, result: false, token);
-            if (!artifact.Available || artifact.Content is null) return new { runId = id, available = false, message = artifact.Message ?? "Logs are not available." };
+            if (!artifact.Available || artifact.Content is null) return new { runId = id, available = false, message = artifact.Message ?? "Logs are not available.", appOutput = output };
             var tail = artifact.Content.Split('\n').TakeLast(count).Select(line => line.Length > MaxLineChars ? line[..MaxLineChars] : line);
-            return new { runId = id, available = true, lines = tail.ToList() };
+            return new { runId = id, available = true, lines = tail.ToList(), appOutput = output };
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or KeyNotFoundException) { throw new KeyNotFoundException(NotFound); }
     }
+
+    private async Task<AppOutput?> AppOutputAsync(Guid appId, Guid userId, int count, CancellationToken token)
+    {
+        if (runnerCommands is null) return null;
+        var target = await db.AppDeploymentTargets.AsNoTracking()
+            .Where(t => t.WebAppId == appId && t.ExecutionRunnerId != null && t.GenericRuntimeDeployed && !t.CleanupPending)
+            .Select(t => new { t.Id, t.ExecutionRunnerId }).FirstOrDefaultAsync(token);
+        if (target?.ExecutionRunnerId is not { } runnerId) return null;
+        try
+        {
+            var json = await runnerCommands.SendAsync(runnerId, userId,
+                Automaton.Core.Models.AppActionCommand.Create("app-logs",
+                    new Automaton.Core.Models.ReadAppLogsRequest(appId, target.Id, Math.Min(count, MaxRunnerLogLines))), RunnerLogTimeout, token);
+            var result = json.Deserialize<Automaton.Core.Models.ReadAppLogsResult>(new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+            if (result is null || !result.Running) return new(false, [], "The app is not running, so it has no output to read.");
+            var tail = result.Text.Split('\n').Where(l => l.Length > 0).TakeLast(count).Select(l => l.Length > MaxLineChars ? l[..MaxLineChars] : l).ToList();
+            return new(true, tail, null);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new(false, [], "The app's output could not be read from its Runner right now.");
+        }
+    }
+
+    private sealed record AppOutput(bool available, List<string> lines, string? message);
 
     public async Task<object> DocsAsync(Guid appId, CancellationToken token)
     {

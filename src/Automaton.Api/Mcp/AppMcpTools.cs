@@ -19,7 +19,7 @@ public sealed class AppMcpTools(AppMcpReader reader)
     public Task<object> AppActivity([Description("The app id from list_apps")] Guid appId, CancellationToken token)
         => Run(() => reader.ActivityAsync(appId, token));
 
-    [McpServerTool(Name = "app_logs", ReadOnly = true), Description("The last lines of the logs of an app's latest run (or a given run), at most 500.")]
+    [McpServerTool(Name = "app_logs", ReadOnly = true), Description("The last lines of an app's latest run logs (or a given run), at most 500; for a running app also appOutput, its own recent output.")]
     public Task<object> AppLogs(
         [Description("The app id from list_apps")] Guid appId,
         [Description("A run id from app_activity; the latest run when empty")] Guid? runId = null,
