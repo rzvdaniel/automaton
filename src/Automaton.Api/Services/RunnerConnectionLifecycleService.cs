@@ -48,7 +48,7 @@ public sealed class RunnerConnectionLifecycleService(
             ApplicationEventLevels.Info,
             ApplicationEventCategories.Runtime,
             ApplicationEventTypes.RunnerConnected,
-            "Runner connected.",
+            await connectionSessionService.DescribeAsync("Runner connected", runner.Id, cancellationToken),
             new { runner.Name, runner.ConnectionId, runner.MachineName, runner.ApiInstanceId },
             userId,
             cancellationToken);
