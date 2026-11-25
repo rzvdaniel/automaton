@@ -63,20 +63,23 @@ public static class LoginCommand
                 config.ProfileOverride = name;
                 existing = config.ResolveExistingConfig(global, cwd);
             }
-            if (!string.IsNullOrWhiteSpace(email))
-            {
-                if (permissionsAdmin || !string.IsNullOrWhiteSpace(key) || HasKeyArgument())
-                    throw new InvalidOperationException("--email cannot be combined with --key or --permissions-admin.");
-                key = await CreateKeyWithPasswordAsync(server, email.Trim(), Console.In, Console.IsInputRedirected);
-            }
+            var passwordKey = await TryCreateKeyWithPasswordAsync(server, email, key, permissionsAdmin);
             await CompletePendingAuthorizationAsync(config, cwd, global, asJson, existing, checks);
-            if (string.IsNullOrWhiteSpace(email)) key = ResolveRequestedKey(key);
+            key = passwordKey ?? ResolveRequestedKey(key);
             await CompleteLoginAsync(config, cwd, server, key, global, device, asJson, checks, permissionsAdmin);
         }
         catch (Exception ex)
         {
             WriteLoginFailure(ex, asJson, checks, nextSteps);
         }
+    }
+
+    private static async Task<string?> TryCreateKeyWithPasswordAsync(string server, string? email, string? key, bool permissionsAdmin)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+        if (permissionsAdmin || !string.IsNullOrWhiteSpace(key) || HasKeyArgument())
+            throw new InvalidOperationException("--email cannot be combined with --key or --permissions-admin.");
+        return await CreateKeyWithPasswordAsync(server, email.Trim(), Console.In, Console.IsInputRedirected);
     }
 
     /// <summary>Password sign-in for an installing agent: the password comes from standard input, never an argument.</summary>

@@ -31,6 +31,7 @@ public sealed class KeysAndPasswordLoginTests
         {
             KeysCommand.WritePrivateFile(path, "k");
             Assert.That(File.GetUnixFileMode(path), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite));
+            Assert.Throws<IOException>(() => KeysCommand.WritePrivateFile(path, "again"));
         }
         finally { File.Delete(path); }
     }

@@ -65,13 +65,14 @@ public static class KeysCommand
         }
     }
 
+    /// <summary>Creates the file owner-only in one step and refuses an existing path (no symlink or reused file).</summary>
     internal static void WritePrivateFile(string path, string content)
     {
+        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
         if (!OperatingSystem.IsWindows())
-        {
-            File.WriteAllText(path, "");
-            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-        File.WriteAllText(path, content + Environment.NewLine, new System.Text.UTF8Encoding(false));
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        using var stream = new FileStream(path, options);
+        using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
+        writer.Write(content + Environment.NewLine);
     }
 }
