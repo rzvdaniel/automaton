@@ -14,10 +14,11 @@ public static class KeysCommand
         var name = new Option<string>("--name", "Name of the key") { IsRequired = true };
         var scope = new Option<string>("--scope", () => "developer", "developer or runner");
         var output = new Option<string?>("--out", "Write the key to this file (owner-only) instead of printing it");
+        var email = new Option<string>("--email", "Your email; the password is read from standard input (a saved key cannot create keys)") { IsRequired = true };
         var json = new Option<bool>("--json", "Print the result as JSON");
-        var create = new Command("create", "Create an API key; the key is shown once") { name, scope, output, json };
-        create.SetHandler((string keyName, string keyScope, string? path, bool asJson) =>
-            CreateAsync(config, keyName, keyScope, path, asJson), name, scope, output, json);
+        var create = new Command("create", "Create an API key; the key is shown once") { name, email, scope, output, json };
+        create.SetHandler((string keyName, string mail, string keyScope, string? path, bool asJson) =>
+            CreateAsync(config, keyName, mail, keyScope, path, asJson), name, email, scope, output, json);
         command.AddCommand(create);
         return command;
     }
@@ -29,16 +30,21 @@ public static class KeysCommand
         _ => throw new InvalidOperationException("Scope must be developer or runner.")
     };
 
-    private static async Task CreateAsync(ConfigService config, string name, string scope, string? path, bool asJson)
+    private static async Task CreateAsync(ConfigService config, string name, string email, string scope, string? path, bool asJson)
     {
         try
         {
             var value = ParseScope(scope);
             var context = config.ResolveContext(directory: Directory.GetCurrentDirectory(), environmentName: null);
-            if (string.IsNullOrWhiteSpace(context.Server) || string.IsNullOrWhiteSpace(context.ApiKey))
-                throw new InvalidOperationException("Not signed in. Run automaton login first.");
-            using var client = new AutomatonApiClient(context.Server, context.ApiKey);
-            var created = await client.CreateApiKeyAsync(name, null, value);
+            if (string.IsNullOrWhiteSpace(context.Server))
+                throw new InvalidOperationException("No server is configured. Run automaton login first.");
+            if (!Console.IsInputRedirected)
+                throw new InvalidOperationException("Pipe the password on standard input, for example: automaton keys create --name mcp --email E < password-file");
+            var password = Console.In.ReadToEnd().TrimEnd('\r', '\n');
+            if (password.Length == 0) throw new InvalidOperationException("No password was read from standard input.");
+            using var client = new AutomatonApiClient(context.Server);
+            var token = await client.SignInWithPasswordAsync(email.Trim(), password);
+            var created = await client.CreateApiKeyWithAccessTokenAsync(token, name, value);
             var key = created.GetProperty("apiKey").GetString()
                 ?? throw new InvalidOperationException("The server did not return an API key.");
             if (!string.IsNullOrWhiteSpace(path))
