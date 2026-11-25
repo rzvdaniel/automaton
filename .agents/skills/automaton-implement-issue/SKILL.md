@@ -21,6 +21,8 @@ the area skills that `AGENTS.md` lists for the code you touch; this skill is onl
   parts; don't print large logs, whole transcripts or lock files into the conversation.
 - **Never end your turn on a wait.** Wait for CI and releases in the foreground (`gh pr checks <N> --watch`,
   `gh run watch`). A turn that ends while a background job runs leaves the task idle until someone notices.
+  Do the work itself in the foreground too: if you hand a part to a subagent, wait for its result before you end. A run
+  that ends while a background subagent works finishes with nothing done, and the card still moves to In review (#1625).
 - **Others work beside you.** Use your own worktree and branch. Touch only the files your issue needs. Do not upgrade
   the test server or cut a release while an orchestrator is running a batch.
 - **Destructive scripts run only in a throwaway place.** Test anything that deletes, uninstalls, restores or prunes in a
