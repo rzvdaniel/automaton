@@ -30,7 +30,7 @@ Your AI can put one app on a server. **Automaton runs all of them**: sign-in, sh
 
 ## Get started
 
-**With your AI agent.** Give it a Linux server, a domain and an email, and point it to [Install with your AI agent](https://automaton.monster/docs/install-with-ai). It installs Automaton and hands you a one-time link to choose your password.
+**With your AI agent.** Give it a Linux server, a domain and an email, and point it to [Work with AI](https://automaton.monster/docs/work-with-ai). It installs Automaton and hands you a one-time link to choose your password.
 
 **By hand.** Point `your-domain.com` and `*.your-domain.com` to the server (DNS only), open ports 80, 443 and 5671, then:
 
@@ -47,7 +47,7 @@ curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/insta
 
 On Windows, in PowerShell: `irm https://github.com/rzvdaniel/automaton/releases/latest/download/install.ps1 | iex`. With the .NET 10 SDK you can use `dotnet tool install -g Automaton.Cli` instead.
 
-Then [create the administrator](https://automaton.monster/docs/first-admin), [add a Runner](https://automaton.monster/docs/deploy-runner) and [deploy your first app](https://automaton.monster/docs/getting-started).
+Then [create the administrator and add a Runner](https://automaton.monster/docs/install) and [deploy your first app](https://automaton.monster/docs/work-with-ai).
 
 In our tests, the installer finished in about 2 minutes, and an AI agent went from an empty server to a live app in about 6 ([measurements](https://github.com/rzvdaniel/automaton/issues/561)).
 
@@ -63,7 +63,7 @@ It fits if you build many small apps, tools or automations, often with an AI age
 
 ## For AI agents
 
-Start with [llms.txt](https://automaton.monster/llms.txt). In an app folder, read the generated `AGENTS.md` and `automaton.json` ([reference](https://automaton.monster/docs/automaton-json)). Working on this repository: read [AGENTS.md](AGENTS.md).
+Start with [llms.txt](https://automaton.monster/llms.txt). In an app folder, read the generated `AGENTS.md` and `automaton.json` ([reference](https://automaton.monster/docs/build-an-app)). Working on this repository: read [AGENTS.md](AGENTS.md).
 
 ## Contributing
 

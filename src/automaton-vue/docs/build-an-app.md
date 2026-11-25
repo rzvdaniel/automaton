@@ -109,7 +109,7 @@ A setting is a plain, non-secret value with an optional `default`, filled in by 
 "settings": [{ "name": "S3_REGION", "description": "Object storage region", "default": "us-east-1" }]
 ```
 
-A changed setting restarts the running app. A default can use the app's own public address; see the [automaton.json reference](./automaton-json#install-manifest-settings-and-default-schedules).
+A changed setting restarts the running app. A default can use the app's own public address; see [Manifest fields](#manifest-fields).
 
 ## Secrets
 
@@ -123,7 +123,7 @@ automaton secrets status                      # present or missing, and where fr
 automaton deploy
 ```
 
-You can also set them in Studio under the app's **Settings → Secrets**. Values are encrypted and never shown again; saving a name again replaces it. `"optional": true` lets an installer leave one empty; `automaton validate --strict` fails when a required one is missing. Details, including the project and user vaults: [automaton.json](./automaton-json#app-secrets).
+You can also set them in Studio under the app's **Settings → Secrets**. Values are encrypted and never shown again; saving a name again replaces it. `"optional": true` lets an installer leave one empty; `automaton validate --strict` fails when a required one is missing. 
 
 ## Permissions
 
@@ -133,7 +133,7 @@ An app gets no access to the server by default. To read server health, list back
 "permissions": ["server:read", "notify:email"]
 ```
 
-Deploy, then run `automaton permissions status`. A system administrator approves each request in Studio (the Home page lists them with Approve and Reject; the command prints the link). The app then receives a scoped key as `APP_AUTOMATON_API_KEY` at its next start. Nothing is granted before that, and revoking stops the next call. Permissions the platform knows include `server:read`, `backups:read`, `backups:run`, `server:restart`, `server:update-os`, `server:cleanup`, `security:read`, `security:manage` and `notify:email`; each is described in the [automaton.json reference](./automaton-json#platform-permissions).
+Deploy, then run `automaton permissions status`. A system administrator approves each request in Studio (the Home page lists them with Approve and Reject; the command prints the link). The app then receives a scoped key as `APP_AUTOMATON_API_KEY` at its next start. Nothing is granted before that, and revoking stops the next call. Permissions the platform knows include `server:read`, `backups:read`, `backups:run`, `server:restart`, `server:update-os`, `server:cleanup`, `security:read`, `security:manage` and `notify:email`; `automaton permissions status` explains each.
 
 ### Email people from an app
 
@@ -164,7 +164,7 @@ cd my-apps
 git init -b main && git add . && git commit -m "First apps repository"
 ```
 
-Push it to GitHub, wait for the `Catalog` workflow to write `catalog.json`, then a system administrator adds the repository under **Apps → Catalog → Catalog sources**. Each app folder needs `name` and `summary` in its `automaton.json`. Installing makes the installer's own copy; permissions are never granted by the catalog. The full format is in [Publish your own app catalog](./apps-repository).
+Push it to GitHub, wait for the `Catalog` workflow to write `catalog.json`, then a system administrator adds the repository under **Apps → Catalog → Catalog sources**. Each app folder needs `name` and `summary` in its `automaton.json`. Installing makes the installer's own copy; permissions are never granted by the catalog. The format is under [Catalog files](#catalog-files).
 
 ## Common errors
 
@@ -174,4 +174,73 @@ Push it to GitHub, wait for the `Catalog` workflow to write `catalog.json`, then
 - **Login does nothing.** The server address must be the API address, not Studio.
 - **Deploy works, app not `Running`.** Read `automaton logs`: the app must listen on `AUTOMATON_PORT` and answer its health path.
 - **Secret shows `missing`.** Set it in the right scope; `--project` needs `automaton project add-app` first.
-- More: [When something goes wrong](./when-something-goes-wrong). The complete field list is the [automaton.json reference](./automaton-json); deploying and publishing is in [Deploy and publish an app](./deploy).
+- More: [When something goes wrong](./when-something-goes-wrong). The field list is [below](#manifest-fields); publishing is in [CLI recipes](./cli#publish-pause-and-delete).
+
+## Manifest fields
+
+All fields sit under `application` unless noted. `appId`, `name` and `summary` (one line for the store card, at most the first screen) are top level; `server` optionally names the server.
+
+| Field | Meaning |
+|---|---|
+| `build.command`, `build.image` | Build executable, `arguments`, `workingDirectory`, `environment`; the image defaults to `runtime.image`. |
+| `build.outputDirectory`, `build.timeoutSeconds` | Folder holding the build result; maximum build time. |
+| `build.singlePageApp` | Static sites only (default `false`). `true` serves `index.html` for unknown paths; otherwise a missing path is 404. |
+| `runtime.image`, `runtime.command`, `runtime.port` | Image, long-running process and port. The image is required with a command. |
+| `runtime.user` | Numeric UID or UID:GID; keep it stable if the app updates files it created. |
+| `runtime.update` | `side-by-side` (default; the old container serves until the new one is ready) or `stop-first` for apps that lock their data folder. |
+| `health.path`, `health.startupTimeoutSeconds` | Ready after a 2xx answer; maximum start time. |
+| `storage.dataDirectory`, `storage.mounts` | Folders that survive redeploys. |
+| `kind` | `web` (default) or `api`. |
+| `description`, `pages`, `openApi` | One line (200 characters), up to 10 key paths `{ "path": "/", "label": "Home" }`, and an API app's OpenAPI path such as `/openapi.json`. |
+| `homeCard` | `{ "intervalSeconds": 900 }` (300 to 86400): how often the `home-card` Action refreshes the app's card on Studio Home. |
+| `openPaths` | Paths that answer without Automaton sign-in (see below). |
+| `publicAccess` | Hint `{ "level": "required" or "recommended", "reason": "..." }` shown before install when outside callers must reach the app. It changes nothing by itself. |
+| `settings`, `secrets`, `permissions` | Described above. |
+
+Commands take structured arguments; set `useShell` only when you need a shell. Keep paths inside the project folder. Deployment is asynchronous: wait for `Running` in `automaton apps`.
+
+### Open paths
+
+The private address asks every visitor to sign in, so an outside service (a payment webhook, an OAuth callback) cannot reach the app. Declare the paths it calls:
+
+```json
+"application": { "openPaths": ["/hooks/*", "/oauth/callback"] }
+```
+
+`/hooks/*` opens `/hooks/` and everything below it. Name at least one folder or file (`/` and `/*` are refused), use only letters, digits and `/ - _ . ~`, at most 20 paths. Those paths answer anyone who knows the address, so the app must check the caller itself (a signature or secret). The routes update with the next deploy.
+
+### Start an Action from outside
+
+A webhook lets something outside (a monitor, a GitHub release) start an Action. Create one with `automaton action webhook add <action-key> --name "Docs walk"` or **Add webhook** on the app's **Actions** tab. The secret is shown once; `rotate` replaces it, `list` and `delete` manage them.
+
+```bash
+curl -X POST https://api.example.com/api/hooks/<webhook-id> \
+  -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" \
+  -d '{"version": "0.2.175"}'
+```
+
+The JSON body (up to 64 KB) is the Action's input. A wrong secret gets 404, a disabled webhook 403, a paused app or an Action already running 409, and more than 30 calls a minute 429. Schedules use five-field cron plus a time zone: `automaton action schedule add <action> --cron "0 2 * * 1-5" --tz Europe/Bucharest`; `list`, `edit`, `on`, `off` and `delete` manage them.
+
+## Catalog files
+
+Layout of an apps repository:
+
+```text
+my-apps/
+  catalog.json            generated; the index a server reads
+  catalog-apps.json       the apps you want listed
+  apps/hello/automaton.json
+  .github/workflows/catalog.yml
+```
+
+`catalog-apps.json` lists the apps:
+
+```json
+{ "repo": "owner/name", "apps": [ { "folder": "apps/hello", "category": "Examples", "minServerVersion": "0.2.32" } ] }
+```
+
+`folder` (path from the repository root), `category` and `minServerVersion` (older servers show the entry without Install) are required. Optional: `repo` (defaults to the GitHub Actions repository), `publisher` (`{ "name": "Acme", "logo": "https://…" }`) and `movedFrom` (`{ "repo": "...", "folder": "..." }` for an app that left another catalog). The workflow writes `catalog.json` from these and from each app's `name`, `summary` and `permissions`. Manage sources from a terminal with `automaton catalog --help`. Run `automaton validate` in each app folder first.
+
+## Related
+
+[Back up and restore](./backup-restore) and the [Security overview](./security) are reference pages.

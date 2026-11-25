@@ -20,7 +20,7 @@ You never write a Dockerfile, open a port, buy a certificate or set up a domain 
 
 ## Set up once
 
-You need an Automaton server (your AI can [install it](./install-with-ai)) and an AI that can run commands on your computer, such as [Claude Code](https://claude.com/claude-code).
+You need an Automaton server (your AI can [install it](./work-with-ai)) and an AI that can run commands on your computer, such as [Claude Code](https://claude.com/claude-code).
 
 1. Install the CLI. Linux or macOS:
 
@@ -96,4 +96,4 @@ Claude can then list your apps and read one app's status, activity, logs (the la
 - **Data survives new versions** when the app keeps it in its data folder (`AUTOMATON_APP_DATA_DIR`); everything else is replaced on each deploy. Your AI knows this from `AGENTS.md`.
 - **A broken version is caught.** If a new version does not answer its health check, the deploy fails and your AI sees why in the logs.
 
-Next: [Build an app](./build-an-app) for what your AI writes, [CLI recipes](./cli) for the commands your AI runs, and the [CLI reference](./automaton-cli) for every command.
+Next: [Build an app](./build-an-app) for what your AI writes, [CLI recipes](./cli) for the commands your AI runs, and the command list in [CLI recipes](./cli#all-commands).

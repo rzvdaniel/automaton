@@ -32,7 +32,7 @@ function openCatalog() {
       <p class="small">
         Studio asks you to approve the login. Approved agents and API keys are listed under
         <RouterLink to="/settings#agents" @click="visible = false">Settings</RouterLink>.
-        <a href="https://automaton.monster/docs/automaton-cli" target="_blank" rel="noopener">CLI guide</a>
+        <a href="https://automaton.monster/docs/cli" target="_blank" rel="noopener">CLI guide</a>
       </p>
     </section>
 

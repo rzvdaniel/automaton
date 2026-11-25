@@ -43,7 +43,7 @@ It runs `sudo /usr/bin/bash /opt/automaton-server/update.sh --version server-v<v
 - **Browser:** Actions → Deploy production → Run workflow → branch `main`, version such as `0.2.103` → Run. Open the run and **Review deployments → Approve**.
 - **GitHub phone app:** open the repository → Actions → Deploy production → ⋯ / Run workflow, enter the version. When the run waits, you get a notification: open it and tap **Review deployments → Approve**.
 
-Run the version on the test server first. A failed update keeps the previous release and its recovery backup; see [Update the server](../../src/automaton-vue/docs/install-server.md).
+Run the version on the test server first. A failed update keeps the previous release and its recovery backup; see [Update the server](../../src/automaton-vue/docs/install.md).
 
 ## Release report and AI check
 

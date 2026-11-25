@@ -19,7 +19,7 @@ const { apps, categories, loading, error, loadApps, loadCategories } = useMarket
 
 useSiteTheme()
 
-const publishDocsUrl = 'https://automaton.monster/docs/deploy#marketplace-listing'
+const publishDocsUrl = 'https://automaton.monster/docs/cli#list-in-the-app-store-and-install-from-a-catalog'
 const hostName = serverHostName(window.location.origin)
 
 // Older links used ?category=Featured or "Live Apps" to mean every app; keep them working.

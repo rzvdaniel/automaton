@@ -23,7 +23,7 @@ const busy = ref(false)
 const success = ref<string | null>(null)
 
 const vTooltip = Tooltip
-const docsUrl = 'https://automaton.monster/docs/apps-repository'
+const docsUrl = 'https://automaton.monster/docs/build-an-app'
 const repoHelp = 'Use the address of the GitHub repository (https://github.com/owner/name, or just owner/name). The server reads catalog.json from its root before saving the source and tells you why if it cannot. Create a catalog with "automaton catalog init".'
 const branchHelp = 'Only fill this in when the catalog.json you want lives on a branch other than main. It is the name of a Git branch, not the word "catalog".'
 const nameHelp = 'A short label for the source. It appears next to each app and in the source filter of the Catalog tab.'

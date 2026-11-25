@@ -29,7 +29,7 @@ Starting an Action or reading its logs returns **503** "It may be offline" when 
 - **Port 5671.** The Runner connects outbound to the `api` host on port 5671 (TLS). The Runner machine must reach it, and the `api` DNS record must not be proxied.
 - **Runner stopped.** On the Runner host run `docker ps` and read the container's logs for startup errors.
 - **Enrollment expired.** Run `automaton runners install` again; each command is single use.
-- **The machine is gone for good.** An administrator can delete the Runner and its apps, see [A Runner that is offline for good](./deploy-runner#a-runner-that-is-offline-for-good).
+- **The machine is gone for good.** An administrator can delete the Runner and its apps, see [Update the server and Runners](./install#update-the-server-and-runners).
 
 ## An update failed
 
@@ -40,7 +40,7 @@ If the services or the public checks fail after an update, the updater goes back
 3. If it is healthy, you are on the previous release; fix the cause the log names and run the update again.
 4. If the rollback did not restore a healthy server, do not rerun blindly. Restore the database, configuration and keys together: [Back up and restore](./backup-restore).
 
-More in [Update the server](./update-server).
+More in [Update the server](./install#update-the-server-and-runners).
 
 ## The disk is nearly full
 
@@ -75,7 +75,7 @@ The server bans addresses that probe for junk paths or fail many sign-ins, for a
 
 ## Installing failed
 
-See the common errors in [Install the server](./install-server#common-errors): DNS, ports, certificates, `command not found`. Rerun the same command; generated credentials are kept.
+See the common errors in [Install the server](./install#common-errors): DNS, ports, certificates, `command not found`. Rerun the same command; generated credentials are kept.
 
 ## Search server logs in the browser
 
@@ -93,7 +93,7 @@ Install the VictoriaLogs app from the catalog and approve its `logs:receive` per
 
 **Where does my data live?** On the servers you install Automaton on.
 
-**How do updates and backups work?** [Update the server](./update-server) and [Back up and restore](./backup-restore).
+**How do updates and backups work?** [Update the server](./install#update-the-server-and-runners) and [Back up and restore](./backup-restore).
 
 **Can I use more than one server?** Yes. Install a Runner on each machine. With several, pick one per app (`automaton set-runner`). There is no automatic balancing or failover.
 

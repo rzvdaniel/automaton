@@ -28,7 +28,7 @@ Ready-made apps you can install on this server.
 
 - **Install** an app. Studio shows which permissions it asks for before you approve.
 - **Update** an installed app when a new version is available.
-- **Add a catalog** of your own, or **Install from URL**. See [Publish your own app catalog](./apps-repository).
+- **Add a catalog** of your own, or **Install from URL**. See [Catalog files](./build-an-app#catalog-files).
 
 ## People
 
@@ -46,9 +46,9 @@ Who can use this server, and the teams they share apps in.
 
 The state of the machine your apps run on.
 
-- **Check the version** and read the release notes. **Check now** looks for a newer one; to upgrade, see [Update the server](./update-server).
+- **Check the version** and read the release notes. **Check now** looks for a newer one; to upgrade, see [Update the server](./install#update-the-server-and-runners).
 - **Read health:** memory, disk and the nightly cleanup.
-- **See Runners** on the second tab, the machines that run apps. To add one, see [Add a Runner](./deploy-runner).
+- **See Runners** on the second tab, the machines that run apps. To add one, see [Add a Runner](./install).
 
 ## Backups
 

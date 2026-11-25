@@ -4,7 +4,7 @@ import { useToast } from 'primevue/usetoast'
 
 const toast = useToast()
 const apiUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
-const cliDocsUrl = 'https://automaton.monster/docs/automaton-cli'
+const cliDocsUrl = 'https://automaton.monster/docs/cli'
 
 const steps = [
   { title: 'Install the CLI (no .NET needed; on Windows see the CLI guide)', command: 'curl -fsSL https://github.com/rzvdaniel/automaton/releases/latest/download/install.sh | sh' },

@@ -20,7 +20,7 @@ dotnet tool install --global Automaton.Cli
 
 ## Common commands
 
-To install a Runner, see [Add a Runner](https://automaton.monster/docs/deploy-runner). All commands: [Automaton CLI reference](https://automaton.monster/docs/automaton-cli).
+To install a Runner, see [Add a Runner](https://automaton.monster/docs/install). All commands: [Automaton CLI reference](https://automaton.monster/docs/cli).
 
 ```bash
 automaton login
