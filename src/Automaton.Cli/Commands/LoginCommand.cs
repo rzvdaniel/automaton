@@ -15,6 +15,8 @@ public static class LoginCommand
         var deviceOption = new Option<bool>("--device", "Do not open a browser; display the authorization URL and code");
         var localOption = new Option<bool>("--local", "Store credentials in the current project instead of ~/.automaton/config.json");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var emailOption = new Option<string?>("--email",
+            "Sign in with this email; the password is read from standard input (no browser). Creates and saves a developer key");
         var permissionsAdminOption = new Option<bool>("--permissions-admin",
             "Ask a system administrator to approve in Studio an admin key that only approves app permissions; saved as profile '<profile>-permissions'");
 
@@ -25,18 +27,19 @@ public static class LoginCommand
             deviceOption,
             localOption,
             jsonOption,
-            permissionsAdminOption
+            permissionsAdminOption,
+            emailOption
         };
 
-        cmd.SetHandler((string? server, string? key, bool device, bool local, bool asJson, bool permissionsAdmin) =>
-            HandleLoginAsync(config, server, key, device, local, asJson, permissionsAdmin),
-            serverOption, keyOption, deviceOption, localOption, jsonOption, permissionsAdminOption);
+        cmd.SetHandler((string? server, string? key, bool device, bool local, bool asJson, bool permissionsAdmin, string? email) =>
+            HandleLoginAsync(config, server, key, device, local, asJson, permissionsAdmin, email),
+            serverOption, keyOption, deviceOption, localOption, jsonOption, permissionsAdminOption, emailOption);
 
         return cmd;
     }
 
     private static async Task HandleLoginAsync(
-        ConfigService config, string? server, string? key, bool device, bool local, bool asJson, bool permissionsAdmin = false)
+        ConfigService config, string? server, string? key, bool device, bool local, bool asJson, bool permissionsAdmin = false, string? email = null)
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -60,14 +63,34 @@ public static class LoginCommand
                 config.ProfileOverride = name;
                 existing = config.ResolveExistingConfig(global, cwd);
             }
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                if (permissionsAdmin || !string.IsNullOrWhiteSpace(key) || HasKeyArgument())
+                    throw new InvalidOperationException("--email cannot be combined with --key or --permissions-admin.");
+                key = await CreateKeyWithPasswordAsync(server, email.Trim(), Console.In, Console.IsInputRedirected);
+            }
             await CompletePendingAuthorizationAsync(config, cwd, global, asJson, existing, checks);
-            key = ResolveRequestedKey(key);
+            if (string.IsNullOrWhiteSpace(email)) key = ResolveRequestedKey(key);
             await CompleteLoginAsync(config, cwd, server, key, global, device, asJson, checks, permissionsAdmin);
         }
         catch (Exception ex)
         {
             WriteLoginFailure(ex, asJson, checks, nextSteps);
         }
+    }
+
+    /// <summary>Password sign-in for an installing agent: the password comes from standard input, never an argument.</summary>
+    internal static async Task<string> CreateKeyWithPasswordAsync(string server, string email, TextReader input, bool redirected)
+    {
+        if (!redirected)
+            throw new InvalidOperationException("Pipe the password on standard input, for example: automaton login --server URL --email E < password-file");
+        var password = input.ReadToEnd().TrimEnd('\r', '\n');
+        if (password.Length == 0) throw new InvalidOperationException("No password was read from standard input.");
+        using var client = new AutomatonApiClient(server);
+        var token = await client.SignInWithPasswordAsync(email, password);
+        var created = await client.CreateApiKeyWithAccessTokenAsync(token, $"CLI {Environment.MachineName}", ApiKeyScopes.Developer);
+        return created.GetProperty("apiKey").GetString()
+            ?? throw new InvalidOperationException("The server did not return an API key.");
     }
 
     private static string ResolveServer(string? server, string? savedServer)
