@@ -88,7 +88,7 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 
         if (apiKeyEntity.Source == Automaton.Core.Enums.ApiKeySource.McpConnector && !IsMcpConnectorPath(Request.Path))
         {
-            Logger.LogWarning("MCP connector API key {ApiKeyId} refused outside /mcp: {Method} {Path}", apiKeyEntity.Id, Request.Method, Request.Path);
+            Logger.LogWarning("MCP connector API key {ApiKeyId} refused outside /mcp", apiKeyEntity.Id);
             return AuthenticateResult.Fail("This API key works only on the MCP endpoint.");
         }
 

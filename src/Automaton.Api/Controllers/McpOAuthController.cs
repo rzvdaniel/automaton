@@ -84,8 +84,12 @@ public sealed class McpOAuthController : ControllerBase
     public IActionResult Authorize()
     {
         var q = Request.Query;
-        if (q["response_type"] != "code"
-            || oauth.ValidateAuthorization(q["client_id"], q["redirect_uri"], q["code_challenge"], q["code_challenge_method"]) is null)
+        if (!string.Equals(q["response_type"], "code", StringComparison.Ordinal))
+            return BadRequest("This sign-in link is invalid. Remove the connector and add it again.");
+
+        // The consent page gets only values that were just checked against the registered client; they are encoded.
+        var client = oauth.ValidateAuthorization(q["client_id"], q["redirect_uri"], q["code_challenge"], q["code_challenge_method"]);
+        if (client is null)
             return BadRequest("This sign-in link is invalid. Remove the connector and add it again.");
 
         var studio = string.IsNullOrWhiteSpace(configurationService.WebsiteUrl) ? ApiBase : configurationService.WebsiteUrl.TrimEnd('/');
