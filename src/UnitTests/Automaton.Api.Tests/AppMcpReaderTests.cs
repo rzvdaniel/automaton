@@ -66,12 +66,13 @@ public sealed class AppMcpReaderTests
         Assert.ThrowsAsync<KeyNotFoundException>(() => stranger.DocsAsync(appId, default));
     }
 
-    [TestCase(false, "Failed", true, true)]
-    [TestCase(false, "Failed", false, false)]
-    [TestCase(false, "Running", true, false)]
-    [TestCase(true, "Failed", true, false)]
-    public void PreviousVersionServing_NeedsAFailedDeployAndAnEarlierSuccess(bool paused, string status, bool hadSuccess, bool expected)
-        => Assert.That(AppMcpReader.PreviousVersionServing(paused, status, hadSuccess ? DateTime.UtcNow : null), Is.EqualTo(expected));
+    [TestCase(false, "Failed", "boom", true, true)]
+    [TestCase(false, "Failed", null, true, false)] // crashed after a good deploy: not a failed deploy
+    [TestCase(false, "Failed", "boom", false, false)]
+    [TestCase(false, "Running", null, true, false)]
+    [TestCase(true, "Failed", "boom", true, false)]
+    public void PreviousVersionServing_NeedsAFailedDeployAndAnEarlierSuccess(bool paused, string status, string? error, bool hadSuccess, bool expected)
+        => Assert.That(AppMcpReader.PreviousVersionServing(paused, status, error, hadSuccess ? DateTime.UtcNow : null), Is.EqualTo(expected));
 
     private sealed class FakeRunner(Guid expectedRunner) : Automaton.Api.ServerCleanup.IRunnerMaintenanceCommands
     {

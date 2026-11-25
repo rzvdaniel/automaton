@@ -39,6 +39,8 @@ public sealed class AppMcpReader(
     public async Task<object> StatusAsync(Guid appId, CancellationToken token)
     {
         var app = (await apps.ListAsync(null, token)).FirstOrDefault(item => item.Id == appId) ?? throw new KeyNotFoundException(NotFound);
+        var previousVersionServing = PreviousVersionServing(app.IsPaused, app.LiveEnvironment?.Status,
+            app.LiveEnvironment?.LastDeploymentError, app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc);
         return new
         {
             app.Id, app.Name, app.Summary,
@@ -46,8 +48,8 @@ public sealed class AppMcpReader(
             app.IsPaused, app.PausedReason,
             version = app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc,
             lastDeploymentError = app.LiveEnvironment?.LastDeploymentError,
-            previousVersionServing = PreviousVersionServing(app.IsPaused, app.LiveEnvironment?.Status, app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc),
-            deployNote = PreviousVersionServing(app.IsPaused, app.LiveEnvironment?.Status, app.LiveEnvironment?.LastSuccessfulDeploymentAtUtc)
+            previousVersionServing,
+            deployNote = previousVersionServing
                 ? "The last deploy failed; the previous version (deployed " + app.LiveEnvironment!.LastSuccessfulDeploymentAtUtc!.Value.ToString("u") + ") is still serving."
                 : null,
             runner = app.Runner is null ? null : new { app.Runner.Name, online = app.LiveEnvironment?.RunnerOnline },
@@ -58,9 +60,12 @@ public sealed class AppMcpReader(
         };
     }
 
-    /// <summary>True when the last deploy failed but an earlier successful one is still running.</summary>
-    public static bool PreviousVersionServing(bool paused, string? status, DateTime? lastSuccessfulDeploymentAtUtc)
-        => !paused && status == "Failed" && lastSuccessfulDeploymentAtUtc is not null;
+    /// <summary>
+    /// True when the latest deploy failed (it has an error; a crashed app is Failed without one) but an earlier
+    /// successful one is still running.
+    /// </summary>
+    public static bool PreviousVersionServing(bool paused, string? status, string? lastDeploymentError, DateTime? lastSuccessfulDeploymentAtUtc)
+        => !paused && status == "Failed" && !string.IsNullOrEmpty(lastDeploymentError) && lastSuccessfulDeploymentAtUtc is not null;
 
     public async Task<object> ActivityAsync(Guid appId, CancellationToken token)
     {
