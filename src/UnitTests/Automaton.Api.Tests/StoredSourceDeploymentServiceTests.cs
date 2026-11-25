@@ -46,10 +46,22 @@ public sealed class StoredSourceDeploymentServiceTests
     public async Task APrebuiltArtifactAppIsRejectedBecauseTheServerDoesNotStoreTheArtifact()
     {
         await using var fixture = await ApplicationDeploymentServiceTests.DeploymentFixture.CreateAsync();
-        WriteSource(fixture, """{"application":{"runtime":{"command":{"executable":"node","arguments":["server.js"]}}}}""");
+        WriteSource(fixture, """{"application":{"build":{"outputDirectory":"dist"},"runtime":{"command":{"executable":"node","arguments":["server.js"]}}}}""");
 
         Assert.ThrowsAsync<InvalidDataException>(() => Service(fixture).AcceptAsync(
             fixture.AppId, fixture.OwnerId, fixture.OwnerId, null, false, CancellationToken.None));
+    }
+
+    [Test]
+    public async Task ARuntimeOnlyAppWithoutABuildStepIsAcceptedFromStoredSource()
+    {
+        await using var fixture = await ApplicationDeploymentServiceTests.DeploymentFixture.CreateAsync();
+        WriteSource(fixture, """{"application":{"runtime":{"image":"node:22-slim","command":{"executable":"node","arguments":["server.js"]}}}}""");
+
+        var response = await Service(fixture).AcceptAsync(
+            fixture.AppId, fixture.OwnerId, fixture.OwnerId, null, false, CancellationToken.None);
+
+        Assert.That(response.Status, Is.EqualTo(DeploymentOperationStatuses.Pending));
     }
 
     [Test]
