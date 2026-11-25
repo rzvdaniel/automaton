@@ -111,7 +111,7 @@ public sealed class AiGuidanceSeedExportTests
             "export|.automaton/agents/skills/automaton-app/SKILL.md|630f6010d38c224ff2b8555d477dba75efa46b07c0e2cb1f0c4b92a7b5fbed9b",
             "base|shared|automaton-app-contract|531014b837b6f3aed563bb9dab285e7d723a8f16500d97b6dd7ac4e5847fcecf",
             "req|studio|automaton-studio-editor|2933c8cf7b268f92e1b3bf9388d08a572a1e5d9e6b64bf9b423bf9eb3aeee93e",
-            "key|automaton-mcp|57773a233804bc2c4717aefa6dfcfb050ec534ac5a8f8e61e357be1ffad7868d",
+            "key|automaton-mcp|4371767fb9d3f03821b2c872080b3f26d9c7bc1f4ebe4f6b0f8befc8dbc62937",
             "key|automaton-actions|63bfb3cae8f5c1c424631e2e874a7fda299ab795d4e686a267b78976b42c3334",
             "key|automaton-studio-editor|2933c8cf7b268f92e1b3bf9388d08a572a1e5d9e6b64bf9b423bf9eb3aeee93e"
         };
