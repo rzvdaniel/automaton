@@ -109,7 +109,7 @@ A setting is a plain, non-secret value with an optional `default`, filled in by 
 "settings": [{ "name": "S3_REGION", "description": "Object storage region", "default": "us-east-1" }]
 ```
 
-A changed setting restarts the running app. A default can use the app's own public address; see [automaton.json fields](#automaton-json-fields).
+A changed setting restarts the running app. A default can use the app's own public address; see [Manifest fields](#manifest-fields).
 
 ## Secrets
 
@@ -174,9 +174,9 @@ Push it to GitHub, wait for the `Catalog` workflow to write `catalog.json`, then
 - **Login does nothing.** The server address must be the API address, not Studio.
 - **Deploy works, app not `Running`.** Read `automaton logs`: the app must listen on `AUTOMATON_PORT` and answer its health path.
 - **Secret shows `missing`.** Set it in the right scope; `--project` needs `automaton project add-app` first.
-- More: [When something goes wrong](./when-something-goes-wrong). The field list is [below](#automaton-json-fields); publishing is in [CLI recipes](./cli#publish-pause-and-delete).
+- More: [When something goes wrong](./when-something-goes-wrong). The field list is [below](#manifest-fields); publishing is in [CLI recipes](./cli#publish-pause-and-delete).
 
-## automaton.json fields
+## Manifest fields
 
 All fields sit under `application` unless noted. `appId`, `name` and `summary` (one line for the store card, at most the first screen) are top level; `server` optionally names the server.
 
