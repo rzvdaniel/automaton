@@ -59,8 +59,18 @@ jobs:
         run: |
           B="$HOME/automaton/.agents/tools/agent-board.sh"
           gh issue edit "$NUMBER" -R "$REPO" --remove-label agent:go || true
+          # A green job is not enough: the run must have left an open or merged PR that references the issue (#1625).
+          HAS_PR=
           if [ "$RESULT" = success ]; then
+            HAS_PR=$(gh pr list -R "$REPO" --state all --limit 100 --search "$NUMBER in:title,body" --json number,state,title,body \
+              --jq "[.[] | select(.state != \"CLOSED\") | select((.title + \" \" + .body) | test(\"#$NUMBER([^0-9]|$)\"))] | length" || echo 0)
+          fi
+          if [ "$RESULT" = success ] && [ "${HAS_PR:-0}" -gt 0 ]; then
             "$B" move "$REPO" "$NUMBER" "In review" || true
+          elif [ "$RESULT" = success ]; then
+            gh issue edit "$NUMBER" -R "$REPO" --add-label agent:failed || true
+            gh issue comment "$NUMBER" -R "$REPO" --body "Agent run ended without a pull request that references this issue: $RUN_URL. Back to Ready. Comment here to let it run again." || true
+            "$B" move "$REPO" "$NUMBER" "Ready for agents" || true
           else
             gh issue edit "$NUMBER" -R "$REPO" --add-label agent:failed || true
             gh issue comment "$NUMBER" -R "$REPO" --body "Agent run failed ($RESULT): $RUN_URL. Back to Ready. Comment here to let it run again." || true
