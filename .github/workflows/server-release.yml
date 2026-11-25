@@ -262,6 +262,7 @@ jobs:
           sudo python3 scripts/tests/server-installer-config-test.py
           sudo python3 scripts/tests/server-updater-test.py
           python3 scripts/tests/server-update-request-test.py
+          python3 scripts/tests/server-install-unattended-test.py
           python3 scripts/tests/mysql-to-postgres-conversion-test.py
           bash scripts/tests/test-server-runner-test.sh
           python3 scripts/tests/postgres-migration-override-test.py

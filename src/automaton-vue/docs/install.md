@@ -98,6 +98,19 @@ automaton server update --wait --runners
 
 It installs the latest release (pin one with `--version server-vX.Y.Z`), checks `/health` and prints the version. `--runners` also upgrades Runners on an old image; a server update alone leaves them as they are. `automaton runners upgrade main --wait` upgrades one. Check the last run with `automaton server update-status`. In Studio: **Server → Update Automaton**. Over SSH: `sudo bash /opt/automaton-server/update.sh`. A failed update leaves the old release running and names the failing step; the log is `/var/lib/automaton/update/status/update.log`. Remove a Runner with `automaton runners delete main --ssh user@host` after you delete or move its apps.
 
+## Create the server with Automaton already on it
+
+Instead of SSH, paste this into the **User data** (cloud-init) box when you create the server. Add the DNS records from step 1 first, or add them within 30 minutes: the installer keeps checking. Hetzner Cloud: **Create server → Cloud config**. DigitalOcean: **Create Droplet → Advanced options → Add initialization scripts (free)**. Use an Ubuntu 24.04 x86_64 server.
+
+```yaml
+#cloud-config
+runcmd:
+  - curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o /root/install-automaton.sh
+  - bash /root/install-automaton.sh --unattended --domain example.com --email you@example.com --admin-email you@example.com
+```
+
+Change the three addresses. A few minutes after boot, `https://api.example.com/health` answers `ok`. The administrator is created with a password nobody sees, and a one-time link to choose your own is written to the root-only file `/root/automaton-admin-link.txt` (valid 30 minutes; the file says how to make a new one). Read it over SSH with `sudo cat /root/automaton-admin-link.txt`. The log is `/var/log/automaton-install.log`; no password, token or key is written to it or to `/var/log/cloud-init-output.log`. The backup key is the root-only file `/etc/automaton/secrets/backup-key`: copy it off the server, then delete it there. Options: `--dns-wait-minutes N` (default 30), `--tls-mode`, `--public-ip`.
+
 ## Common errors
 
 - **DNS check fails.** Fix the records the installer lists, wait, rerun the same command. Proxied (orange cloud) records break certificates.
