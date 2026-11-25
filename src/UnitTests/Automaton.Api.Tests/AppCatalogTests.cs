@@ -36,6 +36,15 @@ public sealed class AppCatalogTests
         return AppCatalogService.AssetUrl("https://raw.example", "owner/apps", app, path);
     }
 
+    [TestCase("../../other/repo/0123456789abcdef0123456789abcdef01234567", Commit)]
+    [TestCase("publishing/ghost", "not-a-commit")]
+    [TestCase("publishing/ghost", null)]
+    public void AssetUrl_DropsAnUnsafeFolderOrCommit(string folder, string? commit)
+    {
+        var app = new AppCatalogService.CatalogApp { Folder = folder, Commit = commit! };
+        Assert.That(AppCatalogService.AssetUrl("https://raw.example", "owner/apps", app, "icon.svg"), Is.Null);
+    }
+
     [Test]
     public async Task Get_ReadsTheCatalogAndCachesIt_ThenServesTheCopyWhenTheSourceIsDown()
     {

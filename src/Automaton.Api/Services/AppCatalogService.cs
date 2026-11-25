@@ -391,8 +391,8 @@ public sealed class AppCatalogService(
         path = path?.Trim();
         if (string.IsNullOrEmpty(path)) return null;
         if (path.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return path;
-        if (!AssetPath.IsMatch(path) || path.Split('/').Any(part => part is "." or "..")) return null;
-        if (!AssetPath.IsMatch(app.Folder) || !AssetPath.IsMatch(repo.Replace("/", "_")) || !System.Text.RegularExpressions.Regex.IsMatch(app.Commit, "^[0-9a-f]{40}$")) return null;
+        static bool Safe(string? value) => !string.IsNullOrEmpty(value) && AssetPath.IsMatch(value) && value.Split('/').All(part => part is not ("." or ".."));
+        if (!Safe(path) || !Safe(app.Folder.Trim('/')) || !Safe(repo) || app.Commit is not { Length: 40 } commit || !commit.All(Uri.IsHexDigit) || commit.Any(char.IsUpper)) return null;
         return $"{rawBase}/{repo}/{app.Commit}/{app.Folder.Trim('/')}/{path}";
     }
 
