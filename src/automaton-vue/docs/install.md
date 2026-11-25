@@ -8,6 +8,8 @@ order: 6
 
 This page takes you from a fresh server to a Runner that shows as connected in Studio. It takes about ten minutes. Want your AI to do it? Use [Work with AI](./work-with-ai).
 
+> **AI agent? Read this first.** Never print, paste or store a password, the setup token (`/etc/automaton/secrets/setup-token`) or the backup key in your messages. Install with `--quiet`. Finish with `automaton server password-link --email "$EMAIL"` (prefix `sudo` as non-root) and give the user only that link: it works once for 30 minutes, and each new link voids the earlier ones. Tell the user the backup key is the root-only file `/etc/automaton/secrets/backup-key` and that they must copy it off the server (then delete it there). Details are in [For AI agents](#for-ai-agents) below.
+
 ## You need
 
 - One x86_64 Linux server (Ubuntu 22.04, 24.04, 26.04 or Debian 12) with at least 2 GB of RAM, 10 GiB of free disk, `sudo` and internet access.
@@ -27,7 +29,7 @@ less install-automaton.sh
 sudo bash install-automaton.sh --domain example.com --email you@example.com --quiet
 ```
 
-The installer checks DNS first and tells you which names to fix. It installs Docker if needed and starts the server. `--quiet` keeps the one-time setup link out of the terminal; you read the token from a file in step 3.
+The installer checks DNS first and tells you which names to fix. It installs Docker if needed and starts the server. `--quiet` keeps the one-time setup link and the backup key out of the terminal: you read the token from a file in step 3, and the backup key stays in the root-only file `/etc/automaton/secrets/backup-key`. Copy that file to a password manager, then delete it from the server.
 
 Check it:
 
@@ -117,7 +119,7 @@ Docker stays. Without `--delete-data` your volumes, backups and backup key are k
 
 ## For AI agents
 
-Ask the user only for what they alone can give: root SSH access, the domain (A records for `domain` and `*.domain`, DNS only), the certificate email and the administrator's email. Run every step in one root shell. Install `jq curl python3 libicu-dev` first and check `jq --version`. Install the server with `--quiet`, which keeps the setup link out of the output. Never print or store the setup token (`/etc/automaton/secrets/setup-token`).
+The rules at the top of this page apply to every step. Ask the user only for what they alone can give: root SSH access, the domain (A records for `domain` and `*.domain`, DNS only), the certificate email and the administrator's email. Run every step in one root shell. Install `jq curl python3 libicu-dev` first and check `jq --version`. Install the server with `--quiet`: the setup link is not printed and the backup key stays in `/etc/automaton/secrets/backup-key` (root-only, mode 0600) instead of the output.
 
 Create the administrator with a password the agent generates and keeps only in a shell variable, then `unset`:
 
@@ -125,7 +127,7 @@ Create the administrator with a password the agent generates and keeps only in a
 PASSWORD=$(printf 'Aa1!'; openssl rand -base64 24 | tr -d '\n=')
 ```
 
-Post it as in step 3 (reading the token with `cat`); the answer must end with `HTTP 200`. Sign the CLI in without a browser: write the password to a root-only file and run `automaton login --server https://api.DOMAIN --email "$EMAIL" < password-file` (it reads the password from standard input and saves a developer key). For MCP, create a key into a root-only file with `automaton keys create --name mcp --email "$EMAIL" --out mcp-key < password-file` and pass it to your MCP client from that file; never print it or put it in a message. Add the Runner, build any requested app, and last run `automaton server password-link --email "$EMAIL"` (prefix `sudo` as non-root). Show the printed link in the final message: it works once for 30 minutes and lets the user set their own password, and each new link voids the earlier ones. Treat it like a password.
+Post it as in step 3 (reading the token with `cat`); the answer must end with `HTTP 200`. Sign the CLI in without a browser: write the password to a root-only file and run `automaton login --server https://api.DOMAIN --email "$EMAIL" < password-file` (it reads the password from standard input and saves a developer key). For MCP, create a key into a root-only file with `automaton keys create --name mcp --email "$EMAIL" --out mcp-key < password-file` and pass it to your MCP client from that file; never print it or put it in a message. Add the Runner, build any requested app, and last run `automaton server password-link --email "$EMAIL"` (prefix `sudo` as non-root). Show only the printed link in the final message: it works once for 30 minutes and lets the user set their own password, and each new link voids the earlier ones. The password, the MCP key and the backup key never appear in it. Last, say where the backup key file is and ask the user to copy it off the server.
 
 ## Move a MySQL server to PostgreSQL
 
