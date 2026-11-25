@@ -30,7 +30,7 @@ captures and drafts.
 | Code or config | A short excerpt (10 lines or fewer) as a clean screenshot, never a whole file |
 | Cover | The diagram, or the key screen with one element highlighted |
 
-Save them under `docs/articles/<slug>/` with the draft (`draft.md`), named `<nn>-<what>.png`.
+Save them with the draft (`draft.md`) in a folder outside the repo (the session scratchpad), named `<nn>-<what>.png`. Articles are never committed.
 
 ## Steps
 
@@ -39,8 +39,8 @@ Save them under `docs/articles/<slug>/` with the draft (`draft.md`), named `<nn>
 2. **Measure:** do the thing on the test server the way a reader would, and time it. Note the version.
 3. **Capture** the screenshots and draw the diagram.
 4. **Draft** `draft.md` in plain words; mark places where the owner's voice or opinion is needed with `TODO(owner)`.
-5. **Hand off:** a PR with the draft and pictures (`automaton-write-pr`); the owner edits, publishes on LinkedIn and on
-   the blog, then closes the issue with the links.
+5. **Hand off:** give the owner the folder path (draft and pictures); the owner keeps their own copy, edits, publishes on
+   LinkedIn and on the blog, and may bring the final version back for a review.
 
 ## Don't
 
