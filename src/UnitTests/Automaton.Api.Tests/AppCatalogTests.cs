@@ -23,6 +23,19 @@ public sealed class AppCatalogTests
            "commit":"0123456789abcdef0123456789abcdef01234567","minServerVersion":"0.2.31","permissions":["backups:read"]}]}
         """;
 
+    [TestCase("icon.svg", ExpectedResult = "https://raw.example/owner/apps/0123456789abcdef0123456789abcdef01234567/publishing/ghost/icon.svg")]
+    [TestCase("https://cdn.example/i.png", ExpectedResult = "https://cdn.example/i.png")]
+    [TestCase("../icon.svg", ExpectedResult = null)]
+    [TestCase("a/../../b.png", ExpectedResult = null)]
+    [TestCase("/etc/passwd", ExpectedResult = null)]
+    [TestCase("javascript:alert(1)", ExpectedResult = null)]
+    [TestCase("", ExpectedResult = null)]
+    public string? AssetUrl_PointsAtThePinnedCommitAndDropsUnsafePaths(string path)
+    {
+        var app = new AppCatalogService.CatalogApp { Folder = "publishing/ghost", Commit = Commit };
+        return AppCatalogService.AssetUrl("https://raw.example", "owner/apps", app, path);
+    }
+
     [Test]
     public async Task Get_ReadsTheCatalogAndCachesIt_ThenServesTheCopyWhenTheSourceIsDown()
     {

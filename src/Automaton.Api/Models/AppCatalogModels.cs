@@ -23,7 +23,8 @@ public sealed record CatalogEntryDto(
     bool Recommended = false,
     int? RecommendedOrder = null,
     CatalogPublisherDto? Publisher = null,
-    bool RequiresNewerRunner = false);
+    bool RequiresNewerRunner = false,
+    IReadOnlyList<string>? Screenshots = null);
 
 /// <summary>Who made a catalog app. Verified only for Automaton's own apps in the official catalog; the server decides, never the catalog file.</summary>
 public sealed record CatalogPublisherDto(string Name, string? Logo, bool Verified);
