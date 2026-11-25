@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run one Claude prompt on an agent machine (called by the agent workflows).
-# Env: PROMPT_FILE (repo path), AGENT_REPO (owner/repo of the issue; its checkout ~/<repo> is the work base), ISSUE_URL (replaces ISSUE_URL in the prompt), AGENT_TASK_TIMEOUT (default 3h),
+# Env: PROMPT_FILE (repo path), PR_URL (replaces PR_URL in the prompt), AGENT_REPO (owner/repo of the issue; its checkout ~/<repo> is the work base), ISSUE_URL (replaces ISSUE_URL in the prompt), AGENT_TASK_TIMEOUT (default 3h),
 # AGENT_MODEL (sonnet), AGENT_EFFORT (low), CLAUDE_CODE_OAUTH_TOKEN (never printed).
 set -euo pipefail
 export PATH=$HOME/.local/bin:$HOME/.dotnet/tools:$PATH DOTNET_ROOT=$HOME/.dotnet
@@ -31,7 +31,7 @@ git worktree add -q --detach "$wt" origin/main
 cleanup() { cd "$base" && { git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"; git worktree prune; }; }
 trap cleanup EXIT
 cd "$wt"
-prompt=$(cat "$prompt_base/$PROMPT_FILE"); prompt=${prompt//ISSUE_URL/${ISSUE_URL:-}}
+prompt=$(cat "$prompt_base/$PROMPT_FILE"); prompt=${prompt//ISSUE_URL/${ISSUE_URL:-}}; prompt=${prompt//PR_URL/${PR_URL:-}}
 set +e
 timeout -k 30 "${AGENT_TASK_TIMEOUT:-3h}" claude -p "$prompt" --model "${AGENT_MODEL:-sonnet}" --effort "${AGENT_EFFORT:-low}" --dangerously-skip-permissions < /dev/null
 rc=$?
