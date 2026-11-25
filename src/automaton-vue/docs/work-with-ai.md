@@ -86,7 +86,11 @@ Claude can then list your apps and read one app's status, activity, logs (the la
 
 #### Add it to Claude on the web or your phone
 
-In Claude, open Settings, Connectors, add a custom connector and enter `https://api.your-domain.com/mcp`. Claude sends you to your server's sign-in page; sign in, check the connector's name and where it returns to, and press Approve. Claude then has the same tools, as you and with the rights the CLI has: no administration and no deleting apps. The access lasts an hour and renews while Claude uses it. Each connection appears under **Settings, API Keys** as "Claude connector"; delete it there and the next call fails. Your server must be reachable from the internet over https for Claude to reach it.
+In Claude, open Settings, Plugins, Browse plugins, Add connector, and under "Or add a custom connector by URL" enter a name and `https://api.your-domain.com/mcp`; keep the detected sign-in settings and press Add, then Connect. Claude sends you to your server's sign-in page; sign in, check the connector's name and where it returns to, and press Approve. Claude then has the same tools, as you and with the rights the CLI has: no administration and no deleting apps. The access lasts an hour and renews while Claude uses it. Each connection appears under **Settings, API Keys** as "Claude connector"; delete it there and the next call fails. Your server must be reachable from the internet over https for Claude to reach it.
+
+![Your server asks you to approve the connector](./ai/connector-consent.png)
+
+![Claude shows the connector as connected, with its tools](./ai/connector-connected.png)
 
 ## Prompts that work well
 
