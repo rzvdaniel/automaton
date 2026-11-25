@@ -11,6 +11,9 @@ version=''
 tls_mode=http
 configure_only=false
 quiet=false
+unattended=false
+admin_email=''
+dns_wait_minutes=30
 status_only=false
 switch_tls=false
 tls_mode_given=false
@@ -32,12 +35,21 @@ while (($#)); do
         --install-docker) shift ;; # Accepted for commands written before Docker installation became automatic.
         --configure-only) configure_only=true; shift ;;
         --quiet) quiet=true; shift ;;
+        --unattended) unattended=true; quiet=true; shift ;; # First boot from cloud-init: no prompts, a log file, DNS retries.
+        --admin-email) admin_email="${2:?Missing administrator email}"; shift 2 ;;
+        --dns-wait-minutes) dns_wait_minutes="${2:?Missing minutes}"; [[ "$dns_wait_minutes" =~ ^[0-9]+$ ]] || { echo '--dns-wait-minutes needs a number.' >&2; exit 1; }; shift 2 ;;
         --status) status_only=true; shift ;;
         --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare (Cloudflare DNS token) or delegated (one NS record, port 53; no token) enables wildcard certificates.' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|delegated|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
 [[ $EUID == 0 ]] || { echo 'Run the installer with sudo.' >&2; exit 1; }
+if $unattended; then
+    [[ -n "$domain" && -n "$email" && -n "$admin_email" ]] || { echo '--unattended needs --domain, --email and --admin-email.' >&2; exit 1; }
+    # Everything the installer prints goes to this root-only file (no passwords, tokens or keys are ever printed).
+    install -m 0600 /dev/null /var/log/automaton-install.log
+    exec > >(tee -a /var/log/automaton-install.log) 2>&1
+fi
 for dir in "$install_dir" "$config_dir"; do
     [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / ]] || { echo 'Use an absolute directory path without shell metacharacters.' >&2; exit 1; }
     [[ ! -L "$dir" ]] || { echo 'Installation/configuration directories must not be symlinks.' >&2; exit 1; }
@@ -295,7 +307,16 @@ fi
 [[ -n "$domain" ]] || read -r -p 'Base domain (example.com): ' domain
 [[ -n "$email" ]] || read -r -p 'Certificate notification email: ' email
 if ! $configure_only && [[ -f "$bundle_dir/check_dns.py" ]]; then
-    python3 "$bundle_dir/check_dns.py" "$domain" "${public_ips[@]}"
+    if $unattended; then
+        # The records are often added after the server is created: retry until they resolve or the time is up.
+        dns_deadline=$((SECONDS + dns_wait_minutes * 60))
+        until python3 "$bundle_dir/check_dns.py" "$domain" ${public_ips[@]+"${public_ips[@]}"}; do
+            (( SECONDS < dns_deadline )) || { echo "DNS did not resolve within $dns_wait_minutes minutes. Add the records, then run the installer again with the same options." >&2; exit 1; }
+            sleep 30
+        done
+    else
+        python3 "$bundle_dir/check_dns.py" "$domain" "${public_ips[@]}"
+    fi
 fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
@@ -367,6 +388,32 @@ if [[ -n "$traefik_before" && "$traefik_before" == "$("${compose[@]}" ps -q trae
 fi
 # Validate actual public HTTPS/API routing as well as container health.
 verify_https
+# Unattended: create the first administrator with a password nobody sees, then a one-time link where they choose their own.
+if $unattended; then
+    install -m 0700 /dev/stdin "$install_dir/admin-link.py" <<'PYLINK'
+import json, os, secrets, sys, urllib.request
+domain, config_dir, email, out = sys.argv[1:5]
+api = f'https://api.{domain}/api/install'
+def post(path, body):
+    token = open(f'{config_dir}/secrets/setup-token').read().strip()  # re-read: it changes once the administrator exists
+    request = urllib.request.Request(api + path, json.dumps(body).encode(), {'Content-Type': 'application/json', 'X-Automaton-Setup-Token': token})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read() or b'{}')
+status = json.load(urllib.request.urlopen(api + '/status', timeout=30))
+if not status.get('installationComplete'):
+    post('', {'name': 'Administrator', 'email': email, 'password': 'Aa1!' + secrets.token_urlsafe(24)})  # never stored or printed
+link = post('/password-link', {'email': email})
+with os.fdopen(os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
+    f.write(f"Open this link once to choose the administrator password (valid 30 minutes, until {link['expiresAt']}):\n{link['url']}\n\n"
+            f"A new link (this one stops working): sudo python3 {__file__} {domain} {config_dir} {email} {out}\n")
+PYLINK
+    link_file=/root/automaton-admin-link.txt
+    if python3 "$install_dir/admin-link.py" "$domain" "$config_dir" "$admin_email" "$link_file"; then
+        printf 'The administrator %s was created. The one-time password link is in %s (root only).\n' "$admin_email" "$link_file"
+    else
+        echo "The administrator or the password link could not be made (an older release has no password link). If https://studio.$domain/install still asks for a setup token, read it with: sudo cat $config_dir/secrets/setup-token. Otherwise run again: sudo python3 $install_dir/admin-link.py $domain $config_dir $admin_email $link_file" >&2
+    fi
+fi
 # Once the first administrator exists the file holds a new value that only root should use: never print it.
 setup_complete=$(curl --silent --max-time 15 "https://api.$domain/api/install/status" 2>/dev/null \
     | python3 -c 'import json,sys; print("yes" if json.load(sys.stdin).get("installationComplete") else "no")' 2>/dev/null || echo unknown)
