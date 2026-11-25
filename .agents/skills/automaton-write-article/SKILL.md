@@ -39,8 +39,11 @@ Save them with the draft (`draft.md`) in a folder outside the repo (the session 
 2. **Measure:** do the thing on the test server the way a reader would, and time it. Note the version.
 3. **Capture** the screenshots and draw the diagram.
 4. **Draft** `draft.md` in plain words; mark places where the owner's voice or opinion is needed with `TODO(owner)`.
-5. **Hand off:** give the owner the folder path (draft and pictures); the owner keeps their own copy, edits, publishes on
-   LinkedIn and on the blog, and may bring the final version back for a review.
+5. **Hand off as an artifact:** `python .agents/skills/automaton-write-article/build-article.py <folder>` turns `draft.md`
+   and the pictures into `article.html`; publish it with the Artifact tool (`capabilities: {"artifact": {}, "downloads": true}`,
+   `icon: "article"`) and give the owner the link. The page is the working copy: the owner edits it in place and saves,
+   copies it for Ghost (with pictures) or LinkedIn (plain text), and downloads the pictures. To revise, read the artifact
+   (`action: "read"`) and publish the change to the same URL.
 
 ## Don't
 

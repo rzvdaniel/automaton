@@ -1,0 +1,85 @@
+<title>__TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap">
+<style id="article-style">
+/* Layout: a reading column like the published post, with a slim sticky toolbar for edit, save and copy */
+:root{--bg:#fbfaf8;--paper:#ffffff;--fg:#1d1f23;--muted:#646a73;--line:#e3e1dc;--accent:#e2601a;--todo:#fff3c4;--todo-fg:#6b4e00;
+--serif:"Source Serif 4",Georgia,serif;--sans:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171b;--paper:#1c1f24;--fg:#e8e6e1;--muted:#a0a6af;--line:#30343b;--accent:#ff8a4c;--todo:#3d3314;--todo-fg:#f5d77a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15171b;--paper:#1c1f24;--fg:#e8e6e1;--muted:#a0a6af;--line:#30343b;--accent:#ff8a4c;--todo:#3d3314;--todo-fg:#f5d77a;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar .status{margin-right:auto;font-size:.85rem;color:var(--muted)}
+button{font:500 .85rem var(--sans);padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+main{max-width:720px;margin:0 auto;padding-block:40px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#article{font-family:var(--serif);font-size:1.18rem;line-height:1.7;outline:none}
+#article[contenteditable="true"]{box-shadow:0 0 0 2px var(--line);border-radius:8px;padding:8px 16px;margin:-8px -16px}
+#article h1{font-size:2.4rem;line-height:1.15;margin:0 0 .6em;text-wrap:balance}
+#article h2{font-size:1.5rem;margin:1.8em 0 .5em;text-wrap:balance}
+#article p{margin:0 0 1.1em}
+#article figure{margin:1.6em 0}
+#article img{display:block;max-width:100%;height:auto;border-radius:6px;border:1px solid var(--line)}
+#article figcaption{font:400 .85rem/1.4 var(--sans);color:var(--muted);margin-top:.5em}
+#article code{font-family:var(--mono);font-size:.85em;background:var(--bg);border:1px solid var(--line);padding:1px 5px;border-radius:4px}
+#article a{color:var(--accent)}
+#article .todo{background:var(--todo);color:var(--todo-fg);font-family:var(--sans);font-size:.95rem;padding:10px 14px;border-radius:6px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+<div class="bar">
+  <span class="status" id="status">Read mode</span>
+  <button id="edit" aria-pressed="false">Edit</button>
+  <button id="save" class="primary" disabled>Save</button>
+  <button id="copy-html">Copy for Ghost</button>
+  <button id="copy-text">Copy for LinkedIn</button>
+  <button id="images" hidden>Download images</button>
+</div>
+<main><article id="article">__BODY__</article></main>
+<script type="application/json" id="images-data">__IMAGES__</script>
+<script id="article-script">
+(function(){
+  var BAR="<div class=\"bar\">  <span class=\"status\" id=\"status\">Read mode</span>  <button id=\"edit\" aria-pressed=\"false\">Edit</button>  <button id=\"save\" class=\"primary\" disabled>Save</button>  <button id=\"copy-html\">Copy for Ghost</button>  <button id=\"copy-text\">Copy for LinkedIn</button>  <button id=\"images\" hidden>Download images</button></div>";
+  var art=document.getElementById('article'), statusEl=document.getElementById('status');
+  var images={}; try{images=JSON.parse(document.getElementById('images-data').textContent)}catch(e){}
+  function paint(root){root.querySelectorAll('img[data-img]').forEach(function(i){var d=images[i.getAttribute('data-img')];if(d)i.src=d;});}
+  paint(art);
+  function say(t){statusEl.textContent=t}
+  var editing=false, dirty=false;
+  var editBtn=document.getElementById('edit'), saveBtn=document.getElementById('save');
+  editBtn.onclick=function(){editing=!editing;art.contentEditable=editing?'true':'false';editBtn.setAttribute('aria-pressed',String(editing));editBtn.textContent=editing?'Done editing':'Edit';say(editing?'Editing: changes stay here until you press Save':(dirty?'Unsaved changes':'Read mode'));if(editing)art.focus();};
+  art.addEventListener('input',function(){dirty=true;saveBtn.disabled=false;try{sessionStorage.setItem('draft',art.innerHTML)}catch(e){}});
+  try{var d=sessionStorage.getItem('draft');if(d){art.innerHTML=d;paint(art);dirty=true;saveBtn.disabled=false;say('Restored unsaved changes');sessionStorage.removeItem('draft');}}catch(e){}
+  // Clean copy of the article: image sources back to their names, editing attributes removed.
+  function cleanBody(){var c=art.cloneNode(true);c.removeAttribute('contenteditable');c.querySelectorAll('img[data-img]').forEach(function(i){i.removeAttribute('src')});c.querySelectorAll('[contenteditable],[style]').forEach(function(e){e.removeAttribute('contenteditable');e.removeAttribute('style')});c.querySelectorAll('script,iframe,object,embed').forEach(function(e){e.remove()});return c.innerHTML;}
+  function esc(s){return s.replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+  function page(){
+    var head='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>'+(document.head.querySelector('style')||{textContent:''}).textContent+'</style></head><body>';
+    var t=document.title;
+    var links=[].map.call(document.querySelectorAll('link[rel=stylesheet]'),function(l){return '<link rel="stylesheet" href="'+l.href+'">'}).join('');
+    return head+'<title>'+esc(t)+'</title><meta name="claude:viewport-fit-sides" content="cover">'+links+'<style id="article-style">'+document.getElementById('article-style').textContent+'</style>'+
+      BAR+'<main><article id="article">'+cleanBody()+'</article></main>'+
+      '<script type="application/json" id="images-data">'+JSON.stringify(images).replace(/</g,'\\u003c')+'<\/script><script id="article-script">'+document.getElementById('article-script').textContent+'<\/script></body></html>';
+  }
+  saveBtn.onclick=async function(){
+    saveBtn.disabled=true;say('Saving…');
+    var a=window.claude&&await window.claude.use('artifact');
+    if(!a){say('Saving is not available here; copy your text out instead');saveBtn.disabled=false;return;}
+    try{sessionStorage.setItem('draft',art.innerHTML)}catch(e){}
+    try{await a.publish(page());try{sessionStorage.removeItem('draft')}catch(e){};say('Saved');}
+    catch(e){var c=e&&e.code;if(c==='conflict'){say('A newer version was saved elsewhere; reloading to it');}else if(c==='not_writer'||c==='not_granted'||c==='capability_disabled'){say('This view is read-only');editBtn.hidden=true;saveBtn.hidden=true;}else{say('Could not save ('+(c||'error')+'); your changes are still here');saveBtn.disabled=false;}}
+  };
+  async function copy(text,html,label){
+    try{if(html&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);}else{await navigator.clipboard.writeText(text);}say(label);}
+    catch(e){var r=document.createRange();r.selectNodeContents(art);var s=getSelection();s.removeAllRanges();s.addRange(r);say('Copy blocked: the article is selected, press Ctrl+C');}
+  }
+  function forGhost(){var c=document.createElement('div');c.innerHTML=cleanBody();c.querySelectorAll('.todo').forEach(function(e){e.remove()});c.querySelectorAll('img[data-img]').forEach(function(i){var d=images[i.getAttribute('data-img')];if(d)i.src=d;i.removeAttribute('data-img')});return c.innerHTML;}
+  function forLinkedIn(){var c=document.createElement('div');c.innerHTML=cleanBody();c.querySelectorAll('.todo,figure').forEach(function(e){e.remove()});var out=[];c.querySelectorAll('h1,h2,p,li').forEach(function(e){var t=e.textContent.trim();if(t)out.push(t)});return out.join('\n\n');}
+  document.getElementById('copy-html').onclick=function(){copy(forLinkedIn(),forGhost(),'Copied with pictures: paste into the Ghost editor')};
+  document.getElementById('copy-text').onclick=function(){copy(forLinkedIn(),null,'Copied as plain text: paste into LinkedIn, then add the pictures')};
+  var imgBtn=document.getElementById('images');
+  (async function(){var dl=window.claude&&await window.claude.use('downloads');if(!dl||!Object.keys(images).length)return;imgBtn.hidden=false;imgBtn.onclick=async function(){for(var n in images){try{var m=images[n].match(/^data:([^;]+);base64,(.*)$/);if(!m)continue;var bin=atob(m[2]),u=new Uint8Array(bin.length);for(var k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);var b=new Blob([u],{type:m[1]});await dl.save({filename:n,data:b});}catch(e){say('Download stopped');return;}}say('Images saved');};})();
+})();
+</script>
