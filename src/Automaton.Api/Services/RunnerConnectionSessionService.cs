@@ -14,8 +14,11 @@ namespace Automaton.Api.Services;
 public sealed class RunnerConnectionSessionService(
     ApplicationDbContext dbContext,
     IApplicationEventService applicationEventService,
-    UserContextService userContextService)
+    UserContextService userContextService,
+    IConfiguration? configuration = null)
 {
+    private static readonly TimeSpan PlannedRestartWindow = TimeSpan.FromMinutes(10);
+
     private readonly Serilog.ILogger logger = Serilog.Log.ForContext<RunnerConnectionSessionService>();
 
     private sealed record RunnerSessionPresenceState(
@@ -124,7 +127,7 @@ public sealed class RunnerConnectionSessionService(
             ApplicationEventLevels.Warning,
             ApplicationEventCategories.Runtime,
             ApplicationEventTypes.RunnerDisconnected,
-            "Runner disconnected.",
+            await DescribeAsync("Runner disconnected", runner.Id, cancellationToken),
             new { runner.Name, runner.MachineName, Reason = RunnerSessionDisconnectReasons.GracefulDisconnect },
             userContextService.GetUserId(),
             cancellationToken);
@@ -234,6 +237,39 @@ public sealed class RunnerConnectionSessionService(
         session.DisconnectReason = disconnectReason;
     }
 
+    /// <summary>
+    /// Names a planned reason (a server update or a Runner upgrade in progress or just finished) so a restart is not read as an outage.
+    /// </summary>
+    internal async Task<string> DescribeAsync(string text, Guid runnerId, CancellationToken cancellationToken, string? unplannedSuffix = null)
+    {
+        var reason = await PlannedRestartReasonAsync(runnerId, cancellationToken);
+        if (reason is not null)
+            return $"{text}: planned restart for {reason}.";
+        return unplannedSuffix is null ? $"{text}." : $"{text} {unplannedSuffix}.";
+    }
+
+    internal async Task<string?> PlannedRestartReasonAsync(Guid runnerId, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var since = now.UtcDateTime - PlannedRestartWindow;
+        var upgrading = await dbContext.ServerMaintenanceRuns.AsNoTracking().AnyAsync(run =>
+            run.Kind == ServerMaintenanceKinds.RunnerUpgrade && run.RunnerId == runnerId
+            && (run.State == ServerMaintenanceStates.Running || run.FinishedAtUtc >= since), cancellationToken);
+        if (upgrading)
+            return "the Runner upgrade";
+
+        if (configuration is null)
+            return null;
+        var update = (await InstallationUpdate.ReadAsync(configuration, now, cancellationToken)).Run;
+        if (update is null)
+            return null;
+        var active = update.State is "starting" or "running";
+        var recent = update.State == "succeeded" && update.FinishedAtUtc >= now - PlannedRestartWindow;
+        if (!active && !recent)
+            return null;
+        return string.IsNullOrWhiteSpace(update.ToVersion) ? "the server update" : $"the update to {update.ToVersion}";
+    }
+
     private async Task WriteStaleDisconnectEventsAsync(
         IEnumerable<Runner> staleRunners,
         CancellationToken cancellationToken)
@@ -245,7 +281,7 @@ public sealed class RunnerConnectionSessionService(
                 ApplicationEventLevels.Error,
                 ApplicationEventCategories.Runtime,
                 ApplicationEventTypes.RunnerDisconnected,
-                "Runner disconnected after heartbeat timeout.",
+                await DescribeAsync("Runner disconnected", runner.Id, cancellationToken, "after heartbeat timeout"),
                 new { runner.Name, Reason = RunnerSessionDisconnectReasons.HeartbeatTimeout },
                 userContextService.GetUserId(),
                 cancellationToken);
