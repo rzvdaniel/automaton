@@ -21,6 +21,7 @@ internal static class CliCommandCatalog
         root.AddCommand(SyncAiCommand.Build(config));
         root.AddCommand(LoginCommand.Build(config));
         root.AddCommand(ProfilesCommand.Build(config));
+        root.AddCommand(KeysCommand.Build(config));
         root.AddCommand(LogoutCommand.Build(config));
         root.AddCommand(WhoAmICommand.Build(config));
         root.AddCommand(CreateCommand.Build(config));

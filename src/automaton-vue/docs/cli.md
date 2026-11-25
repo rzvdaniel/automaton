@@ -83,6 +83,8 @@ It installs the latest release, then checks that the server is healthy and print
 
 Over SSH or for an AI agent: `automaton login --device --server https://api.example.com` prints an approval address and a code, then waits. Open the address in a browser on another device, sign in and approve; the CLI notices within seconds. The output contains the code, so do not share it. Codes expire after a few minutes.
 
+With no one to approve in a browser (an AI agent installing the server), pipe the password on standard input: `automaton login --server https://api.example.com --email you@example.com < password-file`. The CLI signs in, creates a developer key named for the machine and saves it; the password is never an argument or stored. Create a further key (for MCP) with `automaton keys create --name mcp --email you@example.com < password-file` (password on standard input again: a saved key cannot create keys), which prints it once, or add `--out FILE` to write it to an owner-only file instead.
+
 For unattended jobs, create a key in Studio (**API Keys**; shown once) and run `automaton login --server https://api.example.com --key`, which asks for it at a hidden prompt. Or set `AUTOMATON_SERVER` and `AUTOMATON_API_KEY` in the process environment. Never put a key in an argument, a log or an AI conversation.
 
 ## Publish, pause and delete

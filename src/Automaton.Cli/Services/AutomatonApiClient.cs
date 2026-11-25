@@ -545,6 +545,32 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    /// <summary>Signs in with email and password and returns a short-lived access token (never stored).</summary>
+    public async Task<string> SignInWithPasswordAsync(string email, string password, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { email, password }, JsonOptions);
+        using var resp = await PostJsonAsync("api/Account/LoginUser", payload, ct);
+        await EnsureSuccessAsync(resp);
+        var json = await ReadJsonAsync(resp, ct);
+        return json.TryGetProperty("accessToken", out var token) && !string.IsNullOrEmpty(token.GetString())
+            ? token.GetString()!
+            : throw new InvalidOperationException("Sign-in did not return an access token.");
+    }
+
+    /// <summary>Creates an API key as the user behind <paramref name="accessToken"/> (a password sign-in).</summary>
+    public async Task<JsonElement> CreateApiKeyWithAccessTokenAsync(string accessToken, string name, int scope, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { name, scope }, JsonOptions);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/ApiKeys")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        using var resp = await _http.SendAsync(request, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task<CliAuthorizationResponse> CreateCliAuthorizationRequestAsync(string deviceName, CancellationToken ct = default, string? scope = null)
     {
         var payload = JsonSerializer.Serialize(new { deviceName, scope }, JsonOptions);

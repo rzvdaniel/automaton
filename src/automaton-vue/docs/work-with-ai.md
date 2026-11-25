@@ -76,7 +76,7 @@ Studio **Home** tells you what needs you: an update, a failed run, a permission 
 
 ### Let Claude read and manage your apps
 
-Your server has an MCP endpoint at `/mcp`. Studio shows this server's address and the command to copy under **Settings, Agents and keys, Connect your AI**, with a button that creates the key for you. In Claude Code, add it with your API key:
+Your server has an MCP endpoint at `/mcp`. Studio shows this server's address and the command to copy under **Settings, Agents and keys, Connect your AI**, with a button that creates the key for you. Without Studio (an AI agent setting this up), `automaton keys create --name mcp --email you@example.com --out mcp-key < password-file` writes a key to an owner-only file. In Claude Code, add it with your API key:
 
 ```bash
 claude mcp add --transport http automaton https://api.your-domain.com/mcp --header "Authorization: Bearer <your API key>"
