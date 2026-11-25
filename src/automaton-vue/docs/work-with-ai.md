@@ -80,6 +80,10 @@ claude mcp add --transport http automaton https://api.your-domain.com/mcp --head
 
 Claude can then list your apps and read one app's status, activity, logs (the last 500 lines at most) and README. It can also create an app (`create_app`), deploy it from files it writes (`deploy_app`, up to 50 MB, waits until the app is Running or returns the failure with the latest log lines), choose who can open it (`share_app`: only you, people, team, server or internet), pause and resume it, search and install from the catalog, and read the guidance for building Automaton apps (`app_guidance`). `missing_secrets` names the secrets an app still needs and links to Studio to fill them: secret values never pass through MCP. Claude can change only the apps your key can change, and it cannot delete apps. Without a key, or with a wrong one, the endpoint answers 401.
 
+#### Add it to Claude on the web or your phone
+
+In Claude, open Settings, Connectors, add a custom connector and enter `https://api.your-domain.com/mcp`. Claude sends you to your server's sign-in page; sign in, check the connector's name and where it returns to, and press Approve. Claude then has the same tools, as you and with the rights the CLI has: no administration and no deleting apps. The access lasts an hour and renews while Claude uses it. Each connection appears under **Settings, API Keys** as "Claude connector"; delete it there and the next call fails. Your server must be reachable from the internet over https for Claude to reach it.
+
 ## Prompts that work well
 
 - "Deploy it and check it works before you tell me it's done."

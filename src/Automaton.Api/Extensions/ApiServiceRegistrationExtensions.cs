@@ -744,6 +744,7 @@ internal static class ApiOperationsRegistration
     internal static IServiceCollection AddApiOperationsServices(this IServiceCollection services)
     {
         services.AddScoped<ApiKeyService>();
+        services.AddScoped<McpOAuthService>();
         services.AddScoped<AiApiKeyService>();
         services.AddScoped<AiProviderMetadataService>();
         services.AddScoped<AiConversationProviderResolver>();

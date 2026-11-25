@@ -8,6 +8,12 @@ export const authRoutes: RouteRecordRaw[] = [
     meta: { layout: 'auth' },
   },
   {
+    path: '/mcp/authorize',
+    name: 'mcp-authorize',
+    component: () => import('./views/McpAuthorizeView.vue'),
+    meta: { layout: 'auth', requiresAuth: true },
+  },
+  {
     path: '/auth/github/callback',
     name: 'github-callback',
     component: () => import('./views/GitHubCallbackView.vue'),

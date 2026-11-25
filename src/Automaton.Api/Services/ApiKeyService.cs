@@ -137,6 +137,29 @@ public class ApiKeyService
         return (fullApiKey, entity);
     }
 
+    /// <summary>
+    /// Gives an existing key a new secret and expiry in place (one row per connection). Returns null when the key is gone
+    /// or deactivated, so a revoked connection cannot refresh. <paramref name="expectedHashedKey"/> makes a refresh token single use.
+    /// </summary>
+    public async Task<(string ApiKey, ApiKey Entity)?> RotateApiKeyAsync(Guid apiKeyId, string expectedHashedKeyPrefix, DateTime expiresAt)
+    {
+        var entity = await dbContext.ApiKeys.FirstOrDefaultAsync(k => k.Id == apiKeyId && k.IsActive);
+        if (entity == null || entity.Source != ApiKeySource.McpConnector
+            || !HashedKeyFingerprint(entity.HashedKey).Equals(expectedHashedKeyPrefix, StringComparison.Ordinal))
+            return null;
+
+        var prefix = "ak_developer_";
+        var rawKey = GenerateRawKey();
+        var fullApiKey = $"{prefix}{rawKey}";
+        entity.HashedKey = HashApiKey(fullApiKey);
+        entity.KeyPrefix = $"{prefix}{rawKey[..8]}...";
+        entity.ExpiresAt = expiresAt;
+        await dbContext.SaveChangesAsync();
+        return (fullApiKey, entity);
+    }
+
+    internal static string HashedKeyFingerprint(string hashedKey) => hashedKey.Length > 16 ? hashedKey[..16] : hashedKey;
+
     internal static string GenerateRawKey()
     {
         // 20 bytes = 40 hex chars, which gives us a stable fixed-length suffix

@@ -32,6 +32,18 @@ internal static class ApiApplicationPipelineExtensions
         ApiCorsMiddleware.Configure(app, corsOrigins);
 
         app.UseWebSockets();
+        // Tells an AI connector where to sign in (MCP authorization: protected resource metadata).
+        app.UseWhen(context => context.Request.Path.StartsWithSegments("/mcp"), branch => branch.Use((context, next) =>
+        {
+            context.Response.OnStarting(() =>
+            {
+                if (context.Response.StatusCode == StatusCodes.Status401Unauthorized)
+                    context.Response.Headers.WWWAuthenticate =
+                        $"Bearer resource_metadata=\"{context.Request.Scheme}://{context.Request.Host}/.well-known/oauth-protected-resource/mcp\"";
+                return Task.CompletedTask;
+            });
+            return next(context);
+        }));
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseMiddleware<PasswordChangeRequirement>();
