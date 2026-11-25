@@ -10,7 +10,7 @@ and pause apps and to read how they are doing, as the signed-in user.
   `claude mcp add --transport http automaton https://api.your-domain.com/mcp --header "Authorization: Bearer <your API key>"`.
   Without a key, or with a wrong one, the endpoint answers 401.
 - **Claude on the web or phone, as a custom connector:** in Claude open
-  Settings, Connectors, add a custom connector and enter the `/mcp` address.
+  Settings, Plugins, Browse plugins, Add connector, "Or add a custom connector by URL", and enter the `/mcp` address.
   Claude sends the user to the server's sign-in page; they sign in, check the
   connector's name and where it returns to, and press Approve. Access lasts an
   hour and renews while Claude uses it. Each connection shows under Settings,

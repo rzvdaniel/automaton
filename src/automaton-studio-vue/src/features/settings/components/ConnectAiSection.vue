@@ -87,7 +87,7 @@ async function createKey() {
     <div class="block">
       <div class="font-medium mb-1">Claude on the web or phone</div>
       <p class="text-sm text-color-secondary m-0">
-        In Claude open Settings, Connectors, add custom connector and paste the address above.
+        In Claude open Settings, Plugins, Browse plugins, Add connector, then "Or add a custom connector by URL" and paste the address above.
         <span v-if="!isHttps" data-testid="https-note">Your server must be reachable over https for Claude to connect.</span>
         <span v-else>The server must be reachable over https; this one is.</span>
       </p>
