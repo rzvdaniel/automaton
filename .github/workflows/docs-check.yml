@@ -1,0 +1,35 @@
+name: Docs check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  docs-check:
+    name: docs-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Warning only, never a failure. Only git diff runs; nothing from the pull request is executed.
+      - name: Warn when the CLI or Studio changes without a docs change
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if echo "$changed" | grep -qE '^src/(Automaton\.Cli|automaton-studio-vue)/' \
+            && ! echo "$changed" | grep -qE '^src/automaton-vue/docs/.*\.md$'; then
+            echo "::warning title=Docs not updated::This pull request changes the CLI or Studio but no page under src/automaton-vue/docs. If a command, label or step changed, update the page; otherwise name the reason on the PR's Docs line."
+          else
+            echo "No docs warning."
+          fi

@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { defineConfig } from 'vitepress'
 
 const isDev = process.env.NODE_ENV !== 'production'
@@ -11,6 +13,15 @@ export default defineConfig({
   lang: 'en-US',
   cleanUrls: true,
   outDir: '../dist/docs',
+  // The "Copy for AI" button fetches each page's Markdown source from the published docs.
+  buildEnd(siteConfig) {
+    for (const file of fs.readdirSync(siteConfig.srcDir, { recursive: true, encoding: 'utf8' })) {
+      if (!file.endsWith('.md') || file.split(path.sep).some((part) => part.startsWith('.') || part === 'node_modules')) continue
+      const target = path.join(siteConfig.outDir, file)
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.copyFileSync(path.join(siteConfig.srcDir, file), target)
+    }
+  },
   sitemap: {
     hostname: 'https://automaton.monster/docs',
   },
