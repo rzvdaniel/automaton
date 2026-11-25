@@ -382,7 +382,9 @@ fi
 printf 'After the first administrator and Runner connect, Server Console (called Server Keeper in Studio) is installed from the official catalog and started, with its permissions approved; Home says so. Website Monitor, Heartbeat and the other apps are not installed; install them from the catalog when you need them. To opt out before connecting a Runner, set Catalog.InstallEssentialsOnFirstRunner to false in %s/appsettings.Production.json and restart the API. Remove an unwanted app from its Settings > Danger Zone.\n' "$config_dir"
 # Nightly database and key backups are on by default; take the first one now.
 if [[ -f "$install_dir/backup.sh" ]]; then
-    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && AUTOMATON_SHOW_BACKUP_KEY=1 bash "$install_dir/backup.sh" --install-dir "$install_dir" \
+    # --quiet is for an AI agent or a log: the backup key stays in a root-only file instead of the output.
+    show_key=1; $quiet && show_key=0
+    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && AUTOMATON_SHOW_BACKUP_KEY=$show_key bash "$install_dir/backup.sh" --install-dir "$install_dir" \
         || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
 fi
 if [[ -f "$install_dir/cleanup.sh" ]]; then
@@ -398,5 +400,8 @@ fi
 if [[ -f "$install_dir/watchdog.py" ]]; then
     python3 "$install_dir/watchdog.py" --install-units --install-dir "$install_dir" \
         || echo "Warning: the watchdog could not be enabled. Run: sudo python3 $install_dir/watchdog.py --install-units" >&2
+fi
+if $quiet; then
+    printf 'For AI agents: never print the password, the setup token or the backup key. Finish with: sudo automaton server password-link --email <admin email>, and give the user only that link. Tell the user the backup key is the root-only file %s/secrets/backup-key and that they must copy it off the server (then delete it there).\n' "$config_dir"
 fi
 printf 'Backups: nightly database and key backups are kept in %s/backups/nightly. Also enable your provider'"'"'s server backups (snapshots) and copy %s off-host.\n' "$install_dir" "$config_dir"
