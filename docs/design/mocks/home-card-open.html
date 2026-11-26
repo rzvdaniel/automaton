@@ -1,0 +1,102 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Home Card Opening</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: three options side by side, each a Home card in the Studio look; hover a card to see its states. */
+:root{--bg:#f3f2ef;--card:#fcfbf9;--panel:#ecebe7;--fg:#1d1c1a;--muted:#6f6c66;--line:#e2e0db;--accent:#e8682a;--blue:#3b6fd8;--focus:#3b6fd8;
+--font:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,"Cascadia Mono",Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--card:#201f1d;--panel:#2a2926;--fg:#efede8;--muted:#a19d95;--line:#34322f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171716;--card:#201f1d;--panel:#2a2926;--fg:#efede8;--muted:#a19d95;--line:#34322f;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font)}
+.wrap{max-width:1200px;margin:0 auto;padding-block:32px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:26px;margin:0 0 6px}
+.lead{color:var(--muted);margin:0 0 28px;max-width:70ch;line-height:1.5}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;align-items:start}
+.opt h2{font-size:15px;margin:0 0 4px;display:flex;gap:8px;align-items:center}
+.rec{font-size:11px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:1px 8px}
+.opt p{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5}
+.card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:border-color .15s,box-shadow .15s}
+.head{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700}
+.name{font-weight:600;font-size:15px;flex:1;min-width:0}
+.live{font-size:13px;color:var(--muted)}.live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:5px}
+.by{font-size:13px;color:var(--muted)}
+.panel{background:var(--panel);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.panel b{font-size:16px}
+.row{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted)}
+.row span:last-child{color:var(--fg);font-weight:600}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;width:45%;background:var(--fg);opacity:.7}
+.pbtns{display:flex;gap:6px}
+.btn{appearance:none;font:500 13px var(--font);border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:99px;padding:5px 12px;cursor:pointer}
+.btn--primary{background:var(--fg);color:var(--card);border-color:var(--fg)}
+.btn:focus-visible,.card:focus-visible,.icon:focus-visible,.grip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.foot{font-size:12px;color:var(--muted)}
+.icons{display:flex;gap:4px;align-items:center;justify-content:flex-end}
+.icons .spacer{flex:1}
+.icon{appearance:none;border:0;background:none;color:var(--muted);width:28px;height:28px;border-radius:6px;display:grid;place-items:center;cursor:pointer;font-size:15px}
+.icon:hover{background:var(--panel);color:var(--fg)}
+.grip{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:36px;height:14px;border-radius:4px;display:grid;place-items:center;color:var(--muted);cursor:grab;opacity:0;transition:opacity .15s;font-size:11px;letter-spacing:1px;border:0;background:none}
+/* A: whole card opens */
+.optA .card{cursor:pointer}
+.optA .card:hover{border-color:var(--muted);box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.optA .card:hover .grip,.optA .grip:focus-visible{opacity:1}
+.optA .panel{cursor:pointer}
+.optA .btn,.optA .icon{cursor:pointer}
+/* B: drag from the head, Open button in footer */
+.optB .head{cursor:grab}
+/* C: title is a link */
+.optC .head{cursor:grab}
+.optC .name a{color:inherit;text-decoration:none;cursor:pointer}
+.optC .name a:hover{text-decoration:underline;text-underline-offset:3px}
+.note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}
+.note code{font-family:var(--mono);font-size:11px}
+.log{margin-top:28px;font-size:13px;color:var(--muted)}#out{color:var(--fg);font-weight:600}
+</style>
+<div class="wrap">
+  <h1>Opening a Home card</h1>
+  <p class="lead">Today a card opens only from its title strip, the same place you drag it from. Three ways to fix it, using Server Keeper as the example. Hover and click the cards; the line at the bottom says what would happen.</p>
+  <div class="opts">
+    <section class="opt optA">
+      <h2>A. Click anywhere to open <span class="rec">Recommended</span></h2>
+      <p>The whole card opens the app. Its own buttons (Update, Backups, the icon row) keep doing their thing. Dragging moves to a small handle that shows on hover, and the card still moves by keyboard.</p>
+      <div class="card" tabindex="0" role="link" aria-label="Open Server Keeper" data-say="Opens Server Keeper">
+        <button class="grip" type="button" aria-label="Move Server Keeper" data-say="Drag to reorder (handle)">⋮⋮⋮</button>
+        <div class="head"><div class="logo">S</div><div class="name">Server Keeper</div><span class="live">Live</span></div>
+        <div class="by">by Automaton</div>
+        <div class="panel"><b>All good</b><div class="row"><span>DISK</span><span>45.5%</span></div><div class="bar"><i></i></div><div class="row"><span>LAST BACKUP</span><span>2 h ago</span></div><div class="pbtns"><button class="btn" type="button" data-say="Starts Update (does not open the app)">Update</button><button class="btn" type="button" data-say="Opens Backups">Backups</button></div></div>
+        <div class="foot">Deployed 3h ago · updated 10m ago</div>
+        <div class="icons"><button class="icon" type="button" aria-label="Settings" data-say="App settings">⚙</button><button class="icon" type="button" aria-label="Restart" data-say="Restart">↻</button><button class="icon" type="button" aria-label="Open in new tab" data-say="Opens in a new tab">↗</button><button class="icon" type="button" aria-label="Unpin" data-say="Unpin">✕</button></div>
+      </div>
+      <p class="note">How it is built: the title is a real link stretched over the card (<code>::after</code>), so Ctrl+click and middle-click open a new tab; buttons sit above it.</p>
+    </section>
+    <section class="opt optB">
+      <h2>B. Open button in the footer</h2>
+      <p>The card stays a drag target. An Open button starts the icon row, so every card has it in the same place.</p>
+      <div class="card">
+        <div class="head" data-say="Drag to reorder"><div class="logo">S</div><div class="name">Server Keeper</div><span class="live">Live</span></div>
+        <div class="by">by Automaton</div>
+        <div class="panel"><b>All good</b><div class="row"><span>DISK</span><span>45.5%</span></div><div class="bar"><i></i></div><div class="row"><span>LAST BACKUP</span><span>2 h ago</span></div><div class="pbtns"><button class="btn" type="button" data-say="Starts Update">Update</button><button class="btn" type="button" data-say="Opens Backups">Backups</button></div></div>
+        <div class="foot">Deployed 3h ago · updated 10m ago</div>
+        <div class="icons"><button class="btn btn--primary" type="button" data-say="Opens Server Keeper">Open</button><span class="spacer"></span><button class="icon" type="button" aria-label="Settings" data-say="App settings">⚙</button><button class="icon" type="button" aria-label="Restart" data-say="Restart">↻</button><button class="icon" type="button" aria-label="Open in new tab" data-say="Opens in a new tab">↗</button><button class="icon" type="button" aria-label="Unpin" data-say="Unpin">✕</button></div>
+      </div>
+      <p class="note">Clear, but one more button on every card, and the rest of the card still does nothing on click.</p>
+    </section>
+    <section class="opt optC">
+      <h2>C. Title is the link</h2>
+      <p>Only the app name opens it, underlined on hover; the strip around it drags. Smallest change, but still a small target.</p>
+      <div class="card">
+        <div class="head" data-say="Drag to reorder"><div class="logo">S</div><div class="name"><a href="#" data-say="Opens Server Keeper">Server Keeper</a></div><span class="live">Live</span></div>
+        <div class="by">by Automaton</div>
+        <div class="panel"><b>All good</b><div class="row"><span>DISK</span><span>45.5%</span></div><div class="bar"><i></i></div><div class="row"><span>LAST BACKUP</span><span>2 h ago</span></div><div class="pbtns"><button class="btn" type="button" data-say="Starts Update">Update</button><button class="btn" type="button" data-say="Opens Backups">Backups</button></div></div>
+        <div class="foot">Deployed 3h ago · updated 10m ago</div>
+        <div class="icons"><button class="icon" type="button" aria-label="Settings" data-say="App settings">⚙</button><button class="icon" type="button" aria-label="Restart" data-say="Restart">↻</button><button class="icon" type="button" aria-label="Open in new tab" data-say="Opens in a new tab">↗</button><button class="icon" type="button" aria-label="Unpin" data-say="Unpin">✕</button></div>
+      </div>
+      <p class="note">Same as today for most clicks; it only fixes the confusing hand cursor.</p>
+    </section>
+  </div>
+  <p class="log">Last click: <span id="out">nothing yet</span></p>
+</div>
+<script>
+document.addEventListener('click',function(e){var t=e.target.closest('[data-say]');if(!t)return;e.preventDefault();document.getElementById('out').textContent=t.dataset.say;});
+document.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target.matches('.card[data-say]')){document.getElementById('out').textContent=e.target.dataset.say;}});
+</script>
