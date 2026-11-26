@@ -66,7 +66,7 @@ jobs:
               --jq "[.[] | select(.state != \"CLOSED\") | select((.title + \" \" + .body) | test(\"#$NUMBER([^0-9]|$)\"))] | length" || echo 0)
           fi
           if [ "$RESULT" = success ] && [ "${HAS_PR:-0}" -gt 0 ]; then
-            "$B" move "$REPO" "$NUMBER" "In review" || true
+            "$B" move "$REPO" "$NUMBER" "Verify" || true
           elif [ "$RESULT" = success ]; then
             gh issue edit "$NUMBER" -R "$REPO" --add-label agent:failed || true
             gh issue comment "$NUMBER" -R "$REPO" --body "Agent run ended without a pull request that references this issue: $RUN_URL. Moved to Inbox, it needs the owner. Comment here and move the card to Ready for agents to let it run again." || true
