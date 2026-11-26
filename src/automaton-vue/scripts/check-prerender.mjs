@@ -11,6 +11,7 @@ const pages = [
   ['catalog/index.html', 'Find an app to install.', 'https://automaton.monster/catalog'],
   ['how-catalogs-work/index.html', 'Apps as source code.', 'https://automaton.monster/how-catalogs-work'],
   ['how-setup-works/index.html', 'From a rented server to your first app.', 'https://automaton.monster/how-setup-works'],
+  ['roadmap/index.html', 'Where Automaton is going.', 'https://automaton.monster/roadmap'],
   ['get-started/index.html', 'Pick how you want to begin', 'https://automaton.monster/get-started'],
   ['cli/index.html', 'Your AI already writes code.', 'https://automaton.monster/cli'],
   ['pricing/index.html', 'Own your installation.', 'https://automaton.monster/pricing'],
