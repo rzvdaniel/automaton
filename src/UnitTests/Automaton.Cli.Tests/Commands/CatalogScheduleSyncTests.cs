@@ -70,6 +70,14 @@ public sealed class CatalogScheduleSyncTests
     }
 
     [Test]
+    public void ARenamedScheduleWithTheSameActionCronAndInputIsNotAddedAgain_ButAMissingOneIs()
+    {
+        var all = Many("""[{"name":"Smoke test","action":"smoke","cron":"30 2 * * *"},{"name":"Fresh","action":"fresh","cron":"0 3 * * *"}]""");
+        var plan = CatalogScheduleSync.Plan("App", Many($"[{Row("00000000-0000-0000-0000-000000000001", "smoke", "smoke", "30 2 * * *")}]"), all, all, all, true);
+        Assert.That(plan.Select(change => (change.Kind, change.Name)), Is.EqualTo(new[] { (ScheduleChange.Add, "Fresh") }));
+    }
+
+    [Test]
     public void NamedSchedulesNeverRemoveAnything()
         => Assert.That(Plan($"[{Row("00000000-0000-0000-0000-000000000003", "gone", "x", "0 1 * * *")}]", remove: false).Any(change => change.Kind == ScheduleChange.Remove), Is.False);
 

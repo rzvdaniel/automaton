@@ -30,13 +30,21 @@ public static class CatalogScheduleSync
         var dropped = previous is null ? [] : previous.Where(item => !InNew(CatalogSchedules.Name(item))).ToList();
         var droppedUnchanged = dropped.Where(item => Have(CatalogSchedules.Name(item)) is { } have && Same(have, item)).ToList();
         var missingNew = chosen.Where(item => Have(CatalogSchedules.Name(item)) is null).ToList();
+        // Existing schedules that do the same as a declaration (action, cron, time zone, input), whatever their name, and are not
+        // claimed by a declaration of that name.
+        bool HasEquivalent(JsonElement declared) => existing.Any(item => Same(item, declared) && !all.Any(other => string.Equals(FullName(appName, CatalogSchedules.Name(other)), CatalogSchedules.Str(item, "name"), StringComparison.OrdinalIgnoreCase)));
         var (renamed, renamedTo) = PlanRenames(plan, droppedUnchanged, missingNew, Have);
 
         foreach (var item in chosen)
         {
             var name = CatalogSchedules.Name(item);
             if (renamedTo.Contains(item)) continue;
-            if (Have(name) is not { } have) { plan.Add(new ScheduleChange(ScheduleChange.Add, name, "new", null, item)); continue; }
+            if (Have(name) is not { } have)
+            {
+                if (HasEquivalent(item)) continue; // the app already has this schedule under another name
+                plan.Add(new ScheduleChange(ScheduleChange.Add, name, "new", null, item));
+                continue;
+            }
             if (Same(have, item)) continue;
             if (Old(name) is { } old && Same(have, old)) plan.Add(new ScheduleChange(ScheduleChange.Update, name, Diff(old, item, includeName: false).TrimStart(';', ' '), have, item));
             else plan.Add(new ScheduleChange(ScheduleChange.Keep, name, previous is null ? "kept as it is (the previous manifest is unknown)" : "kept: it was changed after the install", have, item));
