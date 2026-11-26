@@ -74,6 +74,9 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         if (apiKeyEntity == null)
         {
             Logger.LogWarning("Invalid API key attempted for request {Method} {Path}", Request.Method, Request.Path);
+            Context.RequestServices?.GetService<Automaton.Api.Security.ApiKeyFailureTracker>()
+                ?.RecordFailure(Context.Connection.RemoteIpAddress?.ToString());
+            Response.Headers[Automaton.Api.Security.ApiKeyFailureTracker.HeaderName] = Automaton.Api.Security.ApiKeyFailureTracker.HeaderValue;
             return AuthenticateResult.Fail("Invalid API key");
         }
 

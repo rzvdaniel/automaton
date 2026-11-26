@@ -177,7 +177,7 @@ def ensure_custom_domain_resolver(root):
 
 
 ACCESS_LOG = {'filePath': '/certificates/logs/access.log', 'format': 'json',
-              'fields': {'defaultMode': 'keep', 'headers': {'defaultMode': 'drop'}}}
+              'fields': {'defaultMode': 'keep', 'headers': {'defaultMode': 'drop', 'names': {'X-Automaton-Auth-Failure': 'keep'}}}}
 
 
 def ensure_access_log(root):
