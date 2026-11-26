@@ -31,6 +31,16 @@ git worktree add -q --detach "$wt" origin/main
 cleanup() { cd "$base" && { git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"; git worktree prune; }; }
 trap cleanup EXIT
 cd "$wt"
+# Another repository's worktree has no Automaton agent definitions or skills: bring them from the shared checkout
+# (copied only where missing, and removed with the worktree) so reviews and implementers start there too.
+if [ "$base" != "$prompt_base" ]; then
+  mkdir -p .claude/agents .agents/skills
+  cp -rn "$prompt_base/.claude/agents/." .claude/agents/ 2>/dev/null || true
+  cp -rn "$prompt_base/.agents/skills/." .agents/skills/ 2>/dev/null || true
+  # never commit the copies: list each untracked one in this repository's exclude file
+  exclude=$(git rev-parse --git-path info/exclude); mkdir -p "$(dirname "$exclude")"
+  git ls-files --others --exclude-standard .claude/agents .agents/skills | sed 's|^|/|' >> "$exclude"; sort -u -o "$exclude" "$exclude"
+fi
 prompt=$(cat "$prompt_base/$PROMPT_FILE"); prompt=${prompt//ISSUE_URL/${ISSUE_URL:-}}; prompt=${prompt//PR_URL/${PR_URL:-}}
 set +e
 timeout -k 30 "${AGENT_TASK_TIMEOUT:-3h}" claude -p "$prompt" --model "${AGENT_MODEL:-sonnet}" --effort "${AGENT_EFFORT:-low}" --dangerously-skip-permissions < /dev/null
