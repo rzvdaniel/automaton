@@ -35,5 +35,13 @@ for (const [file, text, canonical] of pages) {
     failed = true
   }
 }
+// Every item in ROADMAP.md must reach the page (the parser skips lines that do not match).
+const items = (fs.readFileSync(path.resolve('..', '..', 'ROADMAP.md'), 'utf8').match(/^- .+\(\[#\d+\]\(https:\/\/github\.com\/.+\)\)\s*$/gm) ?? []).length
+const rendered = (fs.readFileSync(path.join(dist, 'roadmap/index.html'), 'utf8').match(/href="https:\/\/github\.com\/[^"]+\/issues\/\d+"/g) ?? []).length
+const listed = (fs.readFileSync(path.resolve('..', '..', 'ROADMAP.md'), 'utf8').match(/^- /gm) ?? []).length
+if (rendered !== listed || items !== listed) {
+  console.error(`Prerender check failed: roadmap lists ${listed} items, ${items} parse, ${rendered} render`)
+  failed = true
+}
 if (failed) process.exit(1)
 console.log('Prerender check passed')
