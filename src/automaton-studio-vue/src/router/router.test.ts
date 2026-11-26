@@ -93,6 +93,34 @@ describe('studio router', () => {
     expect(['#agents', '#server']).toContain(redirect.hash)
   })
 
+  describe('CLI approval page', () => {
+    const approval = '/cli/authorize?code=abc&state=x%20y'
+
+    beforeEach(async () => {
+      setActivePinia(createPinia())
+      await router.replace('/login')
+    })
+
+    it('keeps a signed-in user on the page with its query', async () => {
+      const auth = useAuthStore()
+      auth.accessToken = 'token'
+      auth.user = { id: 'u1', email: 'a@b.c', name: 'A' } as typeof auth.user
+      auth.isInitialized = true
+      await router.push(approval)
+      expect(router.currentRoute.value.name).toBe('cli-authorize')
+      expect(router.currentRoute.value.fullPath).toBe(approval)
+    })
+
+    it('sends a signed-out user to login and back to the page', async () => {
+      const auth = useAuthStore()
+      auth.isInitialized = true
+      await router.push(approval)
+      const current = router.currentRoute.value
+      expect(current.path).toBe('/login')
+      expect(current.query.redirect).toBe(approval)
+    })
+  })
+
   describe('Claude connector consent page', () => {
     const consent = '/mcp/authorize?client_id=abc&state=x%20y'
 

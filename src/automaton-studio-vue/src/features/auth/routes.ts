@@ -5,7 +5,7 @@ export const authRoutes: RouteRecordRaw[] = [
     path: '/cli/authorize',
     name: 'cli-authorize',
     component: () => import('./views/CliAuthorizeView.vue'),
-    meta: { layout: 'auth' },
+    meta: { layout: 'auth', requiresAuth: true },
   },
   {
     path: '/mcp/authorize',
