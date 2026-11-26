@@ -8,6 +8,7 @@
 
 # Documentation
 *.md
+!ROADMAP.md
 docs/
 screenshots/
 !shared/ai-guidance/**/*.md

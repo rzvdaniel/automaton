@@ -76,13 +76,19 @@ Studio **Home** tells you what needs you: an update, a failed run, a permission 
 
 ### Let Claude read and manage your apps
 
-Your server has an MCP endpoint at `/mcp`. Studio shows this server's address and the command to copy under **Settings, Agents and keys, Connect your AI**, with a button that creates the key for you. Without Studio (an AI agent setting this up), `automaton keys create --name mcp --email you@example.com --out mcp-key < password-file` writes a key to an owner-only file. In Claude Code, add it with your API key:
+Your server has an MCP endpoint at `/mcp`. Studio shows this server's address and the command to copy under **Settings, Agents and keys, Connect your AI**. In Claude Code, add it without a key:
+
+```bash
+claude mcp add --transport http automaton https://api.your-domain.com/mcp
+```
+
+Claude Code opens your server's sign-in; press Approve in Studio and it is connected. No key passes through your clipboard, chat or terminal history. For CI and headless machines, where nobody can approve, use an API key instead: open "Use an API key instead" in the panel (or, without Studio, run `automaton keys create --name mcp --email you@example.com --out mcp-key < password-file`, which writes a key to an owner-only file) and add it as a header:
 
 ```bash
 claude mcp add --transport http automaton https://api.your-domain.com/mcp --header "Authorization: Bearer <your API key>"
 ```
 
-Claude can then list your apps (each with its full https link, private apps included: `list_apps`, `app_status`, `share_app` and `deploy_app` return it) and read one app's status (after a failed deploy it says whether the previous version is still serving), activity, logs (the last 500 lines at most) and README. It can also create an app (`create_app`), deploy it from files it writes (`deploy_app`, up to 50 MB; an app without a Runner gets your only online Management Runner, as `automaton deploy` does, and with none or several Claude is told to choose one in Studio; waits until the app is Running or returns the failure with the latest log lines), choose who can open it (`share_app`: only you, people, team, server or internet), pause and resume it, search and install from the catalog, and read the guidance for building Automaton apps (`app_guidance`). `missing_secrets` names the secrets an app still needs and links to Studio to fill them: secret values never pass through MCP. Claude can change only the apps your key can change, and it cannot delete apps. Without a key, or with a wrong one, the endpoint answers 401.
+Claude can then list your apps (each with its full https link, private apps included: `list_apps`, `app_status`, `share_app` and `deploy_app` return it) and read one app's status (after a failed deploy it says whether the previous version is still serving), activity, logs (the last 500 lines at most) and README. It can also create an app (`create_app`), deploy it from files it writes (`deploy_app`, up to 50 MB; an app without a Runner gets your only online Management Runner, as `automaton deploy` does, and with none or several Claude is told to choose one in Studio; waits until the app is Running or returns the failure with the latest log lines), choose who can open it (`share_app`: only you, people, team, server or internet), pause and resume it, search and install from the catalog, and read the guidance for building Automaton apps (`app_guidance`). `missing_secrets` names the secrets an app still needs and links to Studio to fill them: secret values never pass through MCP. Claude can change only the apps your key can change, and it cannot delete apps. Without an approval or a key, or with a wrong one, the endpoint answers 401.
 
 #### Add it to Claude on the web or your phone
 

@@ -13,6 +13,7 @@ configure_only=false
 quiet=false
 unattended=false
 admin_email=''
+connect_runner=true
 dns_wait_minutes=30
 status_only=false
 switch_tls=false
@@ -36,10 +37,11 @@ while (($#)); do
         --configure-only) configure_only=true; shift ;;
         --quiet) quiet=true; shift ;;
         --unattended) unattended=true; quiet=true; shift ;; # First boot from cloud-init: no prompts, a log file, DNS retries.
+        --no-runner) connect_runner=false; shift ;; # Unattended: keep the server for the control plane only.
         --admin-email) admin_email="${2:?Missing administrator email}"; shift 2 ;;
         --dns-wait-minutes) dns_wait_minutes="${2:?Missing minutes}"; [[ "$dns_wait_minutes" =~ ^[0-9]+$ ]] || { echo '--dns-wait-minutes needs a number.' >&2; exit 1; }; shift 2 ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare (Cloudflare DNS token) or delegated (one NS record, port 53; no token) enables wildcard certificates.' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|delegated|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' '--unattended also connects a Runner named main on this server; --no-runner skips it' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare (Cloudflare DNS token) or delegated (one NS record, port 53; no token) enables wildcard certificates.' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|delegated|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -412,6 +414,41 @@ PYLINK
         printf 'The administrator %s was created. The one-time password link is in %s (root only).\n' "$admin_email" "$link_file"
     else
         echo "The administrator or the password link could not be made (an older release has no password link). If https://studio.$domain/install still asks for a setup token, read it with: sudo cat $config_dir/secrets/setup-token. Otherwise run again: sudo python3 $install_dir/admin-link.py $domain $config_dir $admin_email $link_file" >&2
+    fi
+    if [[ -f "$link_file" ]] && $connect_runner; then
+        install -m 0700 /dev/stdin "$install_dir/connect-runner.py" <<'PYRUN'
+import json, os, subprocess, sys, tempfile, time, urllib.parse, urllib.request
+domain, config_dir, email, name = sys.argv[1:5]
+api = f'https://api.{domain}/api/install/runner-installation'
+def call(url, body=None):
+    token = open(f'{config_dir}/secrets/setup-token').read().strip()
+    request = urllib.request.Request(url, json.dumps(body).encode() if body else None, {'Content-Type': 'application/json', 'X-Automaton-Setup-Token': token})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read() or b'{}')
+made = call(api, {'email': email, 'runnerName': name})
+fd, path = tempfile.mkstemp()
+try:
+    with os.fdopen(fd, 'w') as f:
+        f.write(made['installationCommand'] + '\n')  # holds a one-time enrollment secret: never printed
+    run = subprocess.run(['sh', path], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=900)
+finally:
+    os.unlink(path)
+if run.returncode:
+    sys.exit(f'The Runner container could not be started (exit {run.returncode}); run the Runner install by hand to see why')
+status_url = f"{api}/{urllib.parse.quote(made['installationId'])}?email={urllib.parse.quote(email)}"
+deadline = time.time() + 300
+while time.time() < deadline:
+    try:
+        if call(status_url).get('status') == 'RunnerConnected':
+            print(f'Runner {name} connected')
+            sys.exit(0)
+    except OSError:
+        pass  # a busy moment (including HTTP errors): try again until the time is up
+    time.sleep(5)
+sys.exit(f'Runner {name} did not connect within 5 minutes')
+PYRUN
+        if python3 "$install_dir/connect-runner.py" "$domain" "$config_dir" "$admin_email" main; then :
+        else echo "Runner main could not be connected. In Studio open Runners > Install, or run: sudo automaton runners install --name main --local --yes" >&2; fi
     fi
 fi
 # Once the first administrator exists the file holds a new value that only root should use: never print it.

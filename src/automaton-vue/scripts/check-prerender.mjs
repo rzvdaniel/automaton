@@ -12,6 +12,7 @@ const pages = [
   ['how-catalogs-work/index.html', 'Apps as source code.', 'https://automaton.monster/how-catalogs-work'],
   ['spec/index.html', 'An open catalog format', 'https://automaton.monster/spec'],
   ['how-setup-works/index.html', 'From a rented server to your first app.', 'https://automaton.monster/how-setup-works'],
+  ['roadmap/index.html', 'Where Automaton is going.', 'https://automaton.monster/roadmap'],
   ['get-started/index.html', 'Pick how you want to begin', 'https://automaton.monster/get-started'],
   ['cli/index.html', 'Your AI already writes code.', 'https://automaton.monster/cli'],
   ['pricing/index.html', 'Own your installation.', 'https://automaton.monster/pricing'],
@@ -34,6 +35,14 @@ for (const [file, text, canonical] of pages) {
     console.error(`Prerender check failed: ${file}: ${problems.join('; ')}`)
     failed = true
   }
+}
+// Every item in ROADMAP.md must reach the page (the parser skips lines that do not match).
+const items = (fs.readFileSync(path.resolve('..', '..', 'ROADMAP.md'), 'utf8').match(/^- .+\(\[#\d+\]\(https:\/\/github\.com\/.+\)\)\s*$/gm) ?? []).length
+const rendered = (fs.readFileSync(path.join(dist, 'roadmap/index.html'), 'utf8').match(/href="https:\/\/github\.com\/[^"]+\/issues\/\d+"/g) ?? []).length
+const listed = (fs.readFileSync(path.resolve('..', '..', 'ROADMAP.md'), 'utf8').match(/^- /gm) ?? []).length
+if (rendered !== listed || items !== listed) {
+  console.error(`Prerender check failed: roadmap lists ${listed} items, ${items} parse, ${rendered} render`)
+  failed = true
 }
 if (failed) process.exit(1)
 console.log('Prerender check passed')

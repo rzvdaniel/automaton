@@ -55,6 +55,12 @@ export const routes: RouteRecordRaw[] = [
       meta: { seo: { title: 'How setup works', description: 'From a rented server to your first app, mostly done by your AI agent, with measured times for each step.' } },
     },
     {
+      path: '/roadmap',
+      name: 'roadmap',
+      component: () => import('@/views/RoadmapView.vue'),
+      meta: { seo: { title: 'Roadmap', description: 'What Automaton does now, next and later, in plain words, with a link to each GitHub issue.' } },
+    },
+    {
       path: '/get-started',
       name: 'get-started',
       component: () => import('@/views/GetStartedView.vue'),

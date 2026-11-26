@@ -26,8 +26,14 @@ public sealed class SelfHostedRunnerInstallationService(
     public async Task<SelfHostedRunnerInstallationResponse> CreateAsync(
         CreateSelfHostedRunnerInstallationRequest request,
         CancellationToken cancellationToken)
+        => await CreateForUserAsync(userContextService.GetUserId(), request, cancellationToken);
+
+    /// <summary>For the server installer, which has no signed-in user: the caller has proven root access with the setup token.</summary>
+    public async Task<SelfHostedRunnerInstallationResponse> CreateForUserAsync(
+        Guid userId,
+        CreateSelfHostedRunnerInstallationRequest request,
+        CancellationToken cancellationToken)
     {
-        var userId = userContextService.GetUserId();
         if (userId == Guid.Empty)
             throw new UnauthorizedAccessException("Authenticated user context is required.");
 
@@ -79,8 +85,13 @@ public sealed class SelfHostedRunnerInstallationService(
     public async Task<SelfHostedRunnerInstallationStatusResponse?> GetStatusAsync(
         string installationId,
         CancellationToken cancellationToken)
+        => await GetStatusForUserAsync(userContextService.GetUserId(), installationId, cancellationToken);
+
+    public async Task<SelfHostedRunnerInstallationStatusResponse?> GetStatusForUserAsync(
+        Guid userId,
+        string installationId,
+        CancellationToken cancellationToken)
     {
-        var userId = userContextService.GetUserId();
         if (userId == Guid.Empty)
             throw new UnauthorizedAccessException("Authenticated user context is required.");
 

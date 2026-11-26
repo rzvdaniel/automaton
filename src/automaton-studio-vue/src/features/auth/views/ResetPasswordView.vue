@@ -115,6 +115,9 @@ async function handleSubmit() {
     if (axiosError.response?.status === 400 && code?.startsWith('reset_link_')) {
       const reason = code.slice('reset_link_'.length)
       linkProblem.value = reason === 'used' || reason === 'expired' ? reason : 'invalid'
+    } else if (axiosError.response?.status === 400 && axiosError.response.data?.message) {
+      // The server rejected the password itself (its rules); the link still works.
+      formErrors.value.password = axiosError.response.data.message
     } else if (axiosError.response?.status === 400) {
       error.value = 'Invalid or expired reset link. Please request a new one.'
     } else if (axiosError.response?.data?.message) {

@@ -49,5 +49,6 @@ public static class OneTimePasswordLink
 }
 
 public sealed record PasswordLinkRequest(string? Email);
+public sealed record RunnerInstallationRequest(string? Email, string? RunnerName);
 
 public sealed record PasswordLinkResponse(string Url, DateTimeOffset ExpiresAt);

@@ -27,6 +27,14 @@ class UnattendedInstallerTests(unittest.TestCase):
         self.assertNotRegex(code, r'print\(')
         self.assertIn('0o600', code)
 
+    def test_runner_helper_compiles_and_never_prints_the_command(self):
+        code = re.search(r"<<'PYRUN'\n(.*?)\nPYRUN", TEXT, re.S).group(1)
+        compile(code, 'connect-runner.py', 'exec')
+        self.assertNotRegex(code, r'print\([^)]*installationCommand')
+        self.assertIn('stdout=subprocess.DEVNULL', code)
+        self.assertIn('--no-runner) connect_runner=false', TEXT)
+        self.assertIn('if [[ -f "$link_file" ]] && $connect_runner; then', TEXT)
+
 
 if __name__ == '__main__':
     unittest.main()
