@@ -76,14 +76,28 @@ public sealed class ApiRouteAuthorizationTests
         "GET /a/{appId:guid}/{*path} - published apps serve visitors; the app's own access rules apply",
         "GET /apps/{slug}/media/{*path} - published apps serve visitors; the app's own access rules apply",
         "GET /{slug}/media/{*path} - published apps serve visitors; the app's own access rules apply",
-        "POST /api/web-apps/{slug}/files/upload - published apps serve visitors; the app's own access rules apply",
-        "GET /api/web-apps/{slug}/files/{sessionId} - published apps serve visitors; the app's own access rules apply",
+        "POST /api/web-apps/{slug}/files/upload - published app upload; the action checks the app's own access rules and the 200 MB request limit",
+        "GET /api/web-apps/{slug}/files/{sessionId} - published app download; the action checks the app's own access rules",
         // checked by its own secret or key, not a sign-in
         "POST /api/hooks/{id:guid} - checked by its own secret or key",
         "POST /api/ApiKeys/validate - checked by its own secret or key",
         "GET /internal/runtime/auth - checked by its own secret or key",
         "POST /internal/runners/reconnect-runtime-tunnels - checked by its own secret or key",
         "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS /runtime-tunnel/apps/{appId:guid}/targets/{deploymentTargetId:guid}/{**path} - checked by its own secret or key",
+        // health and the Studio shell
+        "GET /healthz - liveness probe for the load balancer; returns only a status",
+        "GET /health - public health status; returns only a status",
+        "ANY /_blazor - Studio shell transport; the app inside signs the user in",
+        "ANY /_blazor/negotiate - Studio shell transport; the app inside signs the user in",
+        "ANY /_blazor/disconnect/ - Studio shell transport; the app inside signs the user in",
+        "ANY /_blazor/initializers/ - Studio shell transport; the app inside signs the user in",
+        "ANY /{*path:nonfile} - Studio page shell, serves the sign-in page",
+        "ANY /Identity/Account/LogOut - Studio page shell sign-out page",
+        "ANY /Error - Studio page shell error page",
+        "ANY / - Studio page shell, serves the sign-in page",
+        // unmatched paths
+        "ANY /api/{**path} - answers 404 for an unknown /api route; no data",
+        "ANY /{**path:regex(^(.*/)?\\.(?!well-known(/|$)).*$)} - answers an empty 404 for scanner paths",
     ];
 
     [Test]
@@ -126,6 +140,9 @@ public sealed class ApiRouteAuthorizationTests
             {
                 s.AddRouting();
                 s.AddSignalR();
+                s.AddRazorPages();
+                s.AddServerSideBlazor();
+                s.AddMcpServer().WithHttpTransport(o => o.Stateless = true);
                 s.AddAuthorization();
                 s.AddApiControllers();
                 s.AddMvcCore().AddApplicationPart(typeof(RunnerTunnelEndpoint).Assembly);
@@ -138,9 +155,7 @@ public sealed class ApiRouteAuthorizationTests
                 app.UseRouting();
                 app.UseEndpoints(e =>
                 {
-                    e.MapControllers();
-                    e.MapHub<Automaton.Api.Hubs.AutomatonHub>("/api/workflow/hub");
-                    e.MapRunnerTunnel();
+                    e.MapAutomatonApiEndpoints();
                 });
             });
         }).StartAsync();
