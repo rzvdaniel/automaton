@@ -132,6 +132,17 @@ public sealed class ApiRouteAuthorizationTests
         Assert.That(stale, Is.Empty, "Allowlist entries that are no longer public routes:\n" + string.Join("\n", stale));
     }
 
+    [Test]
+    public async Task GetOnMcp_IsAProtectedRoute_SoItAnswers401LikePost()
+    {
+        using var host = await StartHostAsync();
+        var get = host.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText == "/mcp"
+                && e.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods.Contains("GET") == true).ToList();
+        Assert.That(get, Is.Not.Empty, "GET /mcp must be mapped, or it falls through to the Studio page.");
+        Assert.That(get.All(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any()), Is.True);
+    }
+
     private static async Task<IHost> StartHostAsync() =>
         await new HostBuilder().ConfigureWebHost(web =>
         {

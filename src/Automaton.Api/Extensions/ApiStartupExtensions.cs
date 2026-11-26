@@ -67,6 +67,9 @@ internal static class ApiApplicationPipelineExtensions
         app.MapControllers();
         // deploy_app carries up to 50 MB of file text inside JSON; the room above that covers JSON escaping.
         app.MapMcp("/mcp").RequireAuthorization("DeveloperApiAccess");
+        // The stateless transport maps no GET, so a GET fell through to the Studio page. Without a key it now gets the
+        // same 401 challenge as a POST; with a key, 405 (MCP here is POST only).
+        app.MapGet("/mcp", () => Results.StatusCode(StatusCodes.Status405MethodNotAllowed)).RequireAuthorization("DeveloperApiAccess");
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
         app.MapRunnerTunnel();
