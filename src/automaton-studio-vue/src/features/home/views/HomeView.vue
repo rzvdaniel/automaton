@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
 .pin__link:focus-visible { outline: none; }
 .pin__link:focus-visible::after { outline: 2px solid var(--signal); outline-offset: 2px; }
 /* Anything inside the card that does its own thing sits above the stretched link. */
-.pin__above, .pin :deep(.hc-button), .pin :deep(.hc__nodata-link), .pin__actions { position: relative; z-index: 2; }
+.pin__above, .pin :deep(.hc-button), .pin :deep(.hc__nodata-link), .pin__actions > * { position: relative; z-index: 2; }
 .pin__grip { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); z-index: 3; width: 36px; height: 16px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); cursor: grab; opacity: 0; touch-action: none; font-size: 12px; }
 .pin:hover .pin__grip, .pin__grip:focus-visible { opacity: 1; }
 .pin__grip:focus-visible { outline: 2px solid var(--signal); }

@@ -3,7 +3,7 @@ import { crumbsForRoute } from './breadcrumb'
 
 describe('crumbsForRoute', () => {
   it('has no trail on top-level pages', () => {
-    for (const name of ['home', 'apps', 'apps-catalog', 'people', 'server', 'admin-backups', 'settings']) {
+    for (const name of ['home', 'admin-apps', 'apps', 'apps-catalog', 'people', 'server', 'admin-backups', 'settings']) {
       expect(crumbsForRoute(name)).toEqual([])
     }
   })

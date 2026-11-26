@@ -8,7 +8,7 @@ export interface Crumb {
   to?: RouteLocationRaw
 }
 
-const ADMIN_PAGES = new Set(['admin-permission-requests', 'admin-apps', 'admin-logs', 'admin-app-deploy-rules', 'admin-app-activity'])
+const ADMIN_PAGES = new Set(['admin-permission-requests', 'admin-logs', 'admin-app-deploy-rules', 'admin-app-activity'])
 const ORGANIZATION_PAGES = new Set(['organization-dashboard', 'organization-members', 'organization-apps', 'organization-settings'])
 
 /**
