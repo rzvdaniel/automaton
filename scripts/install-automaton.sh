@@ -434,13 +434,16 @@ try:
 finally:
     os.unlink(path)
 if run.returncode:
-    sys.exit('The Runner container could not be started: ' + (run.stderr.strip().splitlines() or ['unknown error'])[-1][:200])
+    sys.exit(f'The Runner container could not be started (exit {run.returncode}); run the Runner install by hand to see why')
 status_url = f"{api}/{urllib.parse.quote(made['installationId'])}?email={urllib.parse.quote(email)}"
 deadline = time.time() + 300
 while time.time() < deadline:
-    if call(status_url).get('status') == 'RunnerConnected':
-        print(f'Runner {name} connected')
-        sys.exit(0)
+    try:
+        if call(status_url).get('status') == 'RunnerConnected':
+            print(f'Runner {name} connected')
+            sys.exit(0)
+    except OSError:
+        pass  # a busy moment (including HTTP errors): try again until the time is up
     time.sleep(5)
 sys.exit(f'Runner {name} did not connect within 5 minutes')
 PYRUN

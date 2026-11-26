@@ -209,9 +209,9 @@ public class InstallController(InstallService installService, IConfiguration con
         catch (ArgumentException error) { return BadRequest(new { message = error.Message }); }
     }
 
+    // Polled every few seconds while the Runner image downloads: the setup token guards it and the global anonymous limit applies.
     [HttpGet("runner-installation/{installationId}")]
     [AllowAnonymous]
-    [EnableRateLimiting(RateLimitPolicyNames.AuthResetPassword)]
     public async Task<IActionResult> GetRunnerInstallation(string installationId, [FromQuery] string email,
         [FromServices] UserManager<ApplicationUser> userManager,
         [FromServices] SelfHostedRunnerInstallationService installations, CancellationToken token)
