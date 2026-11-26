@@ -20,6 +20,7 @@ public static class RateLimitingServiceCollectionExtensions
 
         services.AddSingleton<IValidateOptions<RateLimitingOptions>, RateLimitingOptionsValidation>();
         services.AddSingleton<MultipartUploadAdmission>();
+        services.AddSingleton<ApiKeyFailureLimiter>();
 
         services.AddOptions<RateLimiterOptions>()
             .Configure<IOptions<RateLimitingOptions>>((options, configuredOptions) =>
@@ -118,6 +119,7 @@ public static class RateLimitingServiceCollectionExtensions
         AddRemoteIpPolicy(options, RateLimitPolicyNames.AuthForgotPassword, configuredOptions.AuthForgotPassword);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.AuthResendConfirmation, configuredOptions.AuthResendConfirmation);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.AuthResetPassword, configuredOptions.AuthResetPassword);
+        AddRemoteIpPolicy(options, RateLimitPolicyNames.AuthInviteAccept, configuredOptions.AuthInviteAccept);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.AuthRefreshToken, configuredOptions.AuthRefreshToken);
     }
 

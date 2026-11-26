@@ -45,6 +45,12 @@ class FilterTests(unittest.TestCase):
               line('7.7.7.7', 401, 'studio.x.com', 'GET', '/api/apps'), line('7.7.7.7', 401, 'a.apps.x.com', 'POST', '/login')]
         self.assertEqual(self.matches('automaton-signin', [failed, failed] + ok), 2)
 
+    def test_signin_filter_matches_rate_limited_api_calls(self):
+        limited = line('7.7.7.7', 429, 'api.x.com', 'GET', '/api/apps')
+        ok = [line('7.7.7.7', 200, 'api.x.com', 'GET', '/api/apps'), line('7.7.7.7', 429, 'a.apps.x.com', 'GET', '/page'),
+              line('7.7.7.7', 401, 'api.x.com', 'GET', '/api/apps')]
+        self.assertEqual(self.matches('automaton-signin', [limited, limited] + ok), 2)
+
 
 class InstallScriptTests(unittest.TestCase):
     def test_writes_jails_and_logrotate_and_keeps_owner_ignoreip(self):

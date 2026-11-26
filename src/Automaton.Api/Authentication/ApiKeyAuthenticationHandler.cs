@@ -23,6 +23,7 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 {
     private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache cache;
     private readonly ApiKeyService apiKeyService;
+    private readonly Automaton.Api.Security.ApiKeyFailureLimiter failureLimiter;
     private readonly ApplicationDbContext dbContext;
     private readonly UserManager<ApplicationUser> userManager;
 
@@ -33,9 +34,11 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         ApiKeyService apiKeyService,
         ApplicationDbContext dbContext,
         UserManager<ApplicationUser> userManager,
-        Microsoft.Extensions.Caching.Memory.IMemoryCache cache) : base(options, logger, encoder)
+        Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
+        Automaton.Api.Security.ApiKeyFailureLimiter failureLimiter) : base(options, logger, encoder)
     {
         this.cache = cache;
+        this.failureLimiter = failureLimiter;
         this.apiKeyService = apiKeyService;
         this.dbContext = dbContext;
         this.userManager = userManager;
@@ -73,6 +76,7 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         var apiKeyEntity = await apiKeyService.ValidateApiKeyAsync(apiKey);
         if (apiKeyEntity == null)
         {
+            failureLimiter.RecordFailure(Context);
             Logger.LogWarning("Invalid API key attempted for request {Method} {Path}", Request.Method, Request.Path);
             return AuthenticateResult.Fail("Invalid API key");
         }

@@ -18,6 +18,8 @@ public class RateLimitingOptionsValidation : IValidateOptions<RateLimitingOption
         ValidatePolicy(options.AuthResendConfirmation, nameof(options.AuthResendConfirmation), errors);
         ValidatePolicy(options.AuthResetPassword, nameof(options.AuthResetPassword), errors);
         ValidatePolicy(options.AuthRefreshToken, nameof(options.AuthRefreshToken), errors);
+        ValidatePolicy(options.AuthInviteAccept, nameof(options.AuthInviteAccept), errors);
+        ValidatePolicy(options.ApiKeyFailures, nameof(options.ApiKeyFailures), errors);
         ValidatePolicy(options.ApiKeyValidation, nameof(options.ApiKeyValidation), errors);
         ValidatePolicy(options.PublicAppControllerExecution, nameof(options.PublicAppControllerExecution), errors);
         ValidatePolicy(options.PublicAppFlowExecution, nameof(options.PublicAppFlowExecution), errors);

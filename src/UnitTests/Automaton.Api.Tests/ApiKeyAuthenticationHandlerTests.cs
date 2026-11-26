@@ -190,7 +190,8 @@ public sealed class ApiKeyAuthenticationHandlerTests
                 apiKeyService,
                 db,
                 services.GetRequiredService<UserManager<ApplicationUser>>(),
-                new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
+                new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+                new Automaton.Api.Security.ApiKeyFailureLimiter(Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Security.RateLimitingOptions())));
 
             await handler.InitializeAsync(
                 new AuthenticationScheme(ApiKeyAuthenticationSchemeOptions.DefaultScheme, null, handler.GetType()),

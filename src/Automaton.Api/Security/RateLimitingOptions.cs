@@ -12,10 +12,14 @@ public class RateLimitingOptions
     public int MaxConcurrentMultipartRequests { get; set; } = 2;
     public RateLimitPolicyOptions AuthLogin { get; set; } = new(5, 60);
     public RateLimitPolicyOptions AuthRegistration { get; set; } = new(3, 3600);
-    public RateLimitPolicyOptions AuthForgotPassword { get; set; } = new(10, 3600);
+    public RateLimitPolicyOptions AuthForgotPassword { get; set; } = new(5, 3600);
     public RateLimitPolicyOptions AuthResendConfirmation { get; set; } = new(3, 3600);
     public RateLimitPolicyOptions AuthResetPassword { get; set; } = new(5, 3600);
     public RateLimitPolicyOptions AuthRefreshToken { get; set; } = new(30, 300);
+    /// <summary>Viewing and accepting an invitation, per address.</summary>
+    public RateLimitPolicyOptions AuthInviteAccept { get; set; } = new(10, 600);
+    /// <summary>Wrong API keys per address; past the limit the address gets 429 until the window ends (accepted keys are not affected).</summary>
+    public RateLimitPolicyOptions ApiKeyFailures { get; set; } = new(20, 60);
     public RateLimitPolicyOptions ApiKeyValidation { get; set; } = new(20, 60);
     public RateLimitPolicyOptions PublicAppControllerExecution { get; set; } = new(10, 60);
     public RateLimitPolicyOptions PublicAppFlowExecution { get; set; } = new(10, 60);

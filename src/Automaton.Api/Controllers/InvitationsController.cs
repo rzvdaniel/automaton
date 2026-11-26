@@ -7,6 +7,7 @@ using Automaton.Api.Constants;
 using Automaton.Api.Entities;
 using Automaton.Api.Services;
 using Automaton.Api.Data;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Automaton.Api.Controllers;
 
@@ -37,6 +38,7 @@ public class InvitationsController : ControllerBase
     }
 
     [HttpGet("validate/{token}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthInviteAccept)]
     [AllowAnonymous]
     public async Task<IActionResult> Validate(string token)
     {
@@ -56,6 +58,7 @@ public class InvitationsController : ControllerBase
     // Accept for authenticated users
     [Authorize]
     [HttpPost("accept/{token}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthInviteAccept)]
     public async Task<IActionResult> Accept(string token)
     {
         var invite = await invitationService.ValidateInvitationToken(token);
@@ -116,6 +119,7 @@ public class InvitationsController : ControllerBase
     // Existing password-bearing accounts must authenticate and use the normal accept flow.
     [AllowAnonymous]
     [HttpPost("accept/{token}/complete")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthInviteAccept)]
     public async Task<IActionResult> Complete(string token, [FromBody] AcceptInvitationRequest request)
     {
         if (string.IsNullOrWhiteSpace(request?.Password))

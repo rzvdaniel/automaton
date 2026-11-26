@@ -8,6 +8,7 @@ public static class RateLimitPolicyNames
     public const string AuthResendConfirmation = "AuthResendConfirmation";
     public const string AuthResetPassword = "AuthResetPassword";
     public const string AuthRefreshToken = "AuthRefreshToken";
+    public const string AuthInviteAccept = "AuthInviteAccept";
     public const string ApiKeyValidation = "ApiKeyValidation";
     public const string PublicAppControllerExecution = "PublicAppControllerExecution";
     public const string PublicAppFlowExecution = "PublicAppFlowExecution";

@@ -1,3 +1,4 @@
+using Automaton.Api.Security;
 using Automaton.Api.Services;
 using Automaton.Api.Authentication;
 using Automaton.Api.Data;
@@ -26,6 +27,7 @@ internal static class ApiApplicationPipelineExtensions
         app.UseRouting();
         ApiRequestLoggingMiddleware.Configure(app, logSuccessfulRequests);
         app.UseRateLimiter();
+        app.UseMiddleware<ApiKeyFailureMiddleware>();
         app.UseMiddleware<ExceptionHandlingMiddleware>();
         ApiEnvironmentMiddleware.Configure(app);
         ApiStaticFileMiddleware.Configure(app);
