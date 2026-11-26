@@ -475,7 +475,7 @@ onBeforeUnmount(() => {
             <component
               :is="appOpenUrl(item.app) ? 'a' : RouterLink" class="pin__link" :aria-label="`Open ${item.app.name}`" data-testid="pin-open"
               v-bind="appOpenUrl(item.app) ? { href: appOpenUrl(item.app), target: '_blank', rel: 'noopener' } : { to: `/apps/${item.app.id}` }"
-              @pointerdown="onPointerDown($event, index)" @dragstart.prevent @click.capture="swallowClick"
+              @dragstart.prevent @click.capture="swallowClick"
             >
               <AppMark :id="item.app.id" :name="item.app.name" :image-url="item.app.thumbnailUrl" />
               <span class="pin__name">{{ item.app.name }}</span>
@@ -483,7 +483,11 @@ onBeforeUnmount(() => {
                 <span class="pin__dot" />{{ stateText(item) }}
               </span>
             </component>
-            <PublisherBadge v-if="publisherOf(item.app.id)" :publisher="publisherOf(item.app.id)!" />
+            <button
+              v-if="store.pinned.length > 1" type="button" class="pin__grip" :aria-label="`Drag ${item.app.name} to reorder (or Alt+arrow keys)`" title="Drag to reorder"
+              data-testid="pin-grip" @pointerdown="onPointerDown($event, index)" @dragstart.prevent
+            ><i class="pi pi-ellipsis-h" aria-hidden="true" /></button>
+            <PublisherBadge v-if="publisherOf(item.app.id)" class="pin__above" :publisher="publisherOf(item.app.id)!" />
             <HomeAppCard v-if="item.card" :app-id="item.app.id" :item="item.card" />
             <p class="pin__footer" data-testid="app-card-time">{{ footerLine(item.app, item.card) }}</p>
             <div class="pin__actions">
@@ -559,12 +563,19 @@ onBeforeUnmount(() => {
 .need__requests { list-style: none; margin: 6px 0 0; padding: 0; }
 .need__requests li + li { border-top: 1px solid var(--row-line); }
 .need__actions { display: flex; align-items: center; gap: 4px; }
-.pin { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-sizing: border-box; }
-.pin:hover { border-color: var(--ink-soft); }
+.pin { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-sizing: border-box; }
+.pin:hover { border-color: var(--ink); }
 .pin--attention, .pin--attention:hover { border-color: var(--signal); }
 .pin--failing, .pin--failing:hover { border-color: var(--hc-critical, #c0392b); }
-.pin__link { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; cursor: grab; user-select: none; touch-action: none; }
-.pin__link:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 8px; }
+.pin__link { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; cursor: pointer; user-select: none; }
+.pin__link::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: 12px; }
+.pin__link:focus-visible { outline: none; }
+.pin__link:focus-visible::after { outline: 2px solid var(--signal); outline-offset: 2px; }
+/* Anything inside the card that does its own thing sits above the stretched link. */
+.pin__above, .pin :deep(.hc-button), .pin :deep(.hc__nodata-link), .pin__actions > * { position: relative; z-index: 2; }
+.pin__grip { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); z-index: 3; width: 36px; height: 16px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); cursor: grab; opacity: 0; touch-action: none; font-size: 12px; }
+.pin:hover .pin__grip, .pin__grip:focus-visible { opacity: 1; }
+.pin__grip:focus-visible { outline: 2px solid var(--signal); }
 .pin__name { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pin__state { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
 .pin__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); opacity: 0.7; }
@@ -593,7 +604,7 @@ onBeforeUnmount(() => {
 @media (max-width: 559px) {
   .pin__wide { display: none; }
   .pin--wide { grid-column: auto; }
-  .pin__link { cursor: grab; touch-action: none; }
+  .pin__grip { opacity: 1; width: 44px; height: 20px; }
   .pin__actions .p-button { min-width: 44px; min-height: 44px; }
   .pin-row__gear { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   .home-cards--apps { grid-template-columns: minmax(0, 1fr); }

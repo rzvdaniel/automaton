@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Menu from 'primevue/menu'
@@ -408,7 +408,6 @@ async function handleSharingChanged() {
 
     <template v-else-if="app">
       <main class="page">
-        <nav class="crumb" aria-label="Breadcrumb"><RouterLink to="/apps">Apps</RouterLink> / {{ app.name }}</nav>
         <header class="head">
           <AppMark :id="app.id" :name="app.name" :image-url="app.thumbnailUrl" :size="52" />
           <div class="head-text">
@@ -583,8 +582,6 @@ async function handleSharingChanged() {
   box-sizing: border-box;
 }
 
-.crumb { color: var(--ink-soft); font-size: 13px; }
-.crumb a { color: inherit; text-decoration: none; }
 
 .head {
   display: flex;
