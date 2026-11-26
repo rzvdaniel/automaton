@@ -12,7 +12,7 @@ Automaton is maintained by a small team. We aim to:
 - tell you whether we confirm it, and our plan, within 14 days;
 - release a fix in a new version and publish a GitHub security advisory, crediting you unless you prefer not to be named.
 
-These are goals, not guarantees. Please give us reasonable time to release a fix before disclosing details.
+Automaton has no bug bounty. These are goals, not guarantees. Please give us reasonable time to release a fix before disclosing details.
 
 ## Supported versions
 
