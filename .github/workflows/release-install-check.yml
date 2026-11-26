@@ -49,6 +49,8 @@ jobs:
       - name: Require the secrets
         run: |
           [[ -n "$HCLOUD_TOKEN" && -n "$CLOUDFLARE_DNS_TOKEN" ]] || { echo "::error::Set the HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN repository secrets."; exit 1; }
+      - name: Install nmap
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nmap
       - name: Install hcloud
         run: |
           curl -fsSL "https://github.com/hetznercloud/cli/releases/download/v${HCLOUD_VERSION}/hcloud-linux-amd64.tar.gz" -o hcloud.tgz
