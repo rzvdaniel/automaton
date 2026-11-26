@@ -167,6 +167,7 @@ automaton deploy --non-interactive
 publish=\$(automaton publish --yes --slug "ci-hello-\$RANDOM")
 url=\$(grep -oE 'https://[^ ]+' <<< "\$publish" | head -1)
 test -n "\$url"
+echo "\$url" > /root/ci-app-url
 for i in \$(seq 1 30); do [ "\$(curl -s -o /dev/null -w '%{http_code}' "\$url")" = 200 ] && exit 0; sleep 10; done
 echo "The published app at \$url did not answer 200" >&2; exit 1
 REMOTE
@@ -190,5 +191,9 @@ REMOTE
     remote 'rm -rf /root/hello'
     checks "after the upgrade to $VERSION"
 fi
+step 'External scan'
+app_url=$(remote 'cat /root/ci-app-url' 2>/dev/null || true)
+[[ -n "$app_url" ]] || app_url="https://apps.$domain/"
+bash "$(dirname "${BASH_SOURCE[0]}")/release-scan.sh" "$domain" "$ip" "$app_url" || fail "The external scan found problems (see the summary above)"
 summary "- $mode: passed"
 echo "All checks passed ($mode)"
