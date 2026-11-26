@@ -255,6 +255,16 @@ describe('HomeView', () => {
     expect(nightly!.find('[data-testid="pin-settings"]').exists()).toBe(false)
   })
 
+  it('gives each card a drag grip, and the open link no longer starts a drag', async () => {
+    const wrapper = mountHome()
+    await flushPromises()
+    const cards = wrapper.findAll('[data-testid="pinned-app"]')
+    for (const card of cards) {
+      expect(card.find('[data-testid="pin-grip"]').element.tagName).toBe('BUTTON')
+      expect(card.find('[data-testid="pin-open"]').element.contains(card.find('[data-testid="pin-grip"]').element)).toBe(false)
+    }
+  })
+
   it('moves a card with Alt+Arrow, announces it, and ignores a plain arrow key', async () => {
     service.get.mockResolvedValue({
       needsYou: [], listView: false,
