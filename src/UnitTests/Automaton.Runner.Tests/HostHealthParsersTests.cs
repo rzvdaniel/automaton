@@ -1,3 +1,4 @@
+using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;
 
@@ -89,6 +90,25 @@ public class HostHealthParsersTests
 
         Assert.That(usage, Is.EqualTo((1000L, 10L, 300L, 50L)));
         Assert.That(HostHealthParsers.ParseDockerDiskUsage("not json"), Is.Null);
+    }
+
+    [Test]
+    public void Disks_ListMainDiskAndDockerDiskOnlyWhenItIsAnotherDevice()
+    {
+        var split = "root 10 4096 100 40\ndocker 20 4096 200 150\n";
+        var disks = HostHealthParsers.ParseDisks(split, "/mnt/docker-data");
+        Assert.That(disks, Is.EqualTo(new[] { new HostDisk("/", 4096 * 100, 4096 * 40), new HostDisk("/mnt/docker-data", 4096 * 200, 4096 * 150) }));
+        Assert.That(HostHealthParsers.ParseDisks("root 10 4096 100 40\ndocker 10 4096 100 40\n", "/var/lib/docker"), Has.Count.EqualTo(1));
+        Assert.That(HostHealthParsers.ParseDisks("docker 20 4096 200 150\n", "/mnt/x"), Is.Null);
+        Assert.That(HostHealthParsers.ParseDisks("garbage", null), Is.Null);
+    }
+
+    [Test]
+    public void DockerRoot_AcceptsOnlyPlainAbsolutePaths()
+    {
+        Assert.That(HostHealthParsers.ParseDockerRoot("{\"DockerRootDir\":\"/mnt/docker-data\"}"), Is.EqualTo("/mnt/docker-data"));
+        Assert.That(HostHealthParsers.ParseDockerRoot("{\"DockerRootDir\":\"/a,source=/etc\"}"), Is.Null);
+        Assert.That(HostHealthParsers.ParseDockerRoot("nope"), Is.Null);
     }
 
     [Test]

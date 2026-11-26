@@ -14,7 +14,9 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
 
     private const string HelperScript =
         "echo '[os]'; cat /host/os-release 2>/dev/null; " +
-        "if [ -e /host/reboot-required ]; then echo '[reboot]'; stat -c %Y /host/reboot-required; fi";
+        "if [ -e /host/reboot-required ]; then echo '[reboot]'; stat -c %Y /host/reboot-required; fi; " +
+        "echo '[disks]'; " +
+        "for d in root docker; do [ -d /host/$d ] && echo \"$d $(stat -c %d /host/$d) $(stat -f -c '%S %b %a' /host/$d)\"; done; true";
 
     public async Task<MachineHostHealth> CollectAsync(CancellationToken token)
     {
@@ -23,7 +25,10 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
         var memory = HostHealthParsers.ParseMemory(Read("/proc/meminfo"));
         var disk = ReadDisk();
         var (docker, dockerApps, apps) = await ReadDockerAsync(token);
-        var files = HostFiles.From(await ReadHostFilesAsync(token), await ReadUpdateCountsAsync(token));
+        var dockerRoot = HostHealthParsers.ParseDockerRoot(await DockerInfoAsync(token));
+        var sections = await ReadHostFilesAsync(dockerRoot, token);
+        var files = HostFiles.From(sections, await ReadUpdateCountsAsync(token));
+        var disks = HostHealthParsers.ParseDisks(sections.GetValueOrDefault("disks"), dockerRoot);
         var fail2Ban = await Fail2BanReader.ReadAsync(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE"), token);
 
         return new MachineHostHealth(
@@ -31,7 +36,7 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
             cpus, cpuPercent, load?.Load1, load?.Load5, load?.Load15, memory?.Total, memory?.Available,
             disk?.Total, disk?.Available, docker?.Images, docker?.Containers, docker?.Volumes, docker?.BuildCache,
             files.Pending, files.Security, files.RebootRequired, files.RebootSince,
-            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps, fail2Ban);
+            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps, fail2Ban, disks);
     }
 
     private async Task<(
@@ -110,6 +115,12 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
         return null;
     }
 
+    private static async Task<string?> DockerInfoAsync(CancellationToken token)
+    {
+        var result = await RunAsync("curl", ["--silent", "--fail", "--max-time", "10", "--unix-socket", DockerSocket, "http://localhost/info"], token);
+        return result?.ExitCode == 0 ? result.Output : null;
+    }
+
     private static async Task<string?> DockerDiskUsageAsync(CancellationToken token)
     {
         var result = await RunAsync("curl",
@@ -119,13 +130,16 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
 
     // Each attempt mounts fewer host paths: docker refuses a bind mount whose source is missing (no reboot-required file
     // when no restart is pending).
-    private static async Task<Dictionary<string, string>> ReadHostFilesAsync(CancellationToken token)
+    private static async Task<Dictionary<string, string>> ReadHostFilesAsync(string? dockerRoot, CancellationToken token)
     {
         var image = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE");
         if (string.IsNullOrWhiteSpace(image)) return [];
         var os = ("/etc/os-release", "/host/os-release");
         var reboot = ("/run/reboot-required", "/host/reboot-required");
-        (string Source, string Target)[][] attempts = [[os, reboot], [os]];
+        var root = ("/", "/host/root");
+        (string Source, string Target)[][] attempts = dockerRoot is null
+            ? [[os, reboot, root], [os, root], [os]]
+            : [[os, reboot, root, (dockerRoot, "/host/docker")], [os, root, (dockerRoot, "/host/docker")], [os, root], [os]];
         foreach (var mounts in attempts)
         {
             var args = new List<string>

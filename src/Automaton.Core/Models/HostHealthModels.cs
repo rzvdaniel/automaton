@@ -28,7 +28,14 @@ public sealed record MachineHostHealth(
     string? RunnerVersion,
     long? DockerUnusedImagesBytes = null,
     IReadOnlyList<AppDiskUsage>? AppDisk = null,
-    Fail2BanStatus? Fail2Ban = null);
+    Fail2BanStatus? Fail2Ban = null,
+    IReadOnlyList<HostDisk>? Disks = null);
+
+/// <summary>
+/// One disk of the host: the main disk (mounted at <c>/</c>) and, when Docker keeps its data on another disk, that disk
+/// at Docker's data root. <c>DiskTotalBytes</c>/<c>DiskAvailableBytes</c> stay the disk the apps' storage is on (what an app's Disk card shows).
+/// </summary>
+public sealed record HostDisk(string MountPoint, long TotalBytes, long AvailableBytes);
 
 /// <summary>
 /// Disk one app uses on a Runner's machine. Values the Runner cannot read are null.
