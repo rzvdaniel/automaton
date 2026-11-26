@@ -28,6 +28,29 @@ public sealed class HomeTests
             });
     }
 
+    private sealed class StubNeedsYouWithFailedCheck : HomeNeedsYouService
+    {
+        public StubNeedsYouWithFailedCheck() : base(null!, null!, null!, null!, null!, null!, null!) { }
+        public override Task<List<HomeCard>> ServerCardsAsync(Guid userId, CancellationToken token) => Task.FromResult(new List<HomeCard>());
+        public override Task<List<HomeCard>> ReadinessCardsAsync(CancellationToken token)
+            => Task.FromResult(ReadinessCards([new InstallationCheck("Database", "error", "Connection failed.")]));
+    }
+
+    [Test]
+    public async Task OnlyAdministratorsSeeAFailedReadinessCardOnHome()
+    {
+        Guid admin = Guid.NewGuid(), user = Guid.NewGuid();
+        var db = AppAuthorizationTestData.CreateDbContext();
+        MakeSystemAdministrator(db, admin);
+        HomeController For(Guid id) => new(new HomeService(db, new ResourceAuthorizationService(db, AppAuthorizationTestData.CreateUserContextService(id)), new StubNeedsYouWithFailedCheck()))
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, id.ToString())], "Test")) } }
+        };
+
+        Assert.That(Keys(await For(admin).Get(default)), Is.EqualTo(new[] { "setup-check:Database" }));
+        Assert.That(Keys(await For(user).Get(default)), Is.Empty, "a person who is not an administrator never sees server checks");
+    }
+
     private static (ApplicationDbContext Db, HomeController Controller) Create(Guid userId, ApplicationDbContext? db = null)
     {
         db ??= AppAuthorizationTestData.CreateDbContext();

@@ -34,7 +34,6 @@ public class HomeNeedsYouService(
                 waiting.Count == 1 ? "An app asks for permissions" : $"{waiting.Count} apps ask for permissions",
                 "Apps wait for an administrator to approve or reject what they requested.", "Review requests",
                 "/admin/permission-requests", false));
-        cards.AddRange(await ReadinessCardsAsync(token));
         if (!await SmtpConfiguredAsync(token))
             cards.Add(new(HomeCardKeys.NoSmtp, HomeCardKeys.NoSmtp, "info", "Set up email",
                 "Invitations and password recovery need SMTP settings.", "Open settings", "/settings#email", true));
@@ -45,8 +44,8 @@ public class HomeNeedsYouService(
         return cards;
     }
 
-    /// <summary>A card for each installation readiness check that reports an error. Backups have their own card.</summary>
-    private async Task<List<HomeCard>> ReadinessCardsAsync(CancellationToken token)
+    /// <summary>A card for each installation readiness check that reports an error. Backups have their own card. Home only: it opens a broker connection, so notifications do not run it.</summary>
+    public virtual async Task<List<HomeCard>> ReadinessCardsAsync(CancellationToken token)
     {
         try { return ReadinessCards(await InstallationReadiness.CheckAsync(db, configuration, smtpSettings, token)); }
         catch (Exception exception) when (exception is not OperationCanceledException) { return []; }
@@ -55,7 +54,7 @@ public class HomeNeedsYouService(
     internal static List<HomeCard> ReadinessCards(IEnumerable<InstallationCheck> checks) => checks
         .Where(check => check.Status == "error" && check.Name != "Backups")
         .Select(check => new HomeCard($"{HomeCardKeys.SetupCheckPrefix}{check.Name}", HomeCardKeys.SetupCheck, "error",
-            $"Check failed: {check.Name}", check.Detail, "Open server", "/server", false)).ToList();
+            $"Check failed: {check.Name}", check.Detail, check.Name == "SMTP" ? "Open settings" : "Open server", check.Name == "SMTP" ? "/settings#email" : "/server", false)).ToList();
 
     /// <summary>How long after the first-Runner install the "Installed for you" note is offered.</summary>
     internal static readonly TimeSpan InstalledNoteWindow = TimeSpan.FromDays(14);
