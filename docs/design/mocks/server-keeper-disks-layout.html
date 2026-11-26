@@ -342,6 +342,7 @@ body{background:var(--bg)}
 .disk--warn .bar i{background:var(--orange)}
 .bar b{position:absolute;top:-4px;bottom:-4px;left:80%;width:2px;background:var(--orange)}
 .disk__size{font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}.disk__size span{color:var(--muted)}
+.more{margin-top:12px}
 .disk__holds{color:var(--muted);font-size:13px;min-width:0}
 .lower{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .hrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border)}.hrow .a-muted{margin-left:auto;text-align:right}
@@ -352,7 +353,8 @@ body{background:var(--bg)}
   .tiles{grid-template-columns:1fr}.a-topbar .a-header__sub{display:none}
   .disk--head{display:none}
   .disk{grid-template-columns:1fr auto;grid-template-areas:"name pct" "bar bar" "size size" "holds holds";gap:6px 12px}
-  .disk__name{grid-area:name}.disk__pct{grid-area:pct}.bar{grid-area:bar}.disk__size{grid-area:size}.disk__holds{grid-area:holds}
+  .disk__name{grid-area:name}.disk__pct{grid-area:pct}.bar{grid-area:bar}.disk__size{grid-area:size}.more{margin-top:12px}
+.disk__holds{grid-area:holds}
 }
 </style>
 <header class="a-topbar">
@@ -411,16 +413,6 @@ body{background:var(--bg)}
     </div>
   </div>
 
-  <section class="a-card disks" aria-labelledby="disks-title">
-    <div class="a-card__head">
-      <h3 class="a-card__title" id="disks-title">Disks</h3>
-      <span class="a-muted small" id="disks-foot">Warning at 80% on any disk · 5.7 GiB can be freed</span>
-    </div>
-    <div class="disk disk--head" aria-hidden="true">
-      <span>Disk</span><span>Used</span><span></span><span class="num">Size</span><span>Holds</span>
-    </div>
-    <div id="disk-rows"></div>
-  </section>
 
   <div class="lower">
     <div class="a-card">
@@ -436,6 +428,17 @@ body{background:var(--bg)}
       <div class="hrow">OS updates<span class="a-muted">nothing to do</span></div>
     </div>
   </div>
+  <section class="a-card disks" aria-labelledby="disks-title">
+    <div class="a-card__head">
+      <h3 class="a-card__title" id="disks-title">Disks</h3>
+      <span class="a-muted small" id="disks-foot">Warning at 80% on any disk · 5.7 GiB can be freed</span>
+    </div>
+    <div class="disk disk--head" aria-hidden="true">
+      <span>Disk</span><span>Used</span><span></span><span class="num">Size</span><span>Holds</span>
+    </div>
+    <div id="disk-rows"></div>
+    <button type="button" class="a-btn more" id="more" hidden></button>
+  </section>
 </main>
 <script>
 (function(){
@@ -462,6 +465,10 @@ body{background:var(--bg)}
         '<div class="disk__holds">'+esc(x.h)+'</div></div>';
     });
     document.getElementById('disk-rows').innerHTML=rows;
+    var els=[].slice.call(document.querySelectorAll('#disk-rows .disk')), more=document.getElementById('more'), extra=0;
+    els.forEach(function(e,i){ if(i>=3 && !e.classList.contains('disk--warn')){e.hidden=true;extra++;} });
+    more.hidden=!extra; more.textContent='Show '+extra+' more disk'+(extra>1?'s':'');
+    more.onclick=function(){els.forEach(function(e){e.hidden=false;});more.hidden=true;};
     var warn=top.p>=80;
     document.getElementById('dt-label').textContent=d.length===1?'Disk':'Disk · fullest of '+d.length;
     document.getElementById('dt-name').textContent=d.length===1?top.x.t.toFixed(1)+' GiB':top.x.n;
