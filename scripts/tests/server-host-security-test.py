@@ -18,7 +18,7 @@ def tcp_row(address_hex, port, state='0A'):
 
 
 class Host:
-    def __init__(self, sshd='', keys=True, ports=(), ufw=False):
+    def __init__(self, sshd='', keys=True, ports=(), ufw=False, ufw_open=None):
         self.dir = tempfile.TemporaryDirectory()
         root = Path(self.dir.name)
         (root / 'etc/ssh/sshd_config.d').mkdir(parents=True)
@@ -30,6 +30,8 @@ class Host:
         if ufw:
             (root / 'etc/ufw').mkdir()
             (root / 'etc/ufw/ufw.conf').write_text('ENABLED=yes\n')
+            if ufw_open is not None:
+                (root / 'etc/ufw/user.rules').write_text(''.join(f'-A ufw-user-input -p tcp --dport {p} -j ACCEPT\n' for p in ufw_open))
         (root / 'proc/net').mkdir(parents=True)
         (root / 'proc/net/tcp').write_text('header\n' + '\n'.join(tcp_row(a, p) for a, p in ports) + '\n')
         self.root = str(root)
@@ -60,6 +62,16 @@ class Tests(unittest.TestCase):
     def test_no_authorized_key_means_passwords_are_not_fixable(self):
         found = Host('PasswordAuthentication yes\n', keys=False, ufw=True).ids()
         self.assertFalse(found['ssh-password']['fixable'])
+
+    def test_port_blocked_by_ufw_is_not_reported_but_an_allowed_one_is(self):
+        ports = [('00000000', 5432), ('00000000', 8080)]
+        found = Host('PasswordAuthentication no\n', ports=ports, ufw=True, ufw_open=[22, 8080]).ids()
+        self.assertEqual(set(found), {'port-tcp-8080'})
+
+    def test_unreadable_sshd_config_is_unknown_not_clean(self):
+        host = Host('')
+        os.remove(os.path.join(host.root, 'etc/ssh/sshd_config'))
+        self.assertFalse(hs.check(host.root, os.path.join(host.root, 'proc'), live=False)['sshConfigRead'])
 
     def test_read_only_helper_does_not_guess_about_the_firewall(self):
         self.assertNotIn('no-firewall', Host('PasswordAuthentication no\n').ids(live=False))

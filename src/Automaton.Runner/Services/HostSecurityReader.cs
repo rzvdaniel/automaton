@@ -5,8 +5,7 @@ namespace Automaton.Runner.Console.Services;
 
 /// <summary>
 /// Runs the installer's host security check (<c>host_security.py</c>, baked into the Runner image) read-only in a short-lived helper
-/// container: the host network namespace (to see listening ports), no capabilities, and /etc/ssh, /etc/passwd, /etc/ufw and home
-/// directories mounted read-only. It changes nothing; fixes are made by the installer or by the user.
+/// container: the host network namespace (to see listening ports), one capability (DAC_READ_SEARCH, to read files) and the host's / mounted read-only. It changes nothing; fixes are made by the installer or by the user.
 /// </summary>
 internal static class HostSecurityReader
 {
@@ -20,10 +19,9 @@ internal static class HostSecurityReader
             "run", "--rm", "--network", "host", "--read-only", "--cap-drop", "ALL", "--user", "0:0",
             "--security-opt", "no-new-privileges", "--pull", "never", "--entrypoint", "python"
         };
-        // Each path is optional on the host (no ufw, no /home): docker refuses a missing bind source, so only existing ones are mounted.
-        foreach (var path in new[] { "/etc/ssh", "/etc/passwd", "/etc/ufw", "/root", "/home", "/run/firewalld.pid" })
-            if (File.Exists(path) || Directory.Exists(path))
-                args.AddRange(["--mount", $"type=bind,source={path},target=/host{path},readonly"]);
+        // The Runner cannot see which host paths exist (its own /etc/ssh is not the host's), so the host's / is mounted read-only
+        // like the other host helpers. DAC_READ_SEARCH only lets root read other users' authorized_keys and ufw's rules; nothing is writable.
+        args.AddRange(["--cap-add", "DAC_READ_SEARCH", "--mount", "type=bind,source=/,target=/host,readonly"]);
         args.AddRange([image, "/app/host_security.py", "--json", "--root", "/host"]);
         var result = await HostHealthCollector.RunAsync("docker", args, token);
         return result?.ExitCode == 0 ? Parse(result.Output) : null;

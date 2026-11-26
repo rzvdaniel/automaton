@@ -115,18 +115,31 @@ def firewall(root, live):
     if os.path.exists(os.path.join(root, 'run/firewalld.pid')):
         return 'firewalld'
     if live:
-        for command in (['iptables', '-S', 'INPUT'], ['nft', 'list', 'ruleset']):
-            if shutil.which(command[0]):
-                result = subprocess.run(command, capture_output=True, text=True)
-                if result.returncode == 0 and (('-P INPUT DROP' in result.stdout) or 'drop' in result.stdout.lower() or '-j DROP' in result.stdout):
-                    return command[0]
+        # Docker adds its own DROP rules (forward chains), so only an input policy or input hook that drops counts.
+        if shutil.which('iptables'):
+            result = subprocess.run(['iptables', '-S', 'INPUT'], capture_output=True, text=True)
+            if result.returncode == 0 and re.search(r'^-P INPUT (DROP|REJECT)', result.stdout, re.M):
+                return 'iptables'
+        if shutil.which('nft'):
+            result = subprocess.run(['nft', 'list', 'ruleset'], capture_output=True, text=True)
+            if result.returncode == 0 and re.search(r'hook input[^\n]*policy drop', result.stdout):
+                return 'nftables'
     return None
+
+
+def ufw_allowed_ports(root):
+    """TCP ports ufw lets in, or None when its rules cannot be read."""
+    rules = read(root, '/etc/ufw/user.rules')
+    if rules is None:
+        return None
+    return {int(m.group(1)) for m in re.finditer(r'-A ufw-user-input .*-p tcp .*--dport (\d+) .*-j ACCEPT', rules)}
 
 
 def check(root='/', proc='/proc', live=True, allowed=()):
     options, has_config = sshd_options(root)
-    keys = users_with_keys(root)
-    ports = sorted((port, kind, address) for port, (kind, address) in public_listeners(proc).items() if port not in ALLOWED_PORTS | set(allowed))
+    keys = [user for user in users_with_keys(root) if user in ('root', os.environ.get('SUDO_USER'))]
+    blocked = ufw_allowed_ports(root) if firewall(root, False) == 'ufw' else None
+    ports = sorted((port, kind, address) for port, (kind, address) in public_listeners(proc).items() if port not in ALLOWED_PORTS | set(allowed) and (blocked is None or port in blocked))
     found = []
     if has_config and password_login(options):
         found.append({'id': 'ssh-password', 'title': 'SSH allows passwords',
@@ -137,7 +150,7 @@ def check(root='/', proc='/proc', live=True, allowed=()):
                       'detail': 'Root can sign in with a password. Allow root with a key only.', 'fixable': bool(keys)})
     for port, kind, address in ports[:50]:
         found.append({'id': f'port-{kind}-{port}', 'title': f'Port {port}/{kind} is open to the internet',
-                      'detail': f'Listening on {address}; only 22, 80, 443 and 5671 (Runners) are needed. Close it in the firewall or bind it to 127.0.0.1.',
+                      'detail': f'Listening on {address}; only 22, 80, 443 and 5671 (Runners) are needed. Turn on the firewall, or bind it to 127.0.0.1 (a port Docker publishes bypasses ufw).',
                       'fixable': False})
     provider = firewall(root, live)
     # The read-only helper cannot see iptables or nftables rules, so there "no firewall" would be a guess: it only reports it when it can look.
@@ -145,14 +158,25 @@ def check(root='/', proc='/proc', live=True, allowed=()):
         found.append({'id': 'no-firewall', 'title': 'No firewall found on this server',
                       'detail': 'Turn on a host firewall that allows only 22, 80, 443 and 5671 (a cloud provider firewall is not checked).',
                       'fixable': shutil.which('ufw') is not None})
-    return {'findings': found, 'firewall': provider, 'authorizedKeyUsers': len(keys)}
+    return {'findings': found, 'firewall': provider, 'authorizedKeyUsers': len(keys), 'sshConfigRead': has_config}
+
+
+def has_tty():
+    try:
+        open('/dev/tty').close()
+        return True
+    except OSError:
+        return False
 
 
 def ask(question, default_yes=True):
     suffix = '[Y/n]' if default_yes else '[y/N]'
     try:
-        answer = input(f'{question} {suffix} ').strip().lower()
-    except EOFError:
+        with open('/dev/tty', 'r+') as tty:  # also works when the script itself was piped into bash
+            tty.write(f'{question} {suffix} ')
+            tty.flush()
+            answer = tty.readline().strip().lower()
+    except OSError:
         return False
     return default_yes if not answer else answer.startswith('y')
 
@@ -167,6 +191,8 @@ def fix_ssh(ids):
         lines.append('PasswordAuthentication no')
     if 'ssh-root-password' in ids:
         lines.append('PermitRootLogin prohibit-password')
+    if not re.search(r'^\s*include\s+.*sshd_config\.d', read('/', '/etc/ssh/sshd_config') or '', re.M | re.I):
+        return False
     previous = None
     if os.path.exists(DROPIN):
         previous = open(DROPIN).read()
@@ -183,10 +209,25 @@ def fix_ssh(ids):
     return reloaded and ('ssh-password' not in ids or not password_login(after)) and ('ssh-root-password' not in ids or not root_password_login(after))
 
 
+def ssh_ports():
+    """Every port sshd listens on (sshd -T reads drop-ins too) plus the port of the session running this installer."""
+    ports = set()
+    sshd = shutil.which('sshd') or '/usr/sbin/sshd'
+    result = subprocess.run([sshd, '-T'], capture_output=True, text=True) if os.path.exists(sshd) else None
+    if result and result.returncode == 0:
+        ports |= {int(m.group(1)) for m in re.finditer(r'^port (\d+)$', result.stdout, re.M)}
+    parts = os.environ.get('SSH_CONNECTION', '').split()
+    if len(parts) == 4 and parts[3].isdigit():
+        ports.add(int(parts[3]))
+    return ports
+
+
 def fix_firewall():
-    # Allow the port sshd really listens on first, so enabling the firewall cannot cut off the current session.
-    ssh_ports = {int(p) for p in re.findall(r'^port\s+(\d+)', read('/', '/etc/ssh/sshd_config') or '', re.M | re.I)} | {22}
-    ports = sorted(ssh_ports) + [80, 443, 5671] + list(ALLOW)
+    ports = ssh_ports()
+    if not ports:
+        print('  Not changed: could not find the port SSH uses, and turning on the firewall could cut you off.')
+        return False
+    ports = sorted(ports) + [80, 443, 5671] + list(ALLOW)
     steps = [['ufw', '--force', 'default', 'deny', 'incoming']] + [['ufw', 'allow', f'{p}/tcp'] for p in ports] + [['ufw', '--force', 'enable']]
     return all(run(step) for step in steps)
 
@@ -199,7 +240,7 @@ def interactive():
     if not result['findings']:
         print('Host security: SSH passwords are off, only 22, 80, 443 and 5671 are open and a firewall is present.')
         return 0
-    interactive_ok = sys.stdin.isatty() and '--yes' not in sys.argv
+    interactive_ok = '--yes' not in sys.argv and has_tty()
     print('Host security: this server needs you:')
     for item in result['findings']:
         print(f"  - {item['title']}. {item['detail']}")
@@ -207,11 +248,14 @@ def interactive():
         print('Nothing was changed (no prompt available). Run: sudo python3 host_security.py   to fix these.')
         return 0
     ssh_ids = [i['id'] for i in result['findings'] if i['id'].startswith('ssh-') and i['fixable']]
+    prompts = {'ssh-password': 'SSH allows passwords. Turn it off? (your SSH key login keeps working)',
+               'ssh-root-password': 'Root can log in with a password. Allow root with a key only?'}
     for item in result['findings']:
         if item['id'].startswith('ssh-') and not item['fixable']:
             print(f"  Not changed: {item['title']} - no account has an authorized SSH key, so turning passwords off would lock you out. Add a key first.")
-    if ssh_ids and ask('SSH allows passwords. Turn it off? (your SSH key login keeps working)'):
-        print('  SSH hardened.' if fix_ssh(ssh_ids) else '  SSH was not changed (the configuration did not validate).')
+    chosen = [i for i in ssh_ids if ask(prompts[i])]
+    if chosen:
+        print('  SSH hardened.' if fix_ssh(chosen) else '  SSH was not changed (sshd_config does not read /etc/ssh/sshd_config.d, or the new setting did not validate).')
     if any(i['id'] == 'no-firewall' and i['fixable'] for i in result['findings']) and ask(
             'No firewall. Turn on ufw allowing only 22, 80, 443 and 5671 (Runners)?'):
         print('  Firewall enabled.' if fix_firewall() else '  The firewall could not be enabled.')
@@ -228,8 +272,9 @@ def main():
     args = parser.parse_args()
     ALLOW[:] = args.allow_port
     if args.json:
-        print(json.dumps(check(args.root, args.proc, live=args.root == '/', allowed=args.allow_port)))
-        return 0
+        result = check(args.root, args.proc, live=args.root == '/', allowed=args.allow_port)
+        print(json.dumps(result))
+        return 0 if result['sshConfigRead'] else 3  # unknown, never "all clear", when sshd_config cannot be read
     return interactive()
 
 
