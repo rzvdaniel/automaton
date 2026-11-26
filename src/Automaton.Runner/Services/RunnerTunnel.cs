@@ -44,9 +44,9 @@ public sealed class RunnerTunnel(
     /// <summary>Called when the tunnel stayed closed even after dialing again; the Runner should connect to the API again.</summary>
     internal Action Stalled { get; set; } = () => { };
 
-    internal TimeSpan StallRedialAfter { get; set; } = TimeSpan.FromSeconds(60);
-    internal TimeSpan StallReconnectAfter { get; set; } = TimeSpan.FromSeconds(180);
-    internal TimeSpan StallCheckInterval { get; set; } = TimeSpan.FromSeconds(10);
+    internal TimeSpan StallRedialAfter { get; set; } = TimeSpan.FromSeconds(15);
+    internal TimeSpan StallReconnectAfter { get; set; } = TimeSpan.FromSeconds(40);
+    internal TimeSpan StallCheckInterval { get; set; } = TimeSpan.FromSeconds(5);
     internal int OpenConnections => Volatile.Read(ref openConnections);
 
     /// <summary>Opens the tunnel connections, replacing any open ones (a new hub connection means a new API instance may be active).</summary>
@@ -112,6 +112,7 @@ public sealed class RunnerTunnel(
         try
         {
             watching?.Cancel();
+            watching?.Dispose();
             watching = null;
             await StopDialingAsync();
         }

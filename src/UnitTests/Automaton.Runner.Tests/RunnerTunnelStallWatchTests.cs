@@ -11,24 +11,24 @@ public class RunnerTunnelStallWatchTests
     [Test]
     public void NoOpenConnection_RedialsOnceThenReconnectsTheHub()
     {
-        var watch = new RunnerTunnelStallWatch(TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(180));
+        var watch = new RunnerTunnelStallWatch(TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(40));
 
         Assert.That(watch.Observe(0, Start), Is.EqualTo(RunnerTunnelStallAction.None));
-        Assert.That(watch.Observe(0, Start.AddSeconds(59)), Is.EqualTo(RunnerTunnelStallAction.None));
-        Assert.That(watch.Observe(0, Start.AddSeconds(60)), Is.EqualTo(RunnerTunnelStallAction.RedialTunnel));
-        Assert.That(watch.Observe(0, Start.AddSeconds(90)), Is.EqualTo(RunnerTunnelStallAction.None));
-        Assert.That(watch.Observe(0, Start.AddSeconds(180)), Is.EqualTo(RunnerTunnelStallAction.ReconnectHub));
+        Assert.That(watch.Observe(0, Start.AddSeconds(14)), Is.EqualTo(RunnerTunnelStallAction.None));
+        Assert.That(watch.Observe(0, Start.AddSeconds(15)), Is.EqualTo(RunnerTunnelStallAction.RedialTunnel));
+        Assert.That(watch.Observe(0, Start.AddSeconds(25)), Is.EqualTo(RunnerTunnelStallAction.None));
+        Assert.That(watch.Observe(0, Start.AddSeconds(40)), Is.EqualTo(RunnerTunnelStallAction.ReconnectHub));
     }
 
     [Test]
     public void AnOpenConnection_ResetsTheClock()
     {
-        var watch = new RunnerTunnelStallWatch(TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(180));
+        var watch = new RunnerTunnelStallWatch(TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(40));
 
         watch.Observe(0, Start);
-        Assert.That(watch.Observe(2, Start.AddSeconds(50)), Is.EqualTo(RunnerTunnelStallAction.None));
-        Assert.That(watch.Observe(0, Start.AddSeconds(100)), Is.EqualTo(RunnerTunnelStallAction.None));
-        Assert.That(watch.Observe(0, Start.AddSeconds(159)), Is.EqualTo(RunnerTunnelStallAction.None));
-        Assert.That(watch.Observe(0, Start.AddSeconds(160)), Is.EqualTo(RunnerTunnelStallAction.RedialTunnel));
+        Assert.That(watch.Observe(2, Start.AddSeconds(10)), Is.EqualTo(RunnerTunnelStallAction.None));
+        Assert.That(watch.Observe(0, Start.AddSeconds(20)), Is.EqualTo(RunnerTunnelStallAction.None));
+        Assert.That(watch.Observe(0, Start.AddSeconds(34)), Is.EqualTo(RunnerTunnelStallAction.None));
+        Assert.That(watch.Observe(0, Start.AddSeconds(35)), Is.EqualTo(RunnerTunnelStallAction.RedialTunnel));
     }
 }
