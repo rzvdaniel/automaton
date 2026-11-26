@@ -28,6 +28,7 @@ Starting an Action or reading its logs returns **503** "It may be offline" when 
 
 - **Port 5671.** The Runner connects outbound to the `api` host on port 5671 (TLS). The Runner machine must reach it, and the `api` DNS record must not be proxied.
 - **Runner stopped.** On the Runner host run `docker ps` and read the container's logs for startup errors.
+- **Docker restarted.** A Runner that loses its Docker socket (Docker restarted, an OS update) exits after about 45 seconds and Docker starts it again with a fresh socket. It runs only when Docker started it with `--restart unless-stopped`, as the installer does.
 - **Enrollment expired.** Run `automaton runners install` again; each command is single use.
 - **The machine is gone for good.** An administrator can delete the Runner and its apps, see [Update the server and Runners](./install#update-the-server-and-runners).
 

@@ -24,6 +24,7 @@ internal static class RunnerRuntimeServicesRegistration
         services.AddSingleton<AppDiskMeasurer>();
         services.AddSingleton<HostHealthCollector>();
         services.AddHostedService<HostHealthBackgroundService>();
+        services.AddHostedService<DockerSocketWatchdogService>();
         services.AddHostedService(provider => provider.GetRequiredService<RunnerRuntimeGatewayService>());
     }
 }
