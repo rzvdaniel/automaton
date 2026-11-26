@@ -78,6 +78,25 @@ public sealed class CatalogScheduleSyncTests
     }
 
     [Test]
+    public void ARenamedPairDroppedByTheUpdateIsStillAddedUnderTheNewNames()
+    {
+        var old = Many("""[{"name":"A1","action":"a","cron":"0 1 * * *"},{"name":"A2","action":"a","cron":"0 2 * * *"}]""");
+        var all = Many("""[{"name":"B1","action":"a","cron":"0 1 * * *"},{"name":"B2","action":"a","cron":"0 2 * * *"}]""");
+        var existing = $"[{Row("00000000-0000-0000-0000-000000000001", "A1", "a", "0 1 * * *")},{Row("00000000-0000-0000-0000-000000000002", "A2", "a", "0 2 * * *")}]";
+        var plan = CatalogScheduleSync.Plan("App", Many(existing), old, all, all, true);
+        Assert.That(plan.Count(change => change.Kind == ScheduleChange.Add), Is.EqualTo(2));
+        Assert.That(plan.Count(change => change.Kind == ScheduleChange.Remove), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void OneExistingScheduleCoversOnlyOneDeclaration()
+    {
+        var all = Many("""[{"name":"X","action":"a","cron":"0 1 * * *"},{"name":"Y","action":"a","cron":"0 1 * * *"}]""");
+        var plan = CatalogScheduleSync.Plan("App", Many($"[{Row("00000000-0000-0000-0000-000000000001", "old", "a", "0 1 * * *")}]"), all, all, all, true);
+        Assert.That(plan.Count(change => change.Kind == ScheduleChange.Add), Is.EqualTo(1));
+    }
+
+    [Test]
     public void NamedSchedulesNeverRemoveAnything()
         => Assert.That(Plan($"[{Row("00000000-0000-0000-0000-000000000003", "gone", "x", "0 1 * * *")}]", remove: false).Any(change => change.Kind == ScheduleChange.Remove), Is.False);
 
