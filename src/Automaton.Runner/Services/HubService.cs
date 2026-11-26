@@ -66,6 +66,14 @@ public class HubService : IRuntimeTunnelReconnectRequester
         this.tunnel = tunnel;
         tunnel.TryBeginRequest = tunnelReconnectState.TryBeginTunnelRequest;
         tunnel.CompleteRequest = CompleteTunnelRequest;
+        tunnel.Stalled = () =>
+        {
+            // No tunnel connection for minutes: connect to the API again from scratch (a new connection registers this
+            // Runner with the API instance that is running now).
+            if (!IsConnected()) return;
+            tunnelReconnectState.RequestReconnect();
+            WakeConnectionLoop();
+        };
         controlHandlerRegistrar = new HubControlHandlerRegistrar(serviceProvider, logger);
         connectionFailureReporter = new HubConnectionFailureReporter(configService, logger);
 
