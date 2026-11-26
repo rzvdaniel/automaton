@@ -66,6 +66,7 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
         ValidateDisks(report.Disks);
         ValidateApps(report.AppDisk);
         ValidateFail2Ban(report.Fail2Ban);
+        ValidateHostSecurity(report.HostSecurity);
         if (report.MemoryAvailableBytes > report.MemoryTotalBytes || report.DiskAvailableBytes > report.DiskTotalBytes)
             throw new ArgumentException("Available space cannot exceed the total.");
         if (Length(report.OsName) > 200 || Length(report.OsVersion) > 100 || Length(report.RunnerVersion) > 80)
@@ -96,6 +97,14 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
                 || jail.BannedLastHour < 0 || jail.BannedLast24Hours < 0
                 || jail.CurrentBans.Any(ban => !System.Net.IPAddress.TryParse(ban.Ip, out _))))
             throw new ArgumentException("The fail2ban report is too large or has an invalid address.");
+    }
+
+    private static void ValidateHostSecurity(HostSecurityStatus? status)
+    {
+        if (status is null) return;
+        if (Length(status.Firewall) > 40 || status.Findings.Count > 60 || status.Findings.Any(finding => finding is null
+                || Length(finding.Id) is 0 or > 60 || Length(finding.Title) is 0 or > 200 || Length(finding.Detail) > 500))
+            throw new ArgumentException("The host security report is too large.");
     }
 
     private static int Length(string? value) => value?.Length ?? 0;

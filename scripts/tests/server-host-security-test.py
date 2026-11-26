@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""The host security check finds SSH password login, public ports and a missing firewall, and never offers a fix that locks the user out."""
+import importlib.util
+import os
+from pathlib import Path
+import tempfile
+import unittest
+
+spec = importlib.util.spec_from_file_location('host_security', Path(__file__).resolve().parents[2] / 'docker/install/host_security.py')
+hs = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hs)
+_firewall = hs.firewall
+hs.firewall = lambda root, live: _firewall(root, False)  # never run iptables or nft of the machine running the test
+
+
+def tcp_row(address_hex, port, state='0A'):
+    return f'  0: {address_hex}:{port:04X} 00000000:0000 {state} 00000000:00000000 00:00000000 00000000     0        0 1 1 0 0 0 0 0'
+
+
+class Host:
+    def __init__(self, sshd='', keys=True, ports=(), ufw=False):
+        self.dir = tempfile.TemporaryDirectory()
+        root = Path(self.dir.name)
+        (root / 'etc/ssh/sshd_config.d').mkdir(parents=True)
+        (root / 'etc/ssh/sshd_config').write_text(sshd)
+        (root / 'etc/passwd').write_text('root:x:0:0::/root:/bin/bash\nsvc:x:5:5::/nonexistent:/usr/sbin/nologin\n')
+        (root / 'root/.ssh').mkdir(parents=True)
+        if keys:
+            (root / 'root/.ssh/authorized_keys').write_text('ssh-ed25519 AAAA test\n')
+        if ufw:
+            (root / 'etc/ufw').mkdir()
+            (root / 'etc/ufw/ufw.conf').write_text('ENABLED=yes\n')
+        (root / 'proc/net').mkdir(parents=True)
+        (root / 'proc/net/tcp').write_text('header\n' + '\n'.join(tcp_row(a, p) for a, p in ports) + '\n')
+        self.root = str(root)
+
+    def ids(self, live=True, **kw):
+        return {f['id']: f for f in hs.check(self.root, os.path.join(self.root, 'proc'), live=live, **kw)['findings']}
+
+
+class Tests(unittest.TestCase):
+    def test_passwords_and_open_port_and_no_firewall_are_found(self):
+        host = Host('PasswordAuthentication yes\nPermitRootLogin yes\n', ports=[('00000000', 5432), ('00000000', 22), ('0100007F', 6000)])
+        found = host.ids()
+        self.assertEqual(set(found), {'ssh-password', 'ssh-root-password', 'port-tcp-5432', 'no-firewall'})
+        self.assertTrue(found['ssh-password']['fixable'])
+
+    def test_default_sshd_allows_passwords_but_root_needs_a_key(self):
+        self.assertEqual(set(Host('').ids()) - {'no-firewall'}, {'ssh-password'})
+
+    def test_clean_server_has_no_findings(self):
+        host = Host('PasswordAuthentication no\n', ports=[('00000000', 80), ('00000000', 443), ('00000000', 5671)], ufw=True)
+        self.assertEqual(host.ids(), {})
+
+    def test_first_value_wins_across_includes(self):
+        host = Host('Include /etc/ssh/sshd_config.d/*.conf\nPasswordAuthentication yes\n', ufw=True)
+        Path(host.root, 'etc/ssh/sshd_config.d/50.conf').write_text('PasswordAuthentication no\n')
+        self.assertEqual(host.ids(), {})
+
+    def test_no_authorized_key_means_passwords_are_not_fixable(self):
+        found = Host('PasswordAuthentication yes\n', keys=False, ufw=True).ids()
+        self.assertFalse(found['ssh-password']['fixable'])
+
+    def test_read_only_helper_does_not_guess_about_the_firewall(self):
+        self.assertNotIn('no-firewall', Host('PasswordAuthentication no\n').ids(live=False))
+
+    def test_extra_allowed_port_and_private_addresses_are_ignored(self):
+        host = Host('PasswordAuthentication no\n', ufw=True, ports=[('00000000', 53), ('0100A8C0', 9000)])
+        self.assertEqual(host.ids(allowed=[53]), {})
+
+
+if __name__ == '__main__':
+    unittest.main()

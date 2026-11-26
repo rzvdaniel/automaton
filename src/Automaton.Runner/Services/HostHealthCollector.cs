@@ -30,13 +30,14 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
         var files = HostFiles.From(sections, await ReadUpdateCountsAsync(token));
         var disks = HostHealthParsers.ParseDisks(sections.GetValueOrDefault("disks"), dockerRoot);
         var fail2Ban = await Fail2BanReader.ReadAsync(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE"), token);
+        var hostSecurity = await HostSecurityReader.ReadAsync(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE"), token);
 
         return new MachineHostHealth(
             DateTime.UtcNow, files.OsName, files.OsVersion, HostHealthParsers.ParseUptimeSeconds(Read("/proc/uptime")),
             cpus, cpuPercent, load?.Load1, load?.Load5, load?.Load15, memory?.Total, memory?.Available,
             disk?.Total, disk?.Available, docker?.Images, docker?.Containers, docker?.Volumes, docker?.BuildCache,
             files.Pending, files.Security, files.RebootRequired, files.RebootSince,
-            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps, fail2Ban, disks);
+            typeof(HostHealthCollector).Assembly.GetName().Version?.ToString(), dockerApps?.UnusedImages, apps, fail2Ban, disks, hostSecurity);
     }
 
     private async Task<(

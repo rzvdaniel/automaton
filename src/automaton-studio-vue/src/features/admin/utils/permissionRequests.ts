@@ -14,7 +14,7 @@ const words: Record<string, { wants: string; allows: string }> = {
   'server:update-os': { wants: 'install OS updates', allows: 'Lets the app install this server\'s operating system updates (security only, or all). It never reboots the server; restarting needs its own approval.' },
   'backups:run': { wants: 'start backups', allows: 'Lets the app start a backup of this server.' },
   'server:read': { wants: 'read server status', allows: 'Lets the app read this server\'s health and settings status.' },
-  'security:read': { wants: 'read fail2ban bans', allows: 'Lets the app see which addresses fail2ban banned on this server. It gets no firewall access.' },
+  'security:read': { wants: 'read fail2ban bans and host security findings', allows: 'Lets the app see which addresses fail2ban banned on this server and whether SSH allows passwords, extra ports are open or no firewall is found. It cannot change any of it.' },
   'security:manage': { wants: 'unban and allowlist addresses', allows: 'Lets the app lift a fail2ban ban or allowlist an address on this server when a system administrator asks it to. It gets no firewall or shell access.' },
   'server:cleanup': { wants: 'clean up the server', allows: 'Lets the app free disk space on this server.' },
   'runner:host-exec': { wants: 'run any command as root on a machine', allows: 'Lets an app you own run any command as root on the machines you approve. Off until you turn host access on.' },
