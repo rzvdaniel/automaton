@@ -356,6 +356,17 @@ body{background:var(--bg)}
   .disk__name{grid-area:name}.disk__pct{grid-area:pct}.bar{grid-area:bar}.disk__size{grid-area:size}.more{margin-top:12px}
 .disk__holds{grid-area:holds}
 }
+
+/* v4: lower area = Maintenance (left, its buttons always in view) | Health over Disks (right). Disk lines are compact. */
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+.a-card__title+.mrow{border-top:0}
+.disk{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name pct" "bar bar" "size holds";gap:4px 12px;padding:10px 0;border-top:1px solid var(--border);align-items:center}
+.disk__name{grid-area:name;display:flex;gap:8px;align-items:baseline;min-width:0}.disk__name code{display:inline}
+.disk__pct{grid-area:pct}.bar{grid-area:bar;margin:4px 0}.disk__size{grid-area:size;font-size:13px}.disk__holds{grid-area:holds;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.disks .a-card__head+div .disk:first-child{border-top:0}
+@media (max-width:860px){.lower{grid-template-columns:1fr}}
 </style>
 <header class="a-topbar">
   <div class="a-topbar__inner">
@@ -415,30 +426,30 @@ body{background:var(--bg)}
 
 
   <div class="lower">
-    <div class="a-card">
-      <h3 class="a-card__title">Health</h3>
-      <div class="hrow"><span class="dot"></span>OS updates<span class="a-muted">none waiting · restart not needed</span></div>
-      <div class="hrow"><span class="dot"></span>Certificates<span class="a-muted">studio, api · 80 days left</span></div>
-      <div class="hrow"><span class="dot"></span>Backups<span class="a-muted">last one 6 minutes ago</span></div>
-    </div>
-    <div class="a-card">
-      <h3 class="a-card__title">Maintenance</h3>
-      <div class="hrow">Cleanup<span class="a-muted">next 05:00 UTC</span></div>
-      <div class="hrow">Backup<span class="a-muted">succeeded 10 minutes ago</span></div>
-      <div class="hrow">OS updates<span class="a-muted">nothing to do</span></div>
+    <section class="a-card" aria-labelledby="mt">
+      <h3 class="a-card__title" id="mt">Maintenance</h3>
+      <div class="mrow"><div><b>Cleanup</b><div class="a-muted small">freed 16 MiB 13 hours ago · next 05:00 UTC</div></div><button class="a-btn" type="button">Run now</button></div>
+      <div class="mrow"><div><b>Backup</b><div class="a-muted small">succeeded 10 minutes ago · daily</div></div><button class="a-btn" type="button">Run now</button></div>
+      <div class="mrow"><div><b>Upgrade Runners</b><div class="a-muted small">all current</div></div><span class="a-muted small">nothing to do</span></div>
+      <div class="mrow"><div><b>OS updates</b><div class="a-muted small">none waiting</div></div><span class="a-muted small">nothing to do</span></div>
+      <div class="mrow"><div><b>Restart server</b><div class="a-muted small">last restart 6 minutes ago</div></div><button class="a-btn" type="button">Restart&hellip;</button></div>
+    </section>
+    <div class="side">
+      <section class="a-card" aria-labelledby="ht">
+        <h3 class="a-card__title" id="ht">Health</h3>
+        <div class="hrow"><span class="dot"></span>OS updates<span class="a-muted">none waiting · restart not needed</span></div>
+        <div class="hrow"><span class="dot"></span>Certificates<span class="a-muted">studio, api · 80 days left</span></div>
+        <div class="hrow"><span class="dot"></span>Runners<span class="a-muted">1 of 1 current</span></div>
+        <div class="hrow"><span class="dot"></span>Backups<span class="a-muted">last one 6 minutes ago</span></div>
+        <div class="hrow"><span class="dot"></span>fail2ban<span class="a-muted">on · 34 bans in 24 h</span></div>
+      </section>
+      <section class="a-card disks" aria-labelledby="disks-title">
+        <div class="a-card__head"><h3 class="a-card__title" id="disks-title">Disks</h3><span class="a-muted small">warning at 80% · 5.7 GiB can be freed</span></div>
+        <div id="disk-rows"></div>
+        <button type="button" class="a-btn more" id="more" hidden></button>
+      </section>
     </div>
   </div>
-  <section class="a-card disks" aria-labelledby="disks-title">
-    <div class="a-card__head">
-      <h3 class="a-card__title" id="disks-title">Disks</h3>
-      <span class="a-muted small" id="disks-foot">Warning at 80% on any disk · 5.7 GiB can be freed</span>
-    </div>
-    <div class="disk disk--head" aria-hidden="true">
-      <span>Disk</span><span>Used</span><span></span><span class="num">Size</span><span>Holds</span>
-    </div>
-    <div id="disk-rows"></div>
-    <button type="button" class="a-btn more" id="more" hidden></button>
-  </section>
 </main>
 <script>
 (function(){
