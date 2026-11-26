@@ -1,1 +1,0 @@
-Follow .agents/skills/automaton-lessons-learned/SKILL.md end to end: file each new root cause as a `lesson` issue in the agent board's Inbox (comment on an existing issue instead of filing a twin). Do not open PRs or move cards to Ready. Never print credentials.

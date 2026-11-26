@@ -11,8 +11,7 @@ Works on Desktop and on a headless agent host; `gh` is the only hard requirement
 
 ## 1. Collect (since the last run)
 
-Last run = the previous successful `agent-lessons.yml` run (`gh run list -w agent-lessons.yml --status success -L 1`);
-none means the last 7 days.
+Collect the last 7 days unless the owner names another period.
 
 - Queue logs, if `~/agent-queue/logs` exists: `grep -il "error\|failed\|cancel\|stall"` on logs newer than the last
   run; read only the tails.
@@ -38,4 +37,4 @@ End with a short list in the job output: issues filed, issues commented, what wa
 
 ## Schedule
 
-Nightly via `agent-lessons.yml` (`.agents/jobs/lessons.md`), see `docs/maintainers/agent-machines.md`.
+None: run it when the owner asks.
