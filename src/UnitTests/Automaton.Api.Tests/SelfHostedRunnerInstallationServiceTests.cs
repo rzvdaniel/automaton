@@ -44,6 +44,28 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         });
     }
 
+    [Test]
+    public async Task CreateForUser_BelongsToThatUserAndOnlyTheyCanReadItsStatus()
+    {
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.Empty);
+        var admin = Guid.NewGuid();
+
+        var response = await service.CreateForUserAsync(admin, new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "main", AcknowledgeHostAccess = true
+        }, CancellationToken.None);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That((await db.SelfHostedRunnerEnrollments.SingleAsync()).UserId, Is.EqualTo(admin));
+            Assert.That(await service.GetStatusForUserAsync(admin, response.InstallationId, CancellationToken.None), Is.Not.Null);
+            Assert.That(await service.GetStatusForUserAsync(Guid.NewGuid(), response.InstallationId, CancellationToken.None), Is.Null);
+        });
+        Assert.That(async () => await service.CreateForUserAsync(Guid.Empty, new CreateSelfHostedRunnerInstallationRequest { RunnerName = "x", AcknowledgeHostAccess = true }, CancellationToken.None),
+            Throws.TypeOf<UnauthorizedAccessException>());
+    }
+
     [TestCase("Standard")]
     [TestCase("PrivilegedHost")]
     public async Task Create_RejectsRetiredRunnerProfiles(string profile)

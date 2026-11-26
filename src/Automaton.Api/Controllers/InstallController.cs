@@ -181,6 +181,49 @@ public class InstallController(InstallService installService, IConfiguration con
         return Ok(new PasswordLinkResponse(url, expiresAt));
     }
 
+    /// <summary>
+    /// The command that connects a Machine Management Runner on this server, for the unattended installer: like the
+    /// password link it needs the setup token (root on the server) and belongs to an existing administrator.
+    /// </summary>
+    [HttpPost("runner-installation")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthResetPassword)]
+    public async Task<IActionResult> CreateRunnerInstallation(RunnerInstallationRequest request,
+        [FromServices] UserManager<ApplicationUser> userManager,
+        [FromServices] SelfHostedRunnerInstallationService installations, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(InstallationSetupAccess.ExpectedToken(configuration)) || !HasSetupAccess())
+            return StatusCode(403, new { message = "A valid server setup token is required." });
+        var user = string.IsNullOrWhiteSpace(request.Email) ? null : await userManager.FindByEmailAsync(request.Email.Trim());
+        if (user is null || user.IsDeleted || !await IsAdministratorAsync(userManager, user))
+            return NotFound(new { message = "No administrator has that email address." });
+        try
+        {
+            return Ok(await installations.CreateForUserAsync(user.Id, new CreateSelfHostedRunnerInstallationRequest
+            {
+                RunnerName = request.RunnerName ?? string.Empty,
+                ApplicationProfile = Automaton.Core.Enums.RunnerApplicationProfiles.MachineManagement,
+                AcknowledgeHostAccess = true
+            }, token));
+        }
+        catch (ArgumentException error) { return BadRequest(new { message = error.Message }); }
+    }
+
+    // Polled every few seconds while the Runner image downloads: the setup token guards it and the global anonymous limit applies.
+    [HttpGet("runner-installation/{installationId}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetRunnerInstallation(string installationId, [FromQuery] string email,
+        [FromServices] UserManager<ApplicationUser> userManager,
+        [FromServices] SelfHostedRunnerInstallationService installations, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(InstallationSetupAccess.ExpectedToken(configuration)) || !HasSetupAccess())
+            return StatusCode(403, new { message = "A valid server setup token is required." });
+        var user = string.IsNullOrWhiteSpace(email) ? null : await userManager.FindByEmailAsync(email.Trim());
+        if (user is null || user.IsDeleted) return NotFound();
+        var status = await installations.GetStatusForUserAsync(user.Id, installationId, token);
+        return status is null ? NotFound() : Ok(status);
+    }
+
     private static async Task<bool> IsAdministratorAsync(UserManager<ApplicationUser> userManager, ApplicationUser user)
         => await userManager.IsInRoleAsync(user, UserRole.SystemAdministrator) || await userManager.IsInRoleAsync(user, UserRole.Administrator);
 
