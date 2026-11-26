@@ -64,6 +64,8 @@ public class ComposeImportTests
 
     [TestCase("services:\n  a:\n    build: .\n    ports: ['80']", "build")]
     [TestCase("services:\n  a:\n    image: x\n    ports: ['80']\n  b:\n    image: y\n    ports: ['81']", "More than one")]
+    [TestCase("services:\n  a:\n    image: x\n    ports: ['80']\n    env_file: .env", "env_file")]
+    [TestCase("x: &a [1]\nservices:\n  a:\n    image: x\n    ports: ['80']\n    command: *a", "anchors")]
     [TestCase("services:\n  a:\n    image: x\n    privileged: true", "privileged")]
     [TestCase("services:\n  a:\n    image: x\n    ports: ['80']\n    volumes: ['/etc:/etc']", "host mounts")]
     [TestCase("services:\n  a:\n    image: x\n    ports: ['80']\n    environment: ['TOKEN=$SECRET']", "interpolation")]

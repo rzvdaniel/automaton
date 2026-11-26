@@ -20,9 +20,8 @@ public static class ImportComposeCommand
                 var result = ComposeImportService.Import(File.ReadAllText(path), appName ?? Path.GetFileName(target.TrimEnd(Path.DirectorySeparatorChar)));
                 var manifestPath = Path.Combine(target, "automaton.json");
                 var composePath = Path.Combine(target, "compose.yaml");
-                var sameFile = string.Equals(Path.GetFullPath(path), composePath, StringComparison.Ordinal);
-                if (File.Exists(manifestPath)) throw new InvalidOperationException($"{manifestPath} already exists; import into an empty folder.");
-                if (File.Exists(composePath) && !sameFile) throw new InvalidOperationException($"{composePath} already exists; import into an empty folder.");
+                                if (File.Exists(manifestPath)) throw new InvalidOperationException($"{manifestPath} already exists; import into an empty folder.");
+                if (File.Exists(composePath)) throw new InvalidOperationException($"{composePath} already exists; import into an empty folder.");
                 Directory.CreateDirectory(target);
                 File.WriteAllText(manifestPath, result.ManifestJson);
                 File.WriteAllText(composePath, result.ComposeYaml);

@@ -13,7 +13,7 @@ namespace Automaton.Cli.Services;
 internal static class ComposeImportService
 {
     private static readonly HashSet<string> Kept = new(["image", "command", "entrypoint", "working_dir", "environment", "depends_on", "volumes"], StringComparer.Ordinal);
-    private static readonly HashSet<string> Dropped = new(["restart", "container_name", "networks", "healthcheck", "labels", "hostname", "stdin_open", "tty", "logging", "profiles", "pull_policy", "platform", "mem_limit", "cpus", "deploy", "env_file"], StringComparer.Ordinal);
+    private static readonly HashSet<string> Dropped = new(["restart", "container_name", "networks", "healthcheck", "labels", "hostname", "stdin_open", "tty", "logging", "profiles", "pull_policy", "platform", "mem_limit", "cpus", "deploy"], StringComparer.Ordinal);
 
     internal sealed record Result(string ComposeYaml, string ManifestJson, IReadOnlyList<string> Notes);
 
@@ -21,44 +21,18 @@ internal static class ComposeImportService
     {
         var notes = new List<string>();
         var stream = new YamlStream();
+        if (System.Text.RegularExpressions.Regex.IsMatch(composeYaml, @"(^|[\s\[{,:-])[&*][A-Za-z0-9_-]+"))
+            throw new InvalidOperationException("YAML anchors and aliases are not supported; write the values out.");
         stream.Load(new StringReader(composeYaml));
         if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root)
             throw new InvalidOperationException("Compose must contain one mapping document.");
 
         var output = new YamlMappingNode();
-        foreach (var entry in root.Children)
-        {
-            var key = Text(entry.Key);
-            if (key == "services" || key == "volumes") continue;
-            notes.Add($"Dropped top-level '{key}' (not part of the supported subset).");
-        }
-
-        var services = root.Children.TryGetValue(new YamlScalarNode("services"), out var s) && s is YamlMappingNode m ? m : throw new InvalidOperationException("Compose needs a 'services' mapping.");
-        var outServices = new YamlMappingNode();
-        var routed = new List<string>();
-        foreach (var service in services.Children)
-        {
-            var name = Text(service.Key);
-            var node = service.Value as YamlMappingNode ?? throw new InvalidOperationException($"services.{name} must be a mapping.");
-            outServices.Add(name, Service(name, node, notes, routed));
-        }
-        output.Add("services", outServices);
-        if (routed.Count > 1)
-            throw new InvalidOperationException($"More than one service publishes a port ({string.Join(", ", routed)}). Automaton routes one HTTP service; remove the other ports and import again.");
-        if (routed.Count == 0)
-            notes.Add("No service publishes a port, so nothing is reachable. Add a 'ports' entry to the web service and import again.");
-
-        if (root.Children.TryGetValue(new YamlScalarNode("volumes"), out var volumes) && volumes is YamlMappingNode vm)
-        {
-            var outVolumes = new YamlMappingNode();
-            foreach (var volume in vm.Children)
-            {
-                if (volume.Value is not (YamlMappingNode { Children.Count: 0 } or YamlScalarNode { Value: null or "" }))
-                    throw new InvalidOperationException($"volumes.{Text(volume.Key)} has options or is external; only plain named volumes are supported.");
-                outVolumes.Add(Text(volume.Key), new YamlMappingNode());
-            }
-            output.Add("volumes", outVolumes);
-        }
+        foreach (var entry in root.Children.Where(e => Text(e.Key) is not ("services" or "volumes")))
+            notes.Add($"Dropped top-level '{Text(entry.Key)}' (not part of the supported subset).");
+        output.Add("services", Services(root, notes));
+        var volumes = Volumes(root);
+        if (volumes is not null) output.Add("volumes", volumes);
 
         var yaml = Serialize(output);
         ApplicationComposeParser.Parse(yaml);
@@ -76,11 +50,45 @@ internal static class ComposeImportService
         return new Result(yaml, json, notes);
     }
 
+
+    private static YamlMappingNode Services(YamlMappingNode root, List<string> notes)
+    {
+        var services = root.Children.TryGetValue(new YamlScalarNode("services"), out var s) && s is YamlMappingNode m ? m : throw new InvalidOperationException("Compose needs a 'services' mapping.");
+        var outServices = new YamlMappingNode();
+        var routed = new List<string>();
+        foreach (var service in services.Children)
+        {
+            var name = Text(service.Key);
+            var node = service.Value as YamlMappingNode ?? throw new InvalidOperationException($"services.{name} must be a mapping.");
+            outServices.Add(name, Service(name, node, notes, routed));
+        }
+        if (routed.Count > 1)
+            throw new InvalidOperationException($"More than one service publishes a port ({string.Join(", ", routed)}). Automaton routes one HTTP service; remove the other ports and import again.");
+        if (routed.Count == 0)
+            notes.Add("No service publishes a port, so nothing is reachable. Add a 'ports' entry to the web service and import again.");
+        return outServices;
+    }
+
+    private static YamlMappingNode? Volumes(YamlMappingNode root)
+    {
+        if (!root.Children.TryGetValue(new YamlScalarNode("volumes"), out var volumes) || volumes is not YamlMappingNode vm) return null;
+        var outVolumes = new YamlMappingNode();
+        foreach (var volume in vm.Children)
+        {
+            if (volume.Value is not (YamlMappingNode { Children.Count: 0 } or YamlScalarNode { Value: null or "" }))
+                throw new InvalidOperationException($"volumes.{Text(volume.Key)} has options or is external; only plain named volumes are supported.");
+            outVolumes.Add(Text(volume.Key), new YamlMappingNode());
+        }
+        return outVolumes;
+    }
+
     private static YamlMappingNode Service(string name, YamlMappingNode node, List<string> notes, List<string> routed)
     {
         var result = new YamlMappingNode();
         if (node.Children.ContainsKey(new YamlScalarNode("build")))
             throw new InvalidOperationException($"services.{name} uses 'build'. Automaton runs published images; push the image and use 'image'.");
+        if (node.Children.ContainsKey(new YamlScalarNode("env_file")))
+            throw new InvalidOperationException($"services.{name} uses 'env_file'. Move its non-secret values into 'environment' (secrets are set after install) and import again.");
         foreach (var entry in node.Children)
         {
             var key = Text(entry.Key);
