@@ -33,7 +33,7 @@ public sealed record MachineHostHealth(
 
 /// <summary>
 /// One disk of the host: the main disk (mounted at <c>/</c>) and, when Docker keeps its data on another disk, that disk
-/// at Docker's data root. <c>DiskTotalBytes</c>/<c>DiskAvailableBytes</c> on the report are the main disk when this list is present.
+/// at Docker's data root. <c>DiskTotalBytes</c>/<c>DiskAvailableBytes</c> stay the disk the apps' storage is on (what an app's Disk card shows).
 /// </summary>
 public sealed record HostDisk(string MountPoint, long TotalBytes, long AvailableBytes);
 

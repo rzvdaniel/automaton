@@ -29,8 +29,6 @@ public sealed class HostHealthCollector(AppDiskMeasurer appDisk)
         var sections = await ReadHostFilesAsync(dockerRoot, token);
         var files = HostFiles.From(sections, await ReadUpdateCountsAsync(token));
         var disks = HostHealthParsers.ParseDisks(sections.GetValueOrDefault("disks"), dockerRoot);
-        // The main disk is the host's "/"; the volume Docker keeps /automaton/storage on is only a fallback.
-        if (disks?[0] is { } main) disk = (main.TotalBytes, main.AvailableBytes);
         var fail2Ban = await Fail2BanReader.ReadAsync(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE"), token);
 
         return new MachineHostHealth(
