@@ -2,10 +2,12 @@
 # Installs one Automaton server release on a throwaway Hetzner server and checks it by script, then deletes it.
 #   release-install-check.sh fresh            install $VERSION, run the checks
 #   release-install-check.sh upgrade          install $PREVIOUS, update to $VERSION with the CLI, run the checks again
+#   release-install-check.sh restore          install $VERSION, create an app and a backup, install a second fresh server,
+#                                             restore the backup there with its key, check user, app and app data
 #   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 180)
 # Environment: HCLOUD_TOKEN (project "automaton-ci" only), CLOUDFLARE_DNS_TOKEN (Zone.DNS edit on the test domain only),
 # VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
-# LOCATIONS ("nbg1 fsn1 hel1"), RUN_ID. Secrets are never printed; the administrator password is generated here and
+# LOCATIONS ("nbg1 fsn1 hel1"), RUN_ID, RESTORE_WRONG_KEY=1 (restore mode: use a wrong key, the job must fail). Secrets are never printed; the administrator password is generated here and
 # lives only in a variable and a root-only file on the throwaway server.
 set -euo pipefail
 
@@ -44,18 +46,20 @@ sweep() {
     done
 }
 if [[ "$mode" == sweep ]]; then sweep; exit 0; fi
-[[ "$mode" == fresh || "$mode" == upgrade ]] || fail "Unknown mode $mode"
+[[ "$mode" == fresh || "$mode" == upgrade || "$mode" == restore ]] || fail "Unknown mode $mode"
 
-work=$(mktemp -d); server_id=''; ssh_key_id=''; ip=''; zone_id=''
+work=$(mktemp -d); server_id=''; ssh_key_id=''; ip=''; zone_id=''; extra_servers=(); extra_keys=(); extra_domains=()
 ssh_opts=(-i "$work/key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15)
 remote() { ssh "${ssh_opts[@]}" "root@$ip" "$@"; }
 
 dns_delete() {
     [[ -n "$zone_id" ]] || return 0
-    local name id
-    for name in "${names[@]}"; do
-        for id in $(cf GET "zones/$zone_id/dns_records?type=A&name=$name.$domain" | jq -r '.result[].id'); do
-            cf DELETE "zones/$zone_id/dns_records/$id" >/dev/null || true
+    local name id d
+    for d in "$domain" "${extra_domains[@]}"; do
+        for name in "${names[@]}"; do
+            for id in $(cf GET "zones/$zone_id/dns_records?type=A&name=$name.$d" | jq -r '.result[].id'); do
+                cf DELETE "zones/$zone_id/dns_records/$id" >/dev/null || true
+            done
         done
     done
 }
@@ -64,6 +68,9 @@ cleanup() {
     step 'Cleanup'
     [[ -n "$server_id" ]] && hcloud server delete "$server_id"
     [[ -n "$ssh_key_id" ]] && hcloud ssh-key delete "$ssh_key_id"
+    local x
+    for x in "${extra_servers[@]}"; do hcloud server delete "$x"; done
+    for x in "${extra_keys[@]}"; do hcloud ssh-key delete "$x"; done
     dns_delete
     rm -rf "$work"
 }
@@ -190,6 +197,86 @@ REMOTE
     wait_healthy
     remote 'rm -rf /root/hello'
     checks "after the upgrade to $VERSION"
+fi
+if [[ "$mode" == restore ]]; then
+    step 'Create an app marker and a backup on the first server'
+    a_ip="$ip"; a_domain="$domain"
+    app_id=$(remote 'export PATH="$HOME/.local/bin:$PATH"; automaton apps --json' | jq -r '[.apps[] | select((.name // .Name) | startswith("CI Hello"))][0] | (.id // .Id) // empty')
+    [[ -n "$app_id" ]] || fail 'Restore check: the CI Hello app is not on the first server'
+    remote "bash -s" <<REMOTE || { on_failure; fail 'Restore check: the first server could not write the app marker or take a backup'; }
+set -euo pipefail
+helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker compose --project-directory /opt/automaton-server -f /opt/automaton-server/compose.yaml ps -aq api | head -1))
+volume=\$(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume | head -1)
+test -n "\$volume"
+docker run --rm --user 0:0 --entrypoint sh -v "\$volume:/v" "\$helper" -c 'mkdir -p /v/workspace/data/$app_id && echo restore-marker-$run_id > /v/workspace/data/$app_id/ci-marker'
+bash /opt/automaton-server/backup.sh
+ls -1t /opt/automaton-server/backups/nightly/*.tar.age | head -1 > /root/ci-archive
+test -s /root/ci-archive
+REMOTE
+    archive_path=$(remote 'cat /root/ci-archive')
+    # The backup key never goes into the log: a file in the private work directory, then a root-only file on the second server.
+    remote 'cat /etc/automaton/secrets/backup-key' > "$work/backup-key" || fail 'Restore check: the first server has no backup key to restore with'
+    [[ -s "$work/backup-key" ]] || fail 'Restore check: the backup key is empty'
+    scp "${ssh_opts[@]}" "root@$a_ip:$archive_path" "$work/backup.tar.age" >/dev/null
+
+    step "Create the second server (install $tag)"
+    domain_b="s${RUN_ID:-local}-$$.$zone_name"; domain_b="${domain_b,,}"
+    extra_domains+=("$domain_b")
+    ssh_key_b=$(hcloud ssh-key create --name "automaton-ci-$run_id-restore-b" --public-key-from-file "$work/key.pub" --label "$label" -o json | jq -r '.ssh_key.id')
+    extra_keys+=("$ssh_key_b")
+    sed "s/$domain/$domain_b/g" "$work/user-data" > "$work/user-data-b"
+    server_b=''
+    for t in $types; do
+        for l in $locations; do
+            if out=$(hcloud server create --name "automaton-ci-$run_id-restore-b" --type "$t" --location "$l" --image ubuntu-24.04 \
+                    --ssh-key "$ssh_key_b" --user-data-from-file "$work/user-data-b" --label "$label" --label "run=$run_id" -o json 2>"$work/err"); then
+                server_b=$(jq -r '.server.id' <<< "$out"); ip_b=$(jq -r '.server.public_net.ipv4.ip' <<< "$out"); break 2
+            fi
+            echo "Could not create $t in $l: $(head -c 300 "$work/err")"
+        done
+    done
+    [[ -n "$server_b" ]] || fail "No second server could be created from types: $types in locations: $locations"
+    extra_servers+=("$server_b")
+    for name in "${names[@]}"; do
+        cf POST "zones/$zone_id/dns_records" "$(jq -n --arg n "$name.$domain_b" --arg ip "$ip_b" '{type:"A",name:$n,content:$ip,ttl:60,proxied:false}')" >/dev/null
+    done
+    ip="$ip_b"; domain="$domain_b"
+    wait_ssh
+    wait_healthy
+
+    step 'Restore the backup on the second server with the key'
+    scp "${ssh_opts[@]}" "$work/backup.tar.age" "root@$ip:/root/backup.tar.age" >/dev/null
+    if [[ "${RESTORE_WRONG_KEY:-}" == 1 ]]; then
+        echo 'RESTORE_WRONG_KEY=1: restoring with a freshly generated key that did not encrypt the backup.'
+        remote 'image=$(grep -m1 "^AGE_IMAGE=" /opt/automaton-server/release.env | cut -d= -f2-); docker run --rm "$image" age-keygen 2>/dev/null | grep -v "^#" > /root/backup-key; chmod 600 /root/backup-key'
+    else
+        remote 'install -m 0600 /dev/stdin /root/backup-key' < "$work/backup-key"
+    fi
+    if ! remote "bash /opt/automaton-server/restore.sh --archive /root/backup.tar.age --key /root/backup-key --confirm $domain" > "$work/restore.log" 2>&1; then
+        echo '--- restore output (it holds no secrets)'; tail -n 25 "$work/restore.log" | grep -viE 'token|secret|password|AGE-SECRET'
+        fail 'Restore failed: restore.sh --archive --key did not finish on the second server (a wrong or unreadable key stops it at decryption)'
+    fi
+    wait_healthy
+
+    step 'Checks on the restored server'
+    code() { curl -s -o /dev/null -w '%{http_code}' "$1" || true; }
+    [[ "$(code "https://studio.$domain/")" == 200 ]] || fail 'Restored server: Studio is not 200'
+    remote "bash -s" <<REMOTE || { on_failure; fail 'Restored server: user, app or app data is missing (see the lines above)'; }
+set -euo pipefail
+export PATH="\$HOME/.local/bin:\$PATH"
+command -v automaton >/dev/null || curl -fsSL https://github.com/rzvdaniel/automaton/releases/download/server-v$VERSION/install.sh | AUTOMATON_VERSION=server-v$VERSION sh
+# The password was set on the first server only: signing in with it proves the user came from the backup.
+printf '%s' '$password' | automaton login --server https://api.$domain --email '$email' >/dev/null
+automaton whoami
+automaton apps --json | grep -q '$app_id'
+volume=\$(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume | head -1)
+test -n "\$volume"
+helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker compose --project-directory /opt/automaton-server -f /opt/automaton-server/compose.yaml ps -aq api | head -1))
+docker run --rm --entrypoint cat -v "\$volume:/v:ro" "\$helper" /v/workspace/data/$app_id/ci-marker | grep -q restore-marker-$run_id
+REMOTE
+    summary "- restore: passed (user, app and app data came back on a second fresh server)"
+    echo "All checks passed ($mode)"
+    exit 0
 fi
 step 'External scan'
 app_url=$(remote 'cat /root/ci-app-url' 2>/dev/null || true)

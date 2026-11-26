@@ -85,6 +85,8 @@ Proven on a fresh server: install the same release (or newer) there, then:
 3. Extract it into the backups folder: `sudo tar -xf backup.tar -C /opt/automaton-server/backups/nightly/`. It then shows in `backup.sh --list`.
 4. Restore it: `sudo bash /opt/automaton-server/restore.sh automaton-YYYYMMDDTHHMMSSZ --confirm your-domain`.
 
+Every release is checked this way: the release install check installs the release, creates an app, takes a backup, installs a second fresh server, restores the backup there with `restore.sh --archive <file> --key <file> --confirm <domain>`, then signs in with the first server's password and finds the app and its data. A wrong key stops the restore at decryption and changes nothing.
+
 Users, projects, Runners and secrets come back, and new deployments work. Runners installed before the backup stay attached to the old server until you re-enroll them.
 
 ## Servers installed before the key was kept off the server

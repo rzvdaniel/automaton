@@ -1,6 +1,7 @@
 name: Release install check
 # Installs each published server release on a throwaway Hetzner server (separate project "automaton-ci"), checks it by
-# script, installs the previous release and upgrades it, then deletes the servers. Needs the repository secrets
+# script, installs the previous release and upgrades it, restores a backup of one install onto a second fresh server,
+# then deletes the servers. Needs the repository secrets
 # HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN; without them the run fails at the first step.
 on:
   workflow_run:
@@ -17,6 +18,10 @@ on:
       locations:
         description: 'Locations to try in order'
         default: 'nbg1 fsn1 hel1'
+      restore_wrong_key:
+        description: 'Test the failure path: restore with a wrong key (the run must fail at the restore job)'
+        type: boolean
+        default: false
 permissions:
   contents: read
 # One server at a time: both runs share the Cloudflare zone and the hcloud project.
@@ -29,7 +34,7 @@ jobs:
   check:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 210
     permissions:
       contents: read
     env:
@@ -80,6 +85,11 @@ jobs:
           VERSION: ${{ steps.versions.outputs.version }}
           PREVIOUS: ${{ steps.versions.outputs.previous }}
         run: bash scripts/ci/release-install-check.sh upgrade
+      - name: Restore a backup onto a fresh server
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+          RESTORE_WRONG_KEY: ${{ inputs.restore_wrong_key && '1' || '' }}
+        run: bash scripts/ci/release-install-check.sh restore
       # The scripts delete what they create; this also covers a cancelled run.
       - name: Delete leftover servers of this run
         if: always()
