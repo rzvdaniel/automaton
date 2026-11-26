@@ -57,7 +57,7 @@ Create a to-do item for each step and tick them off.
      `dotnet test src/UnitTests/Automaton.<Project>.Tests -p:WarningsAsErrors=nullable%3BNU1902%3BNU1903%3BNU1904`
      with the flags from `.github/workflows/tests.yml`.
    - Website (`src/automaton-vue/`): `npm run build` there (runs `vue-tsc -b`, the strict type check the image build uses).
-     Studio and store: `npx vue-tsc --noEmit -p tsconfig.app.json` and `npm run lint:check -- --quiet`.
+     Studio: `npx vue-tsc --noEmit -p tsconfig.app.json` and `npm run lint:check -- --quiet`.
    - Guidance seeds (`src/Automaton.AiGuidance/`, its embedded seed files): run
      `dotnet test src/UnitTests/Automaton.Api.Tests --filter AiGuidanceSeedExportTests`. If
      `GuidanceOutput_IsByteForByteTheOutputOfTheDatabaseBackedRuntime` fails after an intended change, copy the new SHA-256
