@@ -141,4 +141,16 @@ describe('reset password page', () => {
     const wrapper = await submitWith('reset_link_expired')
     expect(wrapper.text()).toContain('This link has expired')
   })
+
+  it('shows the server password rule next to the field and keeps the form', async () => {
+    mocks.resetPassword.mockRejectedValue({ response: { status: 400, data: { message: 'Passwords must have at least one non alphanumeric character.' } } })
+    const { wrapper } = await mountAt(ResetPasswordView, '/reset-password?email=a%40b.com&code=xyz')
+    await wrapper.find('#password').setValue('Abcdef1')
+    await wrapper.find('#confirmPassword').setValue('Abcdef1')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('non alphanumeric')
+    expect(wrapper.text()).not.toContain('Invalid or expired reset link')
+    expect(wrapper.find('#password').exists()).toBe(true)
+  })
 })
