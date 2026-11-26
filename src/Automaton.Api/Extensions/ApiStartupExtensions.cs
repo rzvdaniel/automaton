@@ -48,15 +48,21 @@ internal static class ApiApplicationPipelineExtensions
         app.UseAuthorization();
         app.UseMiddleware<PasswordChangeRequirement>();
         app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
-        app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
-        app.MapGet("/health", () => Results.Json(HealthResponse())).AllowAnonymous();
-        app.MapControllers();
         app.UseWhen(context => context.Request.Path.StartsWithSegments("/mcp"), branch => branch.Use((context, next) =>
         {
             var limit = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
             if (limit is { IsReadOnly: false }) limit.MaxRequestBodySize = Automaton.Api.Mcp.AppMcpManager.MaxRequestBytes;
             return next(context);
         }));
+        app.MapAutomatonApiEndpoints();
+    }
+
+    /// <summary>Every route the API serves. ApiRouteAuthorizationTests maps this same method and checks each route's sign-in rule.</summary>
+    internal static void MapAutomatonApiEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+        app.MapGet("/health", () => Results.Json(HealthResponse())).AllowAnonymous();
+        app.MapControllers();
         // deploy_app carries up to 50 MB of file text inside JSON; the room above that covers JSON escaping.
         app.MapMcp("/mcp").RequireAuthorization("DeveloperApiAccess");
         app.MapBlazorHub();
