@@ -23,6 +23,11 @@ internal static class HostSecurityReader
         // like the other host helpers. DAC_READ_SEARCH only lets root read other users' authorized_keys and ufw's rules; nothing is writable.
         args.AddRange(["--cap-add", "DAC_READ_SEARCH", "--mount", "type=bind,source=/,target=/host,readonly"]);
         args.AddRange([image, "/app/host_security.py", "--json", "--root", "/host"]);
+        // Ports Docker publishes skip ufw; the helper has no Docker socket, so the Runner names them.
+        var published = await HostHealthCollector.RunAsync("docker", ["ps", "--format", "{{.Ports}}"], token);
+        if (published?.ExitCode == 0)
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(published.Output, @":(\d{1,5})->"))
+                args.AddRange(["--docker-port", match.Groups[1].Value]);
         var result = await HostHealthCollector.RunAsync("docker", args, token);
         return result?.ExitCode == 0 ? Parse(result.Output) : null;
     }

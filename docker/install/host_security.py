@@ -128,18 +128,35 @@ def firewall(root, live):
 
 
 def ufw_allowed_ports(root):
-    """TCP ports ufw lets in, or None when its rules cannot be read."""
+    """TCP ports ufw lets in, or None when its rules cannot be read or contain rules (source-only, ranges) this cannot reason about."""
     rules = read(root, '/etc/ufw/user.rules')
     if rules is None:
         return None
-    return {int(m.group(1)) for m in re.finditer(r'-A ufw-user-input .*-p tcp .*--dport (\d+) .*-j ACCEPT', rules)}
+    ports = set()
+    for line in rules.splitlines():
+        if not line.startswith('-A ufw-user-input ') or not line.endswith('-j ACCEPT'):
+            continue
+        match = re.search(r'-p tcp .*--dport (\d+) ', line + ' ')
+        if match is None or re.search(r'-s |--dport \d+:', line):
+            return None
+        ports.add(int(match.group(1)))
+    return ports
 
 
-def check(root='/', proc='/proc', live=True, allowed=()):
+def docker_published_ports(live):
+    """Host ports Docker publishes: they skip ufw, so they stay open to the internet whatever ufw says."""
+    if not live or not shutil.which('docker'):
+        return set()
+    result = subprocess.run(['docker', 'ps', '--format', '{{.Ports}}'], capture_output=True, text=True)
+    return {int(m.group(1)) for m in re.finditer(r':(\d+)->', result.stdout)} if result.returncode == 0 else set()
+
+
+def check(root='/', proc='/proc', live=True, allowed=(), docker_ports=()):
     options, has_config = sshd_options(root)
     keys = [user for user in users_with_keys(root) if user in ('root', os.environ.get('SUDO_USER'))]
+    published = docker_published_ports(live) | set(docker_ports)
     blocked = ufw_allowed_ports(root) if firewall(root, False) == 'ufw' else None
-    ports = sorted((port, kind, address) for port, (kind, address) in public_listeners(proc).items() if port not in ALLOWED_PORTS | set(allowed) and (blocked is None or port in blocked))
+    ports = sorted((port, kind, address) for port, (kind, address) in public_listeners(proc).items() if port not in ALLOWED_PORTS | set(allowed) and (blocked is None or port in blocked or port in published))
     found = []
     if has_config and password_login(options):
         found.append({'id': 'ssh-password', 'title': 'SSH allows passwords',
@@ -175,7 +192,10 @@ def ask(question, default_yes=True):
         with open('/dev/tty', 'r+') as tty:  # also works when the script itself was piped into bash
             tty.write(f'{question} {suffix} ')
             tty.flush()
-            answer = tty.readline().strip().lower()
+            line = tty.readline()
+            if not line:  # Ctrl-D is not a yes
+                return False
+            answer = line.strip().lower()
     except OSError:
         return False
     return default_yes if not answer else answer.startswith('y')
@@ -216,6 +236,7 @@ def ssh_ports():
     result = subprocess.run([sshd, '-T'], capture_output=True, text=True) if os.path.exists(sshd) else None
     if result and result.returncode == 0:
         ports |= {int(m.group(1)) for m in re.finditer(r'^port (\d+)$', result.stdout, re.M)}
+        ports |= {int(m.group(1)) for m in re.finditer(r'^listenaddress .*:(\d+)$', result.stdout, re.M)}
     parts = os.environ.get('SSH_CONNECTION', '').split()
     if len(parts) == 4 and parts[3].isdigit():
         ports.add(int(parts[3]))
@@ -268,11 +289,12 @@ def main():
     parser.add_argument('--root', default='/', help='where the host filesystem is mounted')
     parser.add_argument('--proc', default='/proc', help='the /proc to read listening ports from')
     parser.add_argument('--yes', action='store_true', help='only warn; never change anything')
+    parser.add_argument('--docker-port', type=int, action='append', default=[], help='a host port Docker publishes (ufw does not filter it)')
     parser.add_argument('--allow-port', type=int, action='append', default=[], help='another port that is meant to be open')
     args = parser.parse_args()
     ALLOW[:] = args.allow_port
     if args.json:
-        result = check(args.root, args.proc, live=args.root == '/', allowed=args.allow_port)
+        result = check(args.root, args.proc, live=args.root == '/', allowed=args.allow_port, docker_ports=args.docker_port)
         print(json.dumps(result))
         return 0 if result['sshConfigRead'] else 3  # unknown, never "all clear", when sshd_config cannot be read
     return interactive()

@@ -68,6 +68,16 @@ class Tests(unittest.TestCase):
         found = Host('PasswordAuthentication no\n', ports=ports, ufw=True, ufw_open=[22, 8080]).ids()
         self.assertEqual(set(found), {'port-tcp-8080'})
 
+    def test_docker_published_port_is_reported_even_when_ufw_does_not_allow_it(self):
+        host = Host('PasswordAuthentication no\n', ports=[('00000000', 6379)], ufw=True, ufw_open=[22])
+        self.assertEqual(set(host.ids(docker_ports=[6379])), {'port-tcp-6379'})
+
+    def test_ufw_rules_it_cannot_reason_about_report_every_port(self):
+        host = Host('PasswordAuthentication no\n', ports=[('00000000', 6379)], ufw=True, ufw_open=[22])
+        with open(os.path.join(host.root, 'etc/ufw/user.rules'), 'a') as rules:
+            rules.write('-A ufw-user-input -s 10.0.0.0/8 -j ACCEPT\n')
+        self.assertEqual(set(host.ids()), {'port-tcp-6379'})
+
     def test_unreadable_sshd_config_is_unknown_not_clean(self):
         host = Host('')
         os.remove(os.path.join(host.root, 'etc/ssh/sshd_config'))
