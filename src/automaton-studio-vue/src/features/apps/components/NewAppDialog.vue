@@ -31,7 +31,7 @@ function openCatalog() {
       <CopyCommand class="box" command="automaton login" />
       <p class="small">
         Studio asks you to approve the login. Approved agents and API keys are listed under
-        <RouterLink to="/settings#agents" @click="visible = false">Settings</RouterLink>.
+        <RouterLink to="/settings#keys" @click="visible = false">Settings</RouterLink>.
         <a href="https://automaton.monster/docs/cli" target="_blank" rel="noopener">CLI guide</a>
       </p>
     </section>

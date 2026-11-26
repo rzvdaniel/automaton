@@ -30,6 +30,8 @@ public static class HomeCardKeys
     public const string InstalledForYou = "installed-for-you";
     public const string OffsiteBackup = "offsite-backup";
     public const string RecommendedApp = "recommended-app";
+    public const string SetupCheck = "setup-check";
+    public const string SetupCheckPrefix = "setup-check:";
     public const string RecommendedPrefix = "recommended:";
 
     /// <summary>Only optional cards can be dismissed; the others go away when their task is done.</summary>

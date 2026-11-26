@@ -73,7 +73,7 @@ async function decide(decision: 'approve' | 'deny') {
         <Button label="Approve" class="auth-signal" :loading="working" @click="decide('approve')" />
       </div>
       <p class="auth-note">
-        Remove this access later under <router-link to="/settings#agents" class="auth-link auth-link--inline">API Keys</router-link>.
+        Remove this access later under <router-link to="/settings#keys" class="auth-link auth-link--inline">API Keys</router-link>.
       </p>
     </template>
     <p v-else-if="loading" class="auth-note">Checking the sign-in request…</p>

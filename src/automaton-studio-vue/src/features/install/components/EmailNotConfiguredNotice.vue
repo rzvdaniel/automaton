@@ -38,7 +38,7 @@ watch(() => route.fullPath, () => { if (notConfigured.value) void check() })
       Email is not set up on this server, so password reset emails and invitations will not reach anyone.
       <a :href="docsUrl" target="_blank" rel="noopener">How email works</a>
     </p>
-    <Button as="RouterLink" to="/settings#server" label="Set up email" size="small" outlined data-testid="email-setup-action" />
+    <Button as="RouterLink" to="/settings#email" label="Set up email" size="small" outlined data-testid="email-setup-action" />
   </div>
 </template>
 

@@ -2,8 +2,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -17,7 +15,6 @@ import { apiKeysService } from '../services/apikeys.service'
 import {
   ApiKeyScope,
   getScopeDisplayName,
-  getScopeSeverity,
   getSourceDisplayName,
   getUsageInstructions,
   type ApiKey,
@@ -150,7 +147,7 @@ async function deleteApiKey(id: string) {
     toast.add({
       severity: 'success',
       summary: 'Success',
-      detail: 'API key deleted successfully',
+      detail: 'API key revoked',
       life: 3000,
     })
     await loadApiKeys()
@@ -167,11 +164,11 @@ async function deleteApiKey(id: string) {
 
 function confirmDeleteApiKey(id: string, name: string) {
   confirm.require({
-    message: `Delete the API key "${name}" permanently? This cannot be undone.`,
-    header: 'Delete API Key',
+    message: `Revoke the API key "${name}"? Anything that uses it stops working. This cannot be undone.`,
+    header: 'Revoke API key',
     icon: 'pi pi-exclamation-triangle',
     rejectLabel: 'Cancel',
-    acceptLabel: 'Delete',
+    acceptLabel: 'Revoke',
     acceptClass: 'p-button-danger',
     accept: () => {
       void deleteApiKey(id)
@@ -213,54 +210,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page-header">
-    <div>
-      <h2 class="page-title">API Keys</h2>
-      <p class="page-subtitle">Use a Developer key with the Automaton CLI, or create an advanced key for a specific integration.</p>
-    </div>
-    <div class="page-actions">
-      <span v-tooltip.left="!isEmailConfirmed ? lockedFeatureHint : undefined">
-        <Button
-          label="Generate New Key"
-          :icon="!isEmailConfirmed ? 'pi pi-lock' : 'pi pi-plus'"
-          :disabled="!isEmailConfirmed"
-          @click="openCreateDialog"
-        />
-      </span>
-    </div>
-  </div>
-
-  <Message v-if="!isEmailConfirmed" severity="warn" :closable="false" class="mb-4">
-    <div class="confirmation-guard">
-      <div>
-        Confirm your email to create API keys for runners, published apps, and external
-        integrations.
-      </div>
+  <section class="api-keys" data-testid="api-keys">
+  <div class="head">
+    <p class="studio-muted lede">Keys are for scripts and CI jobs. To connect an AI or the CLI, use Connect your AI instead.</p>
+    <span v-tooltip.left="!isEmailConfirmed ? lockedFeatureHint : undefined">
       <Button
-        label="Change Email"
-        size="small"
-        severity="secondary"
-        outlined
-        @click="router.push('/account')"
-      />
-    </div>
-  </Message>
-
-  <div v-if="!loading && apiKeys.length === 0" class="api-keys-empty mb-4">
-    <i class="pi pi-key api-keys-empty-icon"></i>
-    <h3 class="mt-0 mb-2">No API keys created yet</h3>
-    <p class="text-color-secondary mt-0 mb-3">
-      API keys let runners, scripts, and published apps authenticate with Automaton.
-      Create a scoped key for the job instead of reusing one broad credential everywhere.
-    </p>
-    <div class="api-keys-scopes mb-4">
-      <span class="scope-chip">Developer / CLI</span>
-      <span class="scope-chip">Web App</span>
-      <span class="scope-chip">Read Only</span>
-    </div>
-    <span v-tooltip.bottom="!isEmailConfirmed ? lockedFeatureHint : undefined">
-      <Button
-        label="Generate Your First Key"
+        label="Create key"
         :icon="!isEmailConfirmed ? 'pi pi-lock' : 'pi pi-plus'"
         :disabled="!isEmailConfirmed"
         @click="openCreateDialog"
@@ -268,79 +223,38 @@ onMounted(() => {
     </span>
   </div>
 
-  <DataTable
-    v-else
-    :value="apiKeys"
-    :loading="loading"
-    data-key="id"
-    class="keys-table"
-    :paginator="apiKeys.length > 10"
-    :rows="10"
-  >
-    <template #empty>
-      <div class="text-center py-5">
-        <i class="pi pi-key text-4xl text-color-secondary mb-3"></i>
-        <p class="text-color-secondary">No API keys found. Create one to get started.</p>
-      </div>
-    </template>
+  <Message v-if="!isEmailConfirmed" severity="warn" :closable="false" class="mb-3">
+    <div class="confirmation-guard">
+      <div>Confirm your email to create API keys.</div>
+      <Button label="Change email" size="small" severity="secondary" outlined @click="router.push('/account')" />
+    </div>
+  </Message>
 
-    <Column field="name" header="Name" body-class="cell-name" :sortable="true" />
+  <p v-if="!loading && apiKeys.length === 0" class="studio-muted empty" data-testid="keys-empty">
+    No keys. Create one only for a script or CI job.
+  </p>
 
-    <Column field="keyPrefix" header="Key" body-class="cell-key">
-      <template #body="{ data }">
-        <code class="monospace text-sm text-color-secondary">{{ data.keyPrefix }}</code>
-      </template>
-    </Column>
-
-    <Column field="scope" header="Key type" body-class="cell-scope" :sortable="true">
-      <template #body="{ data }">
-        <Tag :value="getScopeDisplayName(data.scope)" :severity="getScopeSeverity(data.scope)" />
-      </template>
-    </Column>
-
-    <Column field="source" header="Created by" body-class="cell-source" :sortable="true">
-      <template #body="{ data }">
-        <span class="text-sm text-color-secondary">{{ getSourceDisplayName(data.source) }}</span>
-      </template>
-    </Column>
-
-    <Column field="createdAt" header="Created" body-class="cell-created" :sortable="true">
-      <template #body="{ data }">
-        <span class="text-sm text-color-secondary">{{ formatDate(data.createdAt) }}</span>
-      </template>
-    </Column>
-
-    <Column field="lastUsedAt" header="Last Used" body-class="cell-used" :sortable="true">
-      <template #body="{ data }">
-        <span class="text-sm text-color-secondary">{{ formatDate(data.lastUsedAt) }}</span>
-      </template>
-    </Column>
-
-    <Column field="isActive" header="Status" body-class="cell-status" :sortable="true">
-      <template #body="{ data }">
-        <Tag
-          :value="data.isActive ? 'Active' : 'Revoked'"
-          :severity="data.isActive ? 'success' : 'danger'"
-        />
-      </template>
-    </Column>
-
-    <Column header="" body-class="cell-actions" style="width: 100px; text-align: right">
-      <template #body="{ data }">
-        <div class="row-actions">
-          <Button
-            icon="pi pi-trash"
-            size="small"
-            severity="danger"
-            text
-            rounded
-            v-tooltip.top="'Delete'"
-            @click="confirmDeleteApiKey(data.id, data.name)"
-          />
-        </div>
-      </template>
-    </Column>
-  </DataTable>
+  <div v-else-if="apiKeys.length > 0" class="table-wrap">
+    <table class="keys" data-testid="keys-table">
+      <thead>
+        <tr><th>Name</th><th>Key</th><th>Type</th><th>Created by</th><th>Created</th><th>Last used</th><th>State</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="key in apiKeys" :key="key.id">
+          <td class="name" data-label="Name">{{ key.name }}</td>
+          <td data-label="Key"><code>{{ key.keyPrefix }}</code></td>
+          <td data-label="Type">{{ getScopeDisplayName(key.scope) }}</td>
+          <td data-label="Created by">{{ getSourceDisplayName(key.source) }}</td>
+          <td data-label="Created">{{ formatDate(key.createdAt) }}</td>
+          <td data-label="Last used">{{ formatDate(key.lastUsedAt) }}</td>
+          <td data-label="State"><span class="state"><span class="dot" :class="{ off: !key.isActive }" aria-hidden="true"></span>{{ key.isActive ? 'Active' : 'Revoked' }}</span></td>
+          <td class="end">
+            <Button label="Revoke" size="small" outlined class="revoke" @click="confirmDeleteApiKey(key.id, key.name)" />
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
   <!-- Create API Key Dialog -->
   <Dialog
@@ -365,7 +279,7 @@ onMounted(() => {
         <div v-if="!showAdvancedScopes" class="surface-ground border-round p-3">
           <div class="flex align-items-center gap-2">
             <span class="font-medium">Developer / CLI</span>
-            <Tag value="Recommended" severity="success" />
+            <Tag value="Recommended" severity="secondary" />
           </div>
           <p class="text-color-secondary text-sm mb-0 mt-2">
             Use with the Automaton CLI to create, deploy, publish, and manage your apps.
@@ -459,135 +373,38 @@ onMounted(() => {
       />
     </template>
   </Dialog>
+  </section>
 </template>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 0.25rem 0;
-}
-
-.page-subtitle {
-  color: var(--p-text-muted-color);
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.page-actions {
-  display: flex;
-  align-items: center;
-}
-
-.confirmation-guard {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.keys-table {
-  width: 100%;
-}
-
-.monospace {
-  font-family: monospace;
-}
-
-.row-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
-
-.api-keys-empty {
-  text-align: center;
-  padding: 2.5rem 1rem;
-  border: 1px dashed var(--p-surface-300);
-  border-radius: 8px;
-}
-
-:global(.app-dark) .api-keys-empty {
-  border-color: var(--p-surface-600);
-}
-
-.api-keys-empty-icon {
-  font-size: 3rem;
-  color: var(--p-text-muted-color);
-  display: block;
-  margin-bottom: 1rem;
-}
-
-.api-keys-scopes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: center;
-}
-
-.scope-chip {
-  font-size: 0.8rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  background: var(--p-surface-100);
-  color: var(--p-text-muted-color);
-  border: 1px solid var(--p-surface-200);
-}
-
-:global(.app-dark) .scope-chip {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-700);
-}
+.head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.lede { margin: 0; flex: 1 1 280px; }
+.empty { margin: 0; padding: 16px 0; }
+.confirmation-guard { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.table-wrap { overflow-x: auto; }
+.keys { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--ink); }
+.keys th { text-align: left; font-weight: 500; font-size: 12px; color: var(--ink-soft); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.keys td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--row-line); vertical-align: middle; }
+.keys td.name { font-weight: 600; overflow-wrap: anywhere; }
+.keys td.end { text-align: right; padding-right: 0; }
+.keys code { white-space: nowrap; font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+.state { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+.dot.off { background: transparent; border: 1px solid var(--ink-soft); }
+.revoke, .revoke :deep(.p-button-label) { color: var(--danger, #b42318); }
+.revoke { border-color: var(--danger, #b42318); }
 
 @media (max-width: 768px) {
-  .confirmation-guard,
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  .confirmation-guard { flex-direction: column; align-items: flex-start; }
 }
 
-/* Phone width: each key is a stacked card (label left, value right) instead of a table wider than the screen. */
+/* Phone width: each key is a stacked row (label left, value right) instead of a table wider than the screen. */
 @media (max-width: 640px) {
-  .keys-table :deep(thead) { display: none; }
-  .keys-table :deep(tbody tr:not(.p-datatable-empty-message)) {
-    display: block;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--p-content-border-color);
-  }
-  .keys-table :deep(tbody tr:not(.p-datatable-empty-message) td) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    width: auto !important;
-    padding: 0.25rem 1rem;
-    border: 0;
-    text-align: right;
-  }
-  .keys-table :deep(tbody tr:not(.p-datatable-empty-message) td::before) {
-    flex: none;
-    color: var(--p-text-muted-color);
-    font-size: 0.8125rem;
-    text-align: left;
-  }
-  .keys-table :deep(td.cell-name::before) { content: 'Name'; }
-  .keys-table :deep(td.cell-key::before) { content: 'Key'; }
-  .keys-table :deep(td.cell-scope::before) { content: 'Key type'; }
-  .keys-table :deep(td.cell-source::before) { content: 'Created by'; }
-  .keys-table :deep(td.cell-created::before) { content: 'Created'; }
-  .keys-table :deep(td.cell-used::before) { content: 'Last used'; }
-  .keys-table :deep(td.cell-status::before) { content: 'Status'; }
-  .keys-table :deep(td.cell-actions::before) { content: none; }
-  .keys-table :deep(td.cell-actions) { justify-content: flex-end; }
-  .keys-table :deep(td.cell-name) { font-weight: 600; word-break: break-word; }
+  .keys thead { display: none; }
+  .keys, .keys tbody, .keys tr, .keys td { display: block; }
+  .keys tr { padding: 8px 0; border-bottom: 1px solid var(--row-line); }
+  .keys td { display: flex; justify-content: space-between; gap: 1rem; border: 0; padding: 4px 0; text-align: right; }
+  .keys td[data-label]::before { content: attr(data-label); color: var(--ink-soft); font-size: 13px; text-align: left; }
+  .keys td.end { justify-content: flex-end; }
 }
 </style>

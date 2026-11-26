@@ -1,52 +1,32 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { describe, it, expect } from 'vitest'
+import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import ConnectAiSection from './ConnectAiSection.vue'
-import { useAuthStore } from '@/features/auth/stores/auth.store'
 
-const create = vi.fn()
-vi.mock('../services/apikeys.service', () => ({ apiKeysService: { create: (r: unknown) => create(r) } }))
-
-function build(emailConfirmed = true) {
-  const pinia = createPinia()
-  setActivePinia(pinia)
-  const auth = useAuthStore()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(auth as any).user = { emailConfirmed, roles: [] }
-  return mount(ConnectAiSection, { global: { plugins: [pinia, PrimeVue, ToastService] } })
+function build() {
+  return mount(ConnectAiSection, { global: { plugins: [PrimeVue, ToastService] } })
 }
 
 describe('ConnectAiSection', () => {
-  beforeEach(() => create.mockReset())
-
-  it('shows this server MCP address and a keyless command', () => {
+  it('shows three keyless steps for this server', () => {
     const w = build()
+    expect(w.findAll('ol.steps > li')).toHaveLength(3)
+    expect(w.get('[data-testid=claude-code-command]').text()).toBe(`claude mcp add --transport http automaton ${window.location.origin}/mcp`)
     expect(w.get('[data-testid=mcp-address]').text()).toBe(`${window.location.origin}/mcp`)
-    const cmd = w.get('[data-testid=claude-code-command]').text()
-    expect(cmd).toBe(`claude mcp add --transport http automaton ${window.location.origin}/mcp`)
-    expect(cmd).not.toContain('Bearer')
-    expect(w.find('[data-testid=key-section]').exists()).toBe(false)
-    expect(w.find('button.p-button-secondary').exists()).toBe(false)
+    expect(w.get('[data-testid=login-command]').text()).toBe(`automaton login --server ${window.location.origin}`)
+    expect(w.text()).not.toContain('Bearer')
+    expect(w.findAll('button').map((b) => b.text())).toEqual(['Copy', 'Copy', 'Copy'])
   })
 
-  it('creates a Developer key only after "use an API key instead"', async () => {
-    create.mockResolvedValue({ apiKey: 'amk_secret' })
+  it('warns when the address is not https', () => {
+    expect(build().find('[data-testid=https-note]').exists()).toBe(window.location.origin.startsWith('http:'))
+  })
+
+  it('opens the API keys tab from the script and CI link', async () => {
     const w = build()
     await w.get('[data-testid=use-key-link]').trigger('click')
-    expect(w.get('[data-testid=claude-code-command]').text()).toContain('<your API key>')
-    await w.get('button.p-button-secondary').trigger('click')
-    await flushPromises()
-    expect(create.mock.calls[0]?.[0].scope).toBe(7)
-    expect(w.get('[data-testid=claude-code-command]').text()).toContain('Bearer amk_secret')
-    expect(w.find('[data-testid=key-once]').exists()).toBe(true)
-  })
-
-  it('disables key creation until the email is confirmed', async () => {
-    const w = build(false)
-    await w.get('[data-testid=use-key-link]').trigger('click')
-    expect(w.get('button.p-button-secondary').attributes('disabled')).toBeDefined()
+    expect(w.emitted('open-keys')).toHaveLength(1)
   })
 })

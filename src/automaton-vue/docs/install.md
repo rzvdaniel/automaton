@@ -86,7 +86,7 @@ automaton runners
 
 ## Set up email
 
-A fresh server cannot send email, so invitations and password resets reach nobody until you set it up. Sign in as a system administrator, open **Settings → Outgoing email**, enter the SMTP host, port, TLS setting, account, password and sender from your mail provider, then select **Save SMTP settings**, **Check connection** and **Send test email** to a real address.
+A fresh server cannot send email, so invitations and password resets reach nobody until you set it up. Sign in as a system administrator, open **Settings → Email**, enter the SMTP host, port, TLS setting, account, password and sender from your mail provider, then select **Save SMTP settings**, **Check connection** and **Send test email** to a real address.
 
 ## Update the server and Runners
 

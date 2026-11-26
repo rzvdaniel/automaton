@@ -36,13 +36,25 @@ public class HomeNeedsYouService(
                 "/admin/permission-requests", false));
         if (!await SmtpConfiguredAsync(token))
             cards.Add(new(HomeCardKeys.NoSmtp, HomeCardKeys.NoSmtp, "info", "Set up email",
-                "Invitations and password recovery need SMTP settings.", "Open settings", "/settings#server", true));
+                "Invitations and password recovery need SMTP settings.", "Open settings", "/settings#email", true));
         if (!BackupRecent(await InstallationBackups.ReadAsync(configuration, token)))
             cards.Add(new(HomeCardKeys.NoBackup, HomeCardKeys.NoBackup, "info", "Back up this server",
                 "No recent successful backup was found.", "Open backups", "/admin/backups", true));
         cards.AddRange(await CatalogCardsAsync(userId, token));
         return cards;
     }
+
+    /// <summary>A card for each installation readiness check that reports an error. Backups have their own card. Home only: it opens a broker connection, so notifications do not run it.</summary>
+    public virtual async Task<List<HomeCard>> ReadinessCardsAsync(CancellationToken token)
+    {
+        try { return ReadinessCards(await InstallationReadiness.CheckAsync(db, configuration, smtpSettings, token)); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { return []; }
+    }
+
+    internal static List<HomeCard> ReadinessCards(IEnumerable<InstallationCheck> checks) => checks
+        .Where(check => check.Status == "error" && check.Name != "Backups")
+        .Select(check => new HomeCard($"{HomeCardKeys.SetupCheckPrefix}{check.Name}", HomeCardKeys.SetupCheck, "error",
+            $"Check failed: {check.Name}", check.Detail, check.Name == "SMTP" ? "Open settings" : "Open server", check.Name == "SMTP" ? "/settings#email" : "/server", false)).ToList();
 
     /// <summary>How long after the first-Runner install the "Installed for you" note is offered.</summary>
     internal static readonly TimeSpan InstalledNoteWindow = TimeSpan.FromDays(14);

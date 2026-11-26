@@ -43,7 +43,11 @@ public sealed class HomeService(
             .Select(pin => new HomePinnedApp(byId[pin.AppId], pin.PinnedAtUtc, cards.GetValueOrDefault(pin.AppId), pin.Wide)).ToList();
 
         var needsYouCards = new List<HomeCard>();
-        if (await authorization.IsSystemAdministratorAsync(userId, token)) needsYouCards.AddRange(await needsYou.ServerCardsAsync(userId, token));
+        if (await authorization.IsSystemAdministratorAsync(userId, token))
+        {
+            needsYouCards.AddRange(await needsYou.ServerCardsAsync(userId, token));
+            needsYouCards.AddRange(await needsYou.ReadinessCardsAsync(token));
+        }
         needsYouCards.AddRange(HomeNeedsYouService.AppCards(listed));
         var dismissed = await db.UserHomeDismissals.AsNoTracking().Where(item => item.UserId == userId)
             .Select(item => item.CardKey).ToListAsync(token);

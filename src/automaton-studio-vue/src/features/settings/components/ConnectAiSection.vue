@@ -1,30 +1,19 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
-import { useAuthStore } from '@/features/auth/stores/auth.store'
-import { apiKeysService } from '../services/apikeys.service'
-import { ApiKeyScope } from '../types/apikeys.types'
 
+const emit = defineEmits<{ 'open-keys': [] }>()
 const toast = useToast()
-const authStore = useAuthStore()
 
 const apiUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
 const mcpAddress = `${apiUrl}/mcp`
 const docsUrl = 'https://automaton.monster/docs/work-with-ai'
-
-const newKey = ref<string | null>(null)
-const creating = ref(false)
-const isEmailConfirmed = computed(() => authStore.user?.emailConfirmed ?? false)
+const cliDocsUrl = 'https://automaton.monster/docs/cli'
 const isHttps = mcpAddress.startsWith('https://')
-
-const showKey = ref(false)
-const keylessCommand = `claude mcp add --transport http automaton ${mcpAddress}`
-const claudeCodeCommand = computed(() =>
-  showKey.value
-    ? `${keylessCommand} --header "Authorization: Bearer ${newKey.value ?? '<your API key>'}"`
-    : keylessCommand,
-)
+const claudeCodeCommand = `claude mcp add --transport http automaton ${mcpAddress}`
+const loginCommand = `automaton login --server ${apiUrl}`
+const httpsNote = computed(() => (isHttps ? '' : 'Your server must be reachable over https for Claude to connect.'))
 
 async function copy(text: string, what: string) {
   try {
@@ -34,96 +23,72 @@ async function copy(text: string, what: string) {
     toast.add({ severity: 'warn', summary: 'Copy failed', detail: 'Select the text and copy it manually.', life: 4000 })
   }
 }
-
-async function createKey() {
-  creating.value = true
-  try {
-    const stamp = new Date().toISOString().slice(0, 10)
-    const response = await apiKeysService.create({
-      name: `Claude Code ${stamp}`,
-      description: 'Created from Settings, Connect your AI',
-      scope: ApiKeyScope.Developer,
-    })
-    newKey.value = response.apiKey
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create API key', life: 5000 })
-  } finally {
-    creating.value = false
-  }
-}
 </script>
 
 <template>
-  <div class="connect-ai" data-testid="connect-ai">
-    <div class="block">
-      <div class="text-sm text-color-secondary mb-1">This server's MCP address</div>
-      <div class="command">
-        <code data-testid="mcp-address">{{ mcpAddress }}</code>
-        <Button icon="pi pi-copy" text rounded size="small" aria-label="Copy MCP address" @click="copy(mcpAddress, 'MCP address copied')" />
-      </div>
-    </div>
-
-    <div class="block">
-      <div class="font-medium mb-1">Claude Code</div>
-      <div class="command">
-        <code data-testid="claude-code-command">{{ claudeCodeCommand }}</code>
-        <Button icon="pi pi-copy" text rounded size="small" aria-label="Copy command" @click="copy(claudeCodeCommand, 'Command copied')" />
-      </div>
-      <p v-if="!showKey" class="text-sm text-color-secondary m-0 mt-2" data-testid="approve-note">
-        Run it, then approve the sign-in in Studio. No key is needed.
-        <a href="#" data-testid="use-key-link" @click.prevent="showKey = true">Use an API key instead</a> (for CI and headless machines).
-      </p>
-      <div v-else class="mt-2" data-testid="key-section">
-        <Button
-          v-if="!newKey"
-          label="Create a key"
-          icon="pi pi-key"
-          size="small"
-          severity="secondary"
-          :loading="creating"
-          :disabled="!isEmailConfirmed"
-          @click="createKey"
-        />
-        <p v-if="!isEmailConfirmed" class="text-sm text-color-secondary m-0 mt-1">Confirm your email to create a key.</p>
-        <p v-if="newKey" class="text-sm text-color-secondary m-0" data-testid="key-once">
-          This is the only time the key is shown. It is in the command above; copy it now.
-        </p>
-      </div>
-    </div>
-
-    <div class="block">
-      <div class="font-medium mb-1">Claude on the web or phone</div>
-      <p class="text-sm text-color-secondary m-0">
-        In Claude open Settings, Plugins, Browse plugins, Add connector, then "Or add a custom connector by URL" and paste the address above.
-        <span v-if="!isHttps" data-testid="https-note">Your server must be reachable over https for Claude to connect.</span>
-        <span v-else>The server must be reachable over https; this one is.</span>
-      </p>
-    </div>
-
-    <p class="text-sm text-color-secondary m-0">
+  <section class="studio-card connect-ai" data-testid="connect-ai" aria-labelledby="connect-title">
+    <h2 id="connect-title" class="card-title">Connect your AI</h2>
+    <p class="studio-muted lede">Pick the one you use. Studio asks you to approve each sign-in, so no key is needed.</p>
+    <ol class="steps">
+      <li>
+        <div class="step-text">
+          <strong>Claude Code</strong>
+          <span class="studio-muted">Run this, then approve the sign-in in Studio.</span>
+        </div>
+        <div class="command">
+          <code data-testid="claude-code-command">{{ claudeCodeCommand }}</code>
+          <Button label="Copy" icon="pi pi-copy" size="small" outlined aria-label="Copy command" @click="copy(claudeCodeCommand, 'Command copied')" />
+        </div>
+      </li>
+      <li>
+        <div class="step-text">
+          <strong>Claude on the web or phone</strong>
+          <span class="studio-muted">
+            In Claude open Settings, Plugins, Browse plugins, Add connector, then "Or add a custom connector by URL" and paste this address.
+            <span v-if="httpsNote" data-testid="https-note">{{ httpsNote }}</span>
+          </span>
+        </div>
+        <div class="command">
+          <code data-testid="mcp-address">{{ mcpAddress }}</code>
+          <Button label="Copy" icon="pi pi-copy" size="small" outlined aria-label="Copy MCP address" @click="copy(mcpAddress, 'MCP address copied')" />
+        </div>
+      </li>
+      <li>
+        <div class="step-text">
+          <strong>The Automaton command line</strong>
+          <span class="studio-muted">With the CLI installed (<a :href="cliDocsUrl" target="_blank" rel="noopener">CLI guide</a>), sign in and approve it in Studio.</span>
+        </div>
+        <div class="command">
+          <code data-testid="login-command">{{ loginCommand }}</code>
+          <Button label="Copy" icon="pi pi-copy" size="small" outlined aria-label="Copy login command" @click="copy(loginCommand, 'Command copied')" />
+        </div>
+      </li>
+    </ol>
+    <p class="studio-muted foot">
+      <a href="#keys" data-testid="use-key-link" @click.prevent="emit('open-keys')">For scripts and CI: use an API key instead</a>.
       More in <a :href="docsUrl" target="_blank" rel="noopener">Work with AI</a>.
     </p>
-  </div>
+  </section>
 </template>
 
 <style scoped>
-.connect-ai {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.connect-ai { gap: 12px; }
+.card-title { margin: 0; font-family: var(--display); font-size: 16px; font-weight: 600; color: var(--ink); }
+.lede, .foot { margin: 0; }
+.steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.steps li { counter-increment: step; position: relative; padding-left: 36px; display: flex; flex-direction: column; gap: 6px; }
+.steps li::before {
+  content: counter(step);
+  position: absolute; left: 0; top: 0;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-weight: 600;
 }
+.step-text { display: flex; flex-direction: column; font-size: 14px; }
 .command {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  background: var(--p-content-hover-background);
-  border-radius: var(--p-content-border-radius);
-  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
-  overflow-x: auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 6px 8px 6px 12px; overflow-x: auto;
 }
-.command code {
-  white-space: pre-wrap;
-  word-break: break-all;
-}
+.command code { font-family: var(--mono); font-size: 13px; color: var(--ink); white-space: pre-wrap; word-break: break-all; }
 </style>
