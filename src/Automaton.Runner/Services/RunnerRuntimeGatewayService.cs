@@ -16,9 +16,10 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
     public RunnerRuntimeGatewayService(
         RunnerRuntimeRegistry runtimeRegistry,
         HttpClient runtimeClient,
-        ILogger<RunnerRuntimeGatewayService> logger)
+        ILogger<RunnerRuntimeGatewayService> logger,
+        IRuntimePortRefresher? portRefresher = null)
     {
-        proxy = new RunnerRuntimeGatewayProxy(runtimeRegistry, runtimeClient);
+        proxy = new RunnerRuntimeGatewayProxy(runtimeRegistry, runtimeClient, portRefresher);
         this.logger = logger;
     }
 

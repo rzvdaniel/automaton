@@ -10,7 +10,7 @@ namespace Automaton.Runner.Console.Services;
 /// Manages managed application containers. The Runner owns lifecycle and
 /// readiness; the application image owns the process and its HTTP behavior.
 /// </summary>
-public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
+public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, IRuntimePortRefresher
 {
     private readonly RunnerWorkspaceService workspace;
     private readonly RunnerRuntimeMetadataStore metadataStore;
@@ -290,6 +290,34 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         {
             registry.MarkFailed(appId, targetId, $"The runtime could not be started: {ex.Message}");
             throw;
+        }
+    }
+
+    public async Task<int?> RefreshPortAsync(Guid appId, Guid deploymentTargetId, int failedPort, CancellationToken cancellationToken)
+    {
+        ActiveContainer? current;
+        lock (gate) active.TryGetValue(new DeploymentRuntimeKey(appId, deploymentTargetId), out current);
+        if (current is null || current.ComposeCandidateId is not null) return null;
+        try
+        {
+            var identity = await InspectAsync(appId, deploymentTargetId, current.ContainerId, cancellationToken);
+            if (!identity.Exists || !identity.Running || identity.HostPort is not > 0 || identity.HostPort == failedPort
+                || !RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, deploymentTargetId)) return null;
+            var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
+            var metadata = await ReadExistingMetadataAsync(metadataPath, cancellationToken);
+            if (metadata is not null && metadata.ContainerId == current.ContainerId)
+            {
+                metadata.EffectivePort = identity.HostPort;
+                await metadataStore.WriteAsync(metadata, cancellationToken);
+            }
+            Register(appId, deploymentTargetId, current.ContainerId, current.ContainerName, identity.HostPort);
+            logger.LogInformation("Container {ContainerId} of {AppId}/{TargetId} moved to host port {Port}.", current.ContainerId, appId, deploymentTargetId, identity.HostPort);
+            return identity.HostPort;
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug(ex, "Could not refresh the port of {AppId}/{TargetId}.", appId, deploymentTargetId);
+            return null;
         }
     }
 

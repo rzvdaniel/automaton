@@ -31,12 +31,23 @@ public sealed class RunnerTunnel(
     private RunnerTunnelRequestHandler? handler;
     private CancellationTokenSource? dialing;
     private Task[] dialLoops = [];
+    private int openConnections;
+    private string? lastApiKey;
+    private CancellationTokenSource? watching;
 
     /// <summary>Called before each request; false while the Runner is switching to another API instance.</summary>
     internal Func<bool> TryBeginRequest { get; set; } = () => true;
 
     /// <summary>Called when an accepted request has ended.</summary>
     internal Action CompleteRequest { get; set; } = () => { };
+
+    /// <summary>Called when the tunnel stayed closed even after dialing again; the Runner should connect to the API again.</summary>
+    internal Action Stalled { get; set; } = () => { };
+
+    internal TimeSpan StallRedialAfter { get; set; } = TimeSpan.FromSeconds(15);
+    internal TimeSpan StallReconnectAfter { get; set; } = TimeSpan.FromSeconds(40);
+    internal TimeSpan StallCheckInterval { get; set; } = TimeSpan.FromSeconds(5);
+    internal int OpenConnections => Volatile.Read(ref openConnections);
 
     /// <summary>Opens the tunnel connections, replacing any open ones (a new hub connection means a new API instance may be active).</summary>
     public async Task StartAsync(string apiKey, CancellationToken cancellationToken)
@@ -52,15 +63,59 @@ public sealed class RunnerTunnel(
             dialLoops = Enumerable.Range(0, Math.Max(1, config.TunnelConnections))
                 .Select(index => Task.Run(() => DialLoopAsync(index, address, apiKey, source.Token), CancellationToken.None))
                 .ToArray();
+            lastApiKey = apiKey;
+            if (watching is null)
+            {
+                watching = new CancellationTokenSource();
+                var token = watching.Token;
+                _ = Task.Run(() => WatchAsync(token), CancellationToken.None);
+            }
         }
         finally { gate.Release(); }
+    }
+
+    private async Task WatchAsync(CancellationToken cancellationToken)
+    {
+        var watch = new RunnerTunnelStallWatch(StallRedialAfter, StallReconnectAfter);
+        try
+        {
+            using var timer = new PeriodicTimer(StallCheckInterval);
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                switch (watch.Observe(OpenConnections, DateTimeOffset.UtcNow))
+                {
+                    case RunnerTunnelStallAction.RedialTunnel:
+                        Logger.Warning("No tunnel connection is open; dialing the API again");
+                        _ = Task.Run(RedialAsync, CancellationToken.None);
+                        break;
+                    case RunnerTunnelStallAction.ReconnectHub:
+                        Logger.Warning("The tunnel stayed closed; connecting to the API again");
+                        watching = null;
+                        Stalled();
+                        return;
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task RedialAsync()
+    {
+        try { if (lastApiKey is { } key) await StartAsync(key, CancellationToken.None); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { Logger.Debug(ex, "Dialing the tunnel again failed"); }
     }
 
     /// <summary>Closes the tunnel connections; requests in flight on them end.</summary>
     public async Task StopAsync()
     {
         await gate.WaitAsync();
-        try { await StopDialingAsync(); }
+        try
+        {
+            watching?.Cancel();
+            watching?.Dispose();
+            watching = null;
+            await StopDialingAsync();
+        }
         finally { gate.Release(); }
     }
 
@@ -133,11 +188,16 @@ public sealed class RunnerTunnel(
                 socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
                 await socket.ConnectAsync(address, cancellationToken);
                 failures = 0;
-                var stream = new TunnelConnectionStream(WebSocketStream.Create(socket, WebSocketMessageType.Binary, ownsWebSocket: false));
-                Logger.Debug("Tunnel connection {Index} open", index);
-                await AcceptConnectionAsync(stream, cancellationToken);
-                await Task.WhenAny(stream.Closed, Task.Delay(Timeout.Infinite, cancellationToken));
-                await stream.DisposeAsync();
+                Interlocked.Increment(ref openConnections);
+                try
+                {
+                    var stream = new TunnelConnectionStream(WebSocketStream.Create(socket, WebSocketMessageType.Binary, ownsWebSocket: false));
+                    Logger.Debug("Tunnel connection {Index} open", index);
+                    await AcceptConnectionAsync(stream, cancellationToken);
+                    await Task.WhenAny(stream.Closed, Task.Delay(Timeout.Infinite, cancellationToken));
+                    await stream.DisposeAsync();
+                }
+                finally { Interlocked.Decrement(ref openConnections); }
                 Logger.Debug("Tunnel connection {Index} ended", index);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return; }

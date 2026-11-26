@@ -5,7 +5,15 @@ using System.Net.WebSockets;
 
 namespace Automaton.Runner.Console.Services;
 
-internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeRegistry, HttpClient runtimeClient)
+/// <summary>Re-reads the published host port of an app's container after a connection to the registered port was refused.</summary>
+public interface IRuntimePortRefresher
+{
+    /// <summary>The port now in use when it differs from <paramref name="failedPort"/>; otherwise null.</summary>
+    Task<int?> RefreshPortAsync(Guid appId, Guid deploymentTargetId, int failedPort, CancellationToken cancellationToken);
+}
+
+internal sealed class RunnerRuntimeGatewayProxy(
+    RunnerRuntimeRegistry runtimeRegistry, HttpClient runtimeClient, IRuntimePortRefresher? portRefresher = null)
 {
     private const string RuntimeCookiePrefix = "automaton_runtime_";
 
@@ -26,18 +34,35 @@ internal sealed class RunnerRuntimeGatewayProxy(RunnerRuntimeRegistry runtimeReg
             return;
         }
 
-        using var request = CreateRequest(context, runtime.Port, path);
-        try
+        var port = runtime.Port;
+        for (var attempt = 0; ; attempt++)
         {
-            using var response = await runtimeClient.SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
-            await CopyResponseAsync(context, response);
-        }
-        catch (HttpRequestException)
-        {
-            await WriteUnavailableResponseAsync(context);
+            using var request = CreateRequest(context, port, path);
+            try
+            {
+                using var response = await runtimeClient.SendAsync(
+                    request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+                await CopyResponseAsync(context, response);
+                return;
+            }
+            catch (HttpRequestException exception)
+            {
+                // A restarted container has a new host port. Nothing was sent when the connection is refused, so the
+                // request can be tried once more on the port Docker reports now.
+                if (attempt == 0 && IsRefused(exception) && portRefresher is not null
+                    && await portRefresher.RefreshPortAsync(appId, deploymentTargetId, port, context.RequestAborted) is { } fresh)
+                {
+                    port = fresh;
+                    continue;
+                }
+                await WriteUnavailableResponseAsync(context);
+                return;
+            }
         }
     }
+
+    private static bool IsRefused(HttpRequestException exception)
+        => exception.InnerException is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.ConnectionRefused };
 
     // Connects to the app first so a refused upgrade is reported with a real status; only then is the visitor's
     // socket accepted and both directions are relayed. The same header and cookie rules as plain requests apply.
