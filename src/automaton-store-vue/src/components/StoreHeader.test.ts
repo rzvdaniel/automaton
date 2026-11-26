@@ -11,7 +11,7 @@ describe('StoreHeader', () => {
     createApp({ render: () => h(StoreHeader) }).use(router).mount(container)
 
     const links = [...container.querySelectorAll('nav a.link')].map((a) => a.textContent?.trim())
-    expect(links).toEqual(['Product', 'Use cases', 'Live apps', 'Docs', 'GitHub'])
+    expect(links).toEqual(['Product', 'Use cases', 'Catalog', 'Live apps', 'Docs', 'GitHub'])
     expect(container.querySelector('a[aria-current="page"]')?.textContent?.trim()).toBe('Live apps')
     expect(container.querySelector('a.brand')?.getAttribute('href')).toBe('https://automaton.monster/')
     expect(container.textContent).not.toContain('App Store')
