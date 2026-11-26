@@ -2,7 +2,7 @@
 # Installs one Automaton server release on a throwaway Hetzner server and checks it by script, then deletes it.
 #   release-install-check.sh fresh            install $VERSION, run the checks
 #   release-install-check.sh upgrade          install $PREVIOUS, update to $VERSION with the CLI, run the checks again
-#   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 120)
+#   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 180)
 # Environment: HCLOUD_TOKEN (project "automaton-ci" only), CLOUDFLARE_DNS_TOKEN (Zone.DNS edit on the test domain only),
 # VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
 # LOCATIONS ("nbg1 fsn1 hel1"), RUN_ID. Secrets are never printed; the administrator password is generated here and

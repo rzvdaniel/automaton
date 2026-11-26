@@ -19,7 +19,7 @@ on:
         default: 'nbg1 fsn1 hel1'
 permissions:
   contents: read
-# One server at a time: both runs use the same domain.
+# One server at a time: both runs share the Cloudflare zone and the hcloud project.
 concurrency:
   group: release-install-check
   cancel-in-progress: false
