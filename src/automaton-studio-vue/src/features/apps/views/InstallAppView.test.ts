@@ -45,10 +45,10 @@ describe('InstallAppView', () => {
   })
 
   it('shows the app README before install, and nothing when the app ships none', async () => {
-    vi.mocked(appsService.getInstallSource).mockResolvedValue({ id: 'src-1', name: 'Gauntlet', readme: '# Gauntlet\n\nRuns **trials**.', application: {} })
+    vi.mocked(appsService.getInstallSource).mockResolvedValue({ id: 'src-1', name: 'Sample App', readme: '# Sample App\n\nDoes a **sample** job.', application: {} })
     const wrapper = mount(InstallAppView, { global: { plugins: [PrimeVue] } })
     await flushPromises()
-    expect(wrapper.get('[data-testid="install-readme"]').html()).toContain('<strong>trials</strong>')
+    expect(wrapper.get('[data-testid="install-readme"]').html()).toContain('<strong>sample</strong>')
 
     vi.mocked(appsService.getInstallSource).mockResolvedValue({ id: 'src-1', name: 'Plain', application: {} })
     const plain = mount(InstallAppView, { global: { plugins: [PrimeVue] } })

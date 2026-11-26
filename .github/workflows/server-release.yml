@@ -298,41 +298,6 @@ jobs:
           [[ -s release-body.md ]] && notes=(--notes-file release-body.md)
           gh release create "server-v$VERSION" --target "$GITHUB_SHA" --title "Automaton Server $VERSION" "${notes[@]}" automaton-server.tar.gz automaton-server.tar.gz.sha256 scripts/install-automaton.sh scripts/update-automaton.sh scripts/cli/install.sh scripts/cli/install.ps1
 
-  # Starts Gauntlet's Upgrade and Full cycle runs for this release (webhooks of the Gauntlet app, rzvdaniel/automaton-apps).
-  # Runs only after the release is published. It never fails the release; the weekly schedules stay as the safety net.
-  gauntlet:
-    needs: bundle
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions: {}
-    steps:
-      - name: Start the Upgrade run
-        env:
-          VERSION: ${{ inputs.version }}
-          HOOK_URL: ${{ secrets.GAUNTLET_UPGRADE_URL }}
-          HOOK_SECRET: ${{ secrets.GAUNTLET_UPGRADE_SECRET }}
-        run: |
-          # The secret goes to curl on standard input, never in its arguments, and is masked in logs. Only the status is printed.
-          # A missing secret or a refused call never fails this workflow: Gauntlet's own schedules stay as the safety net.
-          if [[ -z "$HOOK_URL" || -z "$HOOK_SECRET" ]]; then echo "No Upgrade webhook configured; skipping."; exit 0; fi
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 0; }
-          code=$(printf 'header = "Authorization: Bearer %s"\n' "$HOOK_SECRET" | curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
-            --config - -X POST -H 'Content-Type: application/json' --data "{\"version\":\"$VERSION\"}" "$HOOK_URL" || true)
-          echo "Upgrade webhook answered ${code:-no answer} (202 = run started)."
-      - name: Start the Full cycle run
-        env:
-          VERSION: ${{ inputs.version }}
-          HOOK_URL: ${{ secrets.GAUNTLET_FULL_CYCLE_URL }}
-          HOOK_SECRET: ${{ secrets.GAUNTLET_FULL_CYCLE_SECRET }}
-        run: |
-          # The secret goes to curl on standard input, never in its arguments, and is masked in logs. Only the status is printed.
-          # A missing secret or a refused call never fails this workflow: Gauntlet's own schedules stay as the safety net.
-          if [[ -z "$HOOK_URL" || -z "$HOOK_SECRET" ]]; then echo "No Full cycle webhook configured; skipping."; exit 0; fi
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must look like 0.2.103."; exit 0; }
-          code=$(printf 'header = "Authorization: Bearer %s"\n' "$HOOK_SECRET" | curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
-            --config - -X POST -H 'Content-Type: application/json' --data "{\"version\":\"$VERSION\"}" "$HOOK_URL" || true)
-          echo "Full cycle webhook answered ${code:-no answer} (202 = run started)."
-
   # Standalone CLI binaries (self-contained, no .NET needed), attached to the release the bundle job created.
   # Each one is built on its own platform and must answer --help and --version before it is uploaded.
   cli-binaries:
