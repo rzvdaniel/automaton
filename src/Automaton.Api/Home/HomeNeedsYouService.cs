@@ -1,5 +1,6 @@
 using Automaton.Api.Config;
 using Automaton.Api.Data;
+using Automaton.Core.Models;
 using Automaton.Api.Models;
 using Automaton.Api.ServerHealth;
 using Automaton.Api.Services;
@@ -28,6 +29,7 @@ public class HomeNeedsYouService(
                 "No Runner is connected, so apps have nowhere to run.", "Add a Runner", "/server", false));
         if (await ServerUpdateAsync(token) is { } update) cards.Add(update);
         if (await RunnerUpdatesAsync(token) is { } runnerUpdate) cards.Add(runnerUpdate);
+        cards.AddRange(await DiskCardsAsync(token));
         var waiting = await appDirectory.WaitingByAppAsync(token);
         if (waiting.Count > 0)
             cards.Add(new(HomeCardKeys.PermissionRequests, HomeCardKeys.PermissionRequests, "warn",
@@ -162,6 +164,47 @@ public class HomeNeedsYouService(
             || InstallationUpdate.Parse(latest) is not { } newest || newest <= current) return null;
         return new(HomeCardKeys.ServerUpdate, HomeCardKeys.ServerUpdate, "warn", "Update Automaton",
             $"{latest} is available. This server runs {configuration["Installation:Version"]}.", "Open server", "/server", false);
+    }
+
+    private async Task<List<HomeCard>> DiskCardsAsync(CancellationToken token)
+    {
+        var json = await db.Runners.AsNoTracking()
+            .Where(runner => runner.DeletionRequestedAtUtc == null && runner.MachineHostHealthJson != null)
+            .Select(runner => runner.MachineHostHealthJson).ToListAsync(token);
+        return DiskCards(json.Select(HostHealthReportService.Parse));
+    }
+
+    internal const long UpdateNeedsFreeBytes = 10L * 1024 * 1024 * 1024;
+    internal const int DiskWarningPercent = 80;
+
+    /// <summary>One card per host disk that is 80% full (the main disk also when under 10 GiB free), naming the disk. A host that reports no disk list is judged by its single disk, as the Server page does.</summary>
+    internal static List<HomeCard> DiskCards(IEnumerable<MachineHostHealth?> hosts)
+    {
+        var cards = new List<HomeCard>();
+        foreach (var host in hosts.OfType<MachineHostHealth>())
+        {
+            var single = host.Disks is not { Count: > 0 };
+            foreach (var disk in HostDisks(host))
+                if (DiskCard(disk, single) is { } card && cards.All(other => other.Key != card.Key)) cards.Add(card);
+        }
+        return cards;
+    }
+
+    private static IReadOnlyList<HostDisk> HostDisks(MachineHostHealth host)
+        => host.Disks is { Count: > 0 } list ? list
+            : host.DiskTotalBytes is > 0 && host.DiskAvailableBytes is { } free ? [new HostDisk("/", host.DiskTotalBytes.Value, free)] : [];
+
+    private static HomeCard? DiskCard(HostDisk disk, bool single)
+    {
+        if (disk.TotalBytes <= 0) return null;
+        var main = disk.MountPoint == "/";
+        var usedPercent = (disk.TotalBytes - disk.AvailableBytes) * 100.0 / disk.TotalBytes;
+        if (usedPercent < DiskWarningPercent && !(main && disk.AvailableBytes < UpdateNeedsFreeBytes)) return null;
+        var name = single ? "The disk" : main ? "The main disk (/)" : $"The Docker disk ({disk.MountPoint})";
+        var detail = $"{name} is {usedPercent:0}% full, {disk.AvailableBytes / (1024.0 * 1024 * 1024):0.0} GiB free."
+            + (main ? " A server update needs 10 GiB free." : "");
+        return new($"{HomeCardKeys.DiskLowPrefix}{disk.MountPoint}", HomeCardKeys.DiskLow, "warn",
+            single ? "The disk is low" : main ? "The main disk is low" : "The Docker disk is low", detail, "Open server", "/server", false);
     }
 
     private async Task<HomeCard?> RunnerUpdatesAsync(CancellationToken token)
