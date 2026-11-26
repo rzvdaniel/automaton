@@ -64,6 +64,7 @@ public sealed class ServerHealthTests
         Assert.ThrowsAsync<ArgumentException>(() => service.ReportAsync(key, Sample(DateTime.UtcNow.AddHours(-2)), default));
         Assert.ThrowsAsync<ArgumentException>(() => service.ReportAsync(key, Sample() with { DiskAvailableBytes = 999_999 }, default));
         Assert.ThrowsAsync<ArgumentException>(() => service.ReportAsync(key, Sample() with { UpdatesPending = -1 }, default));
+        Assert.ThrowsAsync<ArgumentException>(() => service.ReportAsync(key, Sample() with { Disks = [new HostDisk("/", 10, 20)] }, default));
         Assert.That(await service.LatestAsync(default), Is.Null);
     }
 

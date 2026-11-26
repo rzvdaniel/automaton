@@ -84,6 +84,20 @@ describe('ServerView', () => {
     vi.mocked(serverCleanupService.run).mockReset().mockResolvedValue(cleanupBody())
   })
 
+  it('shows the main disk and the Docker disk on their own lines and flags the low one', async () => {
+    vi.mocked(serverHealthService.get).mockResolvedValue({ ...health(false), host: { ...health(false).host!, disks: [
+      { mountPoint: '/', totalBytes: 38 * GIB, availableBytes: 8 * GIB }, { mountPoint: '/mnt/docker-data', totalBytes: 40 * GIB, availableBytes: 29 * GIB }] } } as never)
+    const wrapper = mountView(['Admin', 'SysAdmin'])
+    await flushPromises()
+    const rows = wrapper.findAll('[data-testid="health-disk"]').map((row) => row.text())
+    expect(rows).toHaveLength(2)
+    expect(rows[0]!).toContain('30 GB of 38 GB')
+    expect(rows[0]!).toContain('low')
+    expect(rows[0]!).toContain('an update needs 10 GB free')
+    expect(rows[1]!).toContain('11 GB of 40 GB')
+    expect(rows[1]!).not.toContain('low')
+  })
+
   it('shows the cleanup only to system administrators', async () => {
     for (const roles of [['User'], ['Admin']]) {
       const plain = mountView(roles)

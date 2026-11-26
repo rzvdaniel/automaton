@@ -22,7 +22,23 @@ function usage(total: number | null | undefined, available: number | null | unde
   return total && available !== null && available !== undefined ? `${formatGiB(total - available)} of ${formatGiB(total)}` : 'Not reported'
 }
 const memory = computed(() => usage(host.value?.memoryTotalBytes, host.value?.memoryAvailableBytes))
-const disk = computed(() => usage(host.value?.diskTotalBytes, host.value?.diskAvailableBytes))
+/** Free space a server update needs on the main disk. */
+const UPDATE_NEEDS_BYTES = 10 * 1024 ** 3
+const DISK_WARNING_PERCENT = 80
+const disks = computed(() => {
+  const list = host.value?.disks
+  const reported = list?.length ? list : [{ mountPoint: '/', totalBytes: host.value?.diskTotalBytes ?? 0, availableBytes: host.value?.diskAvailableBytes ?? 0 }]
+  const single = !list?.length
+  return reported.map((disk) => {
+    const known = disk.totalBytes > 0 && !(single && host.value?.diskAvailableBytes == null)
+    const low = known && ((disk.totalBytes - disk.availableBytes) / disk.totalBytes * 100 >= DISK_WARNING_PERCENT
+      || (disk.mountPoint === '/' && disk.availableBytes < UPDATE_NEEDS_BYTES))
+    const main = disk.mountPoint === '/'
+    const label = main ? 'Disk (main, /)' : `Disk (Docker, ${disk.mountPoint})`
+    const text = known ? `${usage(disk.totalBytes, disk.availableBytes)} · ${formatGiB(disk.availableBytes)} free` : 'Not reported'
+    return { key: disk.mountPoint, label: single ? 'Disk' : label, text, low, note: main && known ? `an update needs ${formatGiB(UPDATE_NEEDS_BYTES)} free` : null }
+  })
+})
 </script>
 
 <template>
@@ -37,7 +53,12 @@ const disk = computed(() => usage(host.value?.diskTotalBytes, host.value?.diskAv
     </div>
     <ul class="health-list">
       <li class="health-row"><span>Memory</span><span data-testid="health-memory">{{ memory }}</span></li>
-      <li class="health-row"><span>Disk</span><span data-testid="health-disk">{{ disk }}</span></li>
+      <li v-for="d in disks" :key="d.key" class="health-row">
+        <span>{{ d.label }}</span>
+        <span data-testid="health-disk" :class="{ 'health-row__bad': d.low }">
+          {{ d.text }}<template v-if="d.low"> &middot; low</template><template v-if="d.note"> &middot; {{ d.note }}</template>
+        </span>
+      </li>
       <CleanupSection :console-id="consoleId" />
     </ul>
     <p v-if="showConsole" class="m-0 studio-muted" data-testid="server-console-notice">

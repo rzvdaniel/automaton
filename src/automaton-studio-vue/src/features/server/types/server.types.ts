@@ -7,6 +7,8 @@ export interface ServerHealthHost {
   memoryAvailableBytes: number | null
   diskTotalBytes: number | null
   diskAvailableBytes: number | null
+  /** Every disk that matters: the main disk (`/`) and, when Docker lives elsewhere, Docker's disk. Absent on older Runners. */
+  disks?: { mountPoint: string; totalBytes: number; availableBytes: number }[] | null
   updatesPending: number | null
   securityUpdates: number | null
   rebootRequired: boolean | null

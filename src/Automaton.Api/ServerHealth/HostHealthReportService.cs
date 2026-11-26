@@ -65,6 +65,9 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
             throw new ArgumentException("Host health values must not be negative.");
         ValidateApps(report.AppDisk);
         ValidateFail2Ban(report.Fail2Ban);
+        if (report.Disks is { } disks && (disks.Count > 8 || disks.Any(disk => disk.MountPoint.Length is 0 or > 200
+                || disk.TotalBytes < 0 || disk.AvailableBytes < 0 || disk.AvailableBytes > disk.TotalBytes)))
+            throw new ArgumentException("Host disk values must not be negative or exceed the total, and at most 8 disks are accepted.");
         if (report.MemoryAvailableBytes > report.MemoryTotalBytes || report.DiskAvailableBytes > report.DiskTotalBytes)
             throw new ArgumentException("Available space cannot exceed the total.");
         if (Length(report.OsName) > 200 || Length(report.OsVersion) > 100 || Length(report.RunnerVersion) > 80)

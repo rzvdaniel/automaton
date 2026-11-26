@@ -44,7 +44,7 @@ More in [Update the server](./install#update-the-server-and-runners).
 
 ## The disk is nearly full
 
-Studio shows memory and disk under **Server** (see [A tour of Studio](./studio-tour)); `df -h` on the server shows free space.
+Studio shows memory and disk under **Server** (see [A tour of Studio](./studio-tour)): the main disk (`/`) and, when Docker keeps its data on another disk, that disk on its own line. A disk turns red at 80% full, and the main disk also when less than 10 GB is free, which a server update needs. `df -h` on the server shows the same numbers.
 
 - **Unused Docker data.** A nightly cleanup removes unused Docker images and build cache older than 7 days and trims large journal files. It never touches volumes, images of existing containers or backups. See [Back up and restore](./backup-restore).
 - **Find what is big.** `sudo du -xh --max-depth=1 /var/lib/docker | sort -h | tail` on the server.

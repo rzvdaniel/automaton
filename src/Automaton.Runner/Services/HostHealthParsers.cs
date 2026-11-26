@@ -1,4 +1,5 @@
 using System.Globalization;
+using Automaton.Core.Models;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -200,6 +201,40 @@ internal static partial class HostHealthParsers
             else if (current is not null) sections[current] += line + "\n";
         }
         return sections;
+    }
+
+    /// <summary>
+    /// Reads the helper's [disks] lines ("root|docker device blockSize blocks available"). Docker's disk is listed only when it is
+    /// another device than the main disk; its mount point is Docker's data root.
+    /// </summary>
+    public static IReadOnlyList<HostDisk>? ParseDisks(string? section, string? dockerRoot)
+    {
+        var disks = new List<HostDisk>();
+        string? rootDevice = null;
+        foreach (var line in (section ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 5 || !long.TryParse(parts[2], out var block) || !long.TryParse(parts[3], out var blocks)
+                || !long.TryParse(parts[4], out var free) || block <= 0 || blocks <= 0 || free < 0) continue;
+            var total = blocks * block;
+            var available = Math.Min(free * block, total);
+            if (parts[0] == "root") { rootDevice = parts[1]; disks.Insert(0, new HostDisk("/", total, available)); }
+            else if (parts[0] == "docker" && !string.IsNullOrEmpty(dockerRoot) && rootDevice is not null && parts[1] != rootDevice)
+                disks.Add(new HostDisk(dockerRoot, total, available));
+        }
+        return disks.Count > 0 && disks[0].MountPoint == "/" ? disks : null;
+    }
+
+    /// <summary>Docker's data root from /info, only when it is a plain absolute path that is safe in a mount argument.</summary>
+    public static string? ParseDockerRoot(string? infoJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(infoJson ?? "");
+            var root = document.RootElement.TryGetProperty("DockerRootDir", out var value) ? value.GetString() : null;
+            return root is { Length: > 1 and < 200 } && root[0] == '/' && root.All(c => char.IsAsciiLetterOrDigit(c) || c is '/' or '-' or '_' or '.') ? root : null;
+        }
+        catch (JsonException) { return null; }
     }
 
     public static (string? Name, string? Version) ParseOsRelease(string? osRelease)
