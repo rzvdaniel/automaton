@@ -1,0 +1,25 @@
+name: Release install sweeper
+# Deletes throwaway servers of the release install check that are older than 3 hours (a cancelled or killed run).
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sweep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      HCLOUD_VERSION: '1.52.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Sweep
+        run: |
+          [[ -n "$HCLOUD_TOKEN" ]] || { echo "No HCLOUD_TOKEN secret; nothing to sweep."; exit 0; }
+          curl -fsSL "https://github.com/hetznercloud/cli/releases/download/v${HCLOUD_VERSION}/hcloud-linux-amd64.tar.gz" -o hcloud.tgz
+          sudo tar -xzf hcloud.tgz -C /usr/local/bin hcloud
+          bash scripts/ci/release-install-check.sh sweep

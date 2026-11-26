@@ -1,0 +1,86 @@
+name: Release install check
+# Installs each published server release on a throwaway Hetzner server (separate project "automaton-ci"), checks it by
+# script, installs the previous release and upgrades it, then deletes the servers. Needs the repository secrets
+# HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN; without them the run fails at the first step.
+on:
+  workflow_run:
+    workflows: ['Publish Automaton Server']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release to check, e.g. 0.2.195 (default: the newest server release)'
+        required: false
+      server_types:
+        description: 'Server types to try in order'
+        default: 'cx23 cpx12'
+      locations:
+        description: 'Locations to try in order'
+        default: 'nbg1 fsn1 hel1'
+permissions:
+  contents: read
+# One server at a time: both runs share the Cloudflare zone and the hcloud project.
+concurrency:
+  group: release-install-check
+  cancel-in-progress: false
+env:
+  HCLOUD_VERSION: '1.52.0'
+jobs:
+  check:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      SERVER_TYPES: ${{ inputs.server_types || 'cx23 cpx12' }}
+      LOCATIONS: ${{ inputs.locations || 'nbg1 fsn1 hel1' }}
+      RUN_ID: ${{ github.run_id }}
+    steps:
+      # Checks out the default branch, never the commit under test: the script is the trusted part.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Require the secrets
+        run: |
+          [[ -n "$HCLOUD_TOKEN" && -n "$CLOUDFLARE_DNS_TOKEN" ]] || { echo "::error::Set the HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN repository secrets."; exit 1; }
+      - name: Install hcloud
+        run: |
+          curl -fsSL "https://github.com/hetznercloud/cli/releases/download/v${HCLOUD_VERSION}/hcloud-linux-amd64.tar.gz" -o hcloud.tgz
+          sudo tar -xzf hcloud.tgz -C /usr/local/bin hcloud
+          hcloud version
+      - name: Pick the releases
+        id: versions
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mapfile -t tags < <(gh release list --limit 100 --json tagName,isDraft,isPrerelease,createdAt \
+            --jq '[.[] | select((.isDraft or .isPrerelease) | not) | select(.tagName | startswith("server-v"))] | sort_by(.createdAt) | reverse | .[].tagName')
+          current="${INPUT_VERSION:+server-v$INPUT_VERSION}"; current="${current:-${tags[0]}}"
+          previous=''
+          for t in "${tags[@]}"; do [[ "$t" != "$current" ]] && { previous="$t"; break; }; done
+          [[ -n "$previous" ]] || { echo "::error::No previous server release to upgrade from."; exit 1; }
+          echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
+          echo "previous=${previous#server-v}" >> "$GITHUB_OUTPUT"
+          echo "### Release install check: ${current#server-v} (upgrade from ${previous#server-v})" >> "$GITHUB_STEP_SUMMARY"
+      - name: Fresh install
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: bash scripts/ci/release-install-check.sh fresh
+      - name: Upgrade from the previous release
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+          PREVIOUS: ${{ steps.versions.outputs.previous }}
+        run: bash scripts/ci/release-install-check.sh upgrade
+      # The scripts delete what they create; this also covers a cancelled run (the sweeper catches anything left).
+      - name: Delete leftover servers of this run
+        if: always()
+        run: |
+          for id in $(hcloud server list -l "automaton-ci=true,run=$RUN_ID" -o json | jq -r '.[].id'); do hcloud server delete "$id"; done
+          for id in $(hcloud ssh-key list -l automaton-ci=true -o json | jq -r --arg r "automaton-ci-$RUN_ID-" '.[] | select(.name | startswith($r)) | .id'); do hcloud ssh-key delete "$id"; done
