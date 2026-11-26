@@ -209,20 +209,21 @@ internal static partial class HostHealthParsers
     /// </summary>
     public static IReadOnlyList<HostDisk>? ParseDisks(string? section, string? dockerRoot)
     {
-        var disks = new List<HostDisk>();
-        string? rootDevice = null;
-        foreach (var line in (section ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length != 5 || !long.TryParse(parts[2], out var block) || !long.TryParse(parts[3], out var blocks)
-                || !long.TryParse(parts[4], out var free) || block <= 0 || blocks <= 0 || free < 0) continue;
-            var total = blocks * block;
-            var available = Math.Min(free * block, total);
-            if (parts[0] == "root") { rootDevice = parts[1]; disks.Insert(0, new HostDisk("/", total, available)); }
-            else if (parts[0] == "docker" && !string.IsNullOrEmpty(dockerRoot) && rootDevice is not null && parts[1] != rootDevice)
-                disks.Add(new HostDisk(dockerRoot, total, available));
-        }
-        return disks.Count > 0 && disks[0].MountPoint == "/" ? disks : null;
+        var lines = (section ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(ParseDiskLine).OfType<(string, string, HostDisk)>().ToArray();
+        if (lines.FirstOrDefault(line => line.Item1 == "root") is not { Item3: { } main } root) return null;
+        var disks = new List<HostDisk> { main };
+        if (!string.IsNullOrEmpty(dockerRoot) && lines.FirstOrDefault(line => line.Item1 == "docker") is { Item3: { } docker } other && other.Item2 != root.Item2)
+            disks.Add(docker with { MountPoint = dockerRoot });
+        return disks;
+    }
+
+    private static (string Name, string Device, HostDisk Disk)? ParseDiskLine(string line)
+    {
+        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 5 || !long.TryParse(parts[2], out var block) || !long.TryParse(parts[3], out var blocks)
+            || !long.TryParse(parts[4], out var free) || block <= 0 || blocks <= 0 || free < 0) return null;
+        var total = blocks * block;
+        return (parts[0], parts[1], new HostDisk(parts[0] == "root" ? "/" : parts[0], total, Math.Min(free * block, total)));
     }
 
     /// <summary>Docker's data root from /info, only when it is a plain absolute path that is safe in a mount argument.</summary>

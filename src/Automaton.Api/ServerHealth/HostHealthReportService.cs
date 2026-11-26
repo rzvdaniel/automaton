@@ -63,15 +63,21 @@ public sealed class HostHealthReportService(ApplicationDbContext db)
             report.DockerImagesBytes, report.DockerContainersBytes, report.DockerVolumesBytes, report.DockerBuildCacheBytes, report.DockerUnusedImagesBytes, report.UptimeSeconds];
         if (sizes.Any(value => value < 0) || report.UpdatesPending < 0 || report.SecurityUpdates < 0)
             throw new ArgumentException("Host health values must not be negative.");
+        ValidateDisks(report.Disks);
         ValidateApps(report.AppDisk);
         ValidateFail2Ban(report.Fail2Ban);
-        if (report.Disks is { } disks && (disks.Count > 8 || disks.Any(disk => disk is null || disk.MountPoint is null || disk.MountPoint.Length is 0 or > 200
-                || disk.TotalBytes < 0 || disk.AvailableBytes < 0 || disk.AvailableBytes > disk.TotalBytes)))
-            throw new ArgumentException("Host disk values must not be negative or exceed the total, and at most 8 disks are accepted.");
         if (report.MemoryAvailableBytes > report.MemoryTotalBytes || report.DiskAvailableBytes > report.DiskTotalBytes)
             throw new ArgumentException("Available space cannot exceed the total.");
         if (Length(report.OsName) > 200 || Length(report.OsVersion) > 100 || Length(report.RunnerVersion) > 80)
             throw new ArgumentException("A host health text value is too long.");
+    }
+
+    private static void ValidateDisks(IReadOnlyList<HostDisk>? disks)
+    {
+        if (disks is null) return;
+        if (disks.Count > 8 || disks.Any(disk => disk is null || disk.MountPoint is null || disk.MountPoint.Length is 0 or > 200
+                || disk.TotalBytes < 0 || disk.AvailableBytes < 0 || disk.AvailableBytes > disk.TotalBytes))
+            throw new ArgumentException("Host disk values must not be negative or exceed the total, and at most 8 disks are accepted.");
     }
 
     private static void ValidateApps(IReadOnlyList<AppDiskUsage>? apps)
