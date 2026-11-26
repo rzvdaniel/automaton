@@ -11,7 +11,7 @@
 # lives only in a variable and a root-only file on the throwaway server.
 set -euo pipefail
 
-mode="${1:?Usage: release-install-check.sh fresh|upgrade|sweep}"
+mode="${1:?Usage: release-install-check.sh fresh|upgrade|restore|sweep}"
 zone_name="${CI_DOMAIN:-automatontest.fyi}"
 # One sub-domain per run and mode: Let's Encrypt allows five certificates a week for the same set of names, and every
 # throwaway install asks for new ones.
