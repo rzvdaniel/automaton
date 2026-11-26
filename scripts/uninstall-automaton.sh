@@ -159,6 +159,14 @@ remove_ids() { # kind(container|network) ids...
         name=$(docker "$kind" inspect --format '{{.Name}}' "$id" 2>/dev/null | tr -d / || true)
         name=${name:-$id}
         if [[ $kind == container ]]; then act docker rm --force --volumes=false "$id"; else act docker network rm "$id"; fi
+        if ! $dry_run; then # removal can finish a moment after the command returns (or answer "already in progress"): wait, retry, then report
+            local try
+            for try in 1 2 3 4 5 6 7 8 9 10; do
+                docker "$kind" inspect "$id" >/dev/null 2>&1 || break
+                sleep 1
+                if [[ $kind == container ]]; then docker rm --force --volumes=false "$id" >/dev/null 2>&1 || true; else docker network rm "$id" >/dev/null 2>&1 || true; fi
+            done
+        fi
         if ! $dry_run && docker "$kind" inspect "$id" >/dev/null 2>&1; then warnings+=("$kind $name could not be removed"); else removed+=("$kind $name"); fi
     done
 }
