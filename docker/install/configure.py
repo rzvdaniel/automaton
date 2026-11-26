@@ -176,12 +176,14 @@ def ensure_custom_domain_resolver(root):
     return 'changed' if changed else 'unchanged'
 
 
+PREVIOUS_ACCESS_LOG = {'filePath': '/certificates/logs/access.log', 'format': 'json',
+                       'fields': {'defaultMode': 'keep', 'headers': {'defaultMode': 'drop'}}}
 ACCESS_LOG = {'filePath': '/certificates/logs/access.log', 'format': 'json',
               'fields': {'defaultMode': 'keep', 'headers': {'defaultMode': 'drop', 'names': {'X-Automaton-Auth-Failure': 'keep'}}}}
 
 
 def ensure_access_log(root):
-    """Write Traefik's JSON access log (no headers) into the certificates volume, where the fail2ban jails read it.
+    """Write Traefik's JSON access log (it keeps only the X-Automaton-Auth-Failure response header; the earlier no-header setting is upgraded) into the certificates volume, where the fail2ban jails read it.
     Returns 'changed', 'unchanged', or 'skipped' (traefik.yml was adopted or hand-edited; nothing is touched)."""
     traefik_path = root / 'traefik.yml'
     try:
@@ -190,7 +192,7 @@ def ensure_access_log(root):
             raise ValueError
     except (OSError, ValueError):
         return 'skipped'
-    if 'accessLog' in traefik:
+    if 'accessLog' in traefik and traefik['accessLog'] != PREVIOUS_ACCESS_LOG:
         return 'unchanged'
     traefik['accessLog'] = ACCESS_LOG
     replace_text(traefik_path, json.dumps(traefik))
