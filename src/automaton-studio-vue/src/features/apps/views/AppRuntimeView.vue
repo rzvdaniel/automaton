@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
 import CopyCommand from '../components/CopyCommand.vue'
@@ -83,7 +83,25 @@ function openInNewTab() {
   window.open(applicationUrl.value, '_blank', 'noopener')
 }
 
+// The app session cookie lives 10 minutes; renew it while the app is shown and the Studio session is valid.
+const RUNTIME_RENEW_MS = 4 * 60 * 1000
+let renewTimer: ReturnType<typeof setInterval> | undefined
+function renewRuntimeSession() {
+  if (!appId.value || !applicationUrl.value) return
+  // A failure (Studio session ended) is left alone: the app then shows its own "session ended".
+  appsService.createRuntimeLaunch(appId.value).catch(() => undefined)
+}
+function onVisible() {
+  if (document.visibilityState === 'visible') renewRuntimeSession()
+}
+onBeforeUnmount(() => {
+  if (renewTimer) clearInterval(renewTimer)
+  document.removeEventListener('visibilitychange', onVisible)
+})
+
 onMounted(() => {
+  renewTimer = setInterval(renewRuntimeSession, RUNTIME_RENEW_MS)
+  document.addEventListener('visibilitychange', onVisible)
   void loadRuntimeView()
 })
 </script>
