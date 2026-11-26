@@ -30,18 +30,8 @@ public static class CatalogScheduleSync
         var dropped = previous is null ? [] : previous.Where(item => !InNew(CatalogSchedules.Name(item))).ToList();
         var droppedUnchanged = dropped.Where(item => Have(CatalogSchedules.Name(item)) is { } have && Same(have, item)).ToList();
         var missingNew = chosen.Where(item => Have(CatalogSchedules.Name(item)) is null).ToList();
-        // Existing schedules that do the same as a declaration (action, cron, time zone, input), whatever their name. Not eligible:
-        // ones a declaration of that name owns, ones this update removes, and ones an earlier declaration already matched.
-        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (allowRemove) foreach (var item in droppedUnchanged) if (Have(CatalogSchedules.Name(item)) is { } gone) taken.Add(CatalogSchedules.Str(gone, "id"));
-        bool HasEquivalent(JsonElement declared)
-        {
-            var match = existing.FirstOrDefault(item => Same(item, declared) && !taken.Contains(CatalogSchedules.Str(item, "id"))
-                && !all.Any(other => string.Equals(FullName(appName, CatalogSchedules.Name(other)), CatalogSchedules.Str(item, "name"), StringComparison.OrdinalIgnoreCase)));
-            if (match.ValueKind == JsonValueKind.Undefined) return false;
-            taken.Add(CatalogSchedules.Str(match, "id"));
-            return true;
-        }
+        var equivalents = new EquivalentSchedules(appName, existing, all);
+        equivalents.Reserve(allowRemove ? droppedUnchanged.Select(item => Have(CatalogSchedules.Name(item))) : []);
         var (renamed, renamedTo) = PlanRenames(plan, droppedUnchanged, missingNew, Have);
 
         foreach (var item in chosen)
@@ -50,7 +40,7 @@ public static class CatalogScheduleSync
             if (renamedTo.Contains(item)) continue;
             if (Have(name) is not { } have)
             {
-                if (HasEquivalent(item)) continue; // the app already has this schedule under another name
+                if (equivalents.TryClaim(item)) continue; // the app already has this schedule under another name
                 plan.Add(new ScheduleChange(ScheduleChange.Add, name, "new", null, item));
                 continue;
             }
@@ -61,6 +51,33 @@ public static class CatalogScheduleSync
 
         if (allowRemove) PlanRemovals(plan, dropped.Where(item => !renamed.Contains(item)), Have);
         return plan;
+    }
+
+    /// <summary>
+    /// Existing schedules that do the same as a declaration (action, cron, time zone, input) under another name. Not eligible: ones a
+    /// declaration of that name owns, ones this update removes (<see cref="Reserve"/>) and ones an earlier declaration already matched.
+    /// </summary>
+    private sealed class EquivalentSchedules(string appName, IReadOnlyList<JsonElement> existing, IReadOnlyList<JsonElement> all)
+    {
+        private readonly HashSet<string> _taken = new(StringComparer.OrdinalIgnoreCase);
+
+        public void Reserve(JsonElement schedule) => _taken.Add(CatalogSchedules.Str(schedule, "id"));
+
+        public void Reserve(IEnumerable<JsonElement?> schedules)
+        {
+            foreach (var schedule in schedules.OfType<JsonElement>()) Reserve(schedule);
+        }
+
+        public bool TryClaim(JsonElement declared)
+        {
+            var match = existing.FirstOrDefault(item => Same(item, declared) && !_taken.Contains(CatalogSchedules.Str(item, "id")) && !IsNamedByADeclaration(item));
+            if (match.ValueKind == JsonValueKind.Undefined) return false;
+            Reserve(match);
+            return true;
+        }
+
+        private bool IsNamedByADeclaration(JsonElement item)
+            => all.Any(other => string.Equals(FullName(appName, CatalogSchedules.Name(other)), CatalogSchedules.Str(item, "name"), StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>A dropped unchanged default and a new schedule for the same action, one each, are a rename: the existing schedule is updated in place.</summary>
