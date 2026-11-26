@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automaton.monster/schemas/automaton.schema.json",
+  "$comment": "Automaton app format, spec v1. Schema licensed Apache-2.0; spec text CC BY 4.0. https://automaton.monster/spec",
+  "title": "Automaton app manifest (automaton.json), spec v1",
+  "description": "Describes what an app needs to build, run, store data and stay healthy. Unknown fields are allowed and must be kept by tools, so a newer manifest never loses data in an older tool.",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "description": "One line for the store card. Required for apps in a catalog." },
+    "category": { "type": "string" },
+    "icon": { "type": "string", "description": "Path inside the app folder." },
+    "application": { "$ref": "#/$defs/application" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "command": {
+      "type": "object",
+      "required": ["executable"],
+      "properties": {
+        "executable": { "type": "string", "minLength": 1 },
+        "arguments": { "type": "array", "items": { "type": "string" } },
+        "workingDirectory": { "type": "string" },
+        "environment": { "type": "object", "additionalProperties": { "type": "string" } },
+        "useShell": { "type": "boolean", "description": "Only for commands that need shell expansion." }
+      }
+    },
+    "envName": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]{0,99}$", "not": { "pattern": "^AUTOMATON_" } },
+    "application": {
+      "type": "object",
+      "properties": {
+        "kind": { "enum": ["web", "api"] },
+        "description": { "type": "string", "maxLength": 200 },
+        "build": {
+          "type": "object",
+          "properties": {
+            "image": { "type": "string" },
+            "command": { "$ref": "#/$defs/command" },
+            "outputDirectory": { "type": "string" },
+            "singlePageApp": { "type": "boolean" },
+            "timeoutSeconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "properties": {
+            "image": { "type": "string" },
+            "user": { "type": "string", "pattern": "^\\d+(:\\d+)?$" },
+            "update": { "enum": ["side-by-side", "stop-first"] },
+            "command": { "$ref": "#/$defs/command" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        "health": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "pattern": "^/" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "startupTimeoutSeconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "dataDirectory": { "type": "string" },
+            "mounts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "relativePath"],
+                "properties": { "name": { "type": "string" }, "relativePath": { "type": "string" }, "readOnly": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "compose": {
+          "type": "object",
+          "required": ["publicService", "services"],
+          "properties": {
+            "publicService": { "type": "string" },
+            "volumes": { "type": "array", "items": { "type": "string" } },
+            "services": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "image"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "image": { "type": "string" },
+                  "port": { "type": "integer" },
+                  "command": { "type": "array", "items": { "type": "string" } },
+                  "entrypoint": { "type": "array", "items": { "type": "string" } },
+                  "workingDirectory": { "type": "string" },
+                  "environment": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "dependsOn": { "type": "array", "items": { "type": "string" } },
+                  "mounts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["name", "target"],
+                      "properties": { "name": { "type": "string" }, "target": { "type": "string" }, "readOnly": { "type": "boolean" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pages": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "type": "object", "required": ["path", "label"], "properties": { "path": { "type": "string" }, "label": { "type": "string" } } }
+        },
+        "openApi": { "type": "string" },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "$ref": "#/$defs/envName" },
+              "description": { "type": "string", "maxLength": 200 },
+              "from": { "type": "string", "pattern": "^(project|user):[A-Z_][A-Z0-9_]*$" },
+              "optional": { "type": "boolean" }
+            }
+          }
+        },
+        "settings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "$ref": "#/$defs/envName" },
+              "description": { "type": "string" },
+              "default": { "type": "string" },
+              "required": { "type": "boolean" }
+            }
+          }
+        },
+        "permissions": { "type": "array", "items": { "type": "string" }, "description": "Capabilities requested, never granted by the manifest." },
+        "openPaths": { "type": "array", "maxItems": 20, "items": { "type": "string", "pattern": "^/[A-Za-z0-9/_.~*-]+$" } },
+        "publicAccess": {
+          "type": "object",
+          "required": ["level", "reason"],
+          "properties": { "level": { "enum": ["required", "recommended"] }, "reason": { "type": "string" } }
+        },
+        "homeCard": {
+          "type": "object",
+          "properties": { "intervalSeconds": { "type": "integer", "minimum": 300, "maximum": 86400 } }
+        },
+        "schedules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "action"],
+            "properties": {
+              "name": { "type": "string" },
+              "action": { "type": "string" },
+              "description": { "type": "string" },
+              "cron": { "type": "string" },
+              "intervalSeconds": { "type": "integer", "minimum": 1 },
+              "timeZone": { "type": "string" },
+              "input": {}
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

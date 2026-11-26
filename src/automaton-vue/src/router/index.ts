@@ -37,6 +37,12 @@ export const routes: RouteRecordRaw[] = [
     },
     { path: '/catalog/:id', name: 'catalog-app', component: () => import('@/views/CatalogAppView.vue') },
     {
+      path: '/spec',
+      name: 'spec',
+      component: () => import('@/views/SpecView.vue'),
+      meta: { seo: { title: 'App and catalog spec', description: 'An open, versioned format for self-hosted apps and catalogs: automaton.json and catalog.json, with JSON Schemas under Apache-2.0 and the text under CC BY 4.0.' } },
+    },
+    {
       path: '/how-catalogs-work',
       name: 'how-catalogs-work',
       component: () => import('@/views/HowCatalogsWorkView.vue'),

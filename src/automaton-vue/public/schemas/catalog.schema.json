@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automaton.monster/schemas/catalog.schema.json",
+  "$comment": "Automaton app catalog format, spec v1. Schema licensed Apache-2.0; spec text CC BY 4.0. https://automaton.monster/spec",
+  "title": "Automaton catalog index (catalog.json), spec v1",
+  "description": "The index at the root of a catalog repository. Every entry is pinned to one commit, so an install always gets the files that were listed.",
+  "type": "object",
+  "required": ["schemaVersion", "repo", "apps"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1, "description": "Major version of this format. A reader refuses a higher major version than it knows." },
+    "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$", "description": "GitHub repository as owner/name." },
+    "apps": { "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "name", "summary", "category", "folder", "commit", "minServerVersion"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "description": "The last segment of folder; unique in the catalog." },
+        "name": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1, "description": "One line for the store card." },
+        "category": { "type": "string", "minLength": 1 },
+        "folder": { "type": "string", "maxLength": 300, "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$", "description": "Path of the app folder from the repository root; no . or .. segments." },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$", "description": "Full SHA of the commit the app is installed from." },
+        "minServerVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "description": "Oldest server that can install the app." },
+        "permissions": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the app asks for. Asking never grants: an administrator approves each one on the installing server." },
+        "publisher": {
+          "type": "object",
+          "required": ["name"],
+          "properties": { "name": { "type": "string", "minLength": 1 }, "logo": { "type": "string" } },
+          "additionalProperties": true
+        },
+        "icon": { "type": "string", "description": "Path inside the app folder (png, jpg, webp or svg, up to 512 KB), read at the pinned commit." },
+        "screenshots": { "type": "array", "maxItems": 8, "items": { "type": "string" } },
+        "movedFrom": {
+          "type": "object",
+          "required": ["repo", "folder"],
+          "properties": { "repo": { "type": "string" }, "folder": { "type": "string" } }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

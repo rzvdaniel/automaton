@@ -17,6 +17,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
         <RouterLink to="/use-cases">Use cases</RouterLink>
         <a :href="publicAppConfig.storeUrl">Apps</a>
         <RouterLink to="/catalog">Catalog</RouterLink>
+        <RouterLink to="/spec">Spec</RouterLink>
       </div>
       <div>
         <b>Start</b>

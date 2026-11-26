@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "repo": "example-org/team-tools",
+  "apps": [
+    {
+      "id": "adminer",
+      "name": "Adminer",
+      "summary": "Manage a database from the browser.",
+      "category": "Developer tools",
+      "folder": "tools/adminer",
+      "commit": "0123456789abcdef0123456789abcdef01234567",
+      "minServerVersion": "0.2.200",
+      "permissions": [],
+      "publisher": { "name": "Example Org" }
+    }
+  ]
+}
