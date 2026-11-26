@@ -78,7 +78,7 @@ jobs:
           VERSION: ${{ steps.versions.outputs.version }}
           PREVIOUS: ${{ steps.versions.outputs.previous }}
         run: bash scripts/ci/release-install-check.sh upgrade
-      # The scripts delete what they create; this also covers a cancelled run (the sweeper catches anything left).
+      # The scripts delete what they create; this also covers a cancelled run.
       - name: Delete leftover servers of this run
         if: always()
         run: |
