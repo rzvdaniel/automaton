@@ -163,6 +163,7 @@ public sealed class HomeTests
         var card = HomeNeedsYouService.OffsiteBackupCard([Entry("offsite-backup", recommended: false)])!;
         Assert.That(card.Key, Is.EqualTo("offsite-backup"));
         Assert.That(card.CatalogAppId, Is.EqualTo("offsite-backup"));
+        Assert.That(card.ActionPath, Is.EqualTo("/apps/install-source?repo=r%2Fr&folder=offsite-backup&commit=c"), "opens the install form, not the catalog list");
         Assert.That(HomeCardKeys.CanDismiss(card.Key), Is.True);
         Assert.That(HomeNeedsYouService.OffsiteBackupCard([Entry("offsite-backup", installed: Guid.NewGuid())]), Is.Null, "installed");
         Assert.That(HomeNeedsYouService.OffsiteBackupCard([Entry("offsite-backup", newer: true)]), Is.Null, "needs a newer server");

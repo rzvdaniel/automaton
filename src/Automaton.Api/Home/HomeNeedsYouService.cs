@@ -69,7 +69,15 @@ public class HomeNeedsYouService(
         var app = apps.FirstOrDefault(item => item.Id == OffsiteBackupAppId && item.SourceId == CatalogSourceStore.OfficialId);
         return app is null || app.InstalledAppId is not null || app.RequiresNewerServer ? null
             : new(HomeCardKeys.OffsiteBackup, HomeCardKeys.OffsiteBackup, "warn", "Your backups only live on this server",
-                $"If the server is lost, so are its backups. {app.Name} copies them to another place.", $"Install {app.Name}", "/apps/catalog", true, null, app.Id);
+                $"If the server is lost, so are its backups. {app.Name} copies them to another place.", $"Install {app.Name}", InstallFormPath(app), true, null, app.Id);
+    }
+
+    /// <summary>The install form the Catalog card opens for this app, so a card can skip the list.</summary>
+    internal static string InstallFormPath(CatalogEntryDto app)
+    {
+        var query = $"repo={Uri.EscapeDataString(app.Repo)}";
+        if (!string.IsNullOrEmpty(app.Folder)) query += $"&folder={Uri.EscapeDataString(app.Folder)}";
+        return $"/apps/install-source?{query}&commit={Uri.EscapeDataString(app.Commit)}";
     }
 
     internal const string OffsiteBackupAppId = "offsite-backup";
