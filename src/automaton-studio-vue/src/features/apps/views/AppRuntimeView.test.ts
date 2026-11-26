@@ -49,6 +49,21 @@ describe('AppRuntimeView runtime bootstrap', () => {
     expect(iframe.attributes('src')).not.toContain('/api/apps/app-id/launch-runtime')
   })
 
+  it('renews the app session while the app stays open, and stops after unmount', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = await mountView(true)
+      mocks.createRuntimeLaunch.mockClear()
+      await vi.advanceTimersByTimeAsync(4 * 60 * 1000)
+      expect(mocks.createRuntimeLaunch).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
+      await vi.advanceTimersByTimeAsync(8 * 60 * 1000)
+      expect(mocks.createRuntimeLaunch).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows a note and an Open in a new tab button instead of a blank frame when the app forbids framing', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const wrapper = await mountView(true, false)
