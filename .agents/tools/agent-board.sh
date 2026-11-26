@@ -41,7 +41,7 @@ pick() {
     fi
     if [[ $failed == true ]]; then
       # the failure comment is the last one the workflow posted; a newer comment from the owner reopens the card
-      local flast; flast=$("$GH" issue view "$num" -R "$repo" --json comments --jq '[.comments[]|select(.body|startswith("Agent run failed"))|.createdAt]|last // "none"')
+      local flast; flast=$("$GH" issue view "$num" -R "$repo" --json comments --jq '[.comments[]|select(.body|startswith("Agent run "))|.createdAt]|last // "none"')
       if [[ $flast != none && $last != none && $last > $flast ]]; then "$GH" issue edit "$num" -R "$repo" --remove-label agent:failed >/dev/null || true; else continue; fi
     fi
     # agent:go starts agent-issue.yml only in automaton. Elsewhere dispatch the run first (the runner's login is the

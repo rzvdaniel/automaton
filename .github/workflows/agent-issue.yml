@@ -69,12 +69,12 @@ jobs:
             "$B" move "$REPO" "$NUMBER" "In review" || true
           elif [ "$RESULT" = success ]; then
             gh issue edit "$NUMBER" -R "$REPO" --add-label agent:failed || true
-            gh issue comment "$NUMBER" -R "$REPO" --body "Agent run ended without a pull request that references this issue: $RUN_URL. Back to Ready. Comment here to let it run again." || true
-            "$B" move "$REPO" "$NUMBER" "Ready for agents" || true
+            gh issue comment "$NUMBER" -R "$REPO" --body "Agent run ended without a pull request that references this issue: $RUN_URL. Moved to Inbox, it needs the owner. Comment here and move the card to Ready for agents to let it run again." || true
+            "$B" move "$REPO" "$NUMBER" "Inbox" || true
           else
             gh issue edit "$NUMBER" -R "$REPO" --add-label agent:failed || true
-            gh issue comment "$NUMBER" -R "$REPO" --body "Agent run failed ($RESULT): $RUN_URL. Back to Ready. Comment here to let it run again." || true
-            "$B" move "$REPO" "$NUMBER" "Ready for agents" || true
+            gh issue comment "$NUMBER" -R "$REPO" --body "Agent run failed ($RESULT): $RUN_URL. Moved to Inbox, it needs the owner. Comment here and move the card to Ready for agents to let it run again." || true
+            "$B" move "$REPO" "$NUMBER" "Inbox" || true
           fi
           "$B" pick
 
