@@ -10,8 +10,12 @@
 set -euo pipefail
 
 mode="${1:?Usage: release-install-check.sh fresh|upgrade|sweep}"
-domain="${CI_DOMAIN:-automatontest.fyi}"
-email="${CI_EMAIL:-admin@$domain}"
+zone_name="${CI_DOMAIN:-automatontest.fyi}"
+# One sub-domain per run and mode: Let's Encrypt allows five certificates a week for the same set of names, and every
+# throwaway install asks for new ones.
+domain="${mode:0:1}${RUN_ID:-local}-$$.$zone_name"
+domain="${domain,,}"
+email="${CI_EMAIL:-admin@$zone_name}"
 types="${SERVER_TYPES:-cx23 cpx12}"
 locations="${LOCATIONS:-nbg1 fsn1 hel1}"
 run_id="${RUN_ID:-local-$$}"
@@ -29,7 +33,7 @@ cf() { # cf METHOD PATH [json]
 
 sweep() {
     local cutoff
-    cutoff=$(date -u -d "-${MAX_AGE_MINUTES:-120} minutes" +%s)
+    cutoff=$(date -u -d "-${MAX_AGE_MINUTES:-180} minutes" +%s)
     hcloud server list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created)"' | while read -r id created; do
         if (( $(date -u -d "$created" +%s) < cutoff )); then
             echo "Deleting $id created $created"; hcloud server delete "$id"
@@ -94,8 +98,8 @@ echo "Running on $server_type in $location"
 summary "- $mode: server type \`$server_type\`, location \`$location\`"
 
 step 'DNS'
-zone_id=$(cf GET "zones?name=$domain" | jq -r '.result[0].id // empty')
-[[ -n "$zone_id" ]] || fail "Zone $domain not found for the Cloudflare token"
+zone_id=$(cf GET "zones?name=$zone_name" | jq -r '.result[0].id // empty')
+[[ -n "$zone_id" ]] || fail "Zone $zone_name not found for the Cloudflare token"
 dns_delete
 for name in "${names[@]}"; do
     cf POST "zones/$zone_id/dns_records" "$(jq -n --arg n "$name.$domain" --arg ip "$ip" '{type:"A",name:$n,content:$ip,ttl:60,proxied:false}')" >/dev/null
@@ -109,7 +113,7 @@ low_memory_note() {
 }
 on_failure() {
     echo "--- last lines of the install log (it holds no secrets)"
-    remote 'tail -n 40 /var/log/automaton-install.log' 2>/dev/null || true
+    remote "tail -n 40 /var/log/automaton-install.log | grep -viE 'token|secret|password|key|link|code='" 2>/dev/null || true
     low_memory_note
 }
 

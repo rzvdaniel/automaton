@@ -1,5 +1,5 @@
 name: Release install sweeper
-# Deletes throwaway servers of the release install check that are older than 2 hours (a cancelled or killed run).
+# Deletes throwaway servers of the release install check that are older than 3 hours (a cancelled or killed run).
 on:
   schedule:
     - cron: '17 * * * *'
