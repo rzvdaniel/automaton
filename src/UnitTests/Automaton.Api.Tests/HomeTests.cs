@@ -48,6 +48,22 @@ public sealed class HomeTests
     }
 
     [Test]
+    public void FailedReadinessChecksBecomeCardsNamingTheCheck()
+    {
+        var cards = HomeNeedsYouService.ReadinessCards([
+            new("Database", "error", "Connection failed."), new("Signing keys", "configured", "ok"),
+            new("Backups", "error", "No backup has completed yet."), new("SMTP", "unverified", "later")]);
+
+        var card = cards.Single();
+        Assert.That(card.Key, Is.EqualTo("setup-check:Database"));
+        Assert.That(card.Title, Does.Contain("Database"));
+        Assert.That(card.Severity, Is.EqualTo("error"));
+        Assert.That(card.Dismissible, Is.False);
+        Assert.That(HomeCardKeys.CanDismiss(card.Key), Is.False);
+        Assert.That(HomeNeedsYouService.ReadinessCards([new("Database", "verified", "Connected.")]), Is.Empty, "healthy: no card");
+    }
+
+    [Test]
     public async Task AdministratorSeesServerCardsAndAUserDoesNot()
     {
         Guid admin = Guid.NewGuid(), user = Guid.NewGuid();

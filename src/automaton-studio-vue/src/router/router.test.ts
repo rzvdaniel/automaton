@@ -90,7 +90,7 @@ describe('studio router', () => {
   it.each(['apikeys', 'downloads', 'admin-installation'])('sends the old %s page to Settings', (name) => {
     const redirect = router.getRoutes().find((route) => route.name === name)?.redirect as { path: string; hash: string }
     expect(redirect.path).toBe('/settings')
-    expect(['#agents', '#server']).toContain(redirect.hash)
+    expect(['#keys', '#connect', '#email']).toContain(redirect.hash)
   })
 
   describe('CLI approval page', () => {

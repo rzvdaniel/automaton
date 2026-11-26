@@ -11,6 +11,7 @@ import Tag from 'primevue/tag'
 import { smtpSettingsService } from '../services/smtp-settings.service'
 import type { SmtpSettingsSummary, SmtpSettingsUpdate } from '../types/install.types'
 
+const emit = defineEmits<{ saved: [] }>()
 const summary = ref<SmtpSettingsSummary | null>(null)
 const form = ref<SmtpSettingsUpdate>({ emailHost: '', emailPort: 587, emailUseSsl: true,
   emailAccount: '', emailPassword: '', fromEmail: '', supportEmail: '' })
@@ -54,6 +55,7 @@ async function save() {
   try {
     await smtpSettingsService.save(form.value)
     await load()
+    emit('saved')
     notice.value = 'SMTP settings saved. Check the connection to verify authentication.'
   } catch (cause) {
     error.value = message(cause, 'Could not save SMTP settings.')
@@ -92,7 +94,6 @@ onMounted(load)
 
 <template>
   <div class="flex flex-column gap-3">
-    <p class="text-color-secondary m-0">Configure outgoing mail for invitations and password recovery. Only system administrators can change these settings.</p>
     <div v-if="loading" role="status">Loading SMTP settings…</div>
     <template v-else-if="summary">
       <div class="flex align-items-center gap-2 flex-wrap">
@@ -104,28 +105,30 @@ onMounted(load)
       <Message v-if="summary.source === 'file'" severity="info" :closable="false">
         The server file currently supplies SMTP settings. Enter its password and save to move to Studio-managed settings; Studio cannot read the saved password back.
       </Message>
-      <form class="flex flex-column gap-3" @submit.prevent="save">
-        <div class="flex flex-column gap-1"><label for="smtp-host">SMTP host</label><InputText id="smtp-host" v-model="form.emailHost" required maxlength="255" /></div>
-        <div class="flex flex-column gap-1"><label for="smtp-port">Port</label><InputNumber input-id="smtp-port" v-model="form.emailPort" :min="1" :max="65535" required /></div>
-        <div class="flex align-items-center gap-2"><Checkbox input-id="smtp-tls" v-model="form.emailUseSsl" binary /><label for="smtp-tls">Use TLS</label></div>
-        <small class="text-color-secondary">Port 587 uses STARTTLS and port 465 uses TLS from connection start.</small>
-        <div class="flex flex-column gap-1"><label for="smtp-account">SMTP account</label><InputText id="smtp-account" v-model="form.emailAccount" required maxlength="320" autocomplete="username" /></div>
-        <div class="flex flex-column gap-1"><label for="smtp-password">SMTP password</label>
-          <Password input-id="smtp-password" v-model="form.emailPassword" :feedback="false" toggle-mask fluid autocomplete="new-password" />
-          <small class="text-color-secondary">{{ summary.source === 'studio' ? 'Leave blank to keep the saved password.' : 'Required when first saving settings in Studio.' }}</small>
+      <form class="smtp-form" @submit.prevent="save">
+        <div class="smtp-grid">
+          <div class="flex flex-column gap-1"><label for="smtp-host">SMTP host</label><InputText id="smtp-host" v-model="form.emailHost" required maxlength="255" /></div>
+          <div class="flex flex-column gap-1"><label for="smtp-port">Port</label><InputNumber input-id="smtp-port" v-model="form.emailPort" :min="1" :max="65535" required fluid />
+            <small class="text-color-secondary">587 uses STARTTLS, 465 uses TLS from the start.</small></div>
+          <div class="flex flex-column gap-1"><label for="smtp-account">SMTP account</label><InputText id="smtp-account" v-model="form.emailAccount" required maxlength="320" autocomplete="username" /></div>
+          <div class="flex flex-column gap-1"><label for="smtp-password">SMTP password</label>
+            <Password input-id="smtp-password" v-model="form.emailPassword" :feedback="false" toggle-mask fluid autocomplete="new-password" />
+            <small class="text-color-secondary">{{ summary.source === 'studio' ? 'Leave blank to keep the saved password.' : 'Required when first saving settings in Studio.' }}</small>
+          </div>
+          <div class="flex flex-column gap-1"><label for="smtp-from">Sender email</label><InputText id="smtp-from" v-model="form.fromEmail" type="email" required maxlength="320" /></div>
+          <div class="flex flex-column gap-1"><label for="smtp-support">Support email</label><InputText id="smtp-support" v-model="form.supportEmail" type="email" required maxlength="320" /></div>
+          <div class="flex align-items-center gap-2"><Checkbox input-id="smtp-tls" v-model="form.emailUseSsl" binary /><label for="smtp-tls">Use TLS</label></div>
+          <div class="flex flex-column gap-1"><label for="smtp-test-recipient">Test recipient email</label>
+            <InputText id="smtp-test-recipient" v-model="testRecipient" type="email" autocomplete="email" />
+          </div>
         </div>
-        <div class="flex flex-column gap-1"><label for="smtp-from">Sender email</label><InputText id="smtp-from" v-model="form.fromEmail" type="email" required maxlength="320" /></div>
-        <div class="flex flex-column gap-1"><label for="smtp-support">Support email</label><InputText id="smtp-support" v-model="form.supportEmail" type="email" required maxlength="320" /></div>
-        <div class="flex gap-2 flex-wrap">
-          <Button type="submit" label="Save SMTP settings" :loading="saving" :disabled="saving || verifying" />
+        <small v-if="unsaved" class="text-color-secondary">Save changes before checking the connection or sending a test. They apply to saved settings.</small>
+        <div class="smtp-actions">
           <Button type="button" label="Check connection" outlined :loading="verifying" :disabled="summary.source !== 'studio' || unsaved || saving || verifying" @click="verify" />
+          <Button type="button" label="Send test email" outlined :loading="sendingTest"
+            :disabled="summary.source !== 'studio' || unsaved || !testRecipient || saving || verifying || sendingTest" @click="sendTest" />
+          <Button type="submit" label="Save" :loading="saving" :disabled="saving || verifying" />
         </div>
-        <small v-if="unsaved" class="text-color-secondary">Save changes before checking the connection. Verification applies to saved settings.</small>
-        <div class="flex flex-column gap-1"><label for="smtp-test-recipient">Test recipient email</label>
-          <InputText id="smtp-test-recipient" v-model="testRecipient" type="email" autocomplete="email" />
-        </div>
-        <Button type="button" label="Send test email" outlined :loading="sendingTest"
-          :disabled="summary.source !== 'studio' || unsaved || !testRecipient || saving || verifying || sendingTest" @click="sendTest" />
       </form>
     </template>
     <Button v-else type="button" label="Retry" outlined @click="load" />
@@ -134,3 +137,10 @@ onMounted(load)
     <small class="text-color-secondary">Connection verification checks TLS and account authentication. A successful test send means the SMTP server accepted the message; confirm arrival in the inbox. Back up the database with the API Data Protection key ring.</small>
   </div>
 </template>
+
+<style scoped>
+.smtp-form { display: flex; flex-direction: column; gap: 12px; }
+.smtp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.smtp-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 640px) { .smtp-grid { grid-template-columns: 1fr; } }
+</style>

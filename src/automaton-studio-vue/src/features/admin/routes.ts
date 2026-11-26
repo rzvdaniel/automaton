@@ -28,7 +28,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         path: 'installation',
         name: 'admin-installation',
         // Configuration status and outgoing email now live in Settings.
-        redirect: { path: '/settings', hash: '#server' },
+        redirect: { path: '/settings', hash: '#email' },
       },
       {
         path: 'backups',

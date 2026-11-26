@@ -62,4 +62,4 @@ Nightly copies of the database and the keys that decrypt it. Administrators only
 
 ## Also in the menu
 
-**Home** is the start page. **Admin** and **Settings** hold server-wide and personal settings. **Documentation** opens these pages.
+**Home** is the start page. **Admin** holds server-wide settings. **Settings** has tabs: **Account** (profile, password, light or dark theme), **Connect your AI** (the commands to connect Claude or the CLI), **API keys** (keys for scripts and CI) and, for system administrators, **Email** (a `!` shows while email is not set up). A link such as `/settings#keys` opens a tab directly. **Documentation** opens these pages.
