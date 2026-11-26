@@ -1,0 +1,12 @@
+{
+  "name": "Hello",
+  "summary": "A page that greets you.",
+  "application": {
+    "runtime": { "image": "node:22-slim", "command": { "executable": "node", "arguments": ["server.mjs"] }, "port": 8080 },
+    "health": { "path": "/health" },
+    "storage": { "dataDirectory": "data" },
+    "settings": [{ "name": "GREETING", "description": "Text the page shows", "default": "Hello" }],
+    "secrets": [{ "name": "HELLO_KEY", "description": "Example secret" }],
+    "permissions": ["notify:email"]
+  }
+}

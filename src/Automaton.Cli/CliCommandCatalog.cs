@@ -54,6 +54,7 @@ internal static class CliCommandCatalog
         root.AddCommand(TargetCommand.Build(config));
         root.AddCommand(ListingCommand.Build(config));
         root.AddCommand(CatalogCommand.Build(config));
+        root.AddCommand(ImportComposeCommand.Build());
     }
 
 }

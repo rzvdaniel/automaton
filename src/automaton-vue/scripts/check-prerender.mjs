@@ -10,6 +10,7 @@ const pages = [
   ['use-cases/index.html', 'Small apps that matter.', 'https://automaton.monster/use-cases'],
   ['catalog/index.html', 'Find an app to install.', 'https://automaton.monster/catalog'],
   ['how-catalogs-work/index.html', 'Apps as source code.', 'https://automaton.monster/how-catalogs-work'],
+  ['spec/index.html', 'An open catalog format', 'https://automaton.monster/spec'],
   ['how-setup-works/index.html', 'From a rented server to your first app.', 'https://automaton.monster/how-setup-works'],
   ['roadmap/index.html', 'Where Automaton is going.', 'https://automaton.monster/roadmap'],
   ['get-started/index.html', 'Pick how you want to begin', 'https://automaton.monster/get-started'],

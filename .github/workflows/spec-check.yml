@@ -1,0 +1,33 @@
+name: Spec check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/automaton-vue/public/schemas/**'
+      - 'docs/spec/**'
+      - 'scripts/validate-spec.py'
+      - 'src/Automaton.Cli/Services/CatalogBuildService.cs'
+      - '.github/workflows/spec-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/automaton-vue/public/schemas/**'
+      - 'docs/spec/**'
+
+permissions:
+  contents: read
+
+jobs:
+  spec-check:
+    name: spec-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install jsonschema==4.23.0
+      # The official catalog and a third-party-style catalog must validate against the published schema.
+      - name: Catalogs
+        run: python3 scripts/validate-spec.py catalog docs/spec/examples/third-party-catalog.json https://raw.githubusercontent.com/rzvdaniel/automaton-apps/main/catalog.json
+      - name: Apps
+        run: python3 scripts/validate-spec.py app docs/spec/examples/hello-automaton.json system-apps/automaton-infrastructure/automaton.json

@@ -164,6 +164,7 @@ Run `automaton <command> --help` for a command's options.
 | `automaton target` | Manage deployment targets for the linked app |
 | `automaton listing` | Set how the linked app appears in the public marketplace: summary, description, category, tags, cover image and screenshots. Publishing lists an app by default. |
 | `automaton catalog` | Create and build an apps repository for use as a catalog source, and manage the server's catalog sources |
+| `automaton import-compose <compose-file> [--out DIR] [--name NAME]` | Write `automaton.json` and a supported `compose.yaml` from a Docker Compose file; unsupported keys that are safe to drop are listed, anything else stops the import |
 
 <!-- cli-commands:end -->
 

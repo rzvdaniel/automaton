@@ -197,6 +197,8 @@ All fields sit under `application` unless noted. `appId`, `name` and `summary` (
 | `publicAccess` | Hint `{ "level": "required" or "recommended", "reason": "..." }` shown before install when outside callers must reach the app. It changes nothing by itself. |
 | `settings`, `secrets`, `permissions` | Described above. |
 
+The format is an open spec with JSON Schemas for `automaton.json` and `catalog.json`: [automaton.monster/spec](https://automaton.monster/spec). To start from a Docker Compose file, run `automaton import-compose compose.yaml --out my-app`: it writes `automaton.json` and a `compose.yaml` reduced to what Automaton runs (a published image per service, one routed HTTP port, named volumes), lists what it dropped, and refuses `build:`, host mounts and `$` interpolation.
+
 Commands take structured arguments; set `useShell` only when you need a shell. Keep paths inside the project folder. Deployment is asynchronous: wait for `Running` in `automaton apps`.
 
 ### Open paths
