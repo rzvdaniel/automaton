@@ -367,6 +367,18 @@ body{background:var(--bg)}
 .disk__pct{grid-area:pct}.bar{grid-area:bar;margin:4px 0}.disk__size{grid-area:size;font-size:13px}.disk__holds{grid-area:holds;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .disks .a-card__head+div .disk:first-child{border-top:0}
 @media (max-width:860px){.lower{grid-template-columns:1fr}}
+
+/* v5 (option A): every disk is a tile like CPU and Memory; tiles wrap; Health and Maintenance share one row height. */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.tile{min-height:168px}
+.tile__head code{font:400 12px var(--mono,monospace);color:var(--muted)}
+.tile__foot{font-size:13px;font-variant-numeric:tabular-nums;margin-top:auto}
+.tile .bar{margin:6px 0 4px}
+.tile--warn{border-color:color-mix(in srgb,var(--orange) 45%,var(--border))}
+.tile--warn .tile__value{color:var(--orange-ink)}
+.tile--warn .bar i{background:var(--orange)}
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
+@media (max-width:860px){.lower{grid-template-columns:1fr}}
 </style>
 <header class="a-topbar">
   <div class="a-topbar__inner">
@@ -406,7 +418,7 @@ body{background:var(--bg)}
     <div><b>Backups disk is 86% full.</b> 13.8 of 16 GiB used. Delete old backups or move them off-site; Server Keeper warns at 80%.</div>
   </div>
 
-  <div class="tiles">
+  <div class="tiles" id="tiles">
     <div class="a-card tile">
       <div class="tile__head"><span>CPU · 2 cores</span><span class="a-muted">load 0.25 · 0.68 · 0.60</span></div>
       <div class="tile__value">4.5%</div>
@@ -417,25 +429,19 @@ body{background:var(--bg)}
       <div class="tile__value">61.5%</div>
       <svg class="spark" viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,24 20,25 30,12 40,23 80,24 110,25 130,24 140,16 160,17 170,22 180,21 190,8 200,10"/></svg>
     </div>
-    <div class="a-card tile" id="disk-tile">
-      <div class="tile__head"><span id="dt-label">Disk · fullest of 2</span><span class="a-muted" id="dt-name">System disk</span></div>
-      <div class="tile__value" id="dt-value">45.5%</div>
-      <svg class="spark" viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true"><polyline id="dt-spark" points="0,22 40,22 80,21 120,21 160,20 200,20"/></svg>
-    </div>
   </div>
 
 
   <div class="lower">
     <section class="a-card" aria-labelledby="mt">
       <h3 class="a-card__title" id="mt">Maintenance</h3>
-      <div class="mrow"><div><b>Cleanup</b><div class="a-muted small">freed 16 MiB 13 hours ago · next 05:00 UTC</div></div><button class="a-btn" type="button">Run now</button></div>
+      <div class="mrow"><div><b>Cleanup</b><div class="a-muted small">freed 16 MiB 13 hours ago · next 05:00 UTC · up to 5.7 GiB can be freed</div></div><button class="a-btn" type="button">Run now</button></div>
       <div class="mrow"><div><b>Backup</b><div class="a-muted small">succeeded 10 minutes ago · daily</div></div><button class="a-btn" type="button">Run now</button></div>
       <div class="mrow"><div><b>Upgrade Runners</b><div class="a-muted small">all current</div></div><span class="a-muted small">nothing to do</span></div>
       <div class="mrow"><div><b>OS updates</b><div class="a-muted small">none waiting</div></div><span class="a-muted small">nothing to do</span></div>
       <div class="mrow"><div><b>Restart server</b><div class="a-muted small">last restart 6 minutes ago</div></div><button class="a-btn" type="button">Restart&hellip;</button></div>
     </section>
-    <div class="side">
-      <section class="a-card" aria-labelledby="ht">
+    <section class="a-card" aria-labelledby="ht">
         <h3 class="a-card__title" id="ht">Health</h3>
         <div class="hrow"><span class="dot"></span>OS updates<span class="a-muted">none waiting · restart not needed</span></div>
         <div class="hrow"><span class="dot"></span>Certificates<span class="a-muted">studio, api · 80 days left</span></div>
@@ -443,12 +449,6 @@ body{background:var(--bg)}
         <div class="hrow"><span class="dot"></span>Backups<span class="a-muted">last one 6 minutes ago</span></div>
         <div class="hrow"><span class="dot"></span>fail2ban<span class="a-muted">on · 34 bans in 24 h</span></div>
       </section>
-      <section class="a-card disks" aria-labelledby="disks-title">
-        <div class="a-card__head"><h3 class="a-card__title" id="disks-title">Disks</h3><span class="a-muted small">warning at 80% · 5.7 GiB can be freed</span></div>
-        <div id="disk-rows"></div>
-        <button type="button" class="a-btn more" id="more" hidden></button>
-      </section>
-    </div>
   </div>
 </main>
 <script>
@@ -464,29 +464,19 @@ body{background:var(--bg)}
   };
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
   function render(k){
-    var d=ALL[k], rows="", top=null;
+    var d=ALL[k], html="", top=null, warnN=0;
+    [].slice.call(document.querySelectorAll('.tile--disk')).forEach(function(e){e.remove();});
     d.forEach(function(x){
-      var p=x.u/x.t*100, warn=p>=80, free=(x.t-x.u);
-      if(!top||p>top.p) top={x:x,p:p};
-      rows+='<div class="disk'+(warn?' disk--warn':'')+'">'+
-        '<div class="disk__name"><b>'+esc(x.n)+'</b><code>'+esc(x.m)+'</code></div>'+
-        '<div class="disk__pct">'+p.toFixed(1)+'%</div>'+
+      var p=x.u/x.t*100, warn=p>=80, free=x.t-x.u; if(warn) warnN++;
+      html+='<div class="a-card tile tile--disk'+(warn?' tile--warn':'')+'">'+
+        '<div class="tile__head"><span><b>'+esc(x.n)+'</b> <code>'+esc(x.m)+'</code></span>'+(warn?'<span class="a-pill a-pill--warning">over 80%</span>':'')+'</div>'+
+        '<div class="tile__value">'+p.toFixed(1)+'%</div>'+
         '<div class="bar" role="img" aria-label="'+p.toFixed(0)+'% used'+(warn?', over the 80% warning':'')+'"><i style="width:'+p.toFixed(1)+'%"></i><b></b></div>'+
-        '<div class="disk__size">'+x.u.toFixed(1)+' of '+x.t.toFixed(1)+' GiB <span>· '+free.toFixed(1)+' free</span></div>'+
-        '<div class="disk__holds">'+esc(x.h)+'</div></div>';
+        '<div class="tile__foot">'+x.u.toFixed(1)+' of '+x.t.toFixed(1)+' GiB · '+free.toFixed(1)+' free<br><span class="a-muted">'+esc(x.h)+'</span></div></div>';
     });
-    document.getElementById('disk-rows').innerHTML=rows;
-    var els=[].slice.call(document.querySelectorAll('#disk-rows .disk')), more=document.getElementById('more'), extra=0;
-    els.forEach(function(e,i){ if(i>=3 && !e.classList.contains('disk--warn')){e.hidden=true;extra++;} });
-    more.hidden=!extra; more.textContent='Show '+extra+' more disk'+(extra>1?'s':'');
-    more.onclick=function(){els.forEach(function(e){e.hidden=false;});more.hidden=true;};
-    var warn=top.p>=80;
-    document.getElementById('dt-label').textContent=d.length===1?'Disk':'Disk · fullest of '+d.length;
-    document.getElementById('dt-name').textContent=d.length===1?top.x.t.toFixed(1)+' GiB':top.x.n;
-    document.getElementById('dt-value').textContent=top.p.toFixed(1)+'%';
-    document.getElementById('disk-tile').classList.toggle('tile--warn',warn);
-    document.getElementById('needs').hidden=!warn;
-    document.getElementById('hl-title').textContent=warn?'1 thing needs you':'Everything is healthy';
+    document.getElementById('tiles').insertAdjacentHTML('beforeend',html);
+    document.getElementById('needs').hidden=!warnN;
+    document.getElementById('hl-title').textContent=warnN?'1 thing needs you':'Everything is healthy';
   }
   ['n1','n2','n4'].forEach(function(id){document.getElementById(id).addEventListener('change',function(e){render(e.target.value);});});
   var h=location.hash.slice(1); if(h==='disks-1'||h==='disks-4'){document.getElementById('n'+h.slice(-1)).checked=true;render(h.slice(-1));} else render('2');
