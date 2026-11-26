@@ -8,6 +8,14 @@ license: Apache-2.0
 
 Create an issue before building when the request came from chat, and for every gap found while testing.
 
+## One issue or several
+
+Combine small fixes into one issue so one agent run, review and gate cover them: up to 3-4 fixes in the same area
+(Studio UI, even on different pages; one app; docs and text), each with its own line under **Done when**. Write them
+as one issue from the start. Keep separate: security, auth, installer or backup changes; anything large or uncertain;
+changes in different repositories or layers (Studio and Runner). If review blocks one part of a combined PR, split
+that part out instead of holding the rest.
+
 ## Title
 
 What should be true, in plain words: "An app owner can delete their app after losing Runner access", not
