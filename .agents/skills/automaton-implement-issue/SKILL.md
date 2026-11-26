@@ -51,6 +51,18 @@ Create a to-do item for each step and tick them off.
    the test itself is wrong, and say so in the PR. Keep the evidence for the PR: the commands and what came back, for
    a bug the test that failed before and passes now, for a UI change a screenshot of this branch running locally.
    "Done" without output is a claim, not evidence.
+   **Before you push**, run the checks CI runs that a plain build skips (#1736), picked from the changed paths:
+   - C# (`src/**/*.cs`): `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` (CA1502 complexity 15 and
+     other analyzer errors fail Tests and the CLI binary builds), then
+     `dotnet test src/UnitTests/Automaton.<Project>.Tests -p:WarningsAsErrors=nullable%3BNU1902%3BNU1903%3BNU1904`
+     with the flags from `.github/workflows/tests.yml`.
+   - Website (`src/automaton-vue/`): `npm run build` there (runs `vue-tsc -b`, the strict type check the image build uses).
+     Studio and store: `npx vue-tsc --noEmit -p tsconfig.app.json` and `npm run lint:check -- --quiet`.
+   - Guidance seeds (`src/Automaton.AiGuidance/`, its embedded seed files): run
+     `dotnet test src/UnitTests/Automaton.Api.Tests --filter AiGuidanceSeedExportTests`. If
+     `GuidanceOutput_IsByteForByteTheOutputOfTheDatabaseBackedRuntime` fails after an intended change, copy the new SHA-256
+     values from its failure output into the `expected` list in `AiGuidanceSeedExportTests.cs`.
+   - Docs (`src/automaton-vue/docs`, `docs/`): `node scripts/check-doc-links.mjs`.
 4. **Docs.** Find every user page the change makes wrong: search `src/automaton-vue/docs` for the feature's words
    (commands, labels, messages). Update them in this PR and name them on the Docs line; "none" only with a real reason.
    An app's own `docs/` (apps repository) are part of that app's change too. There is no separate docs walk before a release.
