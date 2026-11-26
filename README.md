@@ -11,7 +11,7 @@
 [![Tests](https://github.com/rzvdaniel/automaton/actions/workflows/tests.yml/badge.svg)](https://github.com/rzvdaniel/automaton/actions/workflows/tests.yml)
 [![CLI on NuGet](https://img.shields.io/nuget/v/Automaton.Cli?label=CLI)](https://www.nuget.org/packages/Automaton.Cli)
 
-[Website](https://automaton.monster) · [Docs](https://automaton.monster/docs/) · [Live apps](https://store.automaton.monster) · [Catalog](https://automaton.monster/catalog)
+[Website](https://automaton.monster) · [Docs](https://automaton.monster/docs/) · [Live apps](https://store.automaton.monster) · [Catalog](https://automaton.monster/catalog) · [Roadmap](ROADMAP.md)
 
 <img src="docs/images/studio-catalog.png" width="800" alt="Automaton Studio: the app catalog, with apps you can install in one click">
 
