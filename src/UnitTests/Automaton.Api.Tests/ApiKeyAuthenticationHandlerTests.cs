@@ -107,6 +107,28 @@ public sealed class ApiKeyAuthenticationHandlerTests
         Assert.That(result.Succeeded, Is.False);
     }
 
+    [Test]
+    public async Task RejectedKey_IsCountedAgainstItsAddressAndMarkedForFail2ban_ButAcceptedKeyIsNot()
+    {
+        await using var setup = await AuthenticationSetup.CreateAsync("SysAdmin", ApiKeyScope.PermissionsAdmin);
+        var tracker = new Automaton.Api.Security.ApiKeyFailureTracker(
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+            Microsoft.Extensions.Options.Options.Create(new Automaton.Api.Security.RateLimitingOptions
+            {
+                ApiKeyFailures = new Automaton.Api.Security.RateLimitPolicyOptions(1, 60)
+            }));
+
+        var accepted = await setup.AuthenticateAsync($"/api/admin/apps/{AppId}/permissions", tracker: tracker);
+        Assert.That(accepted.Succeeded, Is.True);
+        Assert.That(tracker.IsBlocked(null), Is.False);
+
+        var rejected = await setup.AuthenticateAsync("/api/apps", wrongKey: true, tracker: tracker);
+        Assert.That(rejected.Succeeded, Is.False);
+        Assert.That(tracker.IsBlocked(null), Is.True);
+        Assert.That(setup.LastResponseHeaders[Automaton.Api.Security.ApiKeyFailureTracker.HeaderName].ToString(),
+            Is.EqualTo(Automaton.Api.Security.ApiKeyFailureTracker.HeaderValue));
+    }
+
     private sealed class AuthenticationSetup : IAsyncDisposable
     {
         private readonly ServiceProvider services;
@@ -177,9 +199,16 @@ public sealed class ApiKeyAuthenticationHandlerTests
             return (apiKeyService, created.apiKey);
         }
 
-        public async Task<AuthenticateResult> AuthenticateAsync(string path = "/api/apps", bool viaQuery = false)
+        public IHeaderDictionary LastResponseHeaders { get; private set; } = new HeaderDictionary();
+
+        public async Task<AuthenticateResult> AuthenticateAsync(string path = "/api/apps", bool viaQuery = false, bool wrongKey = false,
+            Automaton.Api.Security.ApiKeyFailureTracker? tracker = null)
         {
             var context = new DefaultHttpContext();
+            if (tracker is not null)
+                context.RequestServices = new ServiceCollection().AddSingleton(tracker).BuildServiceProvider();
+            LastResponseHeaders = context.Response.Headers;
+            var apiKey = wrongKey ? "ak_not-a-real-key" : this.apiKey;
             context.Request.Path = path;
             if (viaQuery) context.Request.QueryString = new QueryString($"?api_key={apiKey}");
             else context.Request.Headers["X-API-Key"] = apiKey;

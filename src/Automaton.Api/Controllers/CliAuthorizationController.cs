@@ -64,6 +64,7 @@ public sealed class CliAuthorizationController : BaseController
     }
 
     [HttpPost("requests/{requestId:guid}/approve")]
+    [EnableRateLimiting(RateLimitPolicyNames.CliApproval)]
     [Authorize]
     public async Task<IActionResult> Approve(
         Guid requestId,

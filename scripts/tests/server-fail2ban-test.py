@@ -13,9 +13,12 @@ REPO = Path(__file__).resolve().parents[2]
 SOURCE = REPO / 'docker/install/fail2ban'
 
 
-def line(host, status, request_host, method, path):
-    return json.dumps({'ClientAddr': f'{host}:5', 'ClientHost': host, 'DownstreamStatus': status, 'RequestHost': request_host,
-                       'RequestMethod': method, 'RequestPath': path, 'time': '2026-11-18T10:46:00Z'}, separators=(',', ':'))
+def line(host, status, request_host, method, path, auth_failure=None):
+    fields = {'ClientAddr': f'{host}:5', 'ClientHost': host, 'DownstreamStatus': status, 'RequestHost': request_host,
+              'RequestMethod': method, 'RequestPath': path, 'time': '2026-11-18T10:46:00Z'}
+    if auth_failure:
+        fields['downstream_X-Automaton-Auth-Failure'] = auth_failure
+    return json.dumps(dict(sorted(fields.items())), separators=(',', ':'))
 
 
 @unittest.skipUnless(shutil.which('fail2ban-regex'), 'fail2ban-regex is not installed')
@@ -44,6 +47,12 @@ class FilterTests(unittest.TestCase):
         ok = [line('7.7.7.7', 200, 'studio.x.com', 'POST', '/api/Account/LoginUser'),
               line('7.7.7.7', 401, 'studio.x.com', 'GET', '/api/apps'), line('7.7.7.7', 401, 'a.apps.x.com', 'POST', '/login')]
         self.assertEqual(self.matches('automaton-signin', [failed, failed] + ok), 2)
+
+    def test_signin_filter_matches_rejected_api_keys_only(self):
+        bad = [line('6.6.6.6', 401, 'api.x.com', 'GET', '/api/apps', 'api-key'), line('6.6.6.6', 429, 'api.x.com', 'GET', '/api/apps', 'api-key')]
+        ok = [line('6.6.6.6', 401, 'api.x.com', 'GET', '/api/apps'), line('6.6.6.6', 429, 'api.x.com', 'GET', '/api/apps'),
+              line('6.6.6.6', 200, 'api.x.com', 'GET', '/api/apps')]
+        self.assertEqual(self.matches('automaton-signin', bad + ok), 2)
 
 
 class InstallScriptTests(unittest.TestCase):

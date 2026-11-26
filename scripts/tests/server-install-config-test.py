@@ -217,12 +217,19 @@ class InstallationConfigurationTests(unittest.TestCase):
         access_log = json.loads(traefik_path.read_text())['accessLog']
         self.assertEqual(access_log['format'], 'json')
         self.assertEqual(access_log['filePath'], '/certificates/logs/access.log')
-        self.assertEqual(access_log['fields']['headers']['defaultMode'], 'drop')
+        self.assertEqual(access_log['fields']['headers'], {'defaultMode': 'drop', 'names': {'X-Automaton-Auth-Failure': 'keep'}})
         before = json.loads(traefik_path.read_text())
         del before['accessLog']
         traefik_path.write_text(json.dumps(before))
         self.assertEqual(module.ensure_access_log(self.root), 'changed')
         self.assertEqual(json.loads(traefik_path.read_text())['accessLog'], access_log)
+        self.assertEqual(module.ensure_access_log(self.root), 'unchanged')
+        before['accessLog'] = module.PREVIOUS_ACCESS_LOG
+        traefik_path.write_text(json.dumps(before))
+        self.assertEqual(module.ensure_access_log(self.root), 'changed')
+        self.assertEqual(json.loads(traefik_path.read_text())['accessLog'], access_log)
+        before['accessLog'] = {'filePath': '/elsewhere.log', 'format': 'common'}
+        traefik_path.write_text(json.dumps(before))
         self.assertEqual(module.ensure_access_log(self.root), 'unchanged')
         traefik_path.write_text('entryPoints: {}  # hand written\n')
         self.assertEqual(module.ensure_access_log(self.root), 'skipped')

@@ -20,6 +20,7 @@ public static class RateLimitingServiceCollectionExtensions
 
         services.AddSingleton<IValidateOptions<RateLimitingOptions>, RateLimitingOptionsValidation>();
         services.AddSingleton<MultipartUploadAdmission>();
+        services.AddSingleton<ApiKeyFailureTracker>();
 
         services.AddOptions<RateLimiterOptions>()
             .Configure<IOptions<RateLimitingOptions>>((options, configuredOptions) =>
@@ -124,6 +125,8 @@ public static class RateLimitingServiceCollectionExtensions
     private static void AddApplicationPolicies(RateLimiterOptions options, RateLimitingOptions configuredOptions)
     {
         AddRemoteIpPolicy(options, RateLimitPolicyNames.ApiKeyValidation, configuredOptions.ApiKeyValidation);
+        AddRemoteIpPolicy(options, RateLimitPolicyNames.InvitationAccept, configuredOptions.InvitationAccept);
+        AddRemoteIpPolicy(options, RateLimitPolicyNames.CliApproval, configuredOptions.CliApproval);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.ActionWebhookCall, configuredOptions.ActionWebhookCall);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.PublicAppControllerExecution, configuredOptions.PublicAppControllerExecution);
         AddRemoteIpPolicy(options, RateLimitPolicyNames.PublicAppFlowExecution, configuredOptions.PublicAppFlowExecution);
