@@ -30,6 +30,8 @@ public static class HomeCardKeys
     public const string InstalledForYou = "installed-for-you";
     public const string OffsiteBackup = "offsite-backup";
     public const string RecommendedApp = "recommended-app";
+    public const string DiskLow = "disk-low";
+    public const string DiskLowPrefix = "disk-low:";
     public const string SetupCheck = "setup-check";
     public const string SetupCheckPrefix = "setup-check:";
     public const string RecommendedPrefix = "recommended:";
