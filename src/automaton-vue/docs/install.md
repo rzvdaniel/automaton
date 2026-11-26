@@ -159,4 +159,4 @@ The report lists work in flight; wait for it or pass `--discard-in-flight`. The 
 
 - Build your first app: [Work with AI](./work-with-ai).
 - Something failed: [When something goes wrong](./when-something-goes-wrong).
-- Reference: [Back up and restore](./backup-restore) and [Security overview](./security).
+- Reference: [Back up and restore](./backup-restore) and [Security overview](./security). Found a security problem? Report it privately through the [security policy](https://github.com/rzvdaniel/automaton/security/policy).

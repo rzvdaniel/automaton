@@ -47,6 +47,9 @@ import logoUrl from '@/assets/logo.svg'
         <h4 class="footer-col-title">Project</h4>
         <a :href="publicAppConfig.githubUrl" class="footer-link">Source code</a>
         <a href="https://github.com/rzvdaniel/automaton/issues" class="footer-link">Contact</a>
+        <a href="https://github.com/rzvdaniel/automaton/security/policy" class="footer-link"
+          >Report a vulnerability</a
+        >
         <a href="https://github.com/rzvdaniel/automaton/blob/main/LICENSE" class="footer-link"
           >Apache 2.0 license</a
         >
