@@ -340,7 +340,7 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
-for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh os-update-from-request.sh fail2ban.sh watchdog.py configure.py explain_certificate_failure.py check_dns.py; do
+for script in backup.sh cleanup.sh restore.sh update-from-request.sh restart-from-request.sh os-update-from-request.sh fail2ban.sh watchdog.py configure.py explain_certificate_failure.py check_dns.py host_security.py; do
     if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
 done
 # The responder container runs as an unprivileged user and bind-mounts this script, so it must be world-readable.
@@ -479,6 +479,13 @@ fi
 if [[ -f "$install_dir/fail2ban.sh" && -d "$install_dir/fail2ban" ]]; then
     bash "$install_dir/fail2ban.sh" --install-dir "$install_dir" \
         || echo "Warning: fail2ban could not be set up. Run: sudo bash $install_dir/fail2ban.sh" >&2
+fi
+# SSH passwords and ports open to the internet: asks before fixing; unattended or quiet runs only warn (best effort).
+if [[ -f "$install_dir/host_security.py" ]]; then
+    host_security_args=(); [[ "$tls_mode" == delegated ]] && host_security_args+=(--allow-port 53)
+    if $unattended || $quiet; then host_security_args+=(--yes); fi
+    python3 "$install_dir/host_security.py" ${host_security_args[@]+"${host_security_args[@]}"} \
+        || echo "Warning: the SSH and firewall check could not run. Run: sudo python3 $install_dir/host_security.py" >&2
 fi
 # Alerts when the containers, the data or the backup are missing (best effort: the install is complete without it).
 if [[ -f "$install_dir/watchdog.py" ]]; then

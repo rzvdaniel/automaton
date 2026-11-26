@@ -69,6 +69,7 @@ jobs:
       - run: python3 scripts/tests/server-install-certificate-test.py
       - run: bash -n docker/install/fail2ban.sh
       - run: python3 scripts/tests/server-watchdog-test.py
+      - run: python3 scripts/tests/server-host-security-test.py
       - run: |
           sudo apt-get install -y fail2ban
           python3 scripts/tests/server-fail2ban-test.py

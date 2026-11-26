@@ -259,6 +259,34 @@ public sealed class ServerHealthTests
     }
 
     [Test]
+    public async Task HostSecurityFindingsAreServedToSecurityReadOnly_AndNeverInsideServerHealth()
+    {
+        await using var db = CreateDb();
+        var (_, key) = SeedMachineRunner(db);
+        await db.SaveChangesAsync();
+        var reports = new HostHealthReportService(db);
+        var now = DateTime.UtcNow;
+        Assert.That((await new HostSecurityReadService(reports).GetAsync(now, default)).Reported, Is.False, "no report yet");
+        await reports.ReportAsync(key, Sample() with { HostSecurity = new("ufw", [new("ssh-password", "SSH allows passwords", "d")]) }, default);
+        var memory = new MemoryCache(new MemoryCacheOptions());
+        memory.Set(nameof(LatestReleaseClient), (string?)null);
+
+        var security = await new HostSecurityReadService(reports).GetAsync(now, default);
+        var health = await Service(db, memory, null).GetAsync(now, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(security.Reported, Is.True);
+            Assert.That(security.NeedsYou, Is.True);
+            Assert.That(security.Findings.Single().Id, Is.EqualTo("ssh-password"));
+            Assert.That(health.Host!.HostSecurity, Is.Null, "server:read does not carry the findings");
+            Assert.That(health.Runners.Single().Host!.HostSecurity, Is.Null);
+        });
+        Assert.ThrowsAsync<ArgumentException>(() => reports.ReportAsync(key,
+            Sample(DateTime.UtcNow.AddSeconds(5)) with { HostSecurity = new(null, [new("", "t", "d")]) }, default));
+    }
+
+    [Test]
     public async Task Fail2BanIsNotReportedBeforeARunnerReadsIt()
     {
         await using var db = CreateDb();

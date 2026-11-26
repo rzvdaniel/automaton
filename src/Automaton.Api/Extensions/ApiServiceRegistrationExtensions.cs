@@ -674,6 +674,7 @@ internal static class ApiRunnerRegistration
         services.AddScoped<Automaton.Api.ServerHealth.HostHealthReportService>();
         services.AddScoped<Automaton.Api.ServerHealth.ServerHealthService>();
         services.AddScoped<Automaton.Api.ServerHealth.Fail2BanReadService>();
+        services.AddScoped<Automaton.Api.ServerHealth.HostSecurityReadService>();
         services.AddScoped<Automaton.Api.ServerHealth.Fail2BanManageService>();
         services.AddScoped<Automaton.Api.Services.AppStatusReadService>();
         services.AddScoped<Automaton.Api.ServerHealth.AppDiskUsageService>();

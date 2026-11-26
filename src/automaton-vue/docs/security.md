@@ -46,6 +46,12 @@ An app that needs platform access declares permissions in `automaton.json` (for 
 
 Secret changes and uses (names, scopes and versions, never values) are recorded in the platform audit log and kept for 180 days; app permission requests, approvals and revocations are recorded there too. App owners see their app's history under **Secrets → Show history**; administrators see all events under **Admin → Audit Events**.
 
+## SSH and the firewall
+
+At the end of an install the installer checks how the VPS is set up: SSH password login, root login with a password, ports other than 22, 80, 443 and 5671 (Runners) open to the internet, and whether a firewall is on. It prints what it found and, when you run it in a terminal, asks before each fix, for example "SSH allows passwords. Turn it off? [Y/n]". Turning passwords off is written to `/etc/ssh/sshd_config.d/00-automaton-hardening.conf` (delete that file to allow passwords again) and is refused when no account has an authorized SSH key, so you cannot lock yourself out. The firewall fix turns on `ufw` with those ports and the port sshd listens on. With `--unattended` or `--quiet` the installer only warns and changes nothing. Run the check again any time: `sudo python3 /opt/automaton-server/host_security.py`.
+
+Server Keeper shows the same findings as a "needs you" item once the Runner has measured them (a few minutes). It cannot change them. Cloud provider firewalls are not checked, and Server Keeper cannot see `iptables` or `nftables` rules, so it does not report a missing firewall; the installer does.
+
 ## Scanners and password guessing
 
 The installer and every update set up [fail2ban](https://github.com/fail2ban/fail2ban) with three jails: `sshd`, `automaton-scanner` (20 requests for junk paths such as `/.env`, `/wp-admin` or `*credentials*` that answer 404, or 404 bursts on Studio, the API root and the store, within a minute) and `automaton-signin` (10 failed Automaton sign-ins or rejected API keys within ten minutes). A banned address is blocked at the firewall (Docker's `DOCKER-USER` chain, so ports 80, 443 and 5671 are really closed to it) for an hour, longer each time it returns. Real traffic is never limited: pages, published apps' links, Studio's live connection and uploads do not count. The jails read Traefik's access log (it keeps no request headers), kept in the certificates volume and rotated daily.

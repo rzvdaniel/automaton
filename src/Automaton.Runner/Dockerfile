@@ -79,6 +79,8 @@ COPY --from=build /app/publish .
 # Copy FastAPI server
 COPY src/Automaton.Runner/fastapi_server /app/fastapi_server
 COPY src/Automaton.Runner/automaton-host-exec /usr/local/bin/automaton-host-exec
+# The host security check the installer runs; Server Keeper runs it read-only in a helper container.
+COPY docker/install/host_security.py /app/host_security.py
 RUN chmod +x /usr/local/bin/automaton-host-exec
 RUN pip install --no-cache-dir -r /app/fastapi_server/requirements.txt
 

@@ -29,7 +29,8 @@ public sealed record MachineHostHealth(
     long? DockerUnusedImagesBytes = null,
     IReadOnlyList<AppDiskUsage>? AppDisk = null,
     Fail2BanStatus? Fail2Ban = null,
-    IReadOnlyList<HostDisk>? Disks = null);
+    IReadOnlyList<HostDisk>? Disks = null,
+    HostSecurityStatus? HostSecurity = null);
 
 /// <summary>
 /// One disk of the host: the main disk (mounted at <c>/</c>) and, when Docker keeps its data on another disk, that disk
@@ -63,3 +64,12 @@ public sealed record Fail2BanJail(
     string Name, bool Enabled, int BannedLastHour, int BannedLast24Hours, IReadOnlyList<Fail2BanBan> CurrentBans);
 
 public sealed record Fail2BanBan(string Ip, DateTime BannedAtUtc, DateTime? ExpiresAtUtc);
+
+/// <summary>
+/// What the host security check found on the server: SSH password login, ports open to the internet beyond the ones Automaton
+/// needs, no firewall. Null on the report when the Runner could not run the check (unknown, never "all good").
+/// </summary>
+public sealed record HostSecurityStatus(string? Firewall, IReadOnlyList<HostSecurityFinding> Findings);
+
+/// <param name="Id">Stable key such as <c>ssh-password</c>, <c>ssh-root-password</c>, <c>no-firewall</c> or <c>port-tcp-5432</c>.</param>
+public sealed record HostSecurityFinding(string Id, string Title, string Detail);
