@@ -6,7 +6,10 @@ and pause apps and to read how they are doing, as the signed-in user.
 
 ## Connect
 
-- **Claude Code, with an API key:**
+- **Claude Code, by approval (default for people):**
+  `claude mcp add --transport http automaton https://api.your-domain.com/mcp`, then the person approves the sign-in in
+  Studio. Never ask for or handle a key.
+- **Claude Code, with an API key (CI and headless machines only):**
   `claude mcp add --transport http automaton https://api.your-domain.com/mcp --header "Authorization: Bearer <your API key>"`.
   Without a key, or with a wrong one, the endpoint answers 401.
 - **Claude on the web or phone, as a custom connector:** in Claude open

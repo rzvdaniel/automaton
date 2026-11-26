@@ -18,9 +18,12 @@ const creating = ref(false)
 const isEmailConfirmed = computed(() => authStore.user?.emailConfirmed ?? false)
 const isHttps = mcpAddress.startsWith('https://')
 
-const claudeCodeCommand = computed(
-  () =>
-    `claude mcp add --transport http automaton ${mcpAddress} --header "Authorization: Bearer ${newKey.value ?? '<your API key>'}"`,
+const showKey = ref(false)
+const keylessCommand = `claude mcp add --transport http automaton ${mcpAddress}`
+const claudeCodeCommand = computed(() =>
+  showKey.value
+    ? `${keylessCommand} --header "Authorization: Bearer ${newKey.value ?? '<your API key>'}"`
+    : keylessCommand,
 )
 
 async function copy(text: string, what: string) {
@@ -66,7 +69,11 @@ async function createKey() {
         <code data-testid="claude-code-command">{{ claudeCodeCommand }}</code>
         <Button icon="pi pi-copy" text rounded size="small" aria-label="Copy command" @click="copy(claudeCodeCommand, 'Command copied')" />
       </div>
-      <div class="mt-2">
+      <p v-if="!showKey" class="text-sm text-color-secondary m-0 mt-2" data-testid="approve-note">
+        Run it, then approve the sign-in in Studio. No key is needed.
+        <a href="#" data-testid="use-key-link" @click.prevent="showKey = true">Use an API key instead</a> (for CI and headless machines).
+      </p>
+      <div v-else class="mt-2" data-testid="key-section">
         <Button
           v-if="!newKey"
           label="Create a key"
