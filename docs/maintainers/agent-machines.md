@@ -5,7 +5,7 @@ timeout and logs in the Actions run. Replaces `scripts/agent-queue/` once the pi
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `agent-issue.yml` | issue labelled `agent:go` by `rzvdaniel` or `rzvdaniel-bot` | Runs `.agents/jobs/implement-issue.md` for the issue (180 min). Then, if an open PR of the issue lacks only the main review and/or security pass, `agent-finish-pr.sh` runs `.agents/jobs/finish-pr.md` (60 min): reviewers post with the runner's other logins and the gate merges. Success: card to **In review**. Failure or timeout: `agent:failed`, a comment with the run link, card back to **Ready for agents**. Then runs `pick`. |
+| `agent-issue.yml` | issue labelled `agent:go` by `rzvdaniel` or `rzvdaniel-bot` | Runs `.agents/jobs/implement-issue.md` for the issue (180 min). Then, if an open PR of the issue lacks only the main review and/or security pass, `agent-finish-pr.sh` runs `.agents/jobs/finish-pr.md` (60 min): reviewers post with the runner's other logins and the gate merges. Success: card to **In review**. Failure or timeout: `agent:failed`, a comment with the run link, card to **Inbox** (it needs the owner; Ready only holds work `pick` takes). Then runs `pick`. |
 | `agent-pick-next.yml` | every 10 minutes, `workflow_dispatch` | `agent-board.sh pick`: restarts the chain after a pause. |
 | `agent-lessons.yml` | 03:00 daily, `workflow_dispatch` | Calls the reusable `agent-job.yml` with `.agents/jobs/lessons.md`. |
 | `agent-job.yml` | `workflow_call` | Runs any prompt file; refuses actors other than the owner and bot (schedules are allowed). |
