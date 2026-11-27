@@ -23,12 +23,14 @@ def manifest(app_digit, infrastructure_digit='0', store=True, age=True):
                    for name in names)
 
 
-def compose(store=True, postgres_image='postgres', update_mounts=False, traefik_environment=None):
+def compose(store=True, postgres_image='postgres', update_mounts=False, traefik_environment=None, traefik_volumes=None):
     # JSON is valid YAML; the fake docker prints it for `compose config --format json`.
     services = {name: {'image': name} for name in ('postgres', 'rabbitmq', 'api', 'worker', 'studio', 'traefik')}
     services['postgres']['image'] = postgres_image
     if traefik_environment is not None:
         services['traefik']['environment'] = traefik_environment
+    if traefik_volumes is not None:
+        services['traefik']['volumes'] = traefik_volumes
     if update_mounts:
         services['api']['volumes'] = [
             {'type': 'bind', 'source': '/var/lib/automaton/update/requests', 'target': '/app/update-requests'},
@@ -382,6 +384,17 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn('changes traefik', refused.stderr)
         accepted = self.update(*self.bundle(compose_file=compose(traefik_environment=delegated)))
+        self.assertNotIn('changes traefik', accepted.stderr)
+
+    def test_reviewed_traefik_certs_mount_is_accepted_but_other_volumes_are_not(self):
+        certs = {'type': 'bind', 'source': str(self.config) + '/certs', 'target': '/etc/traefik/certs', 'read_only': True}
+        (self.install / 'compose.yaml').write_text(compose(store=False))
+        for volume in (dict(certs, read_only=False), dict(certs, source='/etc/other'), dict(certs, target='/etc/traefik/other')):
+            refused = self.update(*self.bundle(compose_file=compose(traefik_volumes=[volume])))
+            self.assertIn('changes traefik', refused.stderr)
+        refused = self.update(*self.bundle(compose_file=compose(traefik_volumes=[certs, {'type': 'bind', 'source': '/x', 'target': '/y'}])))
+        self.assertIn('changes traefik', refused.stderr)
+        accepted = self.update(*self.bundle(compose_file=compose(traefik_volumes=[certs])))
         self.assertNotIn('changes traefik', accepted.stderr)
 
     def old_backups(self, count):
