@@ -20,5 +20,5 @@ jobs:
           dotnet tool install Swashbuckle.AspNetCore.Cli --version 10.1.7 --tool-path "$RUNNER_TEMP/swagger"
           dotnet build src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
           # The API refuses to build its host without signing and broker settings; the CLI never connects, so throwaway values are enough.
-          AuthenticationSettings__HMacSettings__SecretKey="$(openssl rand -hex 32)" RabbitMq__Host=localhost RabbitMq__Username=spec RabbitMq__Password=spec ConnectionStrings__PostgreSqlConnection="Host=localhost;Database=spec;Username=spec;Password=spec" ASPNETCORE_ENVIRONMENT=Development "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          AuthenticationSettings__HMacSettings__SecretKey="$(openssl rand -hex 32)" RabbitMq__Host=localhost RabbitMq__Username=spec RabbitMq__Password=spec ConnectionStrings__PostgreSqlConnection="Host=localhost;Database=spec;Username=spec;Password=spec" ASPNETCORE_ENVIRONMENT=Production "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
           jq -e '.paths | length > 1' "$RUNNER_TEMP/openapi.json"; jq '.paths|length' "$RUNNER_TEMP/openapi.json"
