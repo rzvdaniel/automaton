@@ -1,0 +1,139 @@
+name: Security full scan
+# Weekly signed-in full ZAP scan of the newest server release on a throwaway Hetzner server (project "automaton-ci"): the
+# AJAX spider crawls Studio signed in as the install's administrator, the API comes from the release's OpenAPI file, and ZAP's
+# active scan attacks both. Active scans create junk data, so never run this against the shared test server or production.
+# Never blocks a release. High findings fail the run and open one issue each (the owner moves it to the board 17 Inbox).
+# Needs the secrets HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN (and CI_TLS_CERT / CI_TLS_KEY for the shared CI certificate).
+on:
+  schedule:
+    - cron: '43 21 * * 0'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release to scan, e.g. 0.2.195 (default: the newest server release)'
+        required: false
+      server_types:
+        description: 'Server types to try in order'
+        default: 'cx23 cpx12'
+      locations:
+        description: 'Locations to try in order'
+        default: 'nbg1 fsn1 hel1'
+permissions:
+  contents: read
+# Shares the group with the install check: both use the same Cloudflare zone, fixed CI names and hcloud project.
+concurrency:
+  group: release-install-check
+  cancel-in-progress: false
+env:
+  HCLOUD_VERSION: '1.62.0'
+jobs:
+  openapi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.versions.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Pick the release
+        id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          # Only a published, non-draft server release is built: no tag pushed for the purpose.
+          mapfile -t tags < <(gh release list --limit 100 --json tagName,isDraft,isPrerelease \
+            --jq '.[] | select((.isDraft or .isPrerelease) | not) | select(.tagName | startswith("server-v")) | .tagName')
+          current="${INPUT_VERSION:+server-v$INPUT_VERSION}"; current="${current:-${tags[0]}}"
+          printf '%s\n' "${tags[@]}" | grep -qxF -- "$current" || { echo "::error::$current is not a published server release."; exit 1; }
+          echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: server-v${{ steps.versions.outputs.version }}
+          path: release-src
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Generate openapi.json
+        run: |
+          set -euo pipefail
+          dotnet tool install Swashbuckle.AspNetCore.Cli --version 7.1.0 --tool-path "$RUNNER_TEMP/swagger"
+          dotnet build release-src/src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
+          ASPNETCORE_ENVIRONMENT=Development "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          jq -e '.paths | length > 1' "$RUNNER_TEMP/openapi.json" >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: ${{ runner.temp }}/openapi.json
+          retention-days: 3
+  scan:
+    needs: openapi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      CI_TLS_CERT: ${{ secrets.CI_TLS_CERT }}
+      CI_TLS_KEY: ${{ secrets.CI_TLS_KEY }}
+      SERVER_TYPES: ${{ inputs.server_types || 'cx23 cpx12' }}
+      LOCATIONS: ${{ inputs.locations || 'nbg1 fsn1 hel1' }}
+      RUN_ID: ${{ github.run_id }}
+      VERSION: ${{ needs.openapi.outputs.version }}
+    steps:
+      # The default branch, never the commit under test: the scripts are the trusted part.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Require the secrets
+        run: |
+          [[ -n "$HCLOUD_TOKEN" && -n "$CLOUDFLARE_DNS_TOKEN" ]] || { echo "::error::Set the HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN repository secrets."; exit 1; }
+      - name: Install hcloud
+        run: |
+          curl -fsSL "https://github.com/hetznercloud/cli/releases/download/v${HCLOUD_VERSION}/hcloud-linux-amd64.tar.gz" -o hcloud.tgz
+          sudo tar -xzf hcloud.tgz -C /usr/local/bin hcloud
+          hcloud version
+      - uses: actions/download-artifact@v4
+        with:
+          name: openapi
+          path: ${{ runner.temp }}/openapi
+      - name: Install the release and run the full scan
+        run: |
+          echo "### Security full scan: $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          export API_SPEC="$RUNNER_TEMP/openapi/openapi.json" FAILING_JSON="$RUNNER_TEMP/failing.json"
+          echo "- OpenAPI file: $(jq '.paths | length' "$API_SPEC") paths" >> "$GITHUB_STEP_SUMMARY"
+          bash scripts/ci/release-install-check.sh fullscan
+      # One issue per new high finding: a finding that already has an issue (open or closed) is not filed again.
+      - name: File an issue for each new finding
+        if: always() && !cancelled()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -uo pipefail
+          [[ -s "$RUNNER_TEMP/failing.json" ]] || exit 0
+          jq -c '.[]' "$RUNNER_TEMP/failing.json" | while read -r f; do
+            title="Full scan finding: $(jq -r '"\(.title) on \(.where)"' <<< "$f")"
+            title="${title:0:200}"
+            if gh issue list --state all --search "\"$title\" in:title" --json title --jq '.[].title' | grep -qxF -- "$title"; then echo "Known: $title"; continue; fi
+            gh issue create --title "$title" --assignee "$OWNER" \
+              --body "The weekly signed-in full scan (version $VERSION) found: $(jq -r '"\(.level) \(.title), rule \(.id), at \(.where)"' <<< "$f"). Run: $RUN_URL. Move this card to Inbox on board 17." || true
+          done
+      # The script deletes what it creates; this also covers a cancelled run.
+      - name: Delete leftover servers of this run
+        if: always()
+        run: |
+          for id in $(hcloud server list -l "automaton-ci=true,run=$RUN_ID" -o json | jq -r '.[].id'); do hcloud server delete "$id"; done
+          for id in $(hcloud ssh-key list -l automaton-ci=true -o json | jq -r --arg r "automaton-ci-$RUN_ID-" '.[] | select(.name | startswith($r)) | .id'); do hcloud ssh-key delete "$id"; done

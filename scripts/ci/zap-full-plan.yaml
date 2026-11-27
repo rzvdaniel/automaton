@@ -1,0 +1,79 @@
+# ZAP Automation Framework plan of the weekly signed-in full scan (scripts/ci/release-full-scan.sh fills the __PLACEHOLDERS__
+# and passes the credentials as environment variables). Two contexts of one throwaway install: Studio (signed in as the
+# install's administrator through the login page, crawled with the AJAX spider) and the API (OpenAPI file, CLI key header).
+# Endpoints in api-scan-exclude.txt are excluded from every job; the logout page too.
+env:
+  contexts:
+    - name: studio
+      urls: ["https://studio.__DOMAIN__/"]
+      includePaths: ["https://studio[.]__DOMAIN_RX__/.*"]
+      excludePaths: __EXCLUDES__
+      authentication:
+        method: browser
+        parameters:
+          loginPageUrl: "https://studio.__DOMAIN__/login"
+          loginPageWait: 5
+          browserId: firefox-headless
+        verification:
+          method: autodetect
+      sessionManagement:
+        method: autodetect
+      users:
+        - name: ci-admin
+          credentials:
+            username: ${CI_ADMIN_EMAIL}
+            password: ${CI_ADMIN_PASSWORD}
+    - name: api
+      urls: ["https://api.__DOMAIN__/"]
+      includePaths: ["https://api[.]__DOMAIN_RX__/.*"]
+      excludePaths: __EXCLUDES__
+  parameters:
+    failOnError: true
+    progressToStdout: true
+jobs:
+  # The CLI key goes on every request to the API host (the OpenAPI import, the active scan and Studio's own calls).
+  - type: replacer
+    parameters:
+      deleteAllRules: true
+    rules:
+      - description: ci-auth
+        url: "https://api[.]__DOMAIN_RX__/.*"
+        matchType: req_header
+        matchString: Authorization
+        matchRegex: false
+        replacementString: "Bearer ${CI_API_KEY}"
+  - type: spiderAjax
+    parameters:
+      context: studio
+      user: ci-admin
+      browserId: firefox-headless
+      maxDuration: 20
+      maxCrawlDepth: 10
+      clickDefaultElems: true
+  - type: openapi
+    parameters:
+      apiFile: /zap/wrk/openapi.json
+      targetUrl: "https://api.__DOMAIN__"
+      context: api
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+  - type: activeScan
+    parameters:
+      context: studio
+      user: ci-admin
+      maxScanDurationInMins: 30
+  - type: activeScan
+    parameters:
+      context: api
+      maxScanDurationInMins: 30
+  - type: export
+    parameters:
+      type: yaml
+      source: sitestree
+      fileName: /zap/wrk/sites.yaml
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk
+      reportFile: full.json
