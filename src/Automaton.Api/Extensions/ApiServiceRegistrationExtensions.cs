@@ -396,7 +396,6 @@ internal static class ApiMessagingRegistration
             });
         });
         services.AddAutomatonRateLimiting();
-        services.AddSingleton<RefreshTokenCookieService>();
         return services;
     }
 }
