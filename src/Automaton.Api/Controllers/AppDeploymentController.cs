@@ -43,7 +43,7 @@ public sealed class AppDeploymentController(
     [RequestSizeLimit(AppArchiveStorageBounds.MaximumUploadBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = AppArchiveStorageBounds.MaximumUploadBytes)]
     public async Task<ActionResult<DeploymentOperationResponse>> DeployPackage(
-        Guid appId, [FromForm] IFormFile? file, [FromQuery] bool clean = false,
+        Guid appId, IFormFile? file, [FromQuery] bool clean = false,
         [FromQuery] string? targetSlug = null, CancellationToken cancellationToken = default)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
