@@ -55,7 +55,7 @@ if [[ -n "$api_spec" ]]; then
     echo "::add-mask::$key"
     zopts=(-config 'replacer.full_list(0).description=ci-auth' -config 'replacer.full_list(0).enabled=true'
         -config 'replacer.full_list(0).matchtype=REQ_HEADER' -config 'replacer.full_list(0).matchstr=Authorization'
-        -config 'replacer.full_list(0).regex=false' -config "replacer.full_list(0).replacement=Bearer $key")
+        -config 'replacer.full_list(0).regex=false' -config "replacer.full_list(0).replacement=Bearer $key" -config scanner.maxScanDurationInMins=15)
     n=0
     while IFS= read -r rx; do
         [[ -z "$rx" || "$rx" == \#* ]] && continue
@@ -65,7 +65,8 @@ if [[ -n "$api_spec" ]]; then
     # -T: at most 15 minutes of scanning; -I: alerts do not fail the script, the report decides.
     docker run --rm -v "$work:/zap/wrk:rw" "$zap_image" zap-api-scan.py -t /zap/wrk/openapi.json -f openapi -O "https://api.$domain" \
         -J zapi.json -T 15 -I -z "$(printf '%q ' "${zopts[@]}")" >"$work/zapi.log" 2>&1 || rc=$?
-    [[ -s "$work/zapi.json" ]] || { sed "s/$key/***/g" "$work/zapi.log" | tail -n 20; echo "::error::ZAP API scan produced no report (exit $rc)"; exit 1; }
+    sed -i "s/$key/***/g" "$work/zapi.log"
+    [[ -s "$work/zapi.json" ]] || { tail -n 20 "$work/zapi.log"; echo "::error::ZAP API scan produced no report (exit $rc)"; exit 1; }
     zap_args+=(--zap "api-spec=$work/zapi.json")
     api_note="API scan: $endpoints of $all_endpoints endpoints in the OpenAPI file scanned signed in with a CLI key (the rest are destructive, see api-scan-exclude.txt)"
     echo "$api_note"
