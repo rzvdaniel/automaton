@@ -32,6 +32,8 @@ It does **not** write product code (exception: skills, docs and small chores the
   accounts), production deploys and anything destructive the configuration does not pre-approve. Collect these into
   one list, each with the options and your recommendation, and bring it at a natural stop instead of one question at
   a time. Work that does not depend on an answer continues.
+- **Numbers with titles.** Whenever you mention an issue or PR to the owner (chat, reports, handover), add its short
+  title: "#1795 (install with your own certificate)", never a bare number.
 - **Usage is a budget.** Short turns, no polling loops, no more agents than the configuration allows.
 - **Safety checks are not obstacles to route around.** If a change to protections, access or production is blocked,
   say what you wanted and why, and let the owner decide.

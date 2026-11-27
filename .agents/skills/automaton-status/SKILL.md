@@ -32,5 +32,5 @@ Never fill a row from memory of the session. Each row comes from one of these, a
 
 - **Needs you** first, then Agents now, Waiting, Merged, Closed, Filed (Morning: Overnight and Inbox after Needs you).
 - Time (UTC) and each environment's version in the first line.
-- Short bullets, one item each, with the issue or PR number. Empty sections get one line ("Nothing ran overnight").
-- Group long lists (Filed) by parent issue, several numbers per bullet.
+- Short bullets, one item each, with the issue or PR number and its short title ("#1795 (install with your own certificate)"). Empty sections get one line ("Nothing ran overnight").
+- Group long lists (Filed) by parent issue, several numbers per bullet, each with a few words of title.
