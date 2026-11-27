@@ -31,3 +31,7 @@ comments reopen a failed card. `pick` serves `rzvdaniel/automaton`, `automaton-a
 4. Add the repository secret `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`; set it, never print it).
 5. Create the labels `agent:go` and `agent:failed`. Install Agent Keeper (automaton-apps) on the machine; its Pick up Action starts the queue.
 6. Only one machine should carry the `agent` label unless you want jobs to spread; `concurrency: agent` queues per repository, not per machine.
+
+## Which agent runs (#1864)
+
+`agent-run.sh` runs Claude Code (`claude`) or Antigravity (`agy`), set by the repo variables `AGENT_CLI` (`claude` default, or `agy`) and `AGENT_MODEL` (default `sonnet`, or `gemini-4-hydrogen-high` with agy). With agy, a run that fails (a usage limit included) or leaves no pull request for the issue runs once more on Claude from a clean worktree. Each implementer run posts one line on the issue: tool, model, minutes, fallback. Reviews and the security pass always run on Claude (`AGENT_REVIEW_MODEL`, default `sonnet`), because they start `automaton-reviewer` subagents. agy needs a one-time sign-in as the machine user (`~/.local/bin/agy`).

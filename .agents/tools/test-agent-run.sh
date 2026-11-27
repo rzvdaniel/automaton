@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test agent-run.sh with a fake claude and a temp repo: shared checkout stays on main, worktree removed after the run.
+# Test agent-run.sh with fake claude/agy/gh and a temp repo: shared checkout stays on main, worktree removed after the run.
 set -euo pipefail
 tools=$(cd "$(dirname "$0")" && pwd)
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
@@ -35,4 +35,31 @@ HOME="$t/home" PATH="$t/bin:$PATH" AGENT_WORKDIR="$t/base" AGENT_WORK_ROOT="$t/w
 [ ! -s "$t/status" ] || { echo "FAIL: copies show in git status: $(cat "$t/status")"; exit 1; }
 [ "$(git -C "$t/home/other" worktree list | wc -l)" = 1 ] || { echo "FAIL: other repo worktree left"; exit 1; }
 [ "$(git -C "$t/base" worktree list | wc -l)" = 1 ] || { echo "FAIL: automaton worktree used for other repo"; exit 1; }
+# AGENT_CLI=agy (#1864): agy runs with its default model; a failed agy run, or one that leaves no PR, reruns once on claude,
+# from a clean worktree, and AGENT_RECORD posts the tool line on the issue.
+printf '#!/bin/sh
+echo "agy $*" >> "%s/calls"
+touch agy-left-this
+exit "${FAKE_AGY_RC:-0}"
+' "$t" > "$t/bin/agy"
+printf '#!/bin/sh
+echo "claude $*" | cut -c1-40 >> "%s/calls"
+[ -e agy-left-this ] && echo dirty >> "%s/calls"
+exit 0
+' "$t" "$t" > "$t/bin/claude"
+printf '#!/bin/sh
+case "$1 $2" in "pr list") echo "${FAKE_PRS:-1}";; "issue comment") echo "$*" >> "%s/comments";; esac
+' "$t" > "$t/bin/gh"
+chmod +x "$t/bin/agy" "$t/bin/claude" "$t/bin/gh"
+run_agy() { rm -f "$t/calls" "$t/comments"; HOME="$t/home" PATH="$t/bin:$PATH" AGENT_WORKDIR="$t/base" AGENT_WORK_ROOT="$t/work" PROMPT_FILE=prompt.md   AGENT_CLI=agy AGENT_RECORD=1 ISSUE_URL=https://github.com/o/automaton/issues/42 GITHUB_RUN_ID=9 "$@" bash "$tools/agent-run.sh"; }
+run_agy env FAKE_AGY_RC=0 FAKE_PRS=1
+grep -q -- "--model gemini-4-hydrogen-high" "$t/calls" || { echo "FAIL: agy model: $(cat "$t/calls")"; exit 1; }
+! grep -q '^claude' "$t/calls" || { echo "FAIL: claude ran after a good agy run"; exit 1; }
+grep -q "tool agy, model gemini-4-hydrogen-high, .* fallback: no" "$t/comments" || { echo "FAIL: record: $(cat "$t/comments")"; exit 1; }
+run_agy env FAKE_AGY_RC=1 FAKE_PRS=1
+grep -q '^claude' "$t/calls" || { echo "FAIL: no claude fallback after agy failed"; exit 1; }
+! grep -q dirty "$t/calls" || { echo "FAIL: claude saw agy's leftovers"; exit 1; }
+grep -q "tool claude, model sonnet, .* fallback: yes" "$t/comments" || { echo "FAIL: fallback record: $(cat "$t/comments")"; exit 1; }
+run_agy env FAKE_AGY_RC=0 FAKE_PRS=0
+grep -q '^claude' "$t/calls" || { echo "FAIL: no claude fallback when agy left no PR"; exit 1; }
 echo "PASS"
