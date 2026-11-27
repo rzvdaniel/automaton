@@ -272,7 +272,7 @@ if [[ "$mode" == restore || "$mode" == all ]]; then
     [[ -n "$app_id" ]] || fail 'Restore check: the CI Hello app is not on the first install'
     remote "bash -s" <<REMOTE || { on_failure; fail 'Restore check: the first install could not write the app marker or take a backup'; }
 set -euo pipefail
-helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker compose --project-directory /opt/automaton-server -f /opt/automaton-server/compose.yaml ps -aq api | head -1))
+helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker ps -aq --filter label=com.docker.compose.service=api | head -1))
 volume=\$(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume | head -1)
 test -n "\$volume"
 docker run --rm --user 0:0 --entrypoint sh -v "\$volume:/v" "\$helper" -c 'mkdir -p /v/workspace/data/$app_id && echo restore-marker-$run_id > /v/workspace/data/$app_id/ci-marker'
@@ -335,7 +335,7 @@ automaton whoami
 automaton apps --json | grep -q '$app_id'
 volume=\$(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume | head -1)
 test -n "\$volume"
-helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker compose --project-directory /opt/automaton-server -f /opt/automaton-server/compose.yaml ps -aq api | head -1))
+helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker ps -aq --filter label=com.docker.compose.service=api | head -1))
 docker run --rm --entrypoint cat -v "\$volume:/v:ro" "\$helper" /v/workspace/data/$app_id/ci-marker | grep -q restore-marker-$run_id
 REMOTE
     summary "- restore: passed (user, app and app data came back after the rebuild)"
