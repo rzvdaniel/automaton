@@ -8,7 +8,7 @@
 #                                             rebuild (hcloud server rebuild), fresh install and scan, restore, check, delete
 #   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 180)
 # Environment: HCLOUD_TOKEN (project "automaton-ci" only), CLOUDFLARE_DNS_TOKEN (Zone.DNS edit on the test domain only),
-# VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
+# API_SPEC (path of the release's openapi.json: the fresh scan also scans the whole API signed in), VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
 # LOCATIONS ("nbg1 fsn1 hel1"), CI_TLS_CERT / CI_TLS_KEY (PEM of the wildcard for *.ci.$CI_DOMAIN and *.apps.ci.$CI_DOMAIN, from
 # ci-certificate.yml: installs with --tls-mode custom on the fixed ci names and asks Let's Encrypt for nothing; an installer
 # that predates custom mode, or no certificate, falls back to one Let's Encrypt sub-domain per run), RUN_ID, RESTORE_WRONG_KEY=1 (restore mode: use a wrong key, the job must fail). Secrets are never printed; the administrator password is generated here and
@@ -223,11 +223,19 @@ wait_healthy
 password=''
 checks "fresh install of $first"
 
-scan() { # scan LABEL
+scan() { # scan LABEL [api]: "api" adds the signed-in scan of the whole API (fresh installs only)
     step "External scan ($1)"
     app_url=$(remote 'cat /root/ci-app-url' 2>/dev/null || true)
     [[ -n "$app_url" ]] || app_url="https://apps.$domain/"
-    bash "$(dirname "${BASH_SOURCE[0]}")/release-scan.sh" "$domain" "$ip" "$app_url" || fail "The external scan found problems (see the summary above)"
+    local api_args=()
+    if [[ "${2:-}" == api && -n "${API_SPEC:-}" ]]; then
+        # Signed in: a developer CLI key created on this server (the password is on the server only), used as the Authorization header.
+        remote "export PATH=\"\$HOME/.local/bin:\$PATH\"; rm -f /root/ci-scan-key; automaton keys create --name ci-scan-$run_id --email '$email' --out /root/ci-scan-key < /root/ci-password >/dev/null" \
+            || fail "$1: could not create the CLI key for the API scan"
+        remote 'cat /root/ci-scan-key' > "$work/scan-key" || fail "$1: could not read the CLI key for the API scan"
+        api_args=(--api-spec "$API_SPEC" --api-key-file "$work/scan-key")
+    fi
+    bash "$(dirname "${BASH_SOURCE[0]}")/release-scan.sh" "${api_args[@]}" "$domain" "$ip" "$app_url" || fail "The external scan found problems (see the summary above)"
     summary "- $1: scan passed"
 }
 
@@ -280,7 +288,7 @@ REMOTE
     if [[ "$mode" == all ]]; then
         password=''
         checks "fresh install of $VERSION"
-        scan "fresh install"
+        scan "fresh install" api
     fi
 
     step 'Restore the backup with the key'
@@ -317,6 +325,6 @@ REMOTE
     echo "All checks passed ($mode)"
     exit 0
 fi
-scan "$mode"
+scan "$mode" "$([[ "$mode" == fresh ]] && echo api)"
 summary "- $mode: passed"
 echo "All checks passed ($mode)"

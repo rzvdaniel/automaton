@@ -44,7 +44,57 @@ concurrency:
 env:
   HCLOUD_VERSION: '1.62.0'  # server rebuild --user-data-from-file needs 1.62 or later
 jobs:
+  # Builds the API's OpenAPI file from the release's own source (Swagger stays off on servers). It runs the release's startup
+  # code, so this job has no secrets, only a read-only token, and passes the file on as an artifact.
+  openapi:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.versions.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Pick the release
+        id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          # Only a published, non-draft server release is built: no tag pushed for the purpose.
+          mapfile -t tags < <(gh release list --limit 100 --json tagName,isDraft,isPrerelease \
+            --jq '.[] | select((.isDraft or .isPrerelease) | not) | select(.tagName | startswith("server-v")) | .tagName')
+          current="${INPUT_VERSION:+server-v$INPUT_VERSION}"; current="${current:-${tags[0]}}"
+          printf '%s\n' "${tags[@]}" | grep -qxF -- "$current" || { echo "::error::$current is not a published server release."; exit 1; }
+          echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: server-v${{ steps.versions.outputs.version }}
+          path: release-src
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Generate openapi.json
+        run: |
+          set -euo pipefail
+          dotnet tool install Swashbuckle.AspNetCore.Cli --version 7.1.0 --tool-path "$RUNNER_TEMP/swagger"
+          dotnet build release-src/src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
+          ASPNETCORE_ENVIRONMENT=Development "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          jq -e '.paths | length > 1' "$RUNNER_TEMP/openapi.json" >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: ${{ runner.temp }}/openapi.json
+          retention-days: 3
   check:
+    needs: openapi
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 210
@@ -86,13 +136,22 @@ jobs:
           set -euo pipefail
           mapfile -t tags < <(gh release list --limit 100 --json tagName,isDraft,isPrerelease,createdAt \
             --jq '[.[] | select((.isDraft or .isPrerelease) | not) | select(.tagName | startswith("server-v"))] | sort_by(.createdAt) | reverse | .[].tagName')
-          current="${INPUT_VERSION:+server-v$INPUT_VERSION}"; current="${current:-${tags[0]}}"
+          current="server-v${{ needs.openapi.outputs.version }}"
           previous=''
           for t in "${tags[@]}"; do [[ "$t" != "$current" ]] && { previous="$t"; break; }; done
           [[ -n "$previous" ]] || { echo "::error::No previous server release to upgrade from."; exit 1; }
           echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
           echo "previous=${previous#server-v}" >> "$GITHUB_OUTPUT"
           echo "### Release install check: ${current#server-v} (upgrade from ${previous#server-v})" >> "$GITHUB_STEP_SUMMARY"
+      # The OpenAPI file comes from the "openapi" job, which builds the release source without any secret.
+      - uses: actions/download-artifact@v4
+        with:
+          name: openapi
+          path: ${{ runner.temp }}/openapi
+      - name: Use the OpenAPI file for the signed-in API scan
+        run: |
+          echo "API_SPEC=$RUNNER_TEMP/openapi/openapi.json" >> "$GITHUB_ENV"
+          echo "- OpenAPI file: $(jq '.paths | length' "$RUNNER_TEMP/openapi/openapi.json") paths" >> "$GITHUB_STEP_SUMMARY"
       # One server for the run: upgrade and scan, back up, rebuild, fresh install and scan, restore, delete.
       - name: Upgrade, fresh install and restore on one rebuilt server
         env:

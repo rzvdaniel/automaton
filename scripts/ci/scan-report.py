@@ -14,6 +14,7 @@ import sys
 
 HEADER_RULES = {"10038", "10020", "10035", "10021", "10037"}  # CSP, clickjacking, HSTS, nosniff, server version leak
 EXPECTED_PORTS = {22, 80, 443}
+API_FAIL_RULES = {"90022"}  # Application Error Disclosure (stack trace): fails in the signed-in API scan (a report named api-*)
 
 
 def load_allowlist(path):
@@ -40,10 +41,11 @@ def zap_findings(name, path):
         for a in site.get("alerts", []):
             risk = int(a.get("riskcode", 0))
             pid = str(a.get("pluginid"))
-            if risk < 2 and pid not in HEADER_RULES:
+            api_fail = name.startswith("api-") and pid in API_FAIL_RULES
+            if risk < 2 and pid not in HEADER_RULES and not api_fail:
                 continue
             uris = [i.get("uri", "") for i in a.get("instances", [])] or [site.get("@name", name)]
-            level = "high" if risk >= 3 else "fail" if pid in HEADER_RULES else "medium"
+            level = "high" if risk >= 3 else "fail" if pid in HEADER_RULES or api_fail else "medium"
             for uri in uris[:5]:
                 findings.append((level, pid, uri, a.get("alert", pid), name))
     return findings
