@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
 import CopyCommand from '../components/CopyCommand.vue'
 import { useToast } from 'primevue/usetoast'
+import { authService } from '@/features/auth/services/auth.service'
 import { appsService, type CatalogUpdate } from '../services/apps.service'
 import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
 import type { App } from '../types/apps.types'
@@ -88,8 +89,10 @@ const RUNTIME_RENEW_MS = 4 * 60 * 1000
 let renewTimer: ReturnType<typeof setInterval> | undefined
 function renewRuntimeSession() {
   if (!appId.value || !applicationUrl.value) return
-  // A failure (Studio session ended) is left alone: the app then shows its own "session ended".
-  appsService.createRuntimeLaunch(appId.value).catch(() => undefined)
+  // The access token outlives a sign-out in another tab, so check the Studio session itself (the refresh cookie sign-out revokes)
+  // before renewing. A failure (Studio session ended) is left alone: the app then shows its own "session ended".
+  const id = appId.value
+  authService.refreshToken().then(() => appsService.createRuntimeLaunch(id)).catch(() => undefined)
 }
 function onVisible() {
   if (document.visibilityState === 'visible') renewRuntimeSession()

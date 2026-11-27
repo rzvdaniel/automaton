@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   applyCatalogUpdate: vi.fn(),
 }))
 
+const authMocks = vi.hoisted(() => ({ refreshToken: vi.fn() }))
+vi.mock('@/features/auth/services/auth.service', () => ({ authService: authMocks }))
 vi.mock('../services/apps.service', () => ({ appsService: mocks }))
 
 function app(requiresAuthentication: boolean) {
@@ -28,6 +30,7 @@ async function mountView(requiresAuthentication: boolean, framable = true) {
   mocks.get.mockResolvedValue(app(requiresAuthentication))
   mocks.listDeploymentTargets.mockResolvedValue([{ isDefault: true, genericRuntimeDeployed: true }])
   mocks.createRuntimeLaunch.mockResolvedValue({ runtimeToken: '' })
+  authMocks.refreshToken.mockResolvedValue({})
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/apps/:id/application', component: AppRuntimeView }] })
   await router.push('/apps/app-id/application')
   await router.isReady()
@@ -59,6 +62,19 @@ describe('AppRuntimeView runtime bootstrap', () => {
       wrapper.unmount()
       await vi.advanceTimersByTimeAsync(8 * 60 * 1000)
       expect(mocks.createRuntimeLaunch).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops renewing the app session once the Studio session has ended in another tab', async () => {
+    vi.useFakeTimers()
+    try {
+      await mountView(true)
+      mocks.createRuntimeLaunch.mockClear()
+      authMocks.refreshToken.mockRejectedValue(new Error('revoked'))
+      await vi.advanceTimersByTimeAsync(8 * 60 * 1000)
+      expect(mocks.createRuntimeLaunch).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
