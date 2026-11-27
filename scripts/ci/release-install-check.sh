@@ -93,8 +93,9 @@ for v in "$first" "$VERSION"; do [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0
 tag="server-v$first"
 
 tls_args=''; write_files=''
-if [[ -n "${CI_TLS_CERT:-}" && -n "${CI_TLS_KEY:-}" ]] \
-    && curl -fsSL "https://github.com/rzvdaniel/automaton/releases/download/$tag/install-automaton.sh" | grep -q -- '--cert-file'; then
+# Read the whole installer first: "curl | grep -q" fails under pipefail when grep stops at the first match.
+first_installer=$(curl -fsSL "https://github.com/rzvdaniel/automaton/releases/download/$tag/install-automaton.sh" || true)
+if [[ -n "${CI_TLS_CERT:-}" && -n "${CI_TLS_KEY:-}" && "$first_installer" == *--cert-file* ]]; then
     # The runs are one at a time (workflow concurrency group), so the fixed names never collide.
     domain="ci.$zone_name"
     tls_args='--tls-mode custom --cert-file /root/ci-cert.pem --key-file /root/ci-key.pem'
