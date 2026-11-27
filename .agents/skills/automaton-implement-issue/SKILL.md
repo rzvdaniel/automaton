@@ -67,7 +67,9 @@ Create a to-do item for each step and tick them off.
    (commands, labels, messages). Update them in this PR and name them on the Docs line; "none" only with a real reason.
    An app's own `docs/` (apps repository) are part of that app's change too. There is no separate docs walk before a release.
 5. **PR.** Open it as the [write-PR skill](../automaton-write-pr/SKILL.md) describes, including the "Check after
-   release" list. Start step 6 while CI runs. An empty check list means the run has not started; it is not a pass.
+   release" list. Every item must be runnable by an agent on the test server without breaking it; if not, name where it
+   runs instead (the install check's throwaway server) or the test hook that triggers it. Owner-only checks are a review
+   finding unless the PR says why and the owner agreed. Start step 6 while CI runs. An empty check list means the run has not started; it is not a pass.
 6. **Review.** Follow the [PR review skill](../pr-review/SKILL.md): tier, independent review, security pass where it
    applies, at most two rounds. For a high tier, spawn a separate `automaton-reviewer` subagent for the security pass; it
    posts with a different login than the main review (pr-review, Different logins).

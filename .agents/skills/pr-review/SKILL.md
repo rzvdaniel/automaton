@@ -73,6 +73,13 @@ Security: checked who can call the new endpoint / not needed, no reachable surfa
 Not checked: the update script was not run
 ```
 
+## Check after release
+
+Read the PR's "Check after release" list as the verifier would. An item an agent cannot run on the test server without
+breaking it (restarting Docker, deleting shared data), or that only the owner can do, is an Important finding unless the
+item names where it runs instead (the install check's throwaway server) or the test hook that triggers the same path, or
+the PR says why and the owner agreed.
+
 ## Answer and re-review
 
 - The author answers every Important finding: a fix, or a reply saying why it is wrong or intended.
