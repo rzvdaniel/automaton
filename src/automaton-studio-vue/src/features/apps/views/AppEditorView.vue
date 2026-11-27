@@ -51,6 +51,11 @@ const editorStore = useAppEditorStore()
 const appId = computed(() => String(route.params.id ?? ''))
 // Admin → Apps links here with ?view=admin (an approval link may say ?tab=admin).
 const activeView = ref<AppViewKey>(route.query.tab === 'admin' ? 'admin' : resolveAppViewFromQuery(route.query))
+// Following a link to another tab of this app (the breadcrumb's app name) changes only the query.
+watch(() => route.query.view, () => {
+  const view = resolveAppViewFromQuery(route.query)
+  if (view !== activeView.value) activeView.value = view
+})
 const roles = useAuthStore().user?.roles ?? []
 const isAdministrator = roles.includes('SysAdmin') || roles.includes('Admin')
 // Only system administrators approve permissions (the endpoint is SysAdmin-only).
