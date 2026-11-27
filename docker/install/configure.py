@@ -106,8 +106,9 @@ HSTS = dict(stsSeconds=31536000, stsIncludeSubdomains=True)
 
 
 def security_headers_config(domain):
-    """Shared response-header middlewares (#1829). 'security-headers' is for Studio, the API and the Store; Studio frames
-    apps, so 'app-security-headers' lets only the Studio origin do that."""
+    """Shared response-header middlewares (#1829). 'security-headers' is for Studio and the Store. 'app-security-headers'
+    (the API and apps addresses) sets only HSTS and nosniff: Traefik replaces a response's own Content-Security-Policy
+    and X-Frame-Options, which would drop the policies apps and the API set themselves (Studio frames apps)."""
     sources = f"https://*.{domain} wss://*.{domain}"
     csp = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; "
            "img-src 'self' data: blob: https:; font-src 'self' data:; worker-src 'self' blob:; "
@@ -116,8 +117,7 @@ def security_headers_config(domain):
     return {'http': {'middlewares': {
         'security-headers': {'headers': dict(HSTS, contentTypeNosniff=True, frameDeny=True,
                                              contentSecurityPolicy=csp)},
-        'app-security-headers': {'headers': dict(HSTS, contentTypeNosniff=True,
-                                                 contentSecurityPolicy=f'frame-ancestors https://studio.{domain}')},
+        'app-security-headers': {'headers': dict(HSTS, contentTypeNosniff=True)},
     }}}
 
 
@@ -142,7 +142,7 @@ def ensure_security_headers(root):
     for name in ('api', 'studio', 'studio-api', 'apps'):
         router = routers.get(name)
         if isinstance(router, dict) and not router.get('middlewares'):
-            router['middlewares'] = ['app-security-headers@file' if name == 'apps' else 'security-headers@file']
+            router['middlewares'] = ['security-headers@file' if name == 'studio' else 'app-security-headers@file']
             changed = True
     if changed:
         replace_json(edge_path, edge)
@@ -570,7 +570,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
                                 ('apps', f'Host(`apps.{domain}`)', 'api')]:
         edge['http']['routers'][name] = dict(entryPoints=['websecure'], rule=rule, service=service,
                                              tls=tls_block(apps_resolver if name == 'apps' else resolver), priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100,
-                                             middlewares=['app-security-headers@file' if name == 'apps' else 'security-headers@file'])
+                                             middlewares=['security-headers@file' if name == 'studio' else 'app-security-headers@file'])
     if wildcard_store(tls_mode, domain):
         edge['tls'] = wildcard_store(tls_mode, domain)
     write_new(root / 'dynamic' / 'installation.yml', json.dumps(edge))

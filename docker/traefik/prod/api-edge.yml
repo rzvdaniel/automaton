@@ -15,7 +15,7 @@ http:
       service: api-live-edge
       middlewares:
         - api-https-headers
-        - security-headers
+        - app-security-headers
       tls:
         certResolver: cloudflare
 
@@ -93,7 +93,6 @@ http:
         stsSeconds: 31536000
         stsIncludeSubdomains: true
         contentTypeNosniff: true
-        contentSecurityPolicy: "frame-ancestors https://__STUDIO_DOMAIN__"
 
   services:
     api-live-edge:

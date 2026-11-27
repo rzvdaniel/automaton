@@ -54,7 +54,7 @@ Server Keeper shows the same findings as a "needs you" item once the Runner has 
 
 ## Security headers
 
-Studio, the API, the store and the apps address send `Strict-Transport-Security` (one year, subdomains included) and `X-Content-Type-Options: nosniff`. Studio, the API and the store also forbid being framed and send a Content-Security-Policy; the apps address allows framing only by Studio, which shows apps in a frame. nginx does not reveal its version. The installer and updates add the headers to installations it configured; a hand-edited `dynamic/installation.yml` is left as it is, so add the `security-headers@file` middleware to its routers yourself. Apps' own responses keep the headers the apps set.
+Studio, the API, the store and the apps address send `Strict-Transport-Security` (one year, subdomains included) and `X-Content-Type-Options: nosniff`. Studio and the store also forbid being framed and send a Content-Security-Policy. The API and apps keep the Content-Security-Policy and frame rules they set themselves, because Traefik would replace them. nginx does not reveal its version. The installer and updates add the headers to installations it configured; a hand-edited `dynamic/installation.yml` is left as it is, so add the `security-headers@file` middleware to its routers yourself. Apps' own responses keep the headers the apps set.
 
 ## Scanners and password guessing
 

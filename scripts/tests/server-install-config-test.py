@@ -153,11 +153,11 @@ class InstallationConfigurationTests(unittest.TestCase):
         mw = json.loads((self.root / 'dynamic/security-headers.yml').read_text())['http']['middlewares']
         self.assertTrue(mw['security-headers']['headers']['frameDeny'])
         self.assertEqual(mw['security-headers']['headers']['stsSeconds'], 31536000)
-        self.assertIn('https://studio.example.com', mw['app-security-headers']['headers']['contentSecurityPolicy'])
+        self.assertNotIn('contentSecurityPolicy', mw['app-security-headers']['headers'])
         routers = json.loads((self.root / 'dynamic/installation.yml').read_text())['http']['routers']
-        for name in ('api', 'studio', 'studio-api'):
-            self.assertEqual(routers[name]['middlewares'], ['security-headers@file'])
-        self.assertEqual(routers['apps']['middlewares'], ['app-security-headers@file'])
+        self.assertEqual(routers['studio']['middlewares'], ['security-headers@file'])
+        for name in ('api', 'studio-api', 'apps'):
+            self.assertEqual(routers[name]['middlewares'], ['app-security-headers@file'])
         store = json.loads((self.root / 'dynamic/store.yml').read_text())['http']['routers']['store']
         self.assertEqual(store['middlewares'], ['security-headers@file'])
         # An installation from before the middleware gets it once.
