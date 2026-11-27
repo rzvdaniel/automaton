@@ -13,7 +13,7 @@ import re
 import sys
 
 HEADER_RULES = {"10038", "10020", "10035", "10021", "10037"}  # CSP, clickjacking, HSTS, nosniff, server version leak
-EXPECTED_PORTS = {22, 80, 443}
+EXPECTED_PORTS = {22, 80, 443, 5671}  # 5671: Runner broker (amqps), documented as required
 API_FAIL_RULES = {"90022"}  # Application Error Disclosure (stack trace): fails in the signed-in API scan (a report named api-*)
 
 
