@@ -476,7 +476,7 @@ rollback() {
         fi
     fi
     if "${old_compose[@]}" up -d --wait --wait-timeout 600 --force-recreate "${old_application_services[@]}" >&2 \
-        && { [[ "$restart_traefik" != true ]] || "${old_compose[@]}" restart traefik >&2; } && public_checks_pass; then
+        && "${old_compose[@]}" up -d --no-deps "${recreate[@]}" traefik >&2 && public_checks_pass; then
         echo "Rolled back: the server answers on ${current_version:-the previous release}. Database restored: $restored. Recovery backup: $backup" >&2
     else
         echo "Rollback did not restore a healthy server. Recovery backup: $backup. Assess the services before retrying." >&2
@@ -487,10 +487,9 @@ if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${app
     rollback 'services did not become healthy'
 fi
 echo 'Checking that the new release answers.'
-if [[ "$restart_traefik" == true ]]; then
-    echo 'Restarting Traefik to load the new certificate resolver.'
-    "${new_compose[@]}" restart traefik || rollback 'Traefik did not restart'
-fi
+# Recreate, not restart, so a newly added mount such as the certs folder (#1814) takes effect; an unchanged Traefik is left alone.
+echo 'Updating Traefik.'
+"${new_compose[@]}" up -d --no-deps --wait --wait-timeout 120 "${recreate[@]}" traefik || rollback 'Traefik did not start'
 if ! public_checks_pass; then
     rollback 'public route validation failed'
 fi
