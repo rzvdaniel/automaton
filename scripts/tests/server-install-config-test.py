@@ -326,6 +326,23 @@ class InstallationConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'does not belong'):
             module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=other)
 
+    def test_custom_mode_rerun_for_another_domain_keeps_the_installed_certificate(self):
+        cert, key = self.make_certificate(['*.example.com', '*.apps.example.com'])
+        module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=key)
+        before = (self.root / 'certs/fullchain.pem').read_text()
+        other, other_key = self.make_certificate(['*.example.org', '*.apps.example.org'], 'org')
+        with self.assertRaisesRegex(ValueError, 'belongs to another domain'):
+            module.configure(self.root, 'example.org', 'owner@example.com', 'custom', cert_file=other, key_file=other_key)
+        self.assertEqual((self.root / 'certs/fullchain.pem').read_text(), before)
+
+    def test_custom_mode_rejects_a_passphrase_key_without_prompting(self):
+        cert, key = self.make_certificate(['*.example.com', '*.apps.example.com'])
+        locked = key.with_name('locked.key')
+        subprocess.run(['openssl', 'pkey', '-in', str(key), '-out', str(locked), '-aes256', '-passout', 'pass:secret'],
+                       check=True, capture_output=True)
+        with self.assertRaisesRegex(ValueError, 'passphrase'):
+            module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=locked)
+
     def test_replace_certificate_swaps_files(self):
         cert, key = self.make_certificate(['*.example.com', '*.apps.example.com'])
         module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=key)

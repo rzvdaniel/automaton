@@ -7,7 +7,9 @@
 #   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 180)
 # Environment: HCLOUD_TOKEN (project "automaton-ci" only), CLOUDFLARE_DNS_TOKEN (Zone.DNS edit on the test domain only),
 # VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
-# LOCATIONS ("nbg1 fsn1 hel1"), RUN_ID, RESTORE_WRONG_KEY=1 (restore mode: use a wrong key, the job must fail). Secrets are never printed; the administrator password is generated here and
+# LOCATIONS ("nbg1 fsn1 hel1"), CI_TLS_CERT / CI_TLS_KEY (PEM of the wildcard for *.ci.$CI_DOMAIN and *.apps.ci.$CI_DOMAIN, from
+# ci-certificate.yml: installs with --tls-mode custom on the fixed ci names and asks Let's Encrypt for nothing; an installer
+# that predates custom mode, or no certificate, falls back to one Let's Encrypt sub-domain per run), RUN_ID, RESTORE_WRONG_KEY=1 (restore mode: use a wrong key, the job must fail). Secrets are never printed; the administrator password is generated here and
 # lives only in a variable and a root-only file on the throwaway server.
 set -euo pipefail
 
@@ -80,14 +82,29 @@ first="$VERSION"; [[ "$mode" == upgrade ]] && first="${PREVIOUS:?PREVIOUS is req
 for v in "$first" "$VERSION"; do [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || fail "Bad version $v"; done
 tag="server-v$first"
 
+tls_args=''; write_files=''
+if [[ -n "${CI_TLS_CERT:-}" && -n "${CI_TLS_KEY:-}" ]] \
+    && curl -fsSL "https://github.com/rzvdaniel/automaton/releases/download/$tag/install-automaton.sh" | grep -q -- '--cert-file'; then
+    # The runs are one at a time (workflow concurrency group), so the fixed names never collide.
+    domain="ci.$zone_name"
+    tls_args='--tls-mode custom --cert-file /root/ci-cert.pem --key-file /root/ci-key.pem'
+    # The certificate is for this throwaway server only; user data of a server in the CI project dies with it.
+    write_files=$(printf 'write_files:\n  - path: /root/ci-cert.pem\n    permissions: "0644"\n    encoding: b64\n    content: %s\n  - path: /root/ci-key.pem\n    permissions: "0600"\n    encoding: b64\n    content: %s\n' \
+        "$(printf '%s' "$CI_TLS_CERT" | base64 -w0)" "$(printf '%s' "$CI_TLS_KEY" | base64 -w0)")
+    echo "Installing with the CI certificate (--tls-mode custom) on $domain"
+else
+    echo "Installing with Let's Encrypt on $domain (no CI certificate, or the release predates --tls-mode custom)"
+fi
+
 step "Create the server ($mode, install $tag)"
 ssh-keygen -q -t ed25519 -N '' -f "$work/key"
 ssh_key_id=$(hcloud ssh-key create --name "automaton-ci-$run_id-$mode" --public-key-from-file "$work/key.pub" --label "$label" -o json | jq -r '.ssh_key.id')
 cat > "$work/user-data" <<YAML
 #cloud-config
+$write_files
 runcmd:
   - curl -fL https://github.com/rzvdaniel/automaton/releases/download/$tag/install-automaton.sh -o /root/install-automaton.sh
-  - bash /root/install-automaton.sh --version $tag --unattended --domain $domain --email $email --admin-email $email
+  - bash /root/install-automaton.sh --version $tag --unattended --domain $domain --email $email --admin-email $email $tls_args
 YAML
 server_type=''; location=''
 for t in $types; do
@@ -228,6 +245,7 @@ REMOTE
 
     step "Create the second server (install $tag)"
     domain_b="s${RUN_ID:-local}-$$.$zone_name"; domain_b="${domain_b,,}"
+    [[ -z "$tls_args" ]] || domain_b="$domain"  # The CI certificate covers only the fixed names: the second server takes them over.
     extra_domains+=("$domain_b")
     ssh_key_b=$(hcloud ssh-key create --name "automaton-ci-$run_id-restore-b" --public-key-from-file "$work/key.pub" --label "$label" -o json | jq -r '.ssh_key.id')
     extra_keys+=("$ssh_key_b")
@@ -244,6 +262,7 @@ REMOTE
     done
     [[ -n "$server_b" ]] || fail "No second server could be created from types: $types in locations: $locations"
     extra_servers+=("$server_b")
+    [[ -z "$tls_args" ]] || dns_delete
     for name in "${names[@]}"; do
         cf POST "zones/$zone_id/dns_records" "$(jq -n --arg n "$name.$domain_b" --arg ip "$ip_b" '{type:"A",name:$n,content:$ip,ttl:60,proxied:false}')" >/dev/null
     done

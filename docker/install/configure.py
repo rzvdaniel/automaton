@@ -402,9 +402,10 @@ def name_covered(name, patterns):
 
 
 def public_key(args):
-    result = subprocess.run(['openssl', *args], capture_output=True, text=True)
+    # -passin pass: and a closed stdin make a passphrase-protected key fail at once instead of prompting.
+    result = subprocess.run(['openssl', *args], capture_output=True, text=True, stdin=subprocess.DEVNULL)
     if result.returncode != 0:
-        raise ValueError('The key file is not a readable PEM private key that belongs to a certificate.')
+        raise ValueError('The key file is not a readable PEM private key without a passphrase that belongs to a certificate.')
     return result.stdout
 
 
@@ -420,7 +421,7 @@ def install_custom_certificate(root, domain, cert_file, key_file):
     missing = [name.replace('x.apps.', '*.apps.') for name in required if not name_covered(name, names)]
     if missing:
         raise ValueError('The certificate does not cover: ' + ', '.join(missing) + '. It covers: ' + ', '.join(names) + '.')
-    if public_key(['x509', '-noout', '-pubkey', '-in', str(cert_file)]) != public_key(['pkey', '-pubout', '-in', str(key_file)]):
+    if public_key(['x509', '-noout', '-pubkey', '-in', str(cert_file)]) != public_key(['pkey', '-pubout', '-passin', 'pass:', '-in', str(key_file)]):
         raise ValueError('The key file does not belong to the certificate.')
     certs = root / 'certs'
     certs.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -444,16 +445,16 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
             raise ValueError('This installation runs on MySQL; this release uses PostgreSQL. Nothing was changed. Migrate the data first with migrate-to-postgresql.sh (src/automaton-vue/docs/install.md#move-a-mysql-server-to-postgresql, issue #587).')
         if not (root / 'installation.json').exists() or any(not (root / 'secrets' / name).is_file() for name in required):
             raise ValueError('Existing installation credentials are incomplete. Restore the configuration backup; keys will not be regenerated.')
+    state = root / 'installation.json'
+    desired = dict(domain=domain, email=email, tls_mode=tls_mode)
+    if state.exists() and json.loads(state.read_text()) != desired:
+        raise ValueError('This directory belongs to another domain/email. Existing configuration was preserved.')
     if tls_mode == 'custom':
         install_custom_certificate(root, domain, cert_file, key_file)  # Before anything else is written.
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     (root / 'certs').mkdir(exist_ok=True, mode=0o700)  # Bind-mounted into Traefik in every mode.
     (root / 'secrets').mkdir(exist_ok=True, mode=0o700)
     (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
-    state = root / 'installation.json'
-    desired = dict(domain=domain, email=email, tls_mode=tls_mode)
-    if state.exists() and json.loads(state.read_text()) != desired:
-        raise ValueError('This directory belongs to another domain/email. Existing configuration was preserved.')
     cloudflare = root / 'secrets' / 'cloudflare-token'
     if tls_mode in ('http', 'delegated', 'custom'):
         write_new(cloudflare, "")
