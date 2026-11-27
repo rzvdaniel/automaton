@@ -12,9 +12,13 @@ VERIFY_N=0; export VERIFY_N
 [[ $(v check) == "skip: nothing in Verify" ]] || { echo "FAIL: empty Verify"; exit 1; }
 VERIFY_N=3; export VERIFY_N
 v done
-echo server-v0.2.198 > "$t/version"; v done server-v0.2.197; [[ $(cat "$t/state/v") == server-v0.2.197 ]] || { echo "FAIL: done with version"; exit 1; }
+rc=0; v done >/dev/null || rc=$?; [[ $rc == 3 ]] || { echo "FAIL: second claim must exit 3"; exit 1; }
+echo server-v0.2.198 > "$t/version"; v done server-v0.2.197 >/dev/null || true; v done server-v0.2.196; [[ $(cat "$t/state/v") == server-v0.2.196 ]] || { echo "FAIL: done with version"; exit 1; }
+v done server-v0.2.197; [[ $(cat "$t/state/v") == server-v0.2.197 ]] || { echo "FAIL: done with version"; exit 1; }
 echo server-v0.2.197 > "$t/version"
 [[ $(v check) == "skip: server-v0.2.197 already verified" ]] || { echo "FAIL: verified"; exit 1; }
 echo server-v0.2.198 > "$t/version"
 [[ $(v check) == "run server-v0.2.198" ]] || { echo "FAIL: next version"; exit 1; }
+v reset; [[ ! -e "$t/state/v" ]] || { echo "FAIL: reset"; exit 1; }
+v done server-v0.2.197 || { echo "FAIL: claim after reset"; exit 1; }
 echo ok

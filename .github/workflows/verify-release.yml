@@ -42,6 +42,9 @@ jobs:
           AGENT_TASK_TIMEOUT: 180m
           AGENT_MODEL: opus
         run: |
-          # Record the attempt first: a failed run must not restart every 10 minutes. Re-run it by hand.
-          bash "$HOME/automaton/.agents/tools/verify-trigger.sh" done "$ISSUE_URL"
+          # Record the attempt first: a failed run must not restart every 10 minutes. To retry, run `verify-trigger.sh reset` on the runner; the next poll starts it again.
+          # Several triggered runs can pass the check together; only the one that records the version goes on (exit 3).
+          rc=0; bash "$HOME/automaton/.agents/tools/verify-trigger.sh" done "$ISSUE_URL" || rc=$?
+          [[ $rc -ne 3 ]] || exit 0
+          [[ $rc -eq 0 ]] || exit "$rc"
           bash "$HOME/automaton/.agents/tools/agent-run.sh"
