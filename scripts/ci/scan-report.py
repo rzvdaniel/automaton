@@ -89,7 +89,7 @@ def main():
         if allowed(rules, pid, where):
             out.append(f"- allowed: {title} on {where} ({src})")
             continue
-        out.append(f"- **{level}**: {title} on {where} ({src})")
+        out.append(f"- **{level}**: {title} [{pid}] on {where} ({src})")
         if level in ("high", "fail"):
             failing += 1
             failed.append({"level": level, "id": pid, "where": where, "title": title, "source": src})
