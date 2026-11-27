@@ -17,6 +17,8 @@ in production, add one line here (or a test, or an analyzer rule) instead of a n
 - **Migrations:** data dropped or rewritten; a migration that fails on a database with real data in it.
 - **Install and update scripts (`docker/install/`, `scripts/`):** a fresh install, or an update from the previous
   release, breaks; a failed update that leaves the server half-updated.
+  A change to an infrastructure service (postgres, rabbitmq, traefik) in `docker/install/compose.yaml` needs a matching reviewed
+  entry in `scripts/update-automaton.sh`, or servers cannot update to that release (#1814).
 - **Worker and messaging:** a job that runs twice or never; state kept in one process that others need.
 - **Studio:** a button that does nothing or reports success on failure; an error the person cannot act on.
 - **CLI:** exit code 0 on failure; output an agent cannot parse; a flag or command changed under existing users.

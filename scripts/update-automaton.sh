@@ -269,9 +269,10 @@ fi
 "${new_compose[@]}" config --format json > "$working/new-compose.json"
 # Releases may add or change application services. Infrastructure, persistent volumes,
 # secrets and networks must stay identical; those changes need a reviewed migration.
-python3 - "$working/old-compose.json" "$working/new-compose.json" <<'PY'
+python3 - "$working/old-compose.json" "$working/new-compose.json" "$config_dir" <<'PY'
 import json, sys
 old, new = (json.load(open(path)) for path in sys.argv[1:3])
+config_dir = sys.argv[3].rstrip('/')
 infrastructure = ('postgres', 'rabbitmq', 'traefik')
 old_services, new_services = old.get('services', {}), new.get('services', {})
 if not set(old_services) <= set(new_services):
@@ -279,13 +280,21 @@ if not set(old_services) <= set(new_services):
 # Reviewed Traefik changes. Each entry names environment variables a release may add; they must be new
 # (absent in the installed release) and nothing else in the service may differ.
 #  - HTTPREQ_* (#893): hand DNS challenges to the acme-responder; used only in delegated TLS mode.
+#  - certs mount (#1795): one added read-only bind of <config dir>/certs at /etc/traefik/certs, for --tls-mode custom.
 reviewed_traefik_environment = ('HTTPREQ_ENDPOINT', 'HTTPREQ_USERNAME', 'HTTPREQ_PASSWORD')
+def reviewed_certs_mount(volume):
+    return (isinstance(volume, dict) and volume.get('type') == 'bind' and volume.get('read_only') is True
+            and volume.get('source') == config_dir + '/certs' and volume.get('target') == '/etc/traefik/certs')
 def comparable(name, service):
     if name != 'traefik' or not isinstance(service, dict):
         return service
     service = dict(service)
     environment = dict(service.get('environment') or {})
     service['environment'] = {key: value for key, value in environment.items() if key not in reviewed_traefik_environment}
+    if 'volumes' in service:
+        service['volumes'] = [volume for volume in service['volumes'] if not reviewed_certs_mount(volume)]
+        if not service['volumes']:
+            del service['volumes']
     return service
 for name in infrastructure:
     old_service, new_service = old_services.get(name), new_services.get(name)
@@ -388,6 +397,7 @@ for archive in config api-keys worker-keys api-data; do tar -tzf "$backup/$archi
 if [[ -f "$override" ]]; then
     (cd "$backup" && sha256sum compose.override.yaml >> SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null)
 fi
+install -d -m 0700 "$config_dir/certs"  # Traefik bind-mounts it read-only (#1795); the installer makes it the same way.
 if [[ " ${application_services[*]} " == *' store '* ]]; then
     [[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }
     echo 'Adding app store configuration if missing.'
