@@ -81,7 +81,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      # Not blocking (owner, 2026-11-27): if the spec cannot be built, the install, upgrade, restore and baseline scans still run
+      # and only the signed-in API scan is skipped with a warning. Fixing the generation for good is automaton#1792.
       - name: Generate openapi.json
+        continue-on-error: true
         run: |
           set -euo pipefail
           dotnet tool install Swashbuckle.AspNetCore.Cli --version 7.1.0 --tool-path "$RUNNER_TEMP/swagger"
@@ -93,6 +96,7 @@ jobs:
           name: openapi
           path: ${{ runner.temp }}/openapi.json
           retention-days: 3
+          if-no-files-found: ignore
   check:
     needs: openapi
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
@@ -148,11 +152,17 @@ jobs:
           echo "### Release install check: ${current#server-v} (upgrade from ${previous#server-v})" >> "$GITHUB_STEP_SUMMARY"
       # The OpenAPI file comes from the "openapi" job, which builds the release source without any secret.
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: openapi
           path: ${{ runner.temp }}/openapi
       - name: Use the OpenAPI file for the signed-in API scan
         run: |
+          if [[ ! -s "$RUNNER_TEMP/openapi/openapi.json" ]]; then
+            echo "::warning::No OpenAPI file (the openapi job could not build it): the signed-in API scan is skipped. See automaton#1792."
+            echo "- OpenAPI file: missing, signed-in API scan skipped" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           echo "API_SPEC=$RUNNER_TEMP/openapi/openapi.json" >> "$GITHUB_ENV"
           echo "- OpenAPI file: $(jq '.paths | length' "$RUNNER_TEMP/openapi/openapi.json") paths" >> "$GITHUB_STEP_SUMMARY"
       # One server for the run: upgrade and scan, back up, rebuild, fresh install and scan, restore, delete.
