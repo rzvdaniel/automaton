@@ -148,6 +148,25 @@ class InstallationConfigurationTests(unittest.TestCase):
         module.ensure_studio_paths(self.root)
         self.assertEqual(before, {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
 
+    def test_security_headers_on_studio_api_store_and_apps(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        mw = json.loads((self.root / 'dynamic/security-headers.yml').read_text())['http']['middlewares']
+        self.assertTrue(mw['security-headers']['headers']['frameDeny'])
+        self.assertEqual(mw['security-headers']['headers']['stsSeconds'], 31536000)
+        self.assertNotIn('contentSecurityPolicy', mw['app-security-headers']['headers'])
+        routers = json.loads((self.root / 'dynamic/installation.yml').read_text())['http']['routers']
+        self.assertEqual(routers['studio']['middlewares'], ['security-headers@file'])
+        for name in ('api', 'studio-api', 'apps'):
+            self.assertEqual(routers[name]['middlewares'], ['app-security-headers@file'])
+        store = json.loads((self.root / 'dynamic/store.yml').read_text())['http']['routers']['store']
+        self.assertEqual(store['middlewares'], ['security-headers@file'])
+        # An installation from before the middleware gets it once.
+        for name in ('api', 'studio', 'studio-api', 'apps'): routers[name].pop('middlewares')
+        (self.root / 'dynamic/installation.yml').write_text(json.dumps({'http': {'routers': routers}}))
+        module.ensure_security_headers(self.root)
+        migrated = json.loads((self.root / 'dynamic/installation.yml').read_text())['http']['routers']
+        self.assertEqual(migrated['studio']['middlewares'], ['security-headers@file'])
+
     def test_domain_change_does_not_rewrite_existing_installation(self):
         self.configure()
         original = (self.root / 'appsettings.Production.json').read_bytes()
