@@ -52,6 +52,10 @@ At the end of an install the installer checks how the VPS is set up: SSH passwor
 
 Server Keeper shows the same findings as a "needs you" item once the Runner has measured them (a few minutes). It cannot change them. Cloud provider firewalls are not checked, and Server Keeper cannot see `iptables` or `nftables` rules, so it does not report a missing firewall; the installer does.
 
+## Security headers
+
+Studio, the API, the store and the apps address send `Strict-Transport-Security` (one year, subdomains included) and `X-Content-Type-Options: nosniff`. Studio, the API and the store also forbid being framed and send a Content-Security-Policy; the apps address allows framing only by Studio, which shows apps in a frame. nginx does not reveal its version. The installer and updates add the headers to installations it configured; a hand-edited `dynamic/installation.yml` is left as it is, so add the `security-headers@file` middleware to its routers yourself. Apps' own responses keep the headers the apps set.
+
 ## Scanners and password guessing
 
 The installer and every update set up [fail2ban](https://github.com/fail2ban/fail2ban) with three jails: `sshd`, `automaton-scanner` (20 requests for junk paths such as `/.env`, `/wp-admin` or `*credentials*` that answer 404, or 404 bursts on Studio, the API root and the store, within a minute) and `automaton-signin` (10 failed Automaton sign-ins or rejected API keys within ten minutes). A banned address is blocked at the firewall (Docker's `DOCKER-USER` chain, so ports 80, 443 and 5671 are really closed to it) for an hour, longer each time it returns. Real traffic is never limited: pages, published apps' links, Studio's live connection and uploads do not count. The jails read Traefik's access log (it keeps no request headers), kept in the certificates volume and rotated daily.
