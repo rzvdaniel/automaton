@@ -62,4 +62,12 @@ grep -q '^claude' "$t/calls" || { echo "FAIL: no claude fallback after agy faile
 grep -q "tool claude, model sonnet, .* fallback: yes" "$t/comments" || { echo "FAIL: fallback record: $(cat "$t/comments")"; exit 1; }
 run_agy env FAKE_AGY_RC=0 FAKE_PRS=0
 grep -q '^claude' "$t/calls" || { echo "FAIL: no claude fallback when agy left no PR"; exit 1; }
+# the claude fallback in another repository still has the Automaton agents and skills (clean -x removed the copies)
+printf '#!/bin/sh
+echo "claude" >> "%s/calls"
+[ -f .claude/agents/automaton-reviewer.md ] && [ -f .agents/skills/s1/SKILL.md ] && echo agents-ok >> "%s/calls"
+exit 0
+' "$t" "$t" > "$t/bin/claude"
+run_agy env FAKE_AGY_RC=1 FAKE_PRS=1 AGENT_REPO=o/other
+grep -q agents-ok "$t/calls" || { echo "FAIL: fallback in another repo lost the agents: $(cat "$t/calls")"; exit 1; }
 echo "PASS"

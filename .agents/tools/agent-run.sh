@@ -35,27 +35,33 @@ trap cleanup EXIT
 cd "$wt"
 # Another repository's worktree has no Automaton agent definitions or skills: bring them from the shared checkout
 # (copied only where missing, and removed with the worktree) so reviews and implementers start there too.
-if [ "$base" != "$prompt_base" ]; then
+bring_agents() {
+  [ "$base" != "$prompt_base" ] || return 0
   mkdir -p .claude/agents .agents/skills
   cp -rn "$prompt_base/.claude/agents/." .claude/agents/ 2>/dev/null || true
   cp -rn "$prompt_base/.agents/skills/." .agents/skills/ 2>/dev/null || true
   # never commit the copies: list each untracked one in this repository's exclude file
   exclude=$(git rev-parse --git-path info/exclude); mkdir -p "$(dirname "$exclude")"
   git ls-files --others --exclude-standard .claude/agents .agents/skills | sed 's|^|/|' >> "$exclude"; sort -u -o "$exclude" "$exclude"
-fi
+}
+bring_agents
 prompt=$(cat "$prompt_base/$PROMPT_FILE"); prompt=${prompt//ISSUE_URL/${ISSUE_URL:-}}; prompt=${prompt//PR_URL/${PR_URL:-}}
 cli=${AGENT_CLI:-claude}; [ "$cli" = agy ] || cli=claude
 timeout_after=${AGENT_TASK_TIMEOUT:-3h}
+# With agy, keep time for one Claude fallback inside the job's limit: agy gets AGENT_AGY_TIMEOUT (default 100m),
+# the fallback what is left of AGENT_TASK_TIMEOUT (in minutes, e.g. 180m).
+total_min=${timeout_after%m}; [[ $total_min =~ ^[0-9]+$ ]] || total_min=180
+agy_timeout=${AGENT_AGY_TIMEOUT:-100m}
 issue_number=${ISSUE_URL:-}; issue_number=${issue_number##*/}; [[ $issue_number =~ ^[0-9]+$ ]] || issue_number=
 # run_cli <claude|agy> <model>: one run in this worktree; returns the CLI's exit code (124 = timed out)
 run_cli() {
   if [ "$1" = agy ]; then
     # agy cannot start subagents: the finish step (agent-finish-pr.sh) posts the reviews with the runner's other logins.
-    timeout -k 30 "$timeout_after" agy -p "$prompt
+    # agy never sees the Claude token
+    env -u CLAUDE_CODE_OAUTH_TOKEN timeout -k 30 "$agy_timeout" agy -p "$prompt
 
 You cannot start subagents in this run. Do every step of the job except the reviews and the security pass: open the pull request with its description and stop there. The next step of this job posts the reviews and merges through the gate."       --model "$2" --effort "${AGENT_EFFORT:-low}" --dangerously-skip-permissions < /dev/null 2>&1
     return
-
   fi
   timeout -k 30 "$timeout_after" claude -p "$prompt" --model "$2" --effort "${AGENT_EFFORT:-low}" --dangerously-skip-permissions < /dev/null
 }
@@ -73,9 +79,14 @@ run_cli "$cli" "$model"; rc=$?
 # A usage limit ends agy with an error, or with no pull request; the log's wording is not trusted (it echoes the task).
 if [ "$cli" = agy ] && { [ "$rc" != 0 ] || ! has_pr; }; then
   echo "agent-run: agy did not finish the job (exit $rc); running it again on claude" >&2
-  git checkout -q -f --detach origin/main && git clean -qfdx
-  fallback=yes; cli=claude; model=${AGENT_FALLBACK_MODEL:-sonnet}
-  run_cli claude "$model"; rc=$?
+  # a clean worktree (agy's leftovers gone), then the agents and skills again: clean -x removes the copies too
+  if git checkout -q -f --detach origin/main && git clean -qfdx && bring_agents; then
+    fallback=yes; cli=claude; model=${AGENT_FALLBACK_MODEL:-sonnet}
+    used_min=$(( ($(date +%s) - started) / 60 )); timeout_after="$(( total_min - used_min - 5 > 20 ? total_min - used_min - 5 : 20 ))m"
+    run_cli claude "$model"; rc=$?
+  else
+    echo "agent-run: could not reset the worktree for the claude fallback; stopping" >&2; rc=1
+  fi
 fi
 [ "$rc" = 124 ] && echo "agent-run: timed out after $timeout_after; stopped" >&2
 if [ "${AGENT_RECORD:-}" = 1 ] && [ -n "$issue_number" ]; then
