@@ -7,6 +7,9 @@ on:
   workflow_run:
     workflows: ['Publish Automaton Server']
     types: [completed]
+  # The default certificate path (Traefik, Let's Encrypt): fresh mode only, about 5 certificates a week.
+  schedule:
+    - cron: '17 22 * * 0'
   workflow_dispatch:
     inputs:
       version:
@@ -23,6 +26,11 @@ on:
         type: choice
         options: [all, fresh, upgrade, restore]
         default: all
+      tls:
+        description: "Certificates: custom is the shared CI certificate, letsencrypt asks Let's Encrypt"
+        type: choice
+        options: [custom, letsencrypt]
+        default: custom
       restore_wrong_key:
         description: 'Test the failure path: restore with a wrong key (the run must fail at the restore job)'
         type: boolean
@@ -37,7 +45,7 @@ env:
   HCLOUD_VERSION: '1.62.0'  # server rebuild --user-data-from-file needs 1.62 or later
 jobs:
   check:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 210
     permissions:
@@ -48,8 +56,9 @@ jobs:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
       # The shared wildcard from ci-certificate.yml: installs with --tls-mode custom, no Let's Encrypt request per run.
-      CI_TLS_CERT: ${{ secrets.CI_TLS_CERT }}
-      CI_TLS_KEY: ${{ secrets.CI_TLS_KEY }}
+      # A scheduled run and tls=letsencrypt leave them empty: the install then asks Let's Encrypt (the default path).
+      CI_TLS_CERT: ${{ (github.event_name == 'schedule' || inputs.tls == 'letsencrypt') && '' || secrets.CI_TLS_CERT }}
+      CI_TLS_KEY: ${{ (github.event_name == 'schedule' || inputs.tls == 'letsencrypt') && '' || secrets.CI_TLS_KEY }}
       SERVER_TYPES: ${{ inputs.server_types || 'cx23 cpx12' }}
       LOCATIONS: ${{ inputs.locations || 'nbg1 fsn1 hel1' }}
       RUN_ID: ${{ github.run_id }}
@@ -90,7 +99,9 @@ jobs:
           VERSION: ${{ steps.versions.outputs.version }}
           PREVIOUS: ${{ steps.versions.outputs.previous }}
           RESTORE_WRONG_KEY: ${{ inputs.restore_wrong_key && '1' || '' }}
-          MODE: ${{ inputs.mode || 'all' }}
+          # The weekly run is fresh only: the upgrade and restore paths do not depend on the certificate.
+          MODE: ${{ github.event_name == 'schedule' && 'fresh' || inputs.mode || 'all' }}
+          TLS_MODE: ${{ (github.event_name == 'schedule' || inputs.tls == 'letsencrypt') && 'letsencrypt' || 'custom' }}
         run: bash scripts/ci/release-install-check.sh "$MODE"
       # The scripts delete what they create; this also covers a cancelled run.
       - name: Delete leftover servers of this run
