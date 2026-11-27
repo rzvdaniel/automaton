@@ -34,6 +34,15 @@ step() { printf '\n== %s\n' "$*"; }
 fail() { printf '::error::%s\n' "$*" >&2; exit 1; }
 summary() { if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; fi; }
 
+# report_download FILE VERSION: tell Head Counter about one release download of ours (automaton#1802), so GitHub's public
+# count minus ours is other people's. Silent when HEAD_COUNTER_URL or HEAD_COUNTER_TOKEN is unset; never fails the run.
+report_download() {
+    [[ -n "${HEAD_COUNTER_URL:-}" && -n "${HEAD_COUNTER_TOKEN:-}" ]] || return 0
+    jq -n --arg f "$1" --arg v "$2" '{file:$f,version:$v,source:"install-check"}' |
+        curl -fsS -m 10 -o /dev/null "${HEAD_COUNTER_URL%/}/ours" --oauth2-bearer "$HEAD_COUNTER_TOKEN" \
+            -H 'Content-Type: application/json' --data-binary @- 2>/dev/null || true
+}
+
 cf() { # cf METHOD PATH [json]
     curl -fsS -X "$1" "https://api.cloudflare.com/client/v4/$2" -H "Authorization: Bearer $CLOUDFLARE_DNS_TOKEN" \
         -H 'Content-Type: application/json' ${3:+--data "$3"}
@@ -127,6 +136,7 @@ for t in $types; do
 done
 [[ -n "$server_id" ]] || fail "No server could be created from types: $types in locations: $locations"
 echo "Running on $server_type in $location"
+report_download install-automaton.sh "${tag#server-v}"
 summary "- $mode: server type \`$server_type\`, location \`$location\`"
 
 point_dns() { # the names of $domain to $ip, after deleting what is there
@@ -190,6 +200,8 @@ checks() { # checks LABEL
     fi
 
     step 'CLI login, Runner, hello app'
+    # The CLI installer is downloaded only when this server has no CLI yet.
+    remote 'export PATH="$HOME/.local/bin:$PATH"; command -v automaton >/dev/null' 2>/dev/null || report_download install.sh "$VERSION"
     remote "bash -s" <<REMOTE || { on_failure; fail "$1: a CLI check failed (see the lines above)"; }
 set -euo pipefail
 export PATH="\$HOME/.local/bin:\$PATH"
@@ -284,6 +296,7 @@ REMOTE
     make_user_data "$tag" "$domain" "$work/user-data-b"
     hcloud server rebuild "$server_id" --image ubuntu-24.04 --user-data-from-file "$work/user-data-b" >/dev/null \
         || fail 'hcloud server rebuild failed'
+    report_download install-automaton.sh "$VERSION"
     [[ -n "$tls_args" ]] || point_dns
     wait_ssh
     wait_healthy
@@ -310,6 +323,7 @@ REMOTE
     step 'Checks on the restored server'
     code() { curl -s -o /dev/null -w '%{http_code}' "$1" || true; }
     [[ "$(code "https://studio.$domain/")" == 200 ]] || fail 'Restored server: Studio is not 200'
+    remote 'export PATH="$HOME/.local/bin:$PATH"; command -v automaton >/dev/null' 2>/dev/null || report_download install.sh "$VERSION"
     remote "bash -s" <<REMOTE || { on_failure; fail 'Restored server: user, app or app data is missing (see the lines above)'; }
 set -euo pipefail
 export PATH="\$HOME/.local/bin:\$PATH"

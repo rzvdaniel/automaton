@@ -105,6 +105,9 @@ jobs:
       GH_REPO: ${{ github.repository }}
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      # Optional: our own downloads are reported to Head Counter (automaton#1802); unset means nothing is sent.
+      HEAD_COUNTER_URL: ${{ secrets.HEAD_COUNTER_URL }}
+      HEAD_COUNTER_TOKEN: ${{ secrets.HEAD_COUNTER_TOKEN }}
       # The shared wildcard from ci-certificate.yml: installs with --tls-mode custom, no Let's Encrypt request per run.
       # A scheduled run and tls=letsencrypt leave them empty: the install then asks Let's Encrypt (the default path).
       CI_TLS_CERT: ${{ (github.event_name == 'schedule' || inputs.tls == 'letsencrypt') && '' || secrets.CI_TLS_CERT }}
