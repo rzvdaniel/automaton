@@ -20,4 +20,9 @@ assert run([{"pluginid": "1", "alert": "h", "riskcode": "3", "instances": []}], 
 leak = {"pluginid": "90022", "alert": "Application Error Disclosure", "riskcode": "2", "instances": [{"uri": "https://x/api/apps/1"}]}
 assert run([leak], ok)[0] == 0  # unsigned baseline: only a medium
 rc, out = run([leak], ok, name="api-spec"); assert rc == 1 and "Application Error Disclosure" in out
+fj = os.path.join(d, "f.json")
+z = os.path.join(d, "z.json"); json.dump({"site": [{"@name": "s", "alerts": [csp, med]}]}, open(z, "w"))
+a = os.path.join(d, "a.txt"); open(a, "w").write("")
+subprocess.run([sys.executable, "-I", script, "--allowlist", a, "--zap", f"t={z}", "--failing-json", fj], capture_output=True, text=True)
+assert [f["id"] for f in json.load(open(fj))] == ["10038"]  # only the failing finding, not the medium
 print("ok")

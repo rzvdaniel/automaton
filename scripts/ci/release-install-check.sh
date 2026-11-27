@@ -6,6 +6,8 @@
 #                                             a fresh install, restore the backup there with its key, check user, app and app data
 #   release-install-check.sh all              the three in one run on ONE server: upgrade $PREVIOUS to $VERSION and scan, back up,
 #                                             rebuild (hcloud server rebuild), fresh install and scan, restore, check, delete
+#   release-install-check.sh fullscan        install $VERSION, run the checks, then the weekly signed-in full ZAP scan (release-full-scan.sh,
+#                                             active scan: junk data, so only here on a throwaway server); needs API_SPEC
 #   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 180)
 # Environment: HCLOUD_TOKEN (project "automaton-ci" only), CLOUDFLARE_DNS_TOKEN (Zone.DNS edit on the test domain only),
 # API_SPEC (path of the release's openapi.json: the fresh scan also scans the whole API signed in), VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
@@ -15,7 +17,7 @@
 # lives only in a variable and a root-only file on the throwaway server.
 set -euo pipefail
 
-mode="${1:?Usage: release-install-check.sh fresh|upgrade|restore|all|sweep}"
+mode="${1:?Usage: release-install-check.sh fresh|upgrade|restore|all|fullscan|sweep}"
 zone_name="${CI_DOMAIN:-automatontest.fyi}"
 # One sub-domain per run and mode: Let's Encrypt allows five certificates a week for the same set of names, and every
 # throwaway install asks for new ones.
@@ -50,7 +52,7 @@ sweep() {
     done
 }
 if [[ "$mode" == sweep ]]; then sweep; exit 0; fi
-[[ "$mode" == fresh || "$mode" == upgrade || "$mode" == restore || "$mode" == all ]] || fail "Unknown mode $mode"
+[[ "$mode" == fresh || "$mode" == upgrade || "$mode" == restore || "$mode" == all || "$mode" == fullscan ]] || fail "Unknown mode $mode"
 
 work=$(mktemp -d); server_id=''; ssh_key_id=''; ip=''; zone_id=''; extra_domains=()
 ssh_opts=(-i "$work/key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15)
@@ -323,6 +325,18 @@ docker run --rm --entrypoint cat -v "\$volume:/v:ro" "\$helper" /v/workspace/dat
 REMOTE
     summary "- restore: passed (user, app and app data came back after the rebuild)"
     echo "All checks passed ($mode)"
+    exit 0
+fi
+if [[ "$mode" == fullscan ]]; then
+    step 'Signed-in full scan'
+    [[ -n "${API_SPEC:-}" ]] || fail 'fullscan needs API_SPEC (the release openapi.json)'
+    remote "export PATH=\"\$HOME/.local/bin:\$PATH\"; rm -f /root/ci-scan-key; automaton keys create --name ci-full-scan-$run_id --email '$email' --out /root/ci-scan-key < /root/ci-password >/dev/null" \
+        || fail 'Full scan: could not create the CLI key'
+    remote 'cat /root/ci-scan-key' > "$work/scan-key" || fail 'Full scan: could not read the CLI key'
+    remote 'cat /root/ci-password' > "$work/admin-password" || fail 'Full scan: could not read the administrator password'
+    FAILING_JSON="${FAILING_JSON:-}" bash "$(dirname "${BASH_SOURCE[0]}")/release-full-scan.sh" --api-spec "$API_SPEC" \
+        --api-key-file "$work/scan-key" --password-file "$work/admin-password" "$domain" "$email" || fail 'The full scan found problems (see the summary above)'
+    summary '- full scan: passed'
     exit 0
 fi
 scan "$mode" "$([[ "$mode" == fresh ]] && echo api)"

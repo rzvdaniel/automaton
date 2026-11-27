@@ -69,6 +69,7 @@ def main():
     p.add_argument("--zap", action="append", default=[])
     p.add_argument("--nmap")
     p.add_argument("--summary")
+    p.add_argument("--failing-json", help="write the failing findings (not allowlisted) as a JSON list of {level, id, where, title, source}")
     a = p.parse_args()
     rules = load_allowlist(a.allowlist)
     findings = []
@@ -79,6 +80,7 @@ def main():
         findings += nmap_findings(a.nmap)
     out = ["### External scan", ""]
     failing = 0
+    failed = []
     seen = set()
     for level, pid, where, title, src in findings:
         if (pid, where) in seen:
@@ -90,6 +92,7 @@ def main():
         out.append(f"- **{level}**: {title} on {where} ({src})")
         if level in ("high", "fail"):
             failing += 1
+            failed.append({"level": level, "id": pid, "where": where, "title": title, "source": src})
     if not findings:
         out.append("No findings.")
     out.append("")
@@ -98,6 +101,8 @@ def main():
     print(text)
     if a.summary:
         open(a.summary, "a", encoding="utf-8").write(text + "\n")
+    if a.failing_json:
+        json.dump(failed, open(a.failing_json, "w", encoding="utf-8"))
     return 1 if failing else 0
 
 
