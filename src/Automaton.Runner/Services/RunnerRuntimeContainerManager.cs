@@ -902,7 +902,6 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             active.Remove(key, out current);
         }
         registry.Remove(appId, deploymentTargetId);
-        networkPolicy.ReleasePorts(appId, deploymentTargetId);
         var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
         var metadata = File.Exists(metadataPath)
             ? await metadataStore.ReadAsync(metadataPath, CancellationToken.None)
@@ -921,6 +920,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             logger.LogWarning("{Warning}", warning);
         if (warnings.Count > 0)
             throw new InvalidOperationException($"Managed runtime cleanup for {appId}/{deploymentTargetId} is incomplete; target state was preserved for retry. {string.Join(" ", warnings)}");
+        networkPolicy.ReleasePorts(appId, deploymentTargetId);
     }
 
     private static HashSet<string> GetCleanupContainerReferences(

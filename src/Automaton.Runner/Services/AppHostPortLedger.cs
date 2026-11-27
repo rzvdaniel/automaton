@@ -56,12 +56,6 @@ internal sealed class AppHostPortLedger
         }
     }
 
-    public bool IsOwnedByAnother(Guid appId, Guid targetId, int port)
-    {
-        lock (Gate)
-            return Read().Any(pair => pair.Key != Key(appId, targetId) && pair.Value.Contains(port));
-    }
-
     public void Release(Guid appId, Guid targetId)
     {
         lock (Gate)
