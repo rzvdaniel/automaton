@@ -166,6 +166,9 @@ wait_ssh() {
 
 checks() { # checks LABEL
     step "Checks ($1)"
+    # The certificate that Studio really serves: the Let's Encrypt run shows its issuer, the custom run the CI one.
+    issuer=$(openssl s_client -connect "studio.$domain:443" -servername "studio.$domain" </dev/null 2>/dev/null | openssl x509 -noout -issuer 2>/dev/null | sed 's/^issuer= *//' || true)
+    summary "- $1: certificate issuer \`${issuer:-unknown}\` ($([[ -n "$tls_args" ]] && echo custom || echo "Let's Encrypt"))"
     code() { curl -s -o /dev/null -w '%{http_code}' "$1" || true; }
     [[ "$(code "https://api.$domain/health")" == 200 ]] || fail "$1: API health is not 200"
     [[ "$(code "https://api.$domain/api/install/status")" == 200 ]] || fail "$1: API install status is not 200"

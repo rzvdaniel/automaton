@@ -117,6 +117,34 @@ jobs:
             [[ "$ok" == true ]] || exit 1
           done
 
+  # Read-only: the passive ZAP baseline from outside, nothing signed in, no nmap. A finding never rolls the deploy back; it
+  # fails this job and opens one issue (the owner moves it to the board Inbox).
+  scan:
+    name: Scan production
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: ZAP baseline against production
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          bash scripts/ci/release-scan.sh --zap-only automaton.monster https://automaton.monster/ && exit 0
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Production scan after $VERSION found problems" \
+            --body "The read-only ZAP baseline after the deploy of $VERSION failed: $RUN_URL (findings in the run summary). Move this card to Inbox on board 17." \
+            --assignee "${GITHUB_REPOSITORY_OWNER}" || true
+          exit 1
+
   # Always runs, even when the deploy failed or was never approved. Opens an issue assigned to the repository owner,
   # so GitHub sends the owner an email or push notification (no extra service or secret). A failure here never
   # changes the deploy result.
