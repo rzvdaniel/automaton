@@ -30,7 +30,8 @@ public sealed class AppMcpManager(
     IHttpContextAccessor http,
     RunnerService runners,
     ConfigurationService configuration,
-    Microsoft.Extensions.Options.IOptions<Automaton.Api.Config.PublishedAppsConfig>? publishedApps = null)
+    Microsoft.Extensions.Options.IOptions<Automaton.Api.Config.PublishedAppsConfig>? publishedApps = null,
+    StoredSourceDeploymentService? storedSource = null)
 {
     public const long MaxDeployBytes = AppArchiveStorageBounds.MaximumUploadBytes;
     public const long MaxRequestBytes = MaxDeployBytes * 2 + 1024 * 1024;
@@ -113,16 +114,21 @@ public sealed class AppMcpManager(
     {
         var userId = users.GetUserId();
         if (!await authorization.CanUpdateAppAsync(appId, userId, token)) throw new McpUserException(AppMcpReader.NotFound);
-        var json = await db.WebApps.Where(a => a.Id == appId).Select(a => a.ApplicationContractJson).FirstOrDefaultAsync(token);
-        var declarations = string.IsNullOrWhiteSpace(json) ? [] : ApplicationContractSerialization.Deserialize(json).Secrets;
-        var status = declarations.Count == 0 ? [] : await secrets.StatusAsync(appId, userId, declarations, token);
-        var missing = status.Where(s => !s.Present && !s.Optional).Select(s => new { s.Name, s.Description }).ToList();
+        var missing = await FindMissingSecretsAsync(appId, userId, token);
         return new
         {
-            missing,
+            missing = missing.Select(m => new { m.Name, m.Description }).ToList(),
             studio = missing.Count == 0 ? null : StudioLink(appId),
             note = missing.Count == 0 ? "No required secret is missing." : "Open the Studio link and fill these in. Secret values never pass through MCP.",
         };
+    }
+
+    private async Task<List<(string Name, string? Description)>> FindMissingSecretsAsync(Guid appId, Guid userId, CancellationToken token)
+    {
+        var json = await db.WebApps.Where(a => a.Id == appId).Select(a => a.ApplicationContractJson).FirstOrDefaultAsync(token);
+        var declarations = string.IsNullOrWhiteSpace(json) ? [] : ApplicationContractSerialization.Deserialize(json).Secrets;
+        var status = declarations.Count == 0 ? [] : await secrets.StatusAsync(appId, userId, declarations, token);
+        return status.Where(s => !s.Present && !s.Optional).Select(s => (s.Name, s.Description)).ToList();
     }
 
     public async Task<object> ListCatalogAsync(string? query, CancellationToken token)
@@ -137,9 +143,35 @@ public sealed class AppMcpManager(
         try
         {
             var app = await installer.InstallAsync(new CatalogInstallRequest { Repo = repo, Folder = folder, Commit = commit, Name = name }, token);
-            return new { appId = app.Id, name = app.Name, studio = StudioLink(app.Id), next = "Use app_status to follow it, and missing_secrets to see what it still needs." };
+            var userId = users.GetUserId();
+            var missing = await FindMissingSecretsAsync(app.Id, userId, token);
+            if (missing.Count > 0)
+                return new
+                {
+                    appId = app.Id, name = app.Name, studio = StudioLink(app.Id), deployed = false,
+                    missingSecrets = missing.Select(m => m.Name).ToList(),
+                    next = "Installed, not deployed: it waits for these required secrets. Secret values never pass through MCP, so open the Studio link, save them under Settings → Secrets, then press Deploy on the app's page.",
+                };
+            return await DeployInstalledAsync(app.Id, userId, token);
         }
         catch (ArgumentException ex) { throw new McpUserException(ex.Message); }
+    }
+
+    private async Task<object> DeployInstalledAsync(Guid appId, Guid userId, CancellationToken token)
+    {
+        if (storedSource is null) throw new McpUserException("Deploying stored source is not available.");
+        await EnsureRunnerAsync(appId, token);
+        try
+        {
+            var info = await apps.GetAccessibleAppInfoByIdAsync(appId, token) ?? throw new McpUserException(AppMcpReader.NotFound);
+            var accepted = await storedSource.AcceptAsync(appId, userId, info.OwnerId ?? userId, null, false, token);
+            return await WaitForOperationAsync(appId, userId, accepted.OperationId, token);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            throw new McpUserException("Installed, but not deployed: " + ex.Message);
+        }
+        catch (KeyNotFoundException) { throw new McpUserException(AppMcpReader.NotFound); }
     }
 
     public async Task<object> GuidanceAsync(CancellationToken token)
