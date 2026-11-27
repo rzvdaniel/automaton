@@ -26,8 +26,9 @@ useSiteTheme()
 <header class="hero"><div class="wrap">
   <div>
     <p class="eyebrow">Open-source app platform · self-hosted</p>
-    <h1>The home for every app your AI builds. <em>On servers you own.</em></h1>
-    <p class="lede">Your AI can put one app on a server. Automaton runs all of them: sign-in, sharing, an app store, a catalog for your team, secrets, backups and safe updates. Your data stays where you decide, and the cost is the server you rent.</p>
+    <h1>A small cloud of your own.</h1>
+    <p class="lede">Deploy apps, APIs and jobs on servers you own, with backups, monitoring and logs built in. No autoscaling or multi-region failover: built for small and medium workloads.</p>
+    <p class="lede">Built for AI agents: your AI builds the apps, Automaton runs all of them, with sign-in, sharing, an app store, secrets and safe updates. Your data stays where you decide, and the cost is the server you rent.</p>
     <div class="row"><RouterLink class="btn primary" to="/get-started">Let your AI set it up →</RouterLink><a class="btn" :href="publicAppConfig.storeUrl">Browse live apps</a></div>
     <div class="trust"><span>Apache 2.0</span><span>No Automaton account</span><span>One server to start</span></div>
   </div>

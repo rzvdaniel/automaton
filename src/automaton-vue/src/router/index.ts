@@ -95,10 +95,10 @@ export function scrollBehavior(to: RouteLocationNormalized) {
 export function seoFor(to: RouteLocationNormalized): SeoMeta {
   const seo = to.meta?.seo as Partial<SeoMeta> | undefined
   return {
-    title: seo?.title ?? 'The home for every app your AI builds',
+    title: seo?.title ?? 'A small cloud of your own',
     description:
       seo?.description ??
-      'Automaton is an open-source, self-hosted platform for all the apps your AI builds: sign-in, sharing, an app store, catalogs, secrets, backups and safe updates on servers you own.',
+      'Deploy apps, APIs and jobs on servers you own, with backups, monitoring and logs built in. No autoscaling or multi-region failover: built for small and medium workloads.',
     path: to.path,
     noindex: seo?.noindex,
   }

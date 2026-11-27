@@ -1,12 +1,12 @@
 ---
 title: Docs
-description: Automaton is the home for every app your AI builds, on a server you own. Start here.
+description: "Automaton is a small cloud of your own: apps, APIs, jobs, backups, monitoring and logs on servers you own. Start here."
 llms: false
 ---
 
 # Automaton
 
-**The home for every app your AI builds, on a server you own.**
+**A small cloud of your own.** Deploy apps, APIs and jobs on servers you own, with backups, monitoring and logs built in. No autoscaling or multi-region failover: built for small and medium workloads.
 
 You care about the app. Your AI writes it, deploys it and fixes it. Automaton runs it, gives it an address, decides who can open it, keeps its secrets and backs it up. The tenth app is as easy as the first.
 
