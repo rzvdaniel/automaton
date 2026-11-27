@@ -227,7 +227,7 @@ public sealed class AppCatalogUpdateService(
         foreach (var request in MissingSchedules(app.Id, app.Name, declared, existing))
         {
             try { await schedules.CreateAsync(request, userId, false, cancellationToken); }
-            catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 logger.LogWarning(exception, "Default schedule {Schedule} of app {AppId} was not created after the update", request.Name, app.Id);
             }
