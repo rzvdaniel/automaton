@@ -26,13 +26,17 @@ jobs:
     runs-on: [self-hosted, agent]
     timeout-minutes: 190
     steps:
-      - name: Run Claude
+      - name: Run the agent
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           PROMPT_FILE: .agents/jobs/implement-issue.md
           ISSUE_URL: ${{ github.event.issue.html_url || format('https://github.com/{0}/issues/{1}', inputs.repo, inputs.number) }}
           AGENT_REPO: ${{ inputs.repo || github.repository }}
           AGENT_TASK_TIMEOUT: 180m
+          # Repo variables (#1864): AGENT_CLI claude|agy, AGENT_MODEL; with agy, a failed run or one without a PR reruns on claude.
+          AGENT_CLI: ${{ vars.AGENT_CLI }}
+          AGENT_MODEL: ${{ vars.AGENT_MODEL }}
+          AGENT_RECORD: '1'
         run: bash "$HOME/automaton/.agents/tools/agent-run.sh"
       - name: Finish an open pull request that only lacks reviews
         # Posts the missing main review / security pass with the runner's other logins and merges through the gate.
