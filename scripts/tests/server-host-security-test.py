@@ -91,5 +91,28 @@ class Tests(unittest.TestCase):
         self.assertEqual(host.ids(allowed=[53]), {})
 
 
+    def test_ask_reads_a_yes_typed_on_a_real_terminal(self):
+        import pty, time
+        path = Path(__file__).resolve().parents[2] / 'docker/install/host_security.py'
+        code = ("import importlib.util,sys;s=importlib.util.spec_from_file_location('h',sys.argv[1]);m=importlib.util.module_from_spec(s);"
+                "s.loader.exec_module(m);print('ANSWER',m.ask('Fix it?'),m.ask('Again?'))")
+        pid, fd = pty.fork()
+        if pid == 0:
+            os.execvp('python3', ['python3', '-c', code, str(path)])
+        os.write(fd, b'y\nn\n')
+        out = b''
+        deadline = time.time() + 10
+        while b'ANSWER' not in out or not out.rstrip().endswith(b'False') and time.time() < deadline:
+            try:
+                chunk = os.read(fd, 1024)
+            except OSError:
+                break
+            if not chunk:
+                break
+            out += chunk
+        os.waitpid(pid, 0)
+        self.assertIn(b'ANSWER True False', out)
+
+
 if __name__ == '__main__':
     unittest.main()
