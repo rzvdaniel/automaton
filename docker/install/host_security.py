@@ -189,10 +189,12 @@ def has_tty():
 def ask(question, default_yes=True):
     suffix = '[Y/n]' if default_yes else '[y/N]'
     try:
-        with open('/dev/tty', 'r+') as tty:  # also works when the script itself was piped into bash
-            tty.write(f'{question} {suffix} ')
-            tty.flush()
-            line = tty.readline()
+        # /dev/tty is not seekable, so a 'r+' text file fails; use separate handles.
+        # Also works when the script itself was piped into bash.
+        with open('/dev/tty', 'w') as out, open('/dev/tty', 'r') as inp:
+            out.write(f'{question} {suffix} ')
+            out.flush()
+            line = inp.readline()
             if not line:  # Ctrl-D is not a yes
                 return False
             answer = line.strip().lower()
