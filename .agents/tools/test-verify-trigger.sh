@@ -12,6 +12,8 @@ VERIFY_N=0; export VERIFY_N
 [[ $(v check) == "skip: nothing in Verify" ]] || { echo "FAIL: empty Verify"; exit 1; }
 VERIFY_N=3; export VERIFY_N
 v done
+echo server-v0.2.198 > "$t/version"; v done server-v0.2.197; [[ $(cat "$t/state/v") == server-v0.2.197 ]] || { echo "FAIL: done with version"; exit 1; }
+echo server-v0.2.197 > "$t/version"
 [[ $(v check) == "skip: server-v0.2.197 already verified" ]] || { echo "FAIL: verified"; exit 1; }
 echo server-v0.2.198 > "$t/version"
 [[ $(v check) == "run server-v0.2.198" ]] || { echo "FAIL: next version"; exit 1; }

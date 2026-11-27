@@ -43,5 +43,5 @@ jobs:
           AGENT_MODEL: opus
         run: |
           # Record the attempt first: a failed run must not restart every 10 minutes. Re-run it by hand.
-          bash "$HOME/automaton/.agents/tools/verify-trigger.sh" done
+          bash "$HOME/automaton/.agents/tools/verify-trigger.sh" done "$ISSUE_URL"
           bash "$HOME/automaton/.agents/tools/agent-run.sh"
