@@ -28,11 +28,14 @@ public sealed partial class HostContainerExecutionService
         var resolved = await ResolveImageAsync(request, cancellationToken);
         if (!resolved.Success || string.IsNullOrWhiteSpace(resolved.ResolvedImage))
             return resolved;
+        int hostPort;
+        try { hostPort = await ReserveHostPortAsync(scope, hostAddress, cancellationToken); }
+        catch (InvalidOperationException ex) { return Failure("host_port", ex.Message); }
         var args = new List<string>
         {
             "docker", "create", "--name", name, "--network", "bridge",
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
-            "--publish", $"{FormatPublishAddress(hostAddress)}::{request.ContainerPort}",
+            "--publish", $"{FormatPublishAddress(hostAddress)}:{hostPort}:{request.ContainerPort}",
             "--mount", VolumeMount(volume,
                 RunnerWorkspaceService.GetRuntimeCandidateVolumeSubpath(scope.AppId, scope.DeploymentTargetId, request.CandidateId),
                 "/automaton/app", readOnly: true),
@@ -297,6 +300,20 @@ public sealed partial class HostContainerExecutionService
         => string.Join(',', new[] { "type=volume", $"source={volume}", $"target={target}", $"volume-subpath={subpath}", "volume-nocopy" }
             .Concat(readOnly ? new[] { "readonly" } : [])
             .Select(value => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""));
+
+    /// <summary>The app's own fixed host port (#1791): never one that a container of the app already publishes.</summary>
+    private async Task<int> ReserveHostPortAsync(HostContainerScope scope, string hostAddress, CancellationToken cancellationToken)
+    {
+        var listing = await executor(
+            ["docker", "ps", "-a",
+                "--filter", $"label=com.automaton.app-id={scope.AppId}",
+                "--filter", $"label=com.automaton.deployment-target-id={scope.DeploymentTargetId}",
+                "--format", "{{.Ports}}"],
+            RuntimeOperationTimeout, cancellationToken);
+        if (!listing.Success) throw new InvalidOperationException("Docker could not list the app's containers.");
+        return portLedger.Reserve(scope.AppId, scope.DeploymentTargetId, AppHostPortLedger.ParsePublishedPorts(listing.Output),
+            port => HostContainerRuntimeEndpoint.CanBind(hostAddress, port));
+    }
 
     private static string FormatPublishAddress(string address) => address.Contains(':') ? $"[{address}]" : address;
 

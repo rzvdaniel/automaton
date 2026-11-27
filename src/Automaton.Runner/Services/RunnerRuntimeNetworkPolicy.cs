@@ -13,9 +13,12 @@ internal sealed class RunnerRuntimeNetworkPolicy
     private readonly string runtimeHostAddress = RunnerRuntimeEndpointConfiguration.HostAddress;
     private readonly bool canProbeRuntimeHost;
 
-    public RunnerRuntimeNetworkPolicy(RunnerRuntimeRegistry registry)
+    private readonly AppHostPortLedger? ledger;
+
+    public RunnerRuntimeNetworkPolicy(RunnerRuntimeRegistry registry, AppHostPortLedger? ledger = null)
     {
         this.registry = registry;
+        this.ledger = ledger;
         canProbeRuntimeHost = IPAddress.IsLoopback(IPAddress.Parse(runtimeHostAddress));
     }
 
@@ -46,6 +49,14 @@ internal sealed class RunnerRuntimeNetworkPolicy
         }
         throw new TimeoutException($"Runtime container did not become ready on {runtimeHostAddress}:{port}.");
     }
+
+    /// <summary>The app's own fixed host port that its running container does not use (#1791).</summary>
+    public int ReservePort(Guid appId, Guid targetId, int? inUse, int requested)
+        => ledger is null
+            ? AllocatePort(requested)
+            : ledger.Reserve(appId, targetId, inUse is > 0 ? new HashSet<int> { inUse.Value } : new HashSet<int>(), CanBind);
+
+    public void ReleasePorts(Guid appId, Guid targetId) => ledger?.Release(appId, targetId);
 
     public int AllocatePort(int requested)
     {

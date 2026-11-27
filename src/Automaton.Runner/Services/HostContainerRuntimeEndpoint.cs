@@ -7,6 +7,18 @@ namespace Automaton.Runner.Console.Services;
 
 internal static class HostContainerRuntimeEndpoint
 {
+    public static bool CanBind(string address, int port)
+    {
+        try
+        {
+            using var listener = new System.Net.Sockets.TcpListener(IPAddress.Parse(address), port);
+            listener.Start();
+            listener.Stop();
+            return true;
+        }
+        catch (System.Net.Sockets.SocketException ex) { return ex.SocketErrorCode != System.Net.Sockets.SocketError.AddressAlreadyInUse; }
+    }
+
     public static HostContainerExecutionResponse Read(
         JsonElement root,
         string id,
