@@ -5,7 +5,7 @@ import path from 'node:path'
 
 const dist = path.resolve('dist')
 const pages = [
-  ['index.html', 'The home for every app your AI builds', 'https://automaton.monster/'],
+  ['index.html', 'A small cloud of your own', 'https://automaton.monster/'],
   ['product/index.html', 'Five parts.', 'https://automaton.monster/product'],
   ['use-cases/index.html', 'Small apps that matter.', 'https://automaton.monster/use-cases'],
   ['catalog/index.html', 'Find an app to install.', 'https://automaton.monster/catalog'],

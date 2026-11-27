@@ -4,7 +4,9 @@
 
 # Automaton
 
-**The home for every app your AI builds. On servers you own.**
+**A small cloud of your own.**
+
+Deploy apps, APIs and jobs on servers you own, with backups, monitoring and logs built in. No autoscaling or multi-region failover: built for small and medium workloads.
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/rzvdaniel/automaton?label=release)](https://github.com/rzvdaniel/automaton/releases)
@@ -17,7 +19,7 @@
 
 </div>
 
-Your AI can put one app on a server. **Automaton runs all of them**: sign-in, sharing, an app store, a catalog for your team, secrets, backups and safe updates. Your data stays where you decide, and the cost is the server you rent.
+Built for AI agents: your AI can put one app on a server. **Automaton runs all of them**: sign-in, sharing, an app store, a catalog for your team, secrets, backups and safe updates. Your data stays where you decide, and the cost is the server you rent.
 
 ## Why Automaton
 
