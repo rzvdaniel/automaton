@@ -14,7 +14,7 @@ other_app=66666666-7777-8888-9999-aaaaaaaaaaaa
 helper=alpine
 cleanup() {
     docker rm -f "$tag-web" "$tag-compose" >/dev/null 2>&1 || true
-    docker volume rm -f "$web_volume" "$compose_volume" "$other_volume" >/dev/null 2>&1 || true
+    docker volume rm -f "$web_volume" "$compose_volume" "$other_volume" "$tag-renamed-workspace" >/dev/null 2>&1 || true
     rm -rf -- "$work"
 }
 trap cleanup EXIT
@@ -70,6 +70,16 @@ restore_app_data "$app" "$helper" "$work/backup" >/dev/null
 check "$web_volume" "workspace/data/$app/data/a.txt" web-one
 check "$web_volume" "workspace/data/$other_app/data/o.txt" changed
 restore_app_data nobody "$helper" "$work/backup" >/dev/null 2>&1 && fail 'an unknown app was accepted'
+# A fresh server: the manifest names a volume that is gone. With one Runner volume the data lands there; with none it is skipped.
+renamed_volume=$tag-renamed-workspace
+docker volume create --label automaton.resource=machine-workspace-volume "$renamed_volume" >/dev/null
+docker volume rm "$web_volume" "$other_volume" >/dev/null
+restore_app_data '' "$helper" "$work/backup" >/dev/null
+check "$renamed_volume" "workspace/data/$app/data/a.txt" web-one
+check "$renamed_volume" "workspace/data/$other_app/data/o.txt" other
+docker volume rm "$renamed_volume" >/dev/null
+restore_app_data '' "$helper" "$work/backup" 2>"$work/err" >/dev/null || true
+grep -q 'install the Runner first' "$work/err" || fail 'a restore with no Runner volume did not say to install the Runner'
 # An empty backup (a host with no apps) restores cleanly; a tampered manifest is refused.
 mkdir -p "$work/empty/app-data" "$work/bad/app-data"
 : > "$work/empty/app-data/manifest.tsv"

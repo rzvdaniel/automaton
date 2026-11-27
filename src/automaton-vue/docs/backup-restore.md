@@ -69,6 +69,8 @@ sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z --app <app
 
 The app id is the one in Studio's URL for the app; for a Compose app use its project name (`pdf-summarizer`). If the id is not in the backup, the command lists what is. The app's containers are stopped, its data replaced with the backed-up files, and the containers started again. The app itself must already exist (redeploy it first if you deleted it); a Compose volume that no longer exists is recreated. A safety backup is taken first.
 
+On a new server the Runner's workspace volume has a different name. If the host has exactly one Runner workspace volume, web app data is restored into it and the command says so; with none, install the Runner first, and the app is skipped.
+
 To move to a new server, install the same release there, copy a backup folder into `/opt/automaton-server/backups/nightly/`, restore it, and copy `/etc/automaton` if existing sessions and Runners must keep working.
 
 ## Restore on a clean second server from an off-site archive
