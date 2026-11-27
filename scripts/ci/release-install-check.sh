@@ -98,7 +98,7 @@ fi
 make_user_data() { # make_user_data TAG DOMAIN FILE: cloud-config that installs the release; also puts our SSH key on the server (a rebuild does not)
     cat > "$3" <<YAML
 #cloud-config
-disable_root: false
+disable_root: false  # lets the key below reach root; do not remove
 ssh_authorized_keys:
   - $(cat "$work/key.pub")
 $write_files

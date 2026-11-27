@@ -34,7 +34,7 @@ concurrency:
   group: release-install-check
   cancel-in-progress: false
 env:
-  HCLOUD_VERSION: '1.52.0'
+  HCLOUD_VERSION: '1.62.0'  # server rebuild --user-data-from-file needs 1.62 or later
 jobs:
   check:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
