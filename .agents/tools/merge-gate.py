@@ -160,6 +160,27 @@ def proof_row(pr: dict, body: str) -> tuple[str, str, str] | None:
             + ' (or a line "Proof: not possible, because ...")')
 
 
+INSTALL_CHECK_PATHS = re.compile(r"^(scripts/ci/|\.github/workflows/release-install-check\.yml$)")
+RUN_URL = re.compile(r"/actions/runs/(\d+)")
+
+
+def install_run_ids(body: str) -> list[str]:
+    """Workflow run ids linked under How verified."""
+    return RUN_URL.findall(how_verified(body))
+
+
+def install_row(pr: dict, body: str) -> tuple[str, str, str] | None:
+    """A change to the install check needs a passing branch run of it on the final commit."""
+    if not any(INSTALL_CHECK_PATHS.search(path) for path in pr["paths"]):
+        return None
+    for run in pr.get("install_runs", []):
+        if (run.get("path") or "").endswith("release-install-check.yml") and run.get("head_sha") == pr["headRefOid"] \
+                and run.get("conclusion") == "success":
+            return ("PASS", "install-check", f"branch run {run.get('id')} passed on the final commit")
+    return ("FAIL", "install-check", "this change touches the install check: run release-install-check.yml on the branch "
+            "(workflow_dispatch with ref) and link the passing run under How verified; it must be for the final commit")
+
+
 def check(pr: dict, patterns: list[str], security: list[str] = (), skip_ci: bool = False) -> tuple[str, list[tuple[str, str, str]]]:
     """Return the tier and (result, name, detail) rows; result is PASS, FAIL or WARN."""
     rows = []
@@ -228,6 +249,10 @@ def check(pr: dict, patterns: list[str], security: list[str] = (), skip_ci: bool
     if proof:
         rows.append(proof)
 
+    install = install_row(pr, body)
+    if install:
+        rows.append(install)
+
     code = [path for path in paths if path.startswith("src/") and not path.endswith(".md")]
     tests = [path for path in code if "/UnitTests/" in path or re.search(r"\.(test|spec)\.[jt]s$", path)]
     if code and not tests:
@@ -274,6 +299,15 @@ def main() -> int:
         name, old, status, deletions = row.split("\t")
         pr["files"].append({"path": name, "status": status, "deletions": int(deletions)})
         pr["paths"] += [name] + ([old] if old else [])
+    pr["install_runs"] = []
+    if any(INSTALL_CHECK_PATHS.search(path) for path in pr["paths"]):
+        for run_id in install_run_ids(pr.get("body") or "")[:10]:
+            try:
+                run = json.loads(gh("api", f"repos/{slug}/actions/runs/{run_id}"))
+            except subprocess.CalledProcessError:
+                continue
+            pr["install_runs"].append({"id": run_id, "path": run.get("path"), "head_sha": run.get("head_sha"),
+                                       "conclusion": run.get("conclusion")})
     # The owner's paths come from the base branch, so a pull request cannot shorten its own list.
     try:
         owners = gh("api", f"repos/{slug}/contents/.github/CODEOWNERS?ref={pr['baseRefName']}",

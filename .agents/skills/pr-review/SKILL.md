@@ -106,6 +106,8 @@ python3 .agents/tools/merge-gate.py <N>           # check only
 python3 .agents/tools/merge-gate.py <N> --merge   # check, then squash-merge the checked commit on PASS
 ```
 
+A PR that changes `scripts/ci/` or `release-install-check.yml` also needs a passing branch run of the install check on its final commit (`gh workflow run release-install-check.yml --ref <branch>`), linked under How verified; the gate reads the run from GitHub.
+
 Agents merge only with `--merge`, never with `gh pr merge`: running it is the approval. It checks from GitHub that CI
 is green on the final commit, the last review (from an account with write access; a later review replaces an earlier
 one) covers that commit and does not start with CHANGES NEEDED, a high-tier change
