@@ -97,7 +97,7 @@ fi
 # app-data:begin
 # restore_app_data <only this app id/project, or empty for all> <helper image> <backup directory>
 restore_app_data() {
-    local only="$1" helper="$2" backup="$3" manifest="$3/app-data/manifest.tsv" kind key volume sub file label found=0 ids
+    local only="$1" helper="$2" backup="$3" manifest="$3/app-data/manifest.tsv" kind key volume sub file label found=0 ids here
     [[ -f "$manifest" ]] || { echo 'This backup has no app data (it was taken before app data was included).'; return 0; }
     while IFS=$'\t' read -r kind key volume sub file; do
         [[ -z "$only" || "$key" == "$only" ]] || continue
@@ -111,8 +111,15 @@ restore_app_data() {
                 docker volume create --label "com.docker.compose.project=$key" --label "com.docker.compose.volume=$sub" "$volume" >/dev/null
                 sub=.
             else
-                echo "Skipping app $key: volume $volume does not exist on this host (install the Runner first)." >&2
-                continue
+                # A fresh server's Runner has its own workspace volume (the name carries the installation id): use it when it is the only one.
+                mapfile -t here < <(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume)
+                if ((${#here[@]} == 1)); then
+                    echo "Volume $volume does not exist on this host; restoring app $key into the Runner volume ${here[0]}."
+                    volume="${here[0]}"
+                else
+                    echo "Skipping app $key: volume $volume does not exist on this host and it has ${#here[@]} Runner workspace volumes (install the Runner first)." >&2
+                    continue
+                fi
             fi
         fi
         if [[ "$kind" == web ]]; then label="com.automaton.app-id=$key"; else label="com.docker.compose.project=$key"; fi
