@@ -64,9 +64,10 @@ jobs:
       - name: Generate openapi.json
         run: |
           set -euo pipefail
-          dotnet tool install Swashbuckle.AspNetCore.Cli --version 10.1.7 --tool-path "$RUNNER_TEMP/swagger"
+          dotnet tool install Swashbuckle.AspNetCore.Cli --version 7.1.0 --tool-path "$RUNNER_TEMP/swagger"
           dotnet build release-src/src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
-          ASPNETCORE_ENVIRONMENT=Development "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          # The API refuses to start without signing settings; the CLI only builds the host, a random throwaway value is enough.
+          AuthenticationSettings__HMacSettings__SecretKey="$(openssl rand -hex 32)" ASPNETCORE_ENVIRONMENT=Development "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
           jq -e '.paths | length > 1' "$RUNNER_TEMP/openapi.json" >/dev/null
       - uses: actions/upload-artifact@v4
         with:
