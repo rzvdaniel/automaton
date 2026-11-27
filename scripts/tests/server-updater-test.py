@@ -307,7 +307,7 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((self.install / 'release.env').read_text(), manifest('2'))
         calls = [json.loads(line) for line in log.read_text().splitlines()]
-        up, = [args for args in calls if args[0] == 'compose' and 'up' in args]
+        up, = [args for args in calls if args[0] == 'compose' and 'up' in args and 'traefik' not in args]
         pull, = [args for args in calls if args[0] == 'compose' and 'pull' in args]
         self.assertEqual(sorted(up[up.index('600') + 1:]), ['api', 'store', 'studio', 'worker'])
         self.assertEqual(sorted(pull[pull.index('pull') + 1:]), ['api', 'store', 'studio', 'worker'])
@@ -396,6 +396,15 @@ grep -Eq '^[a-z_][a-z0-9_-]* ALL=\\(root\\) NOPASSWD: /usr/local/bin/automaton-d
         self.assertIn('changes traefik', refused.stderr)
         accepted = self.update(*self.bundle(compose_file=compose(traefik_volumes=[certs])))
         self.assertNotIn('changes traefik', accepted.stderr)
+
+    def test_traefik_is_recreated_not_restarted_so_a_new_mount_applies(self):
+        log = self.root / 'docker.log'
+        certs = {'type': 'bind', 'source': str(self.config) + '/certs', 'target': '/etc/traefik/certs', 'read_only': True}
+        result = self.update(*self.bundle(compose_file=compose(traefik_volumes=[certs])), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        self.assertTrue(any(args[0] == 'compose' and 'up' in args and args[-1] == 'traefik' and '--no-deps' in args for args in calls))
+        self.assertFalse(any(args[0] == 'compose' and 'restart' in args for args in calls))
 
     def old_backups(self, count):
         backups = self.install / 'backups'
