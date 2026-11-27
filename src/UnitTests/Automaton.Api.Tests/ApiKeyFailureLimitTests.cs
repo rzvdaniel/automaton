@@ -59,4 +59,26 @@ public class ApiKeyFailureLimitTests
         Assert.That(tracker.IsBlocked(null), Is.True);
         Assert.That(tracker.IsBlocked("203.0.113.9"), Is.False);
     }
+
+    [TestCase("header")]
+    [TestCase("query")]
+    [TestCase("bearer")]
+    public async Task AcceptedKey_StillPassesWhileTheAddressIsOverTheFailureLimit(string where)
+    {
+        using var host = await CreateHostAsync(3, tracker => { for (var i = 0; i < 3; i++) tracker.RecordFailure(null); });
+        RateLimitedApiKeys.Remember(host.Services.GetRequiredService<IMemoryCache>(), "ak_valid");
+        var client = host.GetTestClient();
+
+        var request = new HttpRequestMessage(HttpMethod.Get, where == "query" ? "/api/apps?api_key=ak_valid" : "/api/apps");
+        if (where == "header") request.Headers.Add("X-API-Key", "ak_valid");
+        if (where == "bearer") request.Headers.Add("Authorization", "Bearer ak_valid");
+        var accepted = await client.SendAsync(request);
+
+        var wrong = new HttpRequestMessage(HttpMethod.Get, "/api/apps");
+        wrong.Headers.Add("X-API-Key", "ak_wrong");
+        var rejected = await client.SendAsync(wrong);
+
+        Assert.That(accepted.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(rejected.StatusCode, Is.EqualTo((HttpStatusCode)429));
+    }
 }

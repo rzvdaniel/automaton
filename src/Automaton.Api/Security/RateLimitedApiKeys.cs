@@ -18,10 +18,23 @@ internal static class RateLimitedApiKeys
     /// <summary>The partition key for an accepted key, or null for a missing or unknown one.</summary>
     internal static string? Recognise(HttpContext context)
     {
-        var apiKey = context.Request.Headers["X-API-Key"].FirstOrDefault();
+        var apiKey = FromRequest(context.Request);
         if (string.IsNullOrEmpty(apiKey)) return null;
         var key = CacheKey(apiKey);
         return context.RequestServices.GetService<IMemoryCache>()?.TryGetValue(key, out _) == true ? key : null;
+    }
+
+    /// <summary>The key a request presents, from the header, the query string or a Bearer token, as authentication reads it.</summary>
+    internal static string? FromRequest(HttpRequest request)
+    {
+        var apiKey = request.Headers["X-API-Key"].FirstOrDefault();
+        if (string.IsNullOrEmpty(apiKey))
+            apiKey = request.Query["api_key"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(apiKey))
+            return apiKey;
+
+        var authHeader = request.Headers.Authorization.FirstOrDefault();
+        return authHeader?.StartsWith("Bearer ak_", StringComparison.Ordinal) == true ? authHeader["Bearer ".Length..] : null;
     }
 
     private static string CacheKey(string apiKey)
