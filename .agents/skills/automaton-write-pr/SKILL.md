@@ -26,7 +26,7 @@ Fill in [`.github/pull_request_template.md`](../../../.github/pull_request_templ
   the gate then warns and the reviewer judges it.
 - **Check after release** is what the verifier will run on the test server, written so an agent that never saw your
   work can follow it: who signs in, what they do, what they see. It comes from the issue's "Done when". Every value in it (a setting, a limit, an input)
-  must pass this PR's own validation: check the minimum and maximum in the code before you write it.
+  must pass this PR's own validation, and every item must be runnable by an agent on the test server without breaking it (or name the install check's throwaway server or the test hook it runs on): check the minimum and maximum in the code before you write it.
 
 Never write `Closes #N` or `Fixes #N`: an issue closes only when its change is live on production. Use
 `Part of #N` when the PR delivers only part of the issue.

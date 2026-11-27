@@ -24,6 +24,10 @@ in production, add one line here (or a test, or an analyzer rule) instead of a n
 - **CLI:** exit code 0 on failure; output an agent cannot parse; a flag or command changed under existing users.
 - **Workflows (`.github/workflows/`):** a secret or write permission reachable from pull-request code; a release that
   publishes something that was not built from the release commit.
+- **PR "Check after release" list:** every item must be runnable by an agent on the test server without breaking it
+  (no Docker restart, no deleting shared data). Otherwise it must name where it runs instead (the release install check's
+  throwaway server) or the test hook that triggers the same path. A check only the owner can do is Important, unless the
+  PR says why and the owner agreed.
 - **Docs and skills:** they lie (describe behaviour the code does not have), or get longer without saying more.
 
 ## Findings
