@@ -102,9 +102,55 @@ def public_urls(domain):
     return {name: f'https://{name}.{domain}' for name in ('api', 'studio', 'apps', 'store')}
 
 
+HSTS = dict(stsSeconds=31536000, stsIncludeSubdomains=True)
+
+
+def security_headers_config(domain):
+    """Shared response-header middlewares (#1829). 'security-headers' is for Studio, the API and the Store; Studio frames
+    apps, so 'app-security-headers' lets only the Studio origin do that."""
+    sources = f"https://*.{domain} wss://*.{domain}"
+    csp = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; "
+           "img-src 'self' data: blob: https:; font-src 'self' data:; worker-src 'self' blob:; "
+           f"connect-src 'self' {sources}; frame-src https://*.{domain}; "
+           "object-src 'none'; base-uri 'self'; form-action 'self' https:; frame-ancestors 'none'")
+    return {'http': {'middlewares': {
+        'security-headers': {'headers': dict(HSTS, contentTypeNosniff=True, frameDeny=True,
+                                             contentSecurityPolicy=csp)},
+        'app-security-headers': {'headers': dict(HSTS, contentTypeNosniff=True,
+                                                 contentSecurityPolicy=f'frame-ancestors https://studio.{domain}')},
+    }}}
+
+
+def ensure_security_headers(root):
+    """Write the shared header middlewares; ours, so replaced when the content changes."""
+    state = json.loads((root / 'installation.json').read_text())
+    (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
+    path = root / 'dynamic' / 'security-headers.yml'
+    content = json.dumps(security_headers_config(state['domain']))
+    if not path.exists() or path.read_text() != content:
+        with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
+            stream.write(content)
+        os.replace(stream.name, path)
+    # Routers the installer wrote earlier lack the middleware; add it. A hand-written (non-JSON) file is left alone.
+    edge_path = root / 'dynamic' / 'installation.yml'
+    try:
+        edge = json.loads(edge_path.read_text())
+        routers = edge['http']['routers']
+    except (OSError, ValueError, KeyError, TypeError):
+        return
+    changed = False
+    for name in ('api', 'studio', 'studio-api', 'apps'):
+        router = routers.get(name)
+        if isinstance(router, dict) and not router.get('middlewares'):
+            router['middlewares'] = ['app-security-headers@file' if name == 'apps' else 'security-headers@file']
+            changed = True
+    if changed:
+        replace_json(edge_path, edge)
+
+
 def store_router(domain, resolver):
     return dict(entryPoints=['websecure'], rule=f'Host(`store.{domain}`)', service='store',
-                tls=tls_block(resolver), priority=100)
+                tls=tls_block(resolver), priority=100, middlewares=['security-headers@file'])
 
 
 def studio_paths_router(domain, resolver):
@@ -112,7 +158,8 @@ def studio_paths_router(domain, resolver):
     # matches PathPrefix(`/api`) as plain text on installations configured before this router existed.
     # Any studio.* host: a server can also answer on extra hostnames (the test server has studio.test.<domain>).
     return dict(entryPoints=['websecure'], rule=r'HostRegexp(`^studio\.`) && PathRegexp(`^/api[^/]`)',
-                service='studio-pages', tls=tls_block(resolver), priority=300)
+                service='studio-pages', tls=tls_block(resolver), priority=300,
+                middlewares=['security-headers@file'])
 
 
 def ensure_studio_paths(root):
@@ -154,10 +201,14 @@ def ensure_store(root):
         replace_json(settings_path, settings)
     (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
     # A separate dynamic file: adopted installations may keep a hand-written YAML installation.yml.
-    write_new(root / 'dynamic' / 'store.yml', json.dumps({'http': {
+    store_yml = root / 'dynamic' / 'store.yml'
+    store_content = json.dumps({'http': {
         'routers': {'store': store_router(domain, resolver)},
         'services': {'store': {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}}},
-    }}))
+    }})
+    if store_yml.exists() and store_yml.read_text() != store_content and store_yml.read_text().lstrip().startswith('{'):
+        store_yml.unlink()  # Ours (JSON); earlier versions lacked the security-headers middleware.
+    write_new(store_yml, store_content)
 
 
 def ensure_custom_domain_resolver(root):
@@ -518,10 +569,12 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
                                 ('studio-api', f'Host(`studio.{domain}`) && (Path(`/api`) || PathPrefix(`/api/`) || Path(`/auth/github/login`) || PathPrefix(`/signin-github`))', 'api'),
                                 ('apps', f'Host(`apps.{domain}`)', 'api')]:
         edge['http']['routers'][name] = dict(entryPoints=['websecure'], rule=rule, service=service,
-                                             tls=tls_block(apps_resolver if name == 'apps' else resolver), priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100)
+                                             tls=tls_block(apps_resolver if name == 'apps' else resolver), priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100,
+                                             middlewares=['app-security-headers@file' if name == 'apps' else 'security-headers@file'])
     if wildcard_store(tls_mode, domain):
         edge['tls'] = wildcard_store(tls_mode, domain)
     write_new(root / 'dynamic' / 'installation.yml', json.dumps(edge))
+    ensure_security_headers(root)
     ensure_store(root)
     ensure_studio_paths(root)
 
@@ -604,10 +657,12 @@ if __name__ == '__main__':
             if not (args.config_dir / 'installation.json').is_file():
                 raise ValueError('No existing installation configuration was found.')
             ensure_studio_paths(args.config_dir)
+            ensure_security_headers(args.config_dir)
         elif args.ensure_store:
             if not (args.config_dir / 'installation.json').is_file():
                 raise ValueError('No existing installation configuration was found.')
             ensure_store(args.config_dir)
+            ensure_security_headers(args.config_dir)
         elif not args.domain or not args.email:
             parser.error('--domain and --email are required.')
         else:

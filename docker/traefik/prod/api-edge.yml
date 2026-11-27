@@ -15,6 +15,7 @@ http:
       service: api-live-edge
       middlewares:
         - api-https-headers
+        - security-headers
       tls:
         certResolver: cloudflare
 
@@ -23,6 +24,8 @@ http:
         - websecure
       rule: "Host(`__STUDIO_DOMAIN__`)"
       service: studio-__STUDIO_COLOR__-edge
+      middlewares:
+        - security-headers
       tls:
         certResolver: cloudflare
 
@@ -31,6 +34,8 @@ http:
         - websecure
       rule: "Host(`__WEBSITE_DOMAIN__`) || Host(`www.__WEBSITE_DOMAIN__`)"
       service: website-__WEBSITE_COLOR__-edge
+      middlewares:
+        - website-security-headers
       tls:
         certResolver: cloudflare
 
@@ -41,6 +46,7 @@ http:
       service: api-live-edge
       middlewares:
         - api-https-headers
+        - app-security-headers
       tls:
         certResolver: cloudflare
 
@@ -52,6 +58,7 @@ http:
       service: api-live-edge
       middlewares:
         - api-https-headers
+        - app-security-headers
       tls:
         certResolver: cloudflare
 
@@ -65,6 +72,28 @@ http:
       headers:
         customRequestHeaders:
           X-Forwarded-Proto: "https"
+
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        contentTypeNosniff: true
+        frameDeny: true
+        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' https://*.__WEBSITE_DOMAIN__ wss://*.__WEBSITE_DOMAIN__ https://*.__APPS_DOMAIN__; frame-src https://*.__WEBSITE_DOMAIN__ https://*.__APPS_DOMAIN__ https://__APPS_DOMAIN__; object-src 'none'; base-uri 'self'; form-action 'self' https:; frame-ancestors 'none'"
+
+    website-security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        contentTypeNosniff: true
+        frameDeny: true
+
+    app-security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        contentTypeNosniff: true
+        contentSecurityPolicy: "frame-ancestors https://__STUDIO_DOMAIN__"
 
   services:
     api-live-edge:
