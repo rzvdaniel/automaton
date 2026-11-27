@@ -5,6 +5,7 @@
 #   verify-trigger.sh done [v] records version v (default: the installed one) as verified (called when a run starts, so a failed run is not retried every poll).
 #                             Exits 3 without changing anything when v is already recorded: runs triggered together all
 #                             passed "check" before any recorded it, so only the first one may go on.
+#   verify-trigger.sh reset   forgets the recorded version, so the next poll (or a manual dispatch) verifies it again
 # Env: AGENT_GH (gh), AGENT_BOARD (default rzvdaniel/17), VERIFY_VERSION_FILE (/opt/automaton-server/version),
 #      VERIFY_STATE_FILE (~/.local/state/automaton/verified-version).
 set -euo pipefail
@@ -29,5 +30,6 @@ case ${1:-} in
     exec 9> "$SF.lock"; flock 9
     [[ $installed != "$(cat "$SF" 2>/dev/null || true)" ]] || { echo "skip: $installed already claimed"; exit 3; }
     echo "$installed" > "$SF" ;;
-  *) echo "usage: verify-trigger.sh check|done" >&2; exit 2 ;;
+  reset) rm -f "$SF" ;;
+  *) echo "usage: verify-trigger.sh check|done|reset" >&2; exit 2 ;;
 esac

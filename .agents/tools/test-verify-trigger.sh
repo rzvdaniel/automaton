@@ -19,4 +19,6 @@ echo server-v0.2.197 > "$t/version"
 [[ $(v check) == "skip: server-v0.2.197 already verified" ]] || { echo "FAIL: verified"; exit 1; }
 echo server-v0.2.198 > "$t/version"
 [[ $(v check) == "run server-v0.2.198" ]] || { echo "FAIL: next version"; exit 1; }
+v reset; [[ ! -e "$t/state/v" ]] || { echo "FAIL: reset"; exit 1; }
+v done server-v0.2.197 || { echo "FAIL: claim after reset"; exit 1; }
 echo ok
