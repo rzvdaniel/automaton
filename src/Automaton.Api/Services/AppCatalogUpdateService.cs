@@ -6,6 +6,7 @@ using Automaton.Api.Models;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Automaton.Api.Services;
@@ -29,6 +30,9 @@ public sealed class AppCatalogUpdateRequest
 {
     /// <summary>Required when the app's files were edited after the install: the update replaces those changes.</summary>
     public bool ConfirmEdited { get; set; }
+
+    /// <summary>Create the default schedules the new version declares and the app lacks. Clients that plan schedules themselves (the CLI) send false.</summary>
+    public bool CreateSchedules { get; set; } = true;
 }
 
 /// <summary>
@@ -46,6 +50,8 @@ public sealed class AppCatalogUpdateService(
     AppCatalogInstallService installer,
     AppCatalogBackfillService backfill,
     StoredSourceDeploymentService deployment,
+    ActionScheduleService schedules,
+    ILogger<AppCatalogUpdateService> logger,
     Services.Interfaces.IAuditEventService auditEventService,
     IMemoryCache cache)
 {
@@ -166,8 +172,10 @@ public sealed class AppCatalogUpdateService(
             return await deployment.AcceptAsync(appId, userId, ownerId, null, false, cancellationToken);
 
         var target = await CurrentTargetAsync(source, update.LatestCommit!, cancellationToken);
+        List<ApplicationScheduleDeclaration> declared = [];
         using (var package = await installer.DownloadAsync(target, cancellationToken))
         {
+            declared = AppCatalogInstallService.ReadManifest(package, target).Application.Schedules;
             // Extract next to the app first and swap only when that worked, so a failed download or extract leaves the
             // installed files as they were.
             var directory = Path.GetFullPath(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId)).TrimEnd(Path.DirectorySeparatorChar);
@@ -207,7 +215,50 @@ public sealed class AppCatalogUpdateService(
             ActorUserId = userId,
             Metadata = new { source.Repo, source.Folder, From = source.Commit, To = target.Commit, ToRepo = target.Repo, ToFolder = target.Folder }
         });
+        if (request.CreateSchedules) await CreateMissingSchedulesAsync(entity, declared, userId, cancellationToken);
         return await deployment.AcceptAsync(appId, userId, ownerId, null, false, cancellationToken);
+    }
+
+    /// <summary>The updated files are in place, so the declared Actions resolve; a schedule that cannot be created is logged and does not undo the update.</summary>
+    private async Task CreateMissingSchedulesAsync(WebApp app, List<ApplicationScheduleDeclaration> declared, Guid userId, CancellationToken cancellationToken)
+    {
+        if (declared.Count == 0) return;
+        var existing = await dbContext.ActionSchedules.AsNoTracking().Where(x => x.ApplicationId == app.Id).ToListAsync(cancellationToken);
+        foreach (var request in MissingSchedules(app.Id, app.Name, declared, existing))
+        {
+            try { await schedules.CreateAsync(request, userId, false, cancellationToken); }
+            catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(exception, "Default schedule {Schedule} of app {AppId} was not created after the update", request.Name, app.Id);
+            }
+        }
+    }
+
+    /// <summary>Requests for the declared schedules the app lacks: none with the same "App name: schedule name", none doing the same Action on the same timing.</summary>
+    internal static List<SaveActionScheduleRequest> MissingSchedules(Guid appId, string appName, IEnumerable<ApplicationScheduleDeclaration> declared, IReadOnlyList<ActionSchedule> existing)
+    {
+        var result = new List<SaveActionScheduleRequest>();
+        foreach (var item in declared)
+        {
+            var name = $"{appName.Trim()}: {item.Name}";
+            var cron = string.IsNullOrWhiteSpace(item.Cron) ? null : item.Cron.Trim();
+            bool Same(string actionKey, string? otherCron, int? seconds) => actionKey == item.Action && otherCron == cron && (cron is not null || seconds == item.IntervalSeconds);
+            if (existing.Any(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) || Same(x.ActionKey, x.CronExpression, x.IntervalSeconds))
+                || result.Any(x => x.Name == name)) continue;
+            result.Add(new SaveActionScheduleRequest
+            {
+                ApplicationId = appId,
+                ActionKey = item.Action,
+                Name = name,
+                Description = item.Description,
+                ScheduleType = cron is not null ? "Cron" : "Interval",
+                CronExpression = cron,
+                IntervalSeconds = cron is null ? item.IntervalSeconds : null,
+                TimeZone = string.IsNullOrWhiteSpace(item.TimeZone) ? "Etc/UTC" : item.TimeZone,
+                Input = item.Input is { ValueKind: System.Text.Json.JsonValueKind.Object } input ? input : System.Text.Json.JsonDocument.Parse("{}").RootElement.Clone()
+            });
+        }
+        return result;
     }
 
     private async Task<(WebApp App, Guid OwnerId, GitAppSource? Source)> FindAsync(Guid appId, CancellationToken cancellationToken)

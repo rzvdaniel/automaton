@@ -918,7 +918,7 @@ public class AutomatonApiClient : IDisposable
     /// <summary>Replaces the app's files with the catalog's newer commit and redeploys; with wait, returns the finished result.</summary>
     public async Task<JsonElement> UpdateCatalogAppAsync(string appId, bool confirmEdited, bool wait, CancellationToken ct = default)
     {
-        using var resp = await PostJsonAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update", JsonSerializer.Serialize(new { confirmEdited }, JsonOptions), ct);
+        using var resp = await PostJsonAsync($"api/catalog/apps/{Uri.EscapeDataString(appId)}/update", JsonSerializer.Serialize(new { confirmEdited, createSchedules = false }, JsonOptions), ct);
         if (wait) return await WaitForDeploymentResultAsync(appId, resp, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
