@@ -114,6 +114,7 @@ services:
     volumes:
       - ${CONFIG_DIR:?}/traefik.yml:/etc/traefik/traefik.yml:ro
       - ${CONFIG_DIR:?}/dynamic:/etc/traefik/dynamic:ro
+      - ${CONFIG_DIR:?}/certs:/etc/traefik/certs:ro
       - certificates:/certificates
     depends_on:
       api: {condition: service_healthy}

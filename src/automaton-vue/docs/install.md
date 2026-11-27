@@ -111,6 +111,19 @@ runcmd:
 
 Change the three addresses. A few minutes after boot, `https://api.example.com/health` answers `ok`. The administrator is created with a password nobody sees, and a one-time link to choose your own is written to the root-only file `/root/automaton-admin-link.txt` (valid 30 minutes; the file says how to make a new one). Read it over SSH with `sudo cat /root/automaton-admin-link.txt`. The log is `/var/log/automaton-install.log`; no password, token or key is written to it or to `/var/log/cloud-init-output.log`. The backup key is the root-only file `/etc/automaton/secrets/backup-key`: copy it off the server, then delete it there. The installer also connects a Runner named `main` on the same server, so Studio shows it connected when you sign in; add `--no-runner` to skip it (for a server that only hosts the control plane). If it cannot connect, the log says so and step 5 above does it by hand. Options: `--no-runner`, `--dns-wait-minutes N` (default 30), `--tls-mode`, `--public-ip`.
 
+## Use your own certificate
+
+If Let's Encrypt is not allowed on your network, install with a certificate you already have, such as a company wildcard:
+
+```bash
+sudo bash install-automaton.sh --domain example.com --email admin@example.com \
+  --tls-mode custom --cert-file /path/fullchain.pem --key-file /path/privkey.pem
+```
+
+The certificate (PEM, with its chain) must cover `api`, `studio`, `store` and `apps` under your domain and `*.apps.example.com`, for example `*.example.com` plus `*.apps.example.com`. The installer checks this, names any missing name and changes nothing if the key does not belong to the certificate. No certificate is requested from anyone; published apps use the same certificate, and a custom domain on an app needs a certificate of its own.
+
+To renew, put the new files in place and run `sudo python3 /opt/automaton-server/configure.py --config-dir /etc/automaton --replace-certificate --cert-file NEW.pem --key-file NEW.key`. Traefik loads it within seconds. Switching an existing server to or from custom certificates is not supported yet.
+
 ## Common errors
 
 - **DNS check fails.** Fix the records the installer lists, wait, rerun the same command. Proxied (orange cloud) records break certificates.
