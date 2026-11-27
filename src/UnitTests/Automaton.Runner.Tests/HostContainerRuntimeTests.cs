@@ -441,14 +441,14 @@ public sealed class HostContainerRuntimeTests
     }
 
     [Test]
-    public async Task TwoCreatesAlwaysRequestDockerAllocation()
+    public async Task TwoCreatesOfOneAppPublishItsOwnFixedPort()
     {
         var service = Service();
         await service.ExecuteAsync(CreateRequest());
         await service.ExecuteAsync(CreateRequest());
         var creates = calls.Where(x => x[1] == "create").Select(x => x.ToList()).ToArray();
         Assert.That(creates, Has.Length.EqualTo(2));
-        Assert.That(creates.All(x => x[x.IndexOf("--publish") + 1] == "172.17.0.1::8080"), Is.True);
+        Assert.That(creates.Select(x => x[x.IndexOf("--publish") + 1]).Distinct().Single(), Does.Match(@"^172\.17\.0\.1:\d+:8080$"));
         Assert.That(creates.Select(x => x[x.IndexOf("--name") + 1]).Distinct().Count(), Is.EqualTo(2));
     }
 

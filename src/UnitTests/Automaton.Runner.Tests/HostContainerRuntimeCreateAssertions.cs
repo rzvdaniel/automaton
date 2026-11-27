@@ -29,7 +29,7 @@ internal static class HostContainerRuntimeCreateAssertions
         IReadOnlyList<string> args,
         string digest)
     {
-        Assert.That(args[args.ToList().IndexOf("--publish") + 1], Is.EqualTo("172.17.0.1::8080"));
+        Assert.That(args[args.ToList().IndexOf("--publish") + 1], Does.Match(@"^172\.17\.0\.1:1[89]\d{3}:8080$"));
         Assert.That(args, Does.Contain("no-new-privileges"));
         Assert.That(args[args.ToList().IndexOf("--cap-drop") + 1], Is.EqualTo("ALL"));
         Assert.That(args[args.ToList().IndexOf("--network") + 1], Is.EqualTo("bridge"));

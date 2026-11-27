@@ -38,7 +38,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         this.workspace = workspace;
         metadataStore = new RunnerRuntimeMetadataStore(workspace);
         this.registry = registry;
-        networkPolicy = new RunnerRuntimeNetworkPolicy(registry);
+        networkPolicy = new RunnerRuntimeNetworkPolicy(registry, AppHostPortLedger.ForWorkspace(workspace));
         this.containers = containers;
         this.logger = logger;
     }
@@ -593,7 +593,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     {
         var runtimeImage = RunnerRuntimeMetadataPolicy.RuntimeImage(contract);
         var scopedRuntime = containers as IScopedApplicationContainerRuntime;
-        var effectivePort = scopedRuntime is null ? networkPolicy.AllocatePort(contract.Runtime.Port) : 0;
+        var effectivePort = scopedRuntime is null
+            ? networkPolicy.ReservePort(appId, targetId, previous?.EffectivePort, contract.Runtime.Port) : 0;
         var resolvedCandidateId = candidateId ?? Guid.NewGuid();
         var artifact = artifactRoot ?? workspace.GetAppRuntimeCandidateApplicationDirectory(appId, targetId, resolvedCandidateId);
         artifact = workspace.ValidateRuntimeArtifactRoot(appId, targetId, artifact);
@@ -919,6 +920,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             logger.LogWarning("{Warning}", warning);
         if (warnings.Count > 0)
             throw new InvalidOperationException($"Managed runtime cleanup for {appId}/{deploymentTargetId} is incomplete; target state was preserved for retry. {string.Join(" ", warnings)}");
+        networkPolicy.ReleasePorts(appId, deploymentTargetId);
     }
 
     private static HashSet<string> GetCleanupContainerReferences(

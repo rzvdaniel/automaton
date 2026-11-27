@@ -18,6 +18,7 @@ public sealed partial class HostContainerExecutionService
     private readonly HostContainerComposeProjectExecutor composeExecutor;
     private readonly RunnerWorkspaceService workspace;
     private readonly MachineWorkloadDiskAdmission diskAdmission;
+    private readonly AppHostPortLedger portLedger;
 
     public HostContainerExecutionService(InfrastructureCommandService infrastructureCommandService)
         : this((arguments, timeout, cancellationToken) => infrastructureCommandService.ExecuteTypedDockerAsync(arguments, timeout, cancellationToken))
@@ -30,6 +31,7 @@ public sealed partial class HostContainerExecutionService
     {
         this.executor = executor;
         workspace = new RunnerWorkspaceService();
+        portLedger = AppHostPortLedger.ForWorkspace(workspace);
         this.diskAdmission = diskAdmission ?? new MachineWorkloadDiskAdmission();
         buildExecutor = new HostContainerBuildExecutor(executor);
         actionExecutor = new HostContainerActionExecutor(executor, workspace);
@@ -64,8 +66,12 @@ public sealed partial class HostContainerExecutionService
             or HostContainerOperationKinds.InspectComposeProject or HostContainerOperationKinds.RemoveComposeProject)
             return await composeExecutor.ExecuteAsync(request, cancellationToken);
         if (request.Operation == HostContainerOperationKinds.RemoveTargetContainers)
-            return await new HostContainerRuntimeCleanup(executor, ExecuteContainerOperationAsync)
+        {
+            var removed = await new HostContainerRuntimeCleanup(executor, ExecuteContainerOperationAsync)
                 .ExecuteAsync(request, RuntimeLabels(request.Scope), cancellationToken);
+            if (removed.Success) portLedger.Release(request.Scope.AppId, request.Scope.DeploymentTargetId);
+            return removed;
+        }
         return request.Operation == HostContainerOperationKinds.CreateApplicationContainer
             ? await CreateApplicationContainerAsync(request, cancellationToken)
             : await ExecuteContainerOperationAsync(request, cancellationToken);

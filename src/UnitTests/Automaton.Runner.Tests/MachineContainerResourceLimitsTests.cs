@@ -127,7 +127,7 @@ internal sealed class MachineContainerTestEnvironment : IDisposable
     [
         "AUTOMATON_RUNNER_PURPOSE", "AUTOMATON_RUNNER_APPLICATION_PROFILE", "AUTOMATON_RUNNER_CAPABILITIES",
         "AUTOMATON_RUNNER_ID", "AUTOMATON_RUNNER_INSTALLATION_ID", "AUTOMATON_RUNTIME_HOST_ADDRESS",
-        "AUTOMATON_LOCAL_DOCKER_TEST"
+        "AUTOMATON_WORKSPACE_ROOT", "AUTOMATON_LOCAL_DOCKER_TEST"
     ];
     private readonly string?[] previousValues;
 
@@ -152,7 +152,8 @@ internal sealed class MachineContainerTestEnvironment : IDisposable
         Environment.SetEnvironmentVariable(Names[3], runnerId.ToString());
         Environment.SetEnvironmentVariable(Names[4], installationId);
         Environment.SetEnvironmentVariable(Names[5], "127.0.0.1");
-        Environment.SetEnvironmentVariable(Names[6], "true");
+        Environment.SetEnvironmentVariable(Names[6], Path.Combine(Path.GetTempPath(), "machine-ws-" + Guid.NewGuid().ToString("N")));
+        Environment.SetEnvironmentVariable(Names[7], "true");
         return new(runnerId, installationId, previous);
     }
 
