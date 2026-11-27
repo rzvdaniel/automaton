@@ -1,0 +1,11 @@
+# Endpoints the signed-in API scan must not call: ZAP regexes against the full URL, one per line; `#` lines and blanks are ignored.
+# These update, restart, clean up or uninstall the throwaway server, or delete or change users, keys and sign-in; the scan is
+# meant to find holes, not to take the server down. Add a line when a new destructive endpoint appears.
+.*/api/install/(update|restart|os-updates).*
+.*/api/server/(cleanup|maintenance-runs|security/fail|console).*
+.*/api/admin/(users|settings|retention).*
+.*/api/Account/.*
+.*/api/cli-auth.*
+.*/api/invitations.*
+.*/api/hooks.*
+.*/api/notify/.*

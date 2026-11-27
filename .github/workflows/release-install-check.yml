@@ -93,6 +93,24 @@ jobs:
           echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
           echo "previous=${previous#server-v}" >> "$GITHUB_OUTPUT"
           echo "### Release install check: ${current#server-v} (upgrade from ${previous#server-v})" >> "$GITHUB_STEP_SUMMARY"
+      # The API's OpenAPI file for the signed-in API scan: built from the release's own source, never served by a server.
+      # Only the source is taken from the tag; the scripts stay the trusted checkout of the default branch.
+      - uses: actions/checkout@v4
+        with:
+          ref: server-v${{ steps.versions.outputs.version }}
+          path: release-src
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Generate openapi.json from the release
+        run: |
+          set -euo pipefail
+          dotnet tool install Swashbuckle.AspNetCore.Cli --version 7.1.0 --tool-path "$RUNNER_TEMP/swagger"
+          dotnet build release-src/src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
+          ASPNETCORE_ENVIRONMENT=Development "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          echo "API_SPEC=$RUNNER_TEMP/openapi.json" >> "$GITHUB_ENV"
+          echo "- OpenAPI file: $(jq '.paths | length' "$RUNNER_TEMP/openapi.json") paths" >> "$GITHUB_STEP_SUMMARY"
       # One server for the run: upgrade and scan, back up, rebuild, fresh install and scan, restore, delete.
       - name: Upgrade, fresh install and restore on one rebuilt server
         env:

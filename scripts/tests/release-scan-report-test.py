@@ -2,11 +2,11 @@ import json, os, subprocess, sys, tempfile
 here = os.path.dirname(os.path.abspath(__file__))
 script = os.path.join(here, "..", "ci", "scan-report.py")
 d = tempfile.mkdtemp()
-def run(alerts, nmap="", allow=""):
+def run(alerts, nmap="", allow="", name="t"):
     z = os.path.join(d, "z.json"); json.dump({"site": [{"@name": "s", "alerts": alerts}]}, open(z, "w"))
     a = os.path.join(d, "a.txt"); open(a, "w").write(allow)
     n = os.path.join(d, "n.gnmap"); open(n, "w").write(nmap)
-    r = subprocess.run([sys.executable, "-I", script, "--allowlist", a, "--zap", f"t={z}", "--nmap", n], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-I", script, "--allowlist", a, "--zap", f"{name}={z}", "--nmap", n], capture_output=True, text=True)
     return r.returncode, r.stdout
 csp = {"pluginid": "10038", "alert": "CSP Header Not Set", "riskcode": "2", "instances": [{"uri": "https://x/store"}]}
 med = {"pluginid": "90001", "alert": "Some medium", "riskcode": "2", "instances": [{"uri": "https://x/"}]}
@@ -17,4 +17,7 @@ rc, out = run([csp], ok); assert rc == 1 and "CSP Header Not Set" in out
 assert run([csp], ok, "10038 /store accepted for now\n")[0] == 0
 assert run([], ok + ", 5432/open/tcp//postgresql///")[0] == 1
 assert run([{"pluginid": "1", "alert": "h", "riskcode": "3", "instances": []}], ok)[0] == 1
+leak = {"pluginid": "90022", "alert": "Application Error Disclosure", "riskcode": "2", "instances": [{"uri": "https://x/api/apps/1"}]}
+assert run([leak], ok)[0] == 0  # unsigned baseline: only a medium
+rc, out = run([leak], ok, name="api-spec"); assert rc == 1 and "Application Error Disclosure" in out
 print("ok")
