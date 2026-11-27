@@ -9,6 +9,7 @@ from pathlib import Path
 import ipaddress
 import re
 import secrets
+import subprocess
 import tempfile
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -45,7 +46,14 @@ def replace_json(path, value):
 
 
 def resolver_for(tls_mode):
+    """Traefik certificate resolver of a TLS mode; custom has none (the admin's certificate is a file)."""
+    if tls_mode == 'custom':
+        return ''
     return {'cloudflare': 'cloudflare', 'delegated': 'delegated'}.get(tls_mode, 'letsencrypt')
+
+
+def tls_block(resolver):
+    return {'certResolver': resolver} if resolver else {}
 
 
 def host_resolver(tls_mode):
@@ -54,12 +62,18 @@ def host_resolver(tls_mode):
     return 'letsencrypt' if tls_mode == 'delegated' else resolver_for(tls_mode)
 
 
+def custom_domain_resolver(tls_mode):
+    return '' if tls_mode == 'custom' else 'letsencrypt'
+
+
 def challenge_zone(domain):
     return f'_acme-challenge.apps.{domain}'
 
 
 def certificates_resolvers(tls_mode, email):
     """Traefik certificate resolver for a TLS mode. delegated: Let's Encrypt asks our own DNS responder (#891)."""
+    if tls_mode == 'custom':
+        return {}
     acme = {'email': email, 'storage': '/certificates/acme.json'}
     if tls_mode == 'http':
         acme['httpChallenge'] = {'entryPoint': 'web'}
@@ -78,7 +92,7 @@ def certificates_resolvers(tls_mode, email):
 
 def wildcard_store(tls_mode, domain):
     """Default certificate for *.apps.<domain>; http mode has none (one certificate per app)."""
-    if tls_mode == 'http':
+    if tls_mode in ('http', 'custom'):
         return None
     return {'stores': {'default': {'defaultGeneratedCert': {'resolver': resolver_for(tls_mode),
             'domain': {'main': f'apps.{domain}', 'sans': [f'*.apps.{domain}']}}}}}
@@ -90,7 +104,7 @@ def public_urls(domain):
 
 def store_router(domain, resolver):
     return dict(entryPoints=['websecure'], rule=f'Host(`store.{domain}`)', service='store',
-                tls={'certResolver': resolver}, priority=100)
+                tls=tls_block(resolver), priority=100)
 
 
 def studio_paths_router(domain, resolver):
@@ -98,7 +112,7 @@ def studio_paths_router(domain, resolver):
     # matches PathPrefix(`/api`) as plain text on installations configured before this router existed.
     # Any studio.* host: a server can also answer on extra hostnames (the test server has studio.test.<domain>).
     return dict(entryPoints=['websecure'], rule=r'HostRegexp(`^studio\.`) && PathRegexp(`^/api[^/]`)',
-                service='studio-pages', tls={'certResolver': resolver}, priority=300)
+                service='studio-pages', tls=tls_block(resolver), priority=300)
 
 
 def ensure_studio_paths(root):
@@ -366,7 +380,59 @@ def rsa_settings(root):
     return json.loads(path.read_text())
 
 
-def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdaniel/automaton-runner:latest"):
+def certificate_names(cert_file):
+    """DNS names of a PEM certificate's subjectAltName, and whether it is valid now (openssl, no extra packages)."""
+    result = subprocess.run(['openssl', 'x509', '-noout', '-ext', 'subjectAltName', '-in', str(cert_file)],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ValueError(f'{cert_file} is not a readable PEM certificate.')
+    names = re.findall(r'DNS:([^,\s]+)', result.stdout)
+    if not names:
+        raise ValueError(f'{cert_file} has no subject alternative names.')
+    if subprocess.run(['openssl', 'x509', '-noout', '-checkend', '0', '-in', str(cert_file)],
+                      capture_output=True).returncode != 0:
+        raise ValueError(f'{cert_file} has expired.')
+    return [name.lower() for name in names]
+
+
+def name_covered(name, patterns):
+    labels = name.split('.')
+    return any(pattern == name or (pattern.startswith('*.') and pattern.split('.')[1:] == labels[1:] and len(labels) > 1)
+               for pattern in patterns)
+
+
+def public_key(args):
+    result = subprocess.run(['openssl', *args], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ValueError('The key file is not a readable PEM private key that belongs to a certificate.')
+    return result.stdout
+
+
+def install_custom_certificate(root, domain, cert_file, key_file):
+    """Check the admin's certificate and key and copy them where Traefik reads them (certs/, dynamic/custom-tls.yml)."""
+    if not cert_file or not key_file:
+        raise ValueError('--tls-mode custom needs --cert-file and --key-file.')
+    for path in (cert_file, key_file):
+        if not path.is_file():
+            raise ValueError(f'{path} was not found.')
+    names = certificate_names(cert_file)
+    required = [f'{host}.{domain}' for host in ('api', 'studio', 'store', 'apps')] + [f'x.apps.{domain}']
+    missing = [name.replace('x.apps.', '*.apps.') for name in required if not name_covered(name, names)]
+    if missing:
+        raise ValueError('The certificate does not cover: ' + ', '.join(missing) + '. It covers: ' + ', '.join(names) + '.')
+    if public_key(['x509', '-noout', '-pubkey', '-in', str(cert_file)]) != public_key(['pkey', '-pubout', '-in', str(key_file)]):
+        raise ValueError('The key file does not belong to the certificate.')
+    certs = root / 'certs'
+    certs.mkdir(parents=True, exist_ok=True, mode=0o700)
+    replace_text(certs / 'fullchain.pem', cert_file.read_text(), 0o644)
+    replace_text(certs / 'privkey.pem', key_file.read_text(), 0o600)
+    (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
+    # Rewriting the file makes Traefik reload the certificate files it points to.
+    replace_text(root / 'dynamic' / 'custom-tls.yml', json.dumps({'tls': {'certificates': [
+        {'certFile': '/etc/traefik/certs/fullchain.pem', 'keyFile': '/etc/traefik/certs/privkey.pem'}]}}), 0o600)
+
+
+def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdaniel/automaton-runner:latest", cert_file=None, key_file=None):
     if not re.fullmatch(r'(?=.{1,180}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}', domain):
         raise ValueError('Use a public domain such as example.com, without a scheme or path.')
     if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email):
@@ -378,7 +444,10 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
             raise ValueError('This installation runs on MySQL; this release uses PostgreSQL. Nothing was changed. Migrate the data first with migrate-to-postgresql.sh (src/automaton-vue/docs/install.md#move-a-mysql-server-to-postgresql, issue #587).')
         if not (root / 'installation.json').exists() or any(not (root / 'secrets' / name).is_file() for name in required):
             raise ValueError('Existing installation credentials are incomplete. Restore the configuration backup; keys will not be regenerated.')
+    if tls_mode == 'custom':
+        install_custom_certificate(root, domain, cert_file, key_file)  # Before anything else is written.
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    (root / 'certs').mkdir(exist_ok=True, mode=0o700)  # Bind-mounted into Traefik in every mode.
     (root / 'secrets').mkdir(exist_ok=True, mode=0o700)
     (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
     state = root / 'installation.json'
@@ -386,7 +455,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
     if state.exists() and json.loads(state.read_text()) != desired:
         raise ValueError('This directory belongs to another domain/email. Existing configuration was preserved.')
     cloudflare = root / 'secrets' / 'cloudflare-token'
-    if tls_mode in ('http', 'delegated'):
+    if tls_mode in ('http', 'delegated', 'custom'):
         write_new(cloudflare, "")
     elif not cloudflare.exists():
         write_new(cloudflare, read_cloudflare_token())
@@ -414,7 +483,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         'HostedRunners': {'Enabled': False, 'ServerUrl': api, 'DockerImage': runner_image},
         'Catalog': {'InstallEssentialsOnFirstRunner': True},
         'PublishedApps': dict(ApiBaseUrl=api, PublicBaseUrl=apps, RootPath='/app/AppData/published-apps',
-                              RuntimeProxyAuthKey=secret(root, 'runtime-proxy-key'), TraefikDynamicConfigRoot='/app/AppData/traefik-dynamic', RuntimeTunnelServiceName='api', CertificateResolver=apps_resolver, CustomDomainCertificateResolver='letsencrypt'),
+                              RuntimeProxyAuthKey=secret(root, 'runtime-proxy-key'), TraefikDynamicConfigRoot='/app/AppData/traefik-dynamic', RuntimeTunnelServiceName='api', CertificateResolver=apps_resolver, CustomDomainCertificateResolver=custom_domain_resolver(tls_mode)),
         'DataProtection': {'KeysPath': '/app/data-protection-keys'},
         'Logging': {'File': {'RetainedFileCountLimit': 14, 'FileSizeLimitBytes': 10485760}},
         'EmailConfig': {'EmailHost': '', 'EmailAccount': '', 'EmailPassword': ''},
@@ -432,22 +501,23 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         'entryPoints': {'web': {'address': ':80', 'http': {'redirections': {'entryPoint': {'to': 'websecure', 'scheme': 'https'}}}},
                         'websecure': {'address': ':443'}, 'broker': {'address': ':5671'}},
         'ping': {}, 'providers': {'file': {'directory': '/etc/traefik/dynamic', 'watch': True}},
-        'certificatesResolvers': certificates_resolvers(tls_mode, email),
         'api': {'dashboard': False}, 'accessLog': ACCESS_LOG,
     }
+    if resolvers := certificates_resolvers(tls_mode, email):
+        traefik['certificatesResolvers'] = resolvers
     write_new(root / 'traefik.yml', json.dumps(traefik))
     edge = {'http': {'routers': {}, 'services': {
         'api': {'loadBalancer': {'servers': [{'url': 'http://api:8080'}]}},
         'studio': {'loadBalancer': {'servers': [{'url': 'http://studio:80'}]}},
     }}, 'tcp': {'routers': {'broker': {'entryPoints': ['broker'], 'rule': f'HostSNI(`api.{domain}`)',
-                                     'service': 'broker', 'tls': {'certResolver': resolver}}},
+                                     'service': 'broker', 'tls': tls_block(resolver)}},
                 'services': {'broker': {'loadBalancer': {'servers': [{'address': 'rabbitmq:5672'}]}}}}}
     for name, rule, service in [('api', f'Host(`api.{domain}`)', 'api'),
                                 ('studio', f'Host(`studio.{domain}`)', 'studio'),
                                 ('studio-api', f'Host(`studio.{domain}`) && (Path(`/api`) || PathPrefix(`/api/`) || Path(`/auth/github/login`) || PathPrefix(`/signin-github`))', 'api'),
                                 ('apps', f'Host(`apps.{domain}`)', 'api')]:
         edge['http']['routers'][name] = dict(entryPoints=['websecure'], rule=rule, service=service,
-                                             tls={'certResolver': apps_resolver if name == 'apps' else resolver}, priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100)
+                                             tls=tls_block(apps_resolver if name == 'apps' else resolver), priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100)
     if wildcard_store(tls_mode, domain):
         edge['tls'] = wildcard_store(tls_mode, domain)
     write_new(root / 'dynamic' / 'installation.yml', json.dumps(edge))
@@ -470,7 +540,11 @@ if __name__ == '__main__':
                         help='Turn on the Traefik JSON access log that the fail2ban jails read, on an existing installation.')
     parser.add_argument('--ensure-runner-broker-host', action='store_true',
                         help='Give remote Runners the public API hostname as broker address if a private address is set.')
-    parser.add_argument('--tls-mode', choices=['http', 'cloudflare', 'delegated'], default='http')
+    parser.add_argument('--tls-mode', choices=['http', 'cloudflare', 'delegated', 'custom'], default='http')
+    parser.add_argument('--cert-file', type=Path, help='PEM certificate chain for --tls-mode custom (or --replace-certificate).')
+    parser.add_argument('--key-file', type=Path, help='PEM private key for --tls-mode custom (or --replace-certificate).')
+    parser.add_argument('--replace-certificate', action='store_true',
+                        help='Swap the certificate of an installation in custom mode (renewal).')
     parser.add_argument('--switch-tls', action='store_true',
                         help='Switch an existing installation to --tls-mode; domain, email and credentials are unchanged.')
     parser.add_argument('--cloudflare-token-file', type=Path,
@@ -481,7 +555,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        if args.switch_tls:
+        if args.replace_certificate:
+            state = json.loads((args.config_dir / 'installation.json').read_text())
+            if state.get('tls_mode') != 'custom':
+                raise ValueError('This installation does not use --tls-mode custom.')
+            install_custom_certificate(args.config_dir, state['domain'], args.cert_file, args.key_file)
+            print('Certificate replaced; Traefik reloads it within seconds.')
+        elif args.switch_tls:
+            if 'custom' in (args.tls_mode, json.loads((args.config_dir / 'installation.json').read_text()).get('tls_mode')):
+                raise ValueError('Switching to or from custom certificates is not supported; reinstall or edit the files by hand.')
             if args.domain or args.email:
                 raise ValueError('--switch-tls changes only the TLS mode; the domain and email cannot be changed.')
             print('Switched the TLS mode.' if switch_tls(args.config_dir, args.tls_mode, args.cloudflare_token_file)
@@ -528,6 +610,6 @@ if __name__ == '__main__':
         elif not args.domain or not args.email:
             parser.error('--domain and --email are required.')
         else:
-            configure(args.config_dir, args.domain.lower(), args.email, args.tls_mode, args.runner_image)
+            configure(args.config_dir, args.domain.lower(), args.email, args.tls_mode, args.runner_image, args.cert_file, args.key_file)
     except (ValueError, OSError, KeyError) as error:  # JSONDecodeError is a ValueError.
         parser.exit(1, f'Configuration failed: {error}\n')

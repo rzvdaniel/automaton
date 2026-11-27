@@ -288,6 +288,51 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertEqual((self.root / 'secrets/cloudflare-token').read_text(), 'test-cloudflare-token-not-a-secret')
         self.assertFalse(module.switch_tls(self.root, 'cloudflare'))  # idempotent; keeps the token
 
+    def make_certificate(self, names, name='cert'):
+        folder = Path(self.temporary.name)
+        cert, key = folder / f'{name}.pem', folder / f'{name}.key'
+        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '30', '-subj', '/CN=test',
+                        '-addext', 'subjectAltName=' + ','.join('DNS:' + n for n in names),
+                        '-keyout', str(key), '-out', str(cert)], check=True, capture_output=True)
+        return cert, key
+
+    def test_custom_mode_serves_the_given_certificate_without_acme(self):
+        cert, key = self.make_certificate(['*.example.com', '*.apps.example.com'])
+        module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=key)
+        traefik = json.loads((self.root / 'traefik.yml').read_text())
+        self.assertNotIn('certificatesResolvers', traefik)
+        edge = json.loads((self.root / 'dynamic/installation.yml').read_text())
+        for name in ('api', 'studio', 'apps'):
+            self.assertEqual(edge['http']['routers'][name]['tls'], {})
+        self.assertNotIn('tls', edge)
+        self.assertEqual(edge['tcp']['routers']['broker']['tls'], {})
+        self.assertEqual(json.loads((self.root / 'dynamic/store.yml').read_text())['http']['routers']['store']['tls'], {})
+        settings = json.loads((self.root / 'appsettings.Production.json').read_text())
+        self.assertEqual(settings['PublishedApps']['CertificateResolver'], '')
+        self.assertEqual(settings['PublishedApps']['CustomDomainCertificateResolver'], '')
+        files = json.loads((self.root / 'dynamic/custom-tls.yml').read_text())['tls']['certificates']
+        self.assertEqual(files[0]['certFile'], '/etc/traefik/certs/fullchain.pem')
+        self.assertEqual((self.root / 'certs/privkey.pem').stat().st_mode & 0o777, 0o600)
+
+    def test_custom_mode_names_every_uncovered_name(self):
+        cert, key = self.make_certificate(['*.example.com'])
+        with self.assertRaisesRegex(ValueError, r'does not cover: \*\.apps\.example\.com'):
+            module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=key)
+        self.assertFalse((self.root / 'installation.json').exists())
+
+    def test_custom_mode_rejects_a_key_from_another_certificate(self):
+        cert, _ = self.make_certificate(['*.example.com', '*.apps.example.com'])
+        _, other = self.make_certificate(['*.example.com'], 'other')
+        with self.assertRaisesRegex(ValueError, 'does not belong'):
+            module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=other)
+
+    def test_replace_certificate_swaps_files(self):
+        cert, key = self.make_certificate(['*.example.com', '*.apps.example.com'])
+        module.configure(self.root, 'example.com', 'owner@example.com', 'custom', cert_file=cert, key_file=key)
+        new_cert, new_key = self.make_certificate(['*.example.com', '*.apps.example.com'], 'new')
+        module.install_custom_certificate(self.root, 'example.com', new_cert, new_key)
+        self.assertEqual((self.root / 'certs/fullchain.pem').read_text(), new_cert.read_text())
+
     def test_delegated_mode_uses_httpreq_challenge_and_no_token(self):
         module.configure(self.root, 'example.com', 'owner@example.com', 'delegated')
         traefik = json.loads((self.root / 'traefik.yml').read_text())

@@ -19,6 +19,8 @@ status_only=false
 switch_tls=false
 tls_mode_given=false
 token_file=''
+cert_file=''
+key_file=''
 public_ips=()
 bundle_dir="${AUTOMATON_RELEASE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 [[ -f "$bundle_dir/configure.py" ]] || bundle_dir="$bundle_dir/../docker/install"
@@ -29,6 +31,8 @@ while (($#)); do
         --email) email="${2:?Missing email}"; shift 2 ;;
         --tls-mode) tls_mode="${2:?Missing TLS mode}"; tls_mode_given=true; shift 2 ;;
         --switch-tls) switch_tls=true; shift ;;
+        --cert-file) cert_file="${2:?Missing certificate file}"; shift 2 ;;
+        --key-file) key_file="${2:?Missing key file}"; shift 2 ;;
         --cloudflare-token-file) token_file="${2:?Missing token file}"; shift 2 ;;
         --version) version="${2:?Missing release tag}"; shift 2 ;;
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
@@ -41,7 +45,7 @@ while (($#)); do
         --admin-email) admin_email="${2:?Missing administrator email}"; shift 2 ;;
         --dns-wait-minutes) dns_wait_minutes="${2:?Missing minutes}"; [[ "$dns_wait_minutes" =~ ^[0-9]+$ ]] || { echo '--dns-wait-minutes needs a number.' >&2; exit 1; }; shift 2 ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' '--unattended also connects a Runner named main on this server; --no-runner skips it' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare (Cloudflare DNS token) or delegated (one NS record, port 53; no token) enables wildcard certificates.' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|delegated|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically on Ubuntu and Debian if missing (elsewhere, install Docker first). Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --public-ip ADDRESS --configure-only --status --quiet (do not print the setup link; read it from the secrets/setup-token file)' '--unattended also connects a Runner named main on this server; --no-runner skips it' 'Requires x86_64 Linux with systemd, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare (Cloudflare DNS token) or delegated (one NS record, port 53; no token) enables wildcard certificates. --tls-mode custom --cert-file PEM --key-file PEM installs your own certificate (no Let'\''s Encrypt).' 'Switch an installed server: sudo bash /opt/automaton-server/install.sh --switch-tls --tls-mode cloudflare|delegated|http [--cloudflare-token-file PATH] (token via hidden prompt or AUTOMATON_CLOUDFLARE_TOKEN otherwise)'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -333,7 +337,7 @@ if any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for val
 print(entries['RUNNER_IMAGE'])
 PY
 )
-python3 "$bundle_dir/configure.py" --config-dir "$config_dir" --domain "$domain" --email "$email" --tls-mode "$tls_mode" --runner-image "$runner_image"
+python3 "$bundle_dir/configure.py" --config-dir "$config_dir" --domain "$domain" --email "$email" --tls-mode "$tls_mode" --runner-image "$runner_image" ${cert_file:+--cert-file "$cert_file"} ${key_file:+--key-file "$key_file"}
 install -d -m 0755 "$install_dir"
 install -m 0600 "$bundle_dir/release.env" "$install_dir/release.env"
 install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
