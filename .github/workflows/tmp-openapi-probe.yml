@@ -1,0 +1,23 @@
+name: tmp openapi probe
+on:
+  push:
+    branches: [fix-1792-openapi-cli]
+jobs:
+  p:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: |
+          set -euo pipefail
+          dotnet tool install Swashbuckle.AspNetCore.Cli --version 10.1.7 --tool-path "$RUNNER_TEMP/swagger"
+          dotnet build src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
+          ASPNETCORE_ENVIRONMENT=Development "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          jq -e '.paths | length > 1' "$RUNNER_TEMP/openapi.json"; jq '.paths|length' "$RUNNER_TEMP/openapi.json"
