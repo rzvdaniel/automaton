@@ -103,7 +103,22 @@ Against the test server API, the CLI and Studio, check:
 - each role boundary: a regular user and a stranger are refused, a plain Admin versus a SysAdmin;
 - the error messages a person will see.
 
-Check pages in a browser yourself with `agent-browser` (see the studio-design skill, "Browser automation"; login and screenshot helpers, if your test server has them, are listed in `.agents/environment.md`), following the studio-design visual checklist. When the change is a Studio
+**UI checks run in a real headless browser: `agent-browser`** (Vercel Labs, version 0.41.1 at `/usr/local/bin/agent-browser` on
+runner-01, runs headless as user `agent`, no display). A "Check after release" step about clicks, Ctrl+click, dragging,
+focus or waiting for a session to end is not "verified-partial": run it. See the studio-design skill, "Browser
+automation", for the commands. On runner-01:
+
+- Sign in with `AUTOMATON_TEST_STUDIO_URL=https://studio.runner-01.automaton.monster .agents/tools/studio-login.sh <session> [admin|user]`
+  (reads `accounts.env` literally, never prints it; use `--session <e2e-issue>` so parallel checks do not share a browser).
+- Real pointer input: `mouse move X Y`, `mouse down`, `mouse up` (find a point with `eval` and `document.elementFromPoint`
+  so the click lands on the panel, not a button); Ctrl+click is `keydown Control`, the same three mouse steps, `keyup Control`,
+  then `tab list` to see the new tab. `click @ref --new-tab` only opens the link and is not a Ctrl+click.
+- A wait (a session ending, a refresh) is a loop of `sleep` and `screenshot` in the foreground; a second tab in the same
+  session is "another tab" (`tab new <url>`, `tab t1`). Run long waits with a command timeout under 10 minutes per call.
+- Take one viewport `screenshot` per check as proof (named `e2e-<issue>-<step>.png`), look at it once, and put it in the proof page.
+- Close the session when done (`agent-browser --session <name> close`); one browser at a time, the server has little memory.
+
+Check pages with `agent-browser`, following the studio-design visual checklist. When the change is a Studio
 action (a button, a form), do it by clicking in Studio with `agent-browser`, not through the API. Record what passed
 and what you could not check.
 

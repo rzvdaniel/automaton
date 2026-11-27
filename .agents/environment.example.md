@@ -13,7 +13,7 @@ that the end-to-end check runs after release on a maintainer's test server.
 - Test logins: `<path to accounts.env>` (keys in `.agents/skills/automaton-verify-release/SKILL.md`). Read values
   literally; never `source` it; never print it.
 - Mail catcher (Mailpit) container and how to reach its API, if any.
-- Browser helpers (login and screenshot scripts for `agent-browser`), if any.
+- Browser: `agent-browser` (install once for the agent user, e.g. `npm i -g agent-browser && agent-browser install`; headless, no display needed). Sign-in helper: `.agents/tools/studio-login.sh`.
 
 ## Production
 - Who may change it, and what is pre-approved (for example releases and updates of verified work).
