@@ -43,6 +43,13 @@ Run `sudo bash /opt/automaton-server/update.sh --version server-v<next>` (withou
 previous release) and check `/opt/automaton-server/version`. When the Runner image changed, upgrade the Runners with
 the command Studio shows under **Runners → Upgrade runner**.
 
+## Automatic start
+
+The `Verify release` workflow (`.github/workflows/verify-release.yml`) polls the test server every 10 minutes. When
+`/opt/automaton-server/version` is a version it has not verified and issues sit in Verify, it starts an agent run
+(`.agents/jobs/verify-release.md`) that checks them all and labels each. Upgrading the test server is therefore enough;
+run it by hand with `gh workflow run verify-release.yml` after a failed run (the state is `~/.local/state/automaton/verified-version`).
+
 ## Test accounts
 
 Credentials sit outside the repository in an `accounts.env` file (mode 600) at the path `.agents/environment.md` names:
