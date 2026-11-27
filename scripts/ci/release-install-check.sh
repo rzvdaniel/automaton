@@ -171,7 +171,14 @@ rm -rf /root/hello && mkdir /root/hello && cd /root/hello
 automaton new "CI Hello $1" --template static
 automaton validate
 automaton deploy --non-interactive
-publish=\$(automaton publish --yes --slug "ci-hello-\$RANDOM")
+publish=\$(timeout 600 automaton publish --yes --slug "ci-hello-\$RANDOM") || {
+    rc=\$?
+    [ "\$rc" = 124 ] && echo "automaton publish did not finish within 10 minutes" >&2 || echo "automaton publish failed (exit \$rc)" >&2
+    echo "--- publish output" >&2; printf '%s\n' "\$publish" | head -20 >&2
+    echo "--- Traefik log lines for acme|rate" >&2
+    for c in \$(docker ps -q --filter name=traefik); do docker logs --tail 400 "\$c" 2>&1 | grep -iE 'acme|rate' | tail -20 >&2 || true; done
+    exit 1
+}
 url=\$(grep -oE 'https://[^ ]+' <<< "\$publish" | head -1)
 test -n "\$url"
 echo "\$url" > /root/ci-app-url
