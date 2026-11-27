@@ -66,7 +66,7 @@ jobs:
           echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
-          ref: server-v${{ steps.versions.outputs.version }}
+          ref: agent/1792-openapi-cli-load
           path: release-src
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
