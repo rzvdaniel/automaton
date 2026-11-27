@@ -77,14 +77,9 @@ jobs:
           set -euo pipefail
           dotnet tool install Swashbuckle.AspNetCore.Cli --version 10.3.1 --tool-path "$RUNNER_TEMP/swagger"
           dotnet build release-src/src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
-          # The CLI ships its own Microsoft.OpenApi; the API references a newer one and the CLI cannot load it (automaton#1792). Give the CLI the API's copies.
-          tooldir="$(find "$RUNNER_TEMP/swagger/.store" -name dotnet-swagger.dll -printf '%h' -quit)"
-          for dll in Microsoft.OpenApi Swashbuckle.AspNetCore.Swagger Swashbuckle.AspNetCore.SwaggerGen; do
-            cp -f "$RUNNER_TEMP/api-build/$dll.dll" "$tooldir/$dll.dll"
-          done
-          echo "tooldir=$tooldir"; ls "$tooldir" | grep -i -E "openapi|swagger"; grep -o '"Microsoft.OpenApi[^"]*"' "$tooldir/dotnet-swagger.deps.json" | head
+          # The tool runs on the API's own dependency list: its bundled Microsoft.OpenApi cannot be loaded beside the API's (automaton#1792).
           # The API reads its settings and migrates a database while the CLI builds its host: throwaway values and the empty Postgres service above.
-          AuthenticationSettings__HMacSettings__SecretKey="$(openssl rand -hex 32)" RabbitMq__Host=localhost RabbitMq__Username=spec RabbitMq__Password=spec Logging__File__Path="$RUNNER_TEMP/api-logs" ConnectionStrings__PostgreSqlConnection="Host=localhost;Port=5432;Database=spec;Username=spec;Password=spec" ASPNETCORE_ENVIRONMENT=Production "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          AuthenticationSettings__HMacSettings__SecretKey="$(openssl rand -hex 32)" RabbitMq__Host=localhost RabbitMq__Username=spec RabbitMq__Password=spec Logging__File__Path="$RUNNER_TEMP/api-logs" ConnectionStrings__PostgreSqlConnection="Host=localhost;Port=5432;Database=spec;Username=spec;Password=spec" ASPNETCORE_ENVIRONMENT=Production dotnet exec --runtimeconfig "$RUNNER_TEMP/api-build/Automaton.Api.runtimeconfig.json" --depsfile "$RUNNER_TEMP/api-build/Automaton.Api.deps.json" --additionalprobingpath "$HOME/.nuget/packages" "$(find "$RUNNER_TEMP/swagger/.store" -name dotnet-swagger.dll -print -quit)" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
           jq -e '.paths | length > 1' "$RUNNER_TEMP/openapi.json" >/dev/null
       - uses: actions/upload-artifact@v4
         with:
