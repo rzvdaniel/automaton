@@ -1,11 +1,12 @@
 namespace Automaton.Api.Security;
 
-/// <summary>Answers 429 to a request that carries an API key when its address has had too many keys rejected.</summary>
+/// <summary>Answers 429 to a request that carries an API key when its address has had too many keys rejected. A key that authentication accepted recently still passes.</summary>
 public sealed class ApiKeyFailureMiddleware(RequestDelegate next)
 {
     public Task InvokeAsync(HttpContext context, ApiKeyFailureTracker tracker)
     {
-        if (!HasApiKey(context.Request) || !tracker.IsBlocked(context.Connection.RemoteIpAddress?.ToString()))
+        if (!HasApiKey(context.Request) || !tracker.IsBlocked(context.Connection.RemoteIpAddress?.ToString())
+            || RateLimitedApiKeys.Recognise(context) is not null)
             return next(context);
 
         context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
