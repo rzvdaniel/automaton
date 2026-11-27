@@ -85,6 +85,9 @@ jobs:
       GH_REPO: ${{ github.repository }}
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      # Optional: our own downloads are reported to Head Counter (automaton#1802); unset means nothing is sent.
+      HEAD_COUNTER_URL: ${{ secrets.HEAD_COUNTER_URL }}
+      HEAD_COUNTER_TOKEN: ${{ secrets.HEAD_COUNTER_TOKEN }}
       CI_TLS_CERT: ${{ secrets.CI_TLS_CERT }}
       CI_TLS_KEY: ${{ secrets.CI_TLS_KEY }}
       SERVER_TYPES: ${{ inputs.server_types || 'cx23 cpx12' }}
