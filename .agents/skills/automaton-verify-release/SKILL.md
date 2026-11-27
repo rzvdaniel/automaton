@@ -48,7 +48,7 @@ the command Studio shows under **Runners → Upgrade runner**.
 The `Verify release` workflow (`.github/workflows/verify-release.yml`) polls the test server every 10 minutes. When
 `/opt/automaton-server/version` is a version it has not verified and issues sit in Verify, it starts an agent run
 (`.agents/jobs/verify-release.md`) that checks them all and labels each. Upgrading the test server is therefore enough;
-run it by hand with `gh workflow run verify-release.yml` after a failed run (the state is `~/.local/state/automaton/verified-version`).
+a version is tried once; after a failed run delete the state file and run `gh workflow run verify-release.yml` (the state is `~/.local/state/automaton/verified-version`).
 
 ## Test accounts
 

@@ -2,7 +2,7 @@
 # Decide whether a release verification run must start (issue #1800). Runs on the test server's agent runner.
 #   verify-trigger.sh check   prints "run <version>" when the installed test-server version has not been verified yet
 #                             and the board has issues in Verify; otherwise "skip: <reason>". Always exits 0.
-#   verify-trigger.sh done    records the installed version as verified (call after a successful run)
+#   verify-trigger.sh done    records the installed version as verified (called when a run starts, so a failed run is not retried every poll)
 # Env: AGENT_GH (gh), AGENT_BOARD (default rzvdaniel/17), VERIFY_VERSION_FILE (/opt/automaton-server/version),
 #      VERIFY_STATE_FILE (~/.local/state/automaton/verified-version).
 set -euo pipefail
