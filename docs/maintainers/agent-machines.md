@@ -5,10 +5,9 @@ timeout and logs in the Actions run. Replaces `scripts/agent-queue/` once the pi
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `agent-issue.yml` | issue labelled `agent:go` by `rzvdaniel` or `rzvdaniel-bot` | Runs `.agents/jobs/implement-issue.md` for the issue (180 min). Then, if an open PR of the issue lacks only the main review and/or security pass, `agent-finish-pr.sh` runs `.agents/jobs/finish-pr.md` (60 min): reviewers post with the runner's other logins and the gate merges. Success: card to **Verify**. Failure or timeout: `agent:failed`, a comment with the run link, card to **Inbox** (it needs the owner; Ready only holds work `pick` takes). Then runs `pick`. |
-| `agent-pick-next.yml` | every 10 minutes, `workflow_dispatch` | `agent-board.sh pick`: restarts the chain after a pause. |
+| `agent-issue.yml` | issue labelled `agent:go` by `rzvdaniel` or `rzvdaniel-bot` | Runs `.agents/jobs/implement-issue.md` for the issue (180 min). Then, if an open PR of the issue lacks only the main review and/or security pass, `agent-finish-pr.sh` runs `.agents/jobs/finish-pr.md` (60 min): reviewers post with the runner's other logins and the gate merges. Success: card to **Verify**. Failure or timeout: `agent:failed`, a comment with the run link, card to **Inbox** (it needs the owner; Ready only holds work `pick` takes). Agent Keeper's **Pick up** Action starts the next card within 10 minutes. |
 
-`pick` (board 17): does nothing while an `agent:go` issue is open; takes the top **Ready for agents** card; a card with
+Picking (Agent Keeper's Pick up, board 17; `agent-board.sh pick` by hand): does nothing while an `agent:go` issue is open; takes the top **Ready for agents** card; a card with
 `needs-shape` or no **Done when** goes to **Inbox** with one comment; a card labelled `agent:failed` is skipped until the
 issue has a newer comment; otherwise it adds `agent:go` and moves the card to **Running**.
 
@@ -19,7 +18,7 @@ the machine's `gh` login is rzvdaniel-bot. No production key is on the machine.
 
 Before registering a runner, the owner checks (nothing in the repo enforces it): Settings → Actions → General →
 "Require approval for all outside collaborators"; the runner sits in a runner group limited to the agent workflows
-(`agent-issue.yml`, `agent-pick-next.yml`); no other workflow uses `runs-on: self-hosted`.
+(`agent-issue.yml`); no other workflow uses `runs-on: self-hosted`.
 The agent runs with permissions skipped as the bot: the prompt treats text from other logins as untrusted, and only the owner's
 comments reopen a failed card. `pick` serves `rzvdaniel/automaton`, `automaton-apps` and `automaton-monster` (others dispatch `agent-issue.yml` here; each needs a `~/<repo>` clone and `agent:go` and `agent:failed` labels).
 
@@ -30,5 +29,5 @@ comments reopen a failed card. `pick` serves `rzvdaniel/automaton`, `automaton-a
    with `./config.sh --url <repo URL> --token <token> --labels self-hosted,agent`.
 3. Install it as a service: `sudo ./svc.sh install agent && sudo ./svc.sh start`.
 4. Add the repository secret `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`; set it, never print it).
-5. Create the labels `agent:go` and `agent:failed`. Check with `gh workflow run agent-pick-next.yml`.
+5. Create the labels `agent:go` and `agent:failed`. Install Agent Keeper (automaton-apps) on the machine; its Pick up Action starts the queue.
 6. Only one machine should carry the `agent` label unless you want jobs to spread; `concurrency: agent` queues per repository, not per machine.
