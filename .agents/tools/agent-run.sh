@@ -10,6 +10,17 @@ unset CLAUDE_CONFIG_DIR
 # The shared checkout stays on main: it holds this script and agent-board.sh. Each run works in its own worktree.
 base="${AGENT_WORKDIR:-$HOME/automaton}"
 prompt_base="$base"
+# The scripts and prompts live in the automaton checkout whatever repository the issue is in: bring it to origin/main
+# first (only when clean and on main) and, when this script changed, run the new version once (#1871).
+self="$prompt_base/.agents/tools/agent-run.sh"
+before=$([ -f "$self" ] && cksum < "$self" || true)
+if [ -d "$prompt_base/.git" ] && [ -z "$(git -C "$prompt_base" status --porcelain --untracked-files=no)" ] \
+   && [ "$(git -C "$prompt_base" branch --show-current)" = main ]; then
+  git -C "$prompt_base" fetch -q origin main && git -C "$prompt_base" merge -q --ff-only origin/main || echo "agent-run: could not fast-forward $prompt_base" >&2
+fi
+if [ -z "${AGENT_RUN_REEXEC:-}" ] && [ -n "$before" ] && [ "$before" != "$(cksum < "$self")" ]; then
+  AGENT_RUN_REEXEC=1 exec bash "$self" "$@"
+fi
 repo_name="${AGENT_REPO:-}"; repo_name="${repo_name##*/}"
 if [ -n "$repo_name" ] && [ "$repo_name" != automaton ]; then
   [[ $repo_name =~ ^[A-Za-z0-9._-]+$ && $repo_name != .* && -d "$HOME/$repo_name/.git" ]]     || { echo "agent-run: no checkout ~/$repo_name for $AGENT_REPO" >&2; exit 1; }

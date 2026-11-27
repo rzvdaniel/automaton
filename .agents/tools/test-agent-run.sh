@@ -35,6 +35,19 @@ HOME="$t/home" PATH="$t/bin:$PATH" AGENT_WORKDIR="$t/base" AGENT_WORK_ROOT="$t/w
 [ ! -s "$t/status" ] || { echo "FAIL: copies show in git status: $(cat "$t/status")"; exit 1; }
 [ "$(git -C "$t/home/other" worktree list | wc -l)" = 1 ] || { echo "FAIL: other repo worktree left"; exit 1; }
 [ "$(git -C "$t/base" worktree list | wc -l)" = 1 ] || { echo "FAIL: automaton worktree used for other repo"; exit 1; }
+# #1871: a run for another repository fast-forwards the automaton checkout and re-runs a changed agent-run.sh
+mkdir -p "$t/base/.agents/tools"; cp "$tools/agent-run.sh" "$t/base/.agents/tools/agent-run.sh"
+git -C "$t/base" add -f .; git -C "$t/base" -c user.name=t -c user.email=t@t commit -q -m tools; git -C "$t/base" push -q origin main
+git clone -q -b main "$t/origin.git" "$t/upd" 2>/dev/null; cd "$t/upd"
+{ cat "$tools/agent-run.sh"; echo '# new version marker'; } > .agents/tools/agent-run.sh
+echo newprompt > prompt.md
+git -c user.name=t -c user.email=t@t commit -q -am newer; git push -q origin main; cd "$t/base"
+printf '#!/bin/sh
+cat "%s/base/.agents/tools/agent-run.sh" | grep -c "new version marker" > "%s/marker"
+' "$t" "$t" > "$t/bin/claude"
+HOME="$t/home" PATH="$t/bin:$PATH" AGENT_WORKDIR="$t/base" AGENT_WORK_ROOT="$t/work" PROMPT_FILE=prompt.md AGENT_REPO=o/other GITHUB_RUN_ID=10 bash "$t/base/.agents/tools/agent-run.sh"
+[ "$(git -C "$t/base" rev-parse HEAD)" = "$(git -C "$t/base" rev-parse origin/main)" ] || { echo "FAIL: automaton checkout not fast-forwarded"; exit 1; }
+[ "$(cat "$t/marker")" -ge 1 ] || { echo "FAIL: new script not present"; exit 1; }
 # AGENT_CLI=agy (#1864): agy runs with its default model; a failed agy run, or one that leaves no PR, reruns once on claude,
 # from a clean worktree, and AGENT_RECORD posts the tool line on the issue.
 printf '#!/bin/sh
