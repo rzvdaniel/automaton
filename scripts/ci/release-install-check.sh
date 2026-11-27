@@ -2,8 +2,10 @@
 # Installs one Automaton server release on a throwaway Hetzner server and checks it by script, then deletes it.
 #   release-install-check.sh fresh            install $VERSION, run the checks
 #   release-install-check.sh upgrade          install $PREVIOUS, update to $VERSION with the CLI, run the checks again
-#   release-install-check.sh restore          install $VERSION, create an app and a backup, install a second fresh server,
-#                                             restore the backup there with its key, check user, app and app data
+#   release-install-check.sh restore          install $VERSION, create an app and a backup, rebuild the same server with
+#                                             a fresh install, restore the backup there with its key, check user, app and app data
+#   release-install-check.sh all              the three in one run on ONE server: upgrade $PREVIOUS to $VERSION and scan, back up,
+#                                             rebuild (hcloud server rebuild), fresh install and scan, restore, check, delete
 #   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 180)
 # Environment: HCLOUD_TOKEN (project "automaton-ci" only), CLOUDFLARE_DNS_TOKEN (Zone.DNS edit on the test domain only),
 # VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
@@ -13,7 +15,7 @@
 # lives only in a variable and a root-only file on the throwaway server.
 set -euo pipefail
 
-mode="${1:?Usage: release-install-check.sh fresh|upgrade|restore|sweep}"
+mode="${1:?Usage: release-install-check.sh fresh|upgrade|restore|all|sweep}"
 zone_name="${CI_DOMAIN:-automatontest.fyi}"
 # One sub-domain per run and mode: Let's Encrypt allows five certificates a week for the same set of names, and every
 # throwaway install asks for new ones.
@@ -48,9 +50,9 @@ sweep() {
     done
 }
 if [[ "$mode" == sweep ]]; then sweep; exit 0; fi
-[[ "$mode" == fresh || "$mode" == upgrade || "$mode" == restore ]] || fail "Unknown mode $mode"
+[[ "$mode" == fresh || "$mode" == upgrade || "$mode" == restore || "$mode" == all ]] || fail "Unknown mode $mode"
 
-work=$(mktemp -d); server_id=''; ssh_key_id=''; ip=''; zone_id=''; extra_servers=(); extra_keys=(); extra_domains=()
+work=$(mktemp -d); server_id=''; ssh_key_id=''; ip=''; zone_id=''; extra_domains=()
 ssh_opts=(-i "$work/key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15)
 remote() { ssh "${ssh_opts[@]}" "root@$ip" "$@"; }
 
@@ -70,15 +72,12 @@ cleanup() {
     step 'Cleanup'
     [[ -n "$server_id" ]] && hcloud server delete "$server_id"
     [[ -n "$ssh_key_id" ]] && hcloud ssh-key delete "$ssh_key_id"
-    local x
-    for x in "${extra_servers[@]}"; do hcloud server delete "$x"; done
-    for x in "${extra_keys[@]}"; do hcloud ssh-key delete "$x"; done
     dns_delete
     rm -rf "$work"
 }
 trap cleanup EXIT
 
-first="$VERSION"; [[ "$mode" == upgrade ]] && first="${PREVIOUS:?PREVIOUS is required for upgrade}"
+first="$VERSION"; [[ "$mode" == upgrade || "$mode" == all ]] && first="${PREVIOUS:?PREVIOUS is required for upgrade}"
 for v in "$first" "$VERSION"; do [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || fail "Bad version $v"; done
 tag="server-v$first"
 
@@ -96,16 +95,23 @@ else
     echo "Installing with Let's Encrypt on $domain (no CI certificate, or the release predates --tls-mode custom)"
 fi
 
+make_user_data() { # make_user_data TAG DOMAIN FILE: cloud-config that installs the release; also puts our SSH key on the server (a rebuild does not)
+    cat > "$3" <<YAML
+#cloud-config
+disable_root: false
+ssh_authorized_keys:
+  - $(cat "$work/key.pub")
+$write_files
+runcmd:
+  - curl -fL https://github.com/rzvdaniel/automaton/releases/download/$1/install-automaton.sh -o /root/install-automaton.sh
+  - bash /root/install-automaton.sh --version $1 --unattended --domain $2 --email $email --admin-email $email $tls_args
+YAML
+}
+
 step "Create the server ($mode, install $tag)"
 ssh-keygen -q -t ed25519 -N '' -f "$work/key"
 ssh_key_id=$(hcloud ssh-key create --name "automaton-ci-$run_id-$mode" --public-key-from-file "$work/key.pub" --label "$label" -o json | jq -r '.ssh_key.id')
-cat > "$work/user-data" <<YAML
-#cloud-config
-$write_files
-runcmd:
-  - curl -fL https://github.com/rzvdaniel/automaton/releases/download/$tag/install-automaton.sh -o /root/install-automaton.sh
-  - bash /root/install-automaton.sh --version $tag --unattended --domain $domain --email $email --admin-email $email $tls_args
-YAML
+make_user_data "$tag" "$domain" "$work/user-data"
 server_type=''; location=''
 for t in $types; do
     for l in $locations; do
@@ -121,13 +127,16 @@ done
 echo "Running on $server_type in $location"
 summary "- $mode: server type \`$server_type\`, location \`$location\`"
 
-step 'DNS'
-zone_id=$(cf GET "zones?name=$zone_name" | jq -r '.result[0].id // empty')
-[[ -n "$zone_id" ]] || fail "Zone $zone_name not found for the Cloudflare token"
-dns_delete
-for name in "${names[@]}"; do
-    cf POST "zones/$zone_id/dns_records" "$(jq -n --arg n "$name.$domain" --arg ip "$ip" '{type:"A",name:$n,content:$ip,ttl:60,proxied:false}')" >/dev/null
-done
+point_dns() { # the names of $domain to $ip, after deleting what is there
+    step 'DNS'
+    zone_id=$(cf GET "zones?name=$zone_name" | jq -r '.result[0].id // empty')
+    [[ -n "$zone_id" ]] || fail "Zone $zone_name not found for the Cloudflare token"
+    dns_delete
+    for name in "${names[@]}"; do
+        cf POST "zones/$zone_id/dns_records" "$(jq -n --arg n "$name.$domain" --arg ip "$ip" '{type:"A",name:$n,content:$ip,ttl:60,proxied:false}')" >/dev/null
+    done
+}
+point_dns
 
 low_memory_note() {
     [[ "$server_type" == cpx12 ]] || return 0
@@ -211,7 +220,15 @@ wait_healthy
 password=''
 checks "fresh install of $first"
 
-if [[ "$mode" == upgrade ]]; then
+scan() { # scan LABEL
+    step "External scan ($1)"
+    app_url=$(remote 'cat /root/ci-app-url' 2>/dev/null || true)
+    [[ -n "$app_url" ]] || app_url="https://apps.$domain/"
+    bash "$(dirname "${BASH_SOURCE[0]}")/release-scan.sh" "$domain" "$ip" "$app_url" || fail "The external scan found problems (see the summary above)"
+    summary "- $1: scan passed"
+}
+
+if [[ "$mode" == upgrade || "$mode" == all ]]; then
     step "Upgrade $first to $VERSION"
     remote "bash -s" <<REMOTE || { on_failure; fail "Upgrade to $VERSION failed"; }
 set -euo pipefail
@@ -222,12 +239,12 @@ REMOTE
     remote 'rm -rf /root/hello'
     checks "after the upgrade to $VERSION"
 fi
-if [[ "$mode" == restore ]]; then
-    step 'Create an app marker and a backup on the first server'
-    a_ip="$ip"; a_domain="$domain"
+if [[ "$mode" == restore || "$mode" == all ]]; then
+    [[ "$mode" == all ]] && scan "upgrade"
+    step 'Create an app marker and a backup on the first install'
     app_id=$(remote 'export PATH="$HOME/.local/bin:$PATH"; automaton apps --json' | jq -r '[.apps[] | select((.name // .Name) | startswith("CI Hello"))][0] | (.id // .Id) // empty')
-    [[ -n "$app_id" ]] || fail 'Restore check: the CI Hello app is not on the first server'
-    remote "bash -s" <<REMOTE || { on_failure; fail 'Restore check: the first server could not write the app marker or take a backup'; }
+    [[ -n "$app_id" ]] || fail 'Restore check: the CI Hello app is not on the first install'
+    remote "bash -s" <<REMOTE || { on_failure; fail 'Restore check: the first install could not write the app marker or take a backup'; }
 set -euo pipefail
 helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker compose --project-directory /opt/automaton-server -f /opt/automaton-server/compose.yaml ps -aq api | head -1))
 volume=\$(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume | head -1)
@@ -238,39 +255,32 @@ ls -1t /opt/automaton-server/backups/nightly/*.tar.age | head -1 > /root/ci-arch
 test -s /root/ci-archive
 REMOTE
     archive_path=$(remote 'cat /root/ci-archive')
-    # The backup key never goes into the log: a file in the private work directory, then a root-only file on the second server.
-    remote 'cat /etc/automaton/secrets/backup-key' > "$work/backup-key" || fail 'Restore check: the first server has no backup key to restore with'
+    # The backup key never goes into the log: a file in the private work directory, then a root-only file on the rebuilt server.
+    remote 'cat /etc/automaton/secrets/backup-key' > "$work/backup-key" || fail 'Restore check: the first install has no backup key to restore with'
     [[ -s "$work/backup-key" ]] || fail 'Restore check: the backup key is empty'
-    scp "${ssh_opts[@]}" "root@$a_ip:$archive_path" "$work/backup.tar.age" >/dev/null
+    scp "${ssh_opts[@]}" "root@$ip:$archive_path" "$work/backup.tar.age" >/dev/null
+    old_password="$password"
 
-    step "Create the second server (install $tag)"
-    domain_b="s${RUN_ID:-local}-$$.$zone_name"; domain_b="${domain_b,,}"
-    [[ -z "$tls_args" ]] || domain_b="$domain"  # The CI certificate covers only the fixed names: the second server takes them over.
-    extra_domains+=("$domain_b")
-    ssh_key_b=$(hcloud ssh-key create --name "automaton-ci-$run_id-restore-b" --public-key-from-file "$work/key.pub" --label "$label" -o json | jq -r '.ssh_key.id')
-    extra_keys+=("$ssh_key_b")
-    sed "s/$domain/$domain_b/g" "$work/user-data" > "$work/user-data-b"
-    server_b=''
-    for t in $types; do
-        for l in $locations; do
-            if out=$(hcloud server create --name "automaton-ci-$run_id-restore-b" --type "$t" --location "$l" --image ubuntu-24.04 \
-                    --ssh-key "$ssh_key_b" --user-data-from-file "$work/user-data-b" --label "$label" --label "run=$run_id" -o json 2>"$work/err"); then
-                server_b=$(jq -r '.server.id' <<< "$out"); ip_b=$(jq -r '.server.public_net.ipv4.ip' <<< "$out"); break 2
-            fi
-            echo "Could not create $t in $l: $(head -c 300 "$work/err")"
-        done
-    done
-    [[ -n "$server_b" ]] || fail "No second server could be created from types: $types in locations: $locations"
-    extra_servers+=("$server_b")
-    [[ -z "$tls_args" ]] || dns_delete
-    for name in "${names[@]}"; do
-        cf POST "zones/$zone_id/dns_records" "$(jq -n --arg n "$name.$domain_b" --arg ip "$ip_b" '{type:"A",name:$n,content:$ip,ttl:60,proxied:false}')" >/dev/null
-    done
-    ip="$ip_b"; domain="$domain_b"
+    step "Rebuild the same server (fresh install of $VERSION)"
+    tag="server-v$VERSION"
+    if [[ -z "$tls_args" ]]; then
+        # Let's Encrypt fallback: new names for the new install (the CI certificate covers only the fixed ones).
+        domain="r${RUN_ID:-local}-$$.$zone_name"; domain="${domain,,}"
+        extra_domains+=("$domain")
+    fi
+    make_user_data "$tag" "$domain" "$work/user-data-b"
+    hcloud server rebuild "$server_id" --image ubuntu-24.04 --user-data-from-file "$work/user-data-b" >/dev/null \
+        || fail 'hcloud server rebuild failed'
+    [[ -n "$tls_args" ]] || point_dns
     wait_ssh
     wait_healthy
+    if [[ "$mode" == all ]]; then
+        password=''
+        checks "fresh install of $VERSION"
+        scan "fresh install"
+    fi
 
-    step 'Restore the backup on the second server with the key'
+    step 'Restore the backup with the key'
     scp "${ssh_opts[@]}" "$work/backup.tar.age" "root@$ip:/root/backup.tar.age" >/dev/null
     if [[ "${RESTORE_WRONG_KEY:-}" == 1 ]]; then
         echo 'RESTORE_WRONG_KEY=1: restoring with a freshly generated key that did not encrypt the backup.'
@@ -280,7 +290,7 @@ REMOTE
     fi
     if ! remote "bash /opt/automaton-server/restore.sh --archive /root/backup.tar.age --key /root/backup-key --confirm $domain" > "$work/restore.log" 2>&1; then
         echo '--- restore output (it holds no secrets)'; tail -n 25 "$work/restore.log" | grep -viE 'token|secret|password|AGE-SECRET'
-        fail 'Restore failed: restore.sh --archive --key did not finish on the second server (a wrong or unreadable key stops it at decryption)'
+        fail 'Restore failed: restore.sh --archive --key did not finish on the rebuilt server (a wrong or unreadable key stops it at decryption)'
     fi
     wait_healthy
 
@@ -291,8 +301,8 @@ REMOTE
 set -euo pipefail
 export PATH="\$HOME/.local/bin:\$PATH"
 command -v automaton >/dev/null || curl -fsSL https://github.com/rzvdaniel/automaton/releases/download/server-v$VERSION/install.sh | AUTOMATON_VERSION=server-v$VERSION sh
-# The password was set on the first server only: signing in with it proves the user came from the backup.
-printf '%s' '$password' | automaton login --server https://api.$domain --email '$email' >/dev/null
+# The password of the first install: signing in with it proves the user came from the backup.
+printf '%s' '$old_password' | automaton login --server https://api.$domain --email '$email' >/dev/null
 automaton whoami
 automaton apps --json | grep -q '$app_id'
 volume=\$(docker volume ls -q --filter label=automaton.resource=machine-workspace-volume | head -1)
@@ -300,13 +310,10 @@ test -n "\$volume"
 helper=\$(docker inspect --format '{{.Config.Image}}' \$(docker compose --project-directory /opt/automaton-server -f /opt/automaton-server/compose.yaml ps -aq api | head -1))
 docker run --rm --entrypoint cat -v "\$volume:/v:ro" "\$helper" /v/workspace/data/$app_id/ci-marker | grep -q restore-marker-$run_id
 REMOTE
-    summary "- restore: passed (user, app and app data came back on a second fresh server)"
+    summary "- restore: passed (user, app and app data came back after the rebuild)"
     echo "All checks passed ($mode)"
     exit 0
 fi
-step 'External scan'
-app_url=$(remote 'cat /root/ci-app-url' 2>/dev/null || true)
-[[ -n "$app_url" ]] || app_url="https://apps.$domain/"
-bash "$(dirname "${BASH_SOURCE[0]}")/release-scan.sh" "$domain" "$ip" "$app_url" || fail "The external scan found problems (see the summary above)"
+scan "$mode"
 summary "- $mode: passed"
 echo "All checks passed ($mode)"
