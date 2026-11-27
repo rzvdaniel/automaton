@@ -1,0 +1,67 @@
+name: CI certificate
+# Issues the wildcard certificate the release install check installs with (--tls-mode custom): *.ci.<zone> and
+# *.apps.ci.<zone>, by Let's Encrypt DNS-01 through the Cloudflare token of the install check. Monthly, so the 90-day
+# certificate is always at least 60 days from expiry. Stores it as the repository secrets CI_TLS_CERT and CI_TLS_KEY and
+# its end date as the repository variable CI_TLS_NOT_AFTER.
+#
+# Needs one owner step: the repository secret CI_SECRETS_TOKEN, a fine-grained token for this repository with
+# "Secrets: read and write" and "Variables: read and write" (the default workflow token cannot write secrets).
+# Without it the issuing job fails at its first step, and the check job fails once the stored certificate is within
+# 20 days of its end.
+on:
+  schedule:
+    - cron: '17 4 1 * *'
+    - cron: '43 5 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  ZONE: automatontest.fyi
+jobs:
+  issue:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 4 1 * *'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: release-install-check # not while an install check uses the certificate
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      GH_TOKEN: ${{ secrets.CI_SECRETS_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Require the secrets
+        run: |
+          [[ -n "$CLOUDFLARE_DNS_TOKEN" ]] || { echo "::error::Set the CLOUDFLARE_DNS_TOKEN repository secret."; exit 1; }
+          [[ -n "$GH_TOKEN" ]] || { echo "::error::Set the CI_SECRETS_TOKEN repository secret (fine-grained token: Secrets and Variables read/write on this repository)."; exit 1; }
+      - name: Install certbot
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq certbot python3-certbot-dns-cloudflare
+      - name: Issue the wildcards
+        run: |
+          set -euo pipefail
+          umask 077
+          dir=$(mktemp -d)
+          printf 'dns_cloudflare_api_token = %s\n' "$CLOUDFLARE_DNS_TOKEN" > "$dir/cloudflare.ini"
+          sudo certbot certonly --non-interactive --agree-tos --register-unsafely-without-email \
+            --dns-cloudflare --dns-cloudflare-credentials "$dir/cloudflare.ini" --dns-cloudflare-propagation-seconds 30 \
+            --cert-name automaton-ci -d "*.ci.$ZONE" -d "*.apps.ci.$ZONE" >/dev/null
+          live=/etc/letsencrypt/live/automaton-ci
+          sudo openssl x509 -in "$live/fullchain.pem" -noout -ext subjectAltName | grep -q "DNS:\*.apps.ci.$ZONE"
+          not_after=$(sudo openssl x509 -in "$live/fullchain.pem" -noout -enddate | cut -d= -f2)
+          sudo cat "$live/fullchain.pem" | gh secret set CI_TLS_CERT
+          sudo cat "$live/privkey.pem" | gh secret set CI_TLS_KEY
+          gh variable set CI_TLS_NOT_AFTER --body "$(date -u -d "$not_after" +%F)"
+          echo "CI certificate valid until $not_after" >> "$GITHUB_STEP_SUMMARY"
+  check:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '43 5 * * 1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: The certificate has at least 20 days left
+        env:
+          NOT_AFTER: ${{ vars.CI_TLS_NOT_AFTER }}
+        run: |
+          [[ -n "$NOT_AFTER" ]] || { echo "::error::No CI certificate has been issued yet (variable CI_TLS_NOT_AFTER is empty): run the CI certificate workflow."; exit 1; }
+          left=$(( ( $(date -u -d "$NOT_AFTER" +%s) - $(date -u +%s) ) / 86400 ))
+          echo "CI certificate ends $NOT_AFTER ($left days left)" >> "$GITHUB_STEP_SUMMARY"
+          (( left >= 20 )) || { echo "::error::The CI certificate ends $NOT_AFTER ($left days): the monthly renewal did not happen. Run the CI certificate workflow."; exit 1; }
