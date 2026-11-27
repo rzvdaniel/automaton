@@ -189,8 +189,14 @@ checks() { # checks LABEL
 
     if [[ -z "${password:-}" ]]; then
         step 'Set the administrator password from the one-time link'
-        link=$(remote "sed -n 's#^\(https://[^ ]*\)\$#\1#p' /root/automaton-admin-link.txt | head -1")
-        [[ -n "$link" ]] || fail "$1: /root/automaton-admin-link.txt has no link"
+        # The installer writes the link after the API turns healthy: wait for it (up to 5 minutes).
+        link=''
+        for _ in $(seq 1 30); do
+            link=$(remote "sed -n 's#^\(https://[^ ]*\)\$#\1#p' /root/automaton-admin-link.txt 2>/dev/null | head -1" || true)
+            [[ -n "$link" ]] && break
+            sleep 10
+        done
+        [[ -n "$link" ]] || { on_failure; fail "$1: /root/automaton-admin-link.txt has no link after 5 minutes"; }
         code_param=$(python3 -I -c 'import sys,urllib.parse as u; print(u.parse_qs(u.urlparse(sys.argv[1]).query).get("code",[""])[0])' "$link")
         [[ -n "$code_param" ]] || fail "$1: the admin link has no code"
         password="Aa1!$(openssl rand -base64 24 | tr -d '\n=')"
