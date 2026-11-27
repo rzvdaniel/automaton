@@ -5,4 +5,4 @@
 10021 * X-Content-Type-Options not set yet; production has the same gap. Fix and remove: automaton#1829 (accepted by the owner 2026-11-27 for 0.2.199)
 10020 * Anti-clickjacking header not set yet; production has the same gap. Fix and remove: automaton#1829 (accepted by the owner 2026-11-27 for 0.2.199)
 10038 * Content-Security-Policy not set yet; production has the same gap. Fix and remove: automaton#1829 (accepted by the owner 2026-11-27 for 0.2.199)
-10004 * nginx version shown in the Server header (flagged as a version with known vulnerabilities); production has the same gap. Fix and remove: automaton#1829 (accepted by the owner 2026-11-27 for 0.2.199)
+20020 * nginx version shown in the Server header (flagged as a version with known vulnerabilities); production has the same gap. Fix and remove: automaton#1829 (accepted by the owner 2026-11-27 for 0.2.199)
