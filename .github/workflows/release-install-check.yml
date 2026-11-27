@@ -50,6 +50,17 @@ jobs:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: spec
+          POSTGRES_PASSWORD: spec
+          POSTGRES_DB: spec
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spec" --health-interval 5s --health-timeout 5s --health-retries 10
     permissions:
       contents: read
     outputs:
@@ -89,8 +100,8 @@ jobs:
           set -euo pipefail
           dotnet tool install Swashbuckle.AspNetCore.Cli --version 7.1.0 --tool-path "$RUNNER_TEMP/swagger"
           dotnet build release-src/src/Automaton.Api/Automaton.Api.csproj -c Release -v minimal -o "$RUNNER_TEMP/api-build"
-          # The API refuses to build its host without signing and broker settings; the CLI never connects, so throwaway values are enough.
-          AuthenticationSettings__HMacSettings__SecretKey="$(openssl rand -hex 32)" RabbitMq__Host=localhost RabbitMq__Username=spec RabbitMq__Password=spec ConnectionStrings__PostgreSqlConnection="Host=localhost;Database=spec;Username=spec;Password=spec" ASPNETCORE_ENVIRONMENT=Production "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
+          # The API reads its settings and migrates a database while the CLI builds its host: throwaway values and the empty Postgres service above.
+          AuthenticationSettings__HMacSettings__SecretKey="$(openssl rand -hex 32)" RabbitMq__Host=localhost RabbitMq__Username=spec RabbitMq__Password=spec Logging__File__Path="$RUNNER_TEMP/api-logs" ConnectionStrings__PostgreSqlConnection="Host=localhost;Port=5432;Database=spec;Username=spec;Password=spec" ASPNETCORE_ENVIRONMENT=Production "$RUNNER_TEMP/swagger/swagger" tofile --output "$RUNNER_TEMP/openapi.json" "$RUNNER_TEMP/api-build/Automaton.Api.dll" v1
           jq -e '.paths | length > 1' "$RUNNER_TEMP/openapi.json" >/dev/null
       - uses: actions/upload-artifact@v4
         with:
