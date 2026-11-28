@@ -212,5 +212,35 @@ class Proof(unittest.TestCase):
         self.assertIn("proof", failed(gate.check(item, PATTERNS)))
 
 
+class InstallCheck(unittest.TestCase):
+    RUN = {"id": "9", "path": ".github/workflows/release-install-check.yml", "head_sha": "abc", "conclusion": "success"}
+
+    def item(self, path, runs):
+        item = pr([path])
+        item["install_runs"] = runs
+        return item
+
+    def test_ci_script_without_a_branch_run_fails(self):
+        self.assertIn("install-check", failed(gate.check(self.item("scripts/ci/x.sh", []), PATTERNS)))
+
+    def test_passing_run_on_the_final_commit_passes(self):
+        self.assertNotIn("install-check", failed(gate.check(self.item("scripts/ci/x.sh", [self.RUN]), PATTERNS)))
+
+    def test_workflow_change_needs_it_too(self):
+        path = ".github/workflows/release-install-check.yml"
+        self.assertIn("install-check", failed(gate.check(self.item(path, []), PATTERNS)))
+
+    def test_stale_or_failed_run_fails(self):
+        for bad in ({**self.RUN, "head_sha": "old"}, {**self.RUN, "conclusion": "failure"}, {**self.RUN, "path": ".github/workflows/tests.yml"}):
+            self.assertIn("install-check", failed(gate.check(self.item("scripts/ci/x.sh", [bad]), PATTERNS)))
+
+    def test_other_paths_need_no_run(self):
+        self.assertNotIn("install-check", [n for _, n, _ in gate.check(pr(["src/a.cs"]), PATTERNS)[1]])
+
+    def test_run_ids_come_from_how_verified(self):
+        body = "**How verified:** https://github.com/o/r/actions/runs/123\n**Risk:** low"
+        self.assertEqual(gate.install_run_ids(body), ["123"])
+
+
 if __name__ == "__main__":
     unittest.main()

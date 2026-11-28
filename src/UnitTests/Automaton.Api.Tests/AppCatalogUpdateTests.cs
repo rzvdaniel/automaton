@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Automaton.Api.Models;
+using Automaton.Core.Models;
 using Automaton.Api.Services;
 using NUnit.Framework;
 
@@ -26,6 +27,36 @@ public class AppCatalogUpdateTests
     }
 
     private static readonly GitAppSource Source = new("owner/repo", "tool", new string('a', 40));
+
+    [Test]
+    public void MissingSchedules_AreTheDeclaredOnesTheAppLacks_ByNameOrByTheSameActionAndTiming()
+    {
+        var appId = Guid.NewGuid();
+        var declared = new[]
+        {
+            new ApplicationScheduleDeclaration { Name = "Pick up", Action = "pick-up", Cron = "*/10 * * * *" },
+            new ApplicationScheduleDeclaration { Name = "Tidy", Action = "tidy", IntervalSeconds = 3600 },
+            new ApplicationScheduleDeclaration { Name = "Report", Action = "report", Cron = "0 8 * * *" }
+        };
+        var existing = new[]
+        {
+            new Automaton.Api.Entities.ActionSchedule { Name = "Keeper: tidy", ActionKey = "tidy", IntervalSeconds = 60 },
+            new Automaton.Api.Entities.ActionSchedule { Name = "Mine", ActionKey = "report", CronExpression = "0 8 * * *" }
+        };
+
+        var missing = AppCatalogUpdateService.MissingSchedules(appId, "Keeper", declared, existing);
+
+        Assert.That(missing, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(missing[0].Name, Is.EqualTo("Keeper: Pick up"));
+            Assert.That(missing[0].ActionKey, Is.EqualTo("pick-up"));
+            Assert.That(missing[0].ScheduleType, Is.EqualTo("Cron"));
+            Assert.That(missing[0].CronExpression, Is.EqualTo("*/10 * * * *"));
+            Assert.That(missing[0].ApplicationId, Is.EqualTo(appId));
+            Assert.That(AppCatalogUpdateService.MissingSchedules(appId, "Keeper", declared, [.. existing, new Automaton.Api.Entities.ActionSchedule { Name = "keeper: pick up" }]), Is.Empty);
+        });
+    }
 
     [Test]
     public void WithDeploy_CarriesTheFailureAndOnlyTheCommitTheServerRecorded()
