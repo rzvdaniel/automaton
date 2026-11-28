@@ -8,9 +8,9 @@ export async function restartApp(appId: string, toast: ToastServiceMethods): Pro
     const { restarted, confirmed } = await appsService.restart(appId)
     toast.add({
       severity: restarted > 0 && confirmed ? 'success' : 'info',
-      summary: restarted > 0 ? 'Restarting' : 'Nothing to restart',
+      summary: restarted > 0 ? (confirmed ? 'Restarted' : 'Restarting') : 'Nothing to restart',
       detail: restarted > 0
-        ? (confirmed ? 'The app restarts with its current settings and secrets.' : 'The connection dropped before the answer. The server carries on with the restart; reload in a minute to check.')
+        ? (confirmed ? 'The app is back with its current settings and secrets.' : 'The connection dropped before the answer. The server carries on with the restart; reload in a minute to check.')
         : 'The app is not running. Settings and secrets apply the next time it starts.',
       life: 4000,
     })
