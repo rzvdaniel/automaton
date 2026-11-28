@@ -65,6 +65,8 @@ jobs:
           # Repo variables: AGENT_REVIEW_CLI claude|agy, AGENT_REVIEW_MODEL (agy: gemini-4-neon-high).
           AGENT_REVIEW_CLI: ${{ inputs.review_cli || vars.AGENT_REVIEW_CLI }}
           AGENT_REVIEW_MODEL: ${{ inputs.review_model || vars.AGENT_REVIEW_MODEL }}
+          AGENT_FALLBACK_CLI: ${{ vars.AGENT_FALLBACK_CLI }}
+          AGENT_FALLBACK_MODEL: ${{ vars.AGENT_FALLBACK_MODEL }}
         run: bash "$HOME/automaton/.agents/tools/agent-finish-pr.sh"
 
   finish:
