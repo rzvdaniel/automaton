@@ -177,6 +177,45 @@ wait_ssh() {
     fail 'SSH to the new server never answered'
 }
 
+# restore-wait:begin
+wait_install_lock() { # wait until first boot's install finishes and releases /run/lock/automaton-install.lock
+    local timeout="${INSTALL_LOCK_WAIT_SECONDS:-900}"
+    local poll="${INSTALL_LOCK_POLL_SECONDS:-10}"
+    local deadline=$(( $(date +%s) + timeout ))
+    local rc=0
+    while true; do
+        rc=0
+        remote 'flock -E 75 -n /run/lock/automaton-install.lock true' 2>/dev/null || rc=$?
+        if (( rc == 0 )); then
+            return 0
+        fi
+        if (( $(date +%s) >= deadline )); then
+            on_failure
+            if (( rc == 75 )); then
+                fail "First-boot install did not finish and release /run/lock/automaton-install.lock within ${timeout}s" || return 1
+            else
+                fail "Could not check /run/lock/automaton-install.lock via SSH within ${timeout}s (last exit $rc)" || return 1
+            fi
+            return 1
+        fi
+        sleep "$poll"
+    done
+}
+
+restore_failure_message() { # classify restore.sh failure from its log so the message names the real cause
+    local log="$1"
+    if grep -qF 'Another installation, update or restore is running.' "$log"; then
+        printf '%s\n' 'Restore failed: another installation, update or restore is holding /run/lock/automaton-install.lock'
+    elif grep -qiE 'age: error:|no identity matched|failed to decrypt' "$log"; then
+        printf '%s\n' 'Restore failed: backup decryption failed (wrong or unreadable key)'
+    elif grep -qF 'Archive or key file not found.' "$log"; then
+        printf '%s\n' 'Restore failed: archive or key file not found on the rebuilt server'
+    else
+        printf '%s\n' 'Restore failed: restore.sh did not finish on the rebuilt server (see the restore output above)'
+    fi
+}
+# restore-wait:end
+
 checks() { # checks LABEL
     step "Checks ($1)"
     # The certificate that Studio really serves: the Let's Encrypt run shows its issuer, the custom run the CI one.
@@ -307,6 +346,8 @@ REMOTE
     [[ -n "$tls_args" ]] || point_dns
     wait_ssh
     wait_healthy
+    step 'Wait for first-boot install to finish'
+    wait_install_lock
     if [[ "$mode" == all ]]; then
         password=''
         checks "fresh install of $VERSION"
@@ -322,8 +363,8 @@ REMOTE
         remote 'install -m 0600 /dev/stdin /root/backup-key' < "$work/backup-key"
     fi
     if ! remote "bash /opt/automaton-server/restore.sh --archive /root/backup.tar.age --key /root/backup-key --confirm $domain" > "$work/restore.log" 2>&1; then
-        echo '--- restore output (it holds no secrets)'; tail -n 25 "$work/restore.log" | grep -viE 'token|secret|password|AGE-SECRET'
-        fail 'Restore failed: restore.sh --archive --key did not finish on the rebuilt server (a wrong or unreadable key stops it at decryption)'
+        echo '--- restore output (it holds no secrets)'; tail -n 25 "$work/restore.log" | grep -viE 'token|secret|password|AGE-SECRET' || true
+        fail "$(restore_failure_message "$work/restore.log")"
     fi
     wait_healthy
 

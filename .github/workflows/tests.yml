@@ -87,6 +87,8 @@ jobs:
       - run: bash scripts/tests/backup-key-test.sh
       - run: bash -n scripts/uninstall-automaton.sh
       - run: bash scripts/tests/uninstall-automaton-test.sh
+      - run: bash -n scripts/ci/release-install-check.sh
+      - run: bash scripts/tests/release-install-check-test.sh
       - run: |
           sudo apt-get install -y python3-cryptography
           sudo python3 scripts/tests/server-updater-test.py
