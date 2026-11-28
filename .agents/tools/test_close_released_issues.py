@@ -45,6 +45,11 @@ class Decide(unittest.TestCase):
         ctx["reason"] = "ok by owner"
         self.assertEqual(cri.decide(5, {"verified-partial"}, [pr("server", server=True)], ctx)[0], "close")
 
+    def test_env_gap_closes_without_accept(self):
+        self.assertEqual(cri.decide(5, {"verified-env-gap"}, [pr("server", server=True)], CTX)[0], "close")
+        self.assertEqual(cri.decide(5, {"verified-env-gap"}, [pr("server", server=False)], CTX)[0], "skip")
+        self.assertEqual(cri.decide(5, {"verified-env-gap", "verification-failed"}, [pr("server", server=True)], CTX)[0], "skip")
+
 
 class Helpers(unittest.TestCase):
     def test_classify(self):

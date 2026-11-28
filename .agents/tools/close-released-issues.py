@@ -13,6 +13,8 @@ Rules (anything not decidable is "needs a human", left open, and makes the exit 
 - Server and CLI changes are live when the merge commit is an ancestor of (or equal to) the release tag.
 - Changes only under src/automaton-vue/ or docs/ (website, docs) are live only with `--website-sha`.
 - automaton-apps PRs are live only for issues listed in `--published`.
+- `verified-env-gap` issues (only unchecked items cannot be shown on the test server) close once live without `--accept`
+  (owner's standing rule, 2026-11-27).
 - `verified-partial` / `verification-failed` are never closed, except `verified-partial` named by `--accept N`
   together with `--reason`, which is written into the closing comment.
 - Idempotent: closed issues are not listed, and the `live` label / board Status are only set when missing.
@@ -61,7 +63,7 @@ def decide(number, labels, prs, ctx):
     ctx: {"accept": set of ints, "reason": str, "published": set of ints, "website_sha": str|None}."""
     if "verification-failed" in labels:
         return "skip", "verification-failed"
-    if "verified" not in labels:
+    if "verified" not in labels and "verified-env-gap" not in labels:
         if "verified-partial" in labels:
             if number not in ctx["accept"]:
                 return "skip", "verified-partial: needs the owner's --accept"
@@ -175,7 +177,7 @@ def main(argv=None):
     only = nums(a.only)
 
     issues = {}
-    for label in ("verified", "verified-partial"):
+    for label in ("verified", "verified-env-gap", "verified-partial"):
         for i in json.loads(gh("issue", "list", "--repo", a.repo, "--state", "open", "--label", label, "--limit", "200",
                                "--json", "number,title,labels")):
             issues[i["number"]] = i
@@ -185,7 +187,7 @@ def main(argv=None):
         if only and number not in only:
             continue
         labels = {l["name"] for l in issues[number]["labels"]}
-        if "verified" not in labels and number not in ctx["accept"]:
+        if "verified" not in labels and "verified-env-gap" not in labels and number not in ctx["accept"]:
             action, reason = "skip", "verified-partial: needs the owner's --accept"
         else:
             try:
@@ -197,7 +199,12 @@ def main(argv=None):
             needs_human = True
         done = ""
         if action == "close" and a.apply:
-            extra = f"Owner accepted the gap: {ctx['reason']}" if "verified" not in labels else ""
+            if "verified" in labels:
+                extra = ""
+            elif "verified-env-gap" in labels:
+                extra = "Closed under the standing verified-env-gap rule (unchecked items cannot be shown on the test server)."
+            else:
+                extra = f"Owner accepted the gap: {ctx['reason']}"
             apply_close(a.repo, number, version, labels, extra)
             done = " [closed]"
         label = {"close": "CLOSE", "skip": "keep", "human": "needs a human"}[action]

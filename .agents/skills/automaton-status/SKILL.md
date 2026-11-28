@@ -26,7 +26,7 @@ Never fill a row from memory of the session. Each row comes from one of these, a
 | Overnight (Morning) | `Agent issue` runs since 20:00 the day before (`gh run list -R rzvdaniel/automaton --workflow "Agent issue" --created ">=<yesterday>T20:00:00Z"`) with their result, board items moved to `Verify`/`Done`, and the newest morning report |
 | Lessons (End of day; Morning on Mondays) | open issues labelled `lesson` in each repo of the config, one line each with a recommendation (fix now / later / drop); Mondays add the week's count: filed, closed, reopened as `recurred` |
 | Inbox (Morning) | board items with Status `Inbox` on the agent board in the config, newest first |
-| Stale Verify | issues in Verify whose PR merged before the previous release (`release-report.py`, tags `server-v*`) and that lack `verified`, `verified-partial` or `verification-failed`: list them under **Needs you** as a warning ("verification did not run"; check the `Verify release` workflow) |
+| Stale Verify | issues in Verify whose PR merged before the previous release (`release-report.py`, tags `server-v*`) and that lack `verified`, `verified-env-gap`, `verified-partial` or `verification-failed`: list them under **Needs you** as a warning ("verification did not run"; check the `Verify release` workflow) |
 | Health | test server and production answer (`/api/install/status`), versions from `automaton installation-status` |
 | Needs you | owner actions, gate results that wait on the owner, and anything blocked on a decision |
 

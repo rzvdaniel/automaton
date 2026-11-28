@@ -1,0 +1,21 @@
+name: Return failed verification to agents
+
+# Moves an issue labelled `verification-failed` back to Ready for agents on board 17, with no owner step (#1854).
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  return-to-agents:
+    if: github.event.label.name == 'verification-failed' && contains(fromJSON('["rzvdaniel","rzvdaniel-bot"]'), github.actor)
+    runs-on: [self-hosted, agent]
+    timeout-minutes: 5
+    steps:
+      - name: Move card to Ready for agents
+        env:
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: bash "$HOME/automaton/.agents/tools/agent-board.sh" move "$REPO" "$ISSUE_NUMBER" "Ready for agents"
