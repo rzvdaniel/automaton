@@ -64,7 +64,7 @@ if [[ "$mode" == sweep ]]; then sweep; exit 0; fi
 [[ "$mode" == fresh || "$mode" == upgrade || "$mode" == restore || "$mode" == all || "$mode" == fullscan ]] || fail "Unknown mode $mode"
 
 work=$(mktemp -d); server_id=''; ssh_key_id=''; ip=''; zone_id=''; extra_domains=()
-ssh_opts=(-i "$work/key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15)
+ssh_opts=(-i "$work/key" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10)
 remote() { ssh "${ssh_opts[@]}" "root@$ip" "$@"; }
 
 dns_delete() {
@@ -92,9 +92,24 @@ first="$VERSION"; [[ "$mode" == upgrade || "$mode" == all ]] && first="${PREVIOU
 for v in "$first" "$VERSION"; do [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || fail "Bad version $v"; done
 tag="server-v$first"
 
+use_bundle=false
+if [[ -n "${BUNDLE_ARCHIVE:-}" ]]; then
+    [[ -f "$BUNDLE_ARCHIVE" && -f "${BUNDLE_CHECKSUM:-}" ]] || fail 'BUNDLE_ARCHIVE and BUNDLE_CHECKSUM must both exist'
+    [[ -z "${CLI_BINARY:-}" || -x "$CLI_BINARY" ]] || fail 'CLI_BINARY must be executable when set'
+    use_bundle=true
+fi
+first_from_bundle=false
+if $use_bundle && [[ "$mode" != upgrade && "$mode" != all ]]; then
+    first_from_bundle=true
+fi
+
 tls_args=''; write_files=''
 # Read the whole installer first: "curl | grep -q" fails under pipefail when grep stops at the first match.
-first_installer=$(curl -fsSL "https://github.com/rzvdaniel/automaton/releases/download/$tag/install-automaton.sh" || true)
+if $first_from_bundle; then
+    first_installer='--cert-file'
+else
+    first_installer=$(curl -fsSL "https://github.com/rzvdaniel/automaton/releases/download/$tag/install-automaton.sh" || true)
+fi
 if [[ -n "${CI_TLS_CERT:-}" && -n "${CI_TLS_KEY:-}" && "$first_installer" == *--cert-file* ]]; then
     # The runs are one at a time (workflow concurrency group), so the fixed names never collide.
     domain="ci.$zone_name"
@@ -120,10 +135,43 @@ runcmd:
 YAML
 }
 
-step "Create the server ($mode, install $tag)"
+make_user_data_ssh() { # make_user_data_ssh FILE: cloud-config that only adds our SSH key and CI TLS files (bundle is copied over SSH)
+    cat > "$1" <<YAML
+#cloud-config
+disable_root: false  # lets the key below reach root; do not remove
+ssh_authorized_keys:
+  - $(cat "$work/key.pub")
+$write_files
+YAML
+}
+
+install_from_bundle() {
+    scp "${ssh_opts[@]}" "$BUNDLE_ARCHIVE" "root@$ip:/root/automaton-server.tar.gz" >/dev/null
+    scp "${ssh_opts[@]}" "$BUNDLE_CHECKSUM" "root@$ip:/root/automaton-server.tar.gz.sha256" >/dev/null
+    remote "bash -s" <<REMOTE || { on_failure; fail "Install of $VERSION from bundle failed"; }
+set -euo pipefail
+cd /root
+sha256sum -c automaton-server.tar.gz.sha256
+rm -rf /root/automaton-server
+tar -xzf automaton-server.tar.gz -C /root
+bash /root/automaton-server/install.sh --unattended --domain '$domain' --email '$email' --admin-email '$email' $tls_args
+REMOTE
+}
+
+install_cli_binary() {
+    [[ -n "${CLI_BINARY:-}" ]] || return 0
+    scp "${ssh_opts[@]}" "$CLI_BINARY" "root@$ip:/root/automaton-ci-cli" >/dev/null
+    remote 'install -d -m 0755 "$HOME/.local/bin" && install -m 0755 /root/automaton-ci-cli "$HOME/.local/bin/automaton" && rm -f /root/automaton-ci-cli'
+}
+
+step "Create the server ($mode, install $($first_from_bundle && printf 'bundle %s' "$VERSION" || printf '%s' "$tag"))"
 ssh-keygen -q -t ed25519 -N '' -f "$work/key"
 ssh_key_id=$(hcloud ssh-key create --name "automaton-ci-$run_id-$mode" --public-key-from-file "$work/key.pub" --label "$label" -o json | jq -r '.ssh_key.id')
-make_user_data "$tag" "$domain" "$work/user-data"
+if $first_from_bundle; then
+    make_user_data_ssh "$work/user-data"
+else
+    make_user_data "$tag" "$domain" "$work/user-data"
+fi
 server_type=''; location=''
 for t in $types; do
     for l in $locations; do
@@ -137,7 +185,7 @@ for t in $types; do
 done
 [[ -n "$server_id" ]] || fail "No server could be created from types: $types in locations: $locations"
 echo "Running on $server_type in $location"
-report_download install-automaton.sh "${tag#server-v}"
+$first_from_bundle || report_download install-automaton.sh "${tag#server-v}"
 summary "- $mode: server type \`$server_type\`, location \`$location\`"
 
 point_dns() { # the names of $domain to $ip, after deleting what is there
@@ -216,7 +264,8 @@ restore_failure_message() { # classify restore.sh failure from its log so the me
 }
 # restore-wait:end
 
-checks() { # checks LABEL
+checks() { # checks LABEL [CLI_RELEASE_VERSION]
+    local cli_version="${2:-$VERSION}"
     step "Checks ($1)"
     # The certificate that Studio really serves: the Let's Encrypt run shows its issuer, the custom run the CI one.
     issuer=$(openssl s_client -connect "studio.$domain:443" -servername "studio.$domain" </dev/null 2>/dev/null | openssl x509 -noout -issuer 2>/dev/null | sed 's/^issuer= *//' || true)
@@ -247,11 +296,11 @@ checks() { # checks LABEL
 
     step 'CLI login, Runner, hello app'
     # The CLI installer is downloaded only when this server has no CLI yet.
-    remote 'export PATH="$HOME/.local/bin:$PATH"; command -v automaton >/dev/null' 2>/dev/null || report_download install.sh "$VERSION"
+    remote 'export PATH="$HOME/.local/bin:$PATH"; command -v automaton >/dev/null' 2>/dev/null || report_download install.sh "$cli_version"
     remote "bash -s" <<REMOTE || { on_failure; fail "$1: a CLI check failed (see the lines above)"; }
 set -euo pipefail
 export PATH="\$HOME/.local/bin:\$PATH"
-command -v automaton >/dev/null || curl -fsSL https://github.com/rzvdaniel/automaton/releases/download/server-v$VERSION/install.sh | AUTOMATON_VERSION=server-v$VERSION sh
+command -v automaton >/dev/null || curl -fsSL https://github.com/rzvdaniel/automaton/releases/download/server-v$cli_version/install.sh | AUTOMATON_VERSION=server-v$cli_version sh
 automaton login --server https://api.$domain --email '$email' < /root/ci-password >/dev/null
 automaton whoami
 for i in \$(seq 1 30); do automaton runners | grep -qw connected && break; sleep 10; done
@@ -279,9 +328,13 @@ REMOTE
 
 step 'Wait for first boot'
 wait_ssh
+if $first_from_bundle; then
+    install_from_bundle
+    install_cli_binary
+fi
 wait_healthy
 password=''
-checks "fresh install of $first"
+checks "fresh install of $first" "$first"
 
 scan() { # scan LABEL [api]: "api" adds the signed-in scan of the whole API (fresh installs only)
     step "External scan ($1)"
@@ -301,11 +354,23 @@ scan() { # scan LABEL [api]: "api" adds the signed-in scan of the whole API (fre
 
 if [[ "$mode" == upgrade || "$mode" == all ]]; then
     step "Upgrade $first to $VERSION"
-    remote "bash -s" <<REMOTE || { on_failure; fail "Upgrade to $VERSION failed"; }
+    if $use_bundle; then
+        scp "${ssh_opts[@]}" "$BUNDLE_ARCHIVE" "root@$ip:/root/automaton-server.tar.gz" >/dev/null
+        scp "${ssh_opts[@]}" "$BUNDLE_CHECKSUM" "root@$ip:/root/automaton-server.tar.gz.sha256" >/dev/null
+        remote "bash -s" <<REMOTE || { on_failure; fail "Upgrade to $VERSION failed"; }
+set -euo pipefail
+cd /root
+sha256sum -c automaton-server.tar.gz.sha256
+bash /opt/automaton-server/update.sh --version server-v$VERSION --bundle /root/automaton-server.tar.gz --checksum /root/automaton-server.tar.gz.sha256
+REMOTE
+        install_cli_binary
+    else
+        remote "bash -s" <<REMOTE || { on_failure; fail "Upgrade to $VERSION failed"; }
 set -euo pipefail
 export PATH="\$HOME/.local/bin:\$PATH"
 automaton server update --version $VERSION --wait --timeout 1800
 REMOTE
+    fi
     wait_healthy
     remote 'rm -rf /root/hello'
     checks "after the upgrade to $VERSION"
@@ -339,12 +404,22 @@ REMOTE
         domain="r${RUN_ID:-local}-$$.$zone_name"; domain="${domain,,}"
         extra_domains+=("$domain")
     fi
-    make_user_data "$tag" "$domain" "$work/user-data-b"
-    hcloud server rebuild "$server_id" --image ubuntu-24.04 --user-data-from-file "$work/user-data-b" >/dev/null \
-        || fail 'hcloud server rebuild failed'
-    report_download install-automaton.sh "$VERSION"
-    [[ -n "$tls_args" ]] || point_dns
-    wait_ssh
+    if $use_bundle; then
+        make_user_data_ssh "$work/user-data-b"
+        hcloud server rebuild "$server_id" --image ubuntu-24.04 --user-data-from-file "$work/user-data-b" >/dev/null \
+            || fail 'hcloud server rebuild failed'
+        [[ -n "$tls_args" ]] || point_dns
+        wait_ssh
+        install_from_bundle
+        install_cli_binary
+    else
+        make_user_data "$tag" "$domain" "$work/user-data-b"
+        hcloud server rebuild "$server_id" --image ubuntu-24.04 --user-data-from-file "$work/user-data-b" >/dev/null \
+            || fail 'hcloud server rebuild failed'
+        report_download install-automaton.sh "$VERSION"
+        [[ -n "$tls_args" ]] || point_dns
+        wait_ssh
+    fi
     wait_healthy
     step 'Wait for first-boot install to finish'
     wait_install_lock
