@@ -264,7 +264,8 @@ restore_failure_message() { # classify restore.sh failure from its log so the me
 }
 # restore-wait:end
 
-checks() { # checks LABEL
+checks() { # checks LABEL [CLI_RELEASE_VERSION]
+    local cli_version="${2:-$VERSION}"
     step "Checks ($1)"
     # The certificate that Studio really serves: the Let's Encrypt run shows its issuer, the custom run the CI one.
     issuer=$(openssl s_client -connect "studio.$domain:443" -servername "studio.$domain" </dev/null 2>/dev/null | openssl x509 -noout -issuer 2>/dev/null | sed 's/^issuer= *//' || true)
@@ -295,11 +296,11 @@ checks() { # checks LABEL
 
     step 'CLI login, Runner, hello app'
     # The CLI installer is downloaded only when this server has no CLI yet.
-    remote 'export PATH="$HOME/.local/bin:$PATH"; command -v automaton >/dev/null' 2>/dev/null || report_download install.sh "$VERSION"
+    remote 'export PATH="$HOME/.local/bin:$PATH"; command -v automaton >/dev/null' 2>/dev/null || report_download install.sh "$cli_version"
     remote "bash -s" <<REMOTE || { on_failure; fail "$1: a CLI check failed (see the lines above)"; }
 set -euo pipefail
 export PATH="\$HOME/.local/bin:\$PATH"
-command -v automaton >/dev/null || curl -fsSL https://github.com/rzvdaniel/automaton/releases/download/server-v$VERSION/install.sh | AUTOMATON_VERSION=server-v$VERSION sh
+command -v automaton >/dev/null || curl -fsSL https://github.com/rzvdaniel/automaton/releases/download/server-v$cli_version/install.sh | AUTOMATON_VERSION=server-v$cli_version sh
 automaton login --server https://api.$domain --email '$email' < /root/ci-password >/dev/null
 automaton whoami
 for i in \$(seq 1 30); do automaton runners | grep -qw connected && break; sleep 10; done
@@ -333,7 +334,7 @@ if $first_from_bundle; then
 fi
 wait_healthy
 password=''
-checks "fresh install of $first"
+checks "fresh install of $first" "$first"
 
 scan() { # scan LABEL [api]: "api" adds the signed-in scan of the whole API (fresh installs only)
     step "External scan ($1)"
