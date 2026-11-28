@@ -180,9 +180,14 @@ on pull requests that change `src/Automaton.Cli` or `src/automaton-studio-vue` w
 ## Labels and closing
 
 - `verified`: every "Done when" check passed end to end on the test server, with a proof artifact.
-- `verified-partial`: only unit tests or part of the checks ran; the proof says what is missing and why. If an agent
-  can run the missing check, it is not partial yet: run it.
-- `verification-failed`: a check failed; fix forward.
+- `verified-env-gap`: the only unchecked items cannot be shown on the test server (e.g. Docker restart not allowed,
+  missing machine/token/real domain, >2h wait); the proof says what is missing and why. Closes automatically once live
+  (owner's standing rule, 2026-11-27).
+- `verified-partial`: a product decision or owner-only check is still needed; the proof says what is missing and why.
+  If an agent can run the missing check, it is not partial yet: run it.
+- `verification-failed`: a check failed; comment the findings on the issue and move the card back to `Ready for agents`
+  (`bash .agents/tools/agent-board.sh move <owner/repo> <number> "Ready for agents"`, also triggered automatically by
+  `.github/workflows/verification-failed.yml` in `automaton`).
 - `live`: set by whoever updates production, just before closing.
 
 After labelling, comment the results (pass or fail per check) and every administrator action on the PR and link that
@@ -193,7 +198,8 @@ production update ships.
 closes each issue in that release with a comment naming the version (`.agents/tools/close-released-issues.py`), when:
 - the merge gate held (`python3 .agents/tools/merge-gate.py <N>` output is on the PR);
 - the issue has a `proof` artifact naming the release and how it was checked;
-- the label is `verified` (a `verified-partial` issue closes only when the owner accepts the gap, said in a comment);
+- the label is `verified` or `verified-env-gap` (a `verified-partial` issue closes only when the owner accepts the gap,
+  said in a comment);
 - the production version contains the merge commit.
 
 ## Production
