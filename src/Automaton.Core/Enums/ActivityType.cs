@@ -20,6 +20,8 @@ namespace Automaton.Core.Enums
         AppUpdated,
         AppDeleted,
         AppPublished,
-        AppUnpublished
+        AppUnpublished,
+        AppDataGrantAdded,
+        AppDataGrantRemoved
     }
 }

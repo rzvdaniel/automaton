@@ -42,6 +42,17 @@ public sealed record HostContainerScope(
     Guid DeploymentAttemptId = default,
     Guid MachineRunnerId = default);
 
+/// <summary>
+/// A data volume of another app that the owner granted to this app. Set only by the API relay from stored grants; the
+/// Runner mounts it into the public Compose service at <see cref="Target"/>, read-only unless <see cref="ReadOnly"/> is false.
+/// </summary>
+public sealed record HostContainerGrantedMount(
+    Guid SourceAppId,
+    Guid SourceDeploymentTargetId,
+    string Volume,
+    string Target,
+    bool ReadOnly);
+
 public sealed record HostContainerResourceRef(
     string SourceKind,
     string ArtifactKind,
@@ -87,6 +98,7 @@ public sealed record HostContainerExecutionRequest
     public Guid CandidateId { get; init; }
     public ApplicationStorageSpec? Storage { get; init; }
     public ApplicationComposeSpec? Compose { get; init; }
+    public IReadOnlyList<HostContainerGrantedMount> GrantedMounts { get; init; } = [];
     public ApplicationCommandSpec? Command { get; init; }
     public string? User { get; init; }
     public int ContainerPort { get; init; }

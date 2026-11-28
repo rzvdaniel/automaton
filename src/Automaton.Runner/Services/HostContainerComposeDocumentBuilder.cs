@@ -16,13 +16,17 @@ internal static class HostContainerComposeDocumentBuilder
         HostContainerResourceLimits limits,
         int sharedMemoryMb,
         int logMaxSizeMb,
-        int logMaxFiles)
+        int logMaxFiles,
+        IReadOnlyList<HostContainerGrantedMount>? grantedMounts = null)
     {
+        grantedMounts ??= [];
         var services = compose.Services.ToDictionary(service => service.Name,
             service => CreateService(service, compose, resolvedImages, scope, candidateId, address,
-                limits, sharedMemoryMb, logMaxSizeMb, logMaxFiles), StringComparer.Ordinal);
+                limits, sharedMemoryMb, logMaxSizeMb, logMaxFiles, grantedMounts), StringComparer.Ordinal);
         var volumes = compose.Volumes.ToDictionary(name => name,
             name => (object)new { name = VolumeName(scope, name), external = true }, StringComparer.Ordinal);
+        foreach (var grant in grantedMounts)
+            volumes[GrantedVolumeKey(grant)] = new { name = GrantedVolumeName(grant), external = true };
         return new
         {
             services,
@@ -37,6 +41,12 @@ internal static class HostContainerComposeDocumentBuilder
     public static string VolumeName(HostContainerScope scope, string volume)
         => "automaton-data-" + StableHash($"{scope.AppId:N}:{scope.DeploymentTargetId:N}:{volume}")[..32];
 
+    public static string GrantedVolumeName(HostContainerGrantedMount grant)
+        => VolumeName(new HostContainerScope(Guid.Empty, Guid.Empty, grant.SourceAppId, grant.SourceDeploymentTargetId), grant.Volume);
+
+    private static string GrantedVolumeKey(HostContainerGrantedMount grant)
+        => "granted_" + grant.SourceAppId.ToString("N")[..12] + "_" + grant.Volume;
+
     public static string CandidateLabel(Guid candidateId)
         => $"com.automaton.compose-candidate={candidateId:N}";
 
@@ -50,7 +60,8 @@ internal static class HostContainerComposeDocumentBuilder
         HostContainerResourceLimits limits,
         int sharedMemoryMb,
         int logMaxSizeMb,
-        int logMaxFiles)
+        int logMaxFiles,
+        IReadOnlyList<HostContainerGrantedMount> grantedMounts)
     {
         var image = resolvedImages[service.Name];
         var config = new Dictionary<string, object>(StringComparer.Ordinal)
@@ -67,8 +78,9 @@ internal static class HostContainerComposeDocumentBuilder
             ["logging"] = new { driver = "local", options = new Dictionary<string, string> { ["max-size"] = $"{logMaxSizeMb}m", ["max-file"] = logMaxFiles.ToString(CultureInfo.InvariantCulture) } },
             ["labels"] = ContainerLabels(scope, candidateId, image)
         };
-        AddOptionalConfiguration(config, service, scope);
-        if (string.Equals(service.Name, compose.PublicService, StringComparison.Ordinal))
+        var isPublic = string.Equals(service.Name, compose.PublicService, StringComparison.Ordinal);
+        AddOptionalConfiguration(config, service, scope, isPublic ? grantedMounts : []);
+        if (isPublic)
             config["ports"] = new[] { new { target = service.Port!.Value, host_ip = address, protocol = "tcp" } };
         return config;
     }
@@ -76,16 +88,19 @@ internal static class HostContainerComposeDocumentBuilder
     private static void AddOptionalConfiguration(
         IDictionary<string, object> config,
         ApplicationComposeService service,
-        HostContainerScope scope)
+        HostContainerScope scope,
+        IReadOnlyList<HostContainerGrantedMount> grantedMounts)
     {
         if (service.Command.Count > 0) config["command"] = service.Command;
         if (service.Entrypoint.Count > 0) config["entrypoint"] = service.Entrypoint;
         if (service.WorkingDirectory is not null) config["working_dir"] = service.WorkingDirectory;
         if (service.Environment.Count > 0) config["environment"] = service.Environment;
         if (service.DependsOn.Count > 0) config["depends_on"] = service.DependsOn;
-        if (service.Mounts.Count == 0) return;
+        if (service.Mounts.Count == 0 && grantedMounts.Count == 0) return;
         config["volumes"] = service.Mounts.Select(mount =>
-            $"{mount.Name}:{mount.Target}{(mount.ReadOnly ? ":ro" : string.Empty)}").ToArray();
+                $"{mount.Name}:{mount.Target}{(mount.ReadOnly ? ":ro" : string.Empty)}")
+            .Concat(grantedMounts.Select(grant =>
+                $"{GrantedVolumeKey(grant)}:{grant.Target}{(grant.ReadOnly ? ":ro" : string.Empty)}")).ToArray();
     }
 
     private static Dictionary<string, string> ContainerLabels(

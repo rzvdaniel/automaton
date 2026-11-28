@@ -9,6 +9,7 @@ namespace Automaton.Api.Services;
 public sealed class HostContainerRelayService(
     HostContainerRelayStateResolver stateResolver,
     RunnerExecutionOperationService runnerOperations,
+    AppDataGrantService dataGrants,
     IOptions<MachineContainerResourceOptions> machineContainerResources)
 {
     public async Task<HostContainerExecutionOperationResponse> SubmitAsync(
@@ -38,6 +39,12 @@ public sealed class HostContainerRelayService(
 
         var managedRequest = HostContainerRelayRequestPreparer.PrepareForMachine(
             request, state, machineContainerResources.Value);
+        // Mounts of other apps' data come only from the stored, owner-approved grants, never from the caller.
+        if (managedRequest.Operation == HostContainerOperationKinds.ApplyComposeProject)
+            managedRequest = managedRequest with
+            {
+                GrantedMounts = await dataGrants.ResolveMountsAsync(state.Target.WebAppId, state.MachineRunner.Id, cancellationToken)
+            };
         await runnerOperations.QueueHostContainerAsync(
             managedRequest.OperationId,
             state.MachineRunner.Id,
@@ -88,6 +95,7 @@ internal static class HostContainerRelayRequestPreparer
             DockerLogMaxFiles = requiresContainerLimits ? resourceOptions.DockerLogMaxFiles : null,
             MinimumFreeDiskMb = RequiresDiskAdmission(request.Operation) ? resourceOptions.MinimumFreeDiskMb : null,
             HostPort = 0,
+            GrantedMounts = [],
             Environment = request.Environment.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
         };

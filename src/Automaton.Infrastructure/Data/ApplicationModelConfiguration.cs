@@ -15,6 +15,7 @@ internal static class ApplicationModelConfiguration
         ConfigureWebAppUser(modelBuilder);
         ConfigureAppShare(modelBuilder);
         ConfigureAppCustomDomain(modelBuilder);
+        ConfigureAppDataGrant(modelBuilder);
         ConfigureWebAppStar(modelBuilder);
         ConfigureUserHome(modelBuilder);
         ConfigureWebAppScreenshot(modelBuilder);
@@ -78,6 +79,20 @@ internal static class ApplicationModelConfiguration
             entity.HasIndex(e => e.WebAppId);
             // A domain goes away with its app.
             entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.WebAppId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureAppDataGrant(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AppDataGrant>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Volume).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => new { e.SourceAppId, e.GranteeAppId, e.Volume }).IsUnique();
+            entity.HasIndex(e => e.GranteeAppId);
+            // A grant goes away with either app.
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.SourceAppId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.GranteeAppId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 

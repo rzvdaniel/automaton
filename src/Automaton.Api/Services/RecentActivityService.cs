@@ -140,6 +140,8 @@ namespace Automaton.Api.Services
                 ActivityType.AppDeleted => $"Deleted app '{entityName}'",
                 ActivityType.AppPublished => $"Published app '{entityName}'",
                 ActivityType.AppUnpublished => $"Unpublished app '{entityName}'",
+                ActivityType.AppDataGrantAdded => $"Granted access to data of app '{entityName}'",
+                ActivityType.AppDataGrantRemoved => $"Removed access to data of app '{entityName}'",
                 _ => $"Performed action on '{entityName}'"
             };
         }

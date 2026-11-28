@@ -320,7 +320,7 @@ public sealed class HostContainerRelayServiceTests
         {
             RunnerOperations = RunnerExecutionTestServices.Operations(Db, Events);
             return new HostContainerRelayService(
-                new HostContainerRelayStateResolver(Db), RunnerOperations, Options.Create(MachineResources));
+                new HostContainerRelayStateResolver(Db), RunnerOperations, new AppDataGrantService(Db, null!, null!, null!, null!, null!), Options.Create(MachineResources));
         }
 
         public async Task SetCallerProfileAsync(string profile)
