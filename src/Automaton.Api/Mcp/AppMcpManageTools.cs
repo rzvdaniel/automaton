@@ -43,7 +43,7 @@ public sealed class AppMcpManageTools(AppMcpManager manager)
     public Task<object> ListCatalog([Description("Words to match name, summary and tags")] string? query = null, CancellationToken token = default)
         => Run(() => manager.ListCatalogAsync(query, token));
 
-    [McpServerTool(Name = "install_from_catalog", Destructive = false), Description("Install an app from the catalog using repo, folder and commit from list_catalog.")]
+    [McpServerTool(Name = "install_from_catalog", Destructive = false), Description("Install an app from the catalog using repo, folder and commit from list_catalog, then deploy it. When a required secret is missing it is not deployed: the result lists the missing names and the Studio link, and the app waits until the owner saves them and presses Deploy.")]
     public Task<object> InstallFromCatalog(
         [Description("Repository (owner/name)")] string repo,
         [Description("Pinned commit")] string commit,

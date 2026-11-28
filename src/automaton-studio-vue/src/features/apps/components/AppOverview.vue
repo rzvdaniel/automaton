@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import type { ActionModule, ActionSchedule } from '../services/action-schedules.service'
@@ -19,6 +19,7 @@ import AppRunsOn from './AppRunsOn.vue'
 import PublisherBadge from './PublisherBadge.vue'
 import { usePublishers } from '../composables/usePublishers'
 import { applyCatalogUpdate, isRetryOnly, shortReason } from '../utils/catalog-update'
+import { appActionErrorMessage } from '../utils/app-action-error'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { DeploymentTargetStatus } from '../types/apps.types'
 
@@ -73,8 +74,68 @@ async function applyUpdate() {
   }
 }
 
-const kind = computed(() => appKindOf(props.app))
 const liveTarget = computed(() => getLiveTarget([...props.targets]))
+const updateSecrets = reactive<Record<string, string>>({})
+
+/** New secrets the update adds are asked for first, like the install form, then the update runs and deploys. */
+async function applyUpdateWithSecrets() {
+  const current = update.value
+  if (!current || updateBusy.value) return
+  const entered = current.newSecrets.filter((name) => updateSecrets[name]?.trim())
+  if (entered.length > 0) {
+    updateBusy.value = true
+    try {
+      for (const name of entered) await appsService.setSecret(props.app.id, name, updateSecrets[name]!)
+    } catch (error) {
+      toast.add({ severity: 'error', summary: 'Secret not saved', detail: appActionErrorMessage(error, 'The secrets could not be saved.'), life: 8000 })
+      updateBusy.value = false
+      return
+    }
+    updateBusy.value = false
+    for (const name of entered) delete updateSecrets[name]
+  }
+  await applyUpdate()
+}
+
+// An app that was never deployed (installed from the catalog, or through the AI connector) is deployed from here once its required secrets exist.
+const neverDeployed = computed(() => props.app.canUpdate !== false && liveTarget.value?.status === DeploymentTargetStatus.NotDeployed)
+const savedSecretNames = ref<string[] | null>(null)
+const deployBusy = ref(false)
+const missingRequiredSecrets = computed(() => {
+  const saved = savedSecretNames.value
+  if (!saved) return []
+  return (props.app.application?.secrets ?? []).filter((item) => !item.optional && !item.from && !saved.includes(item.name)).map((item) => item.name)
+})
+watch(neverDeployed, async (value) => {
+  savedSecretNames.value = null
+  if (!value) return
+  const id = props.app.id
+  const list = await appsService.listSecrets(id).catch(() => null)
+  if (props.app.id === id) savedSecretNames.value = (list ?? []).map((item) => item.name)
+}, { immediate: true })
+
+async function deployNow() {
+  if (deployBusy.value || missingRequiredSecrets.value.length > 0) return
+  deployBusy.value = true
+  try {
+    const operation = await appsService.deployStoredSource(props.app.id)
+    toast.add({ severity: 'success', summary: 'Deploying', detail: 'The app is being deployed.', life: 5000 })
+    emit('targets-changed')
+    for (let attempt = 0; attempt < 150; attempt++) {
+      const current = await appsService.getDeploymentOperation(props.app.id, operation.operationId)
+      if (current.status === 'Succeeded') break
+      if (current.status === 'Failed') throw new Error(current.error ?? 'The deployment failed.')
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+    }
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Deploy failed', detail: appActionErrorMessage(error, 'The app could not be deployed.'), life: 8000 })
+  } finally {
+    deployBusy.value = false
+    emit('targets-changed')
+  }
+}
+
+const kind = computed(() => appKindOf(props.app))
 const host = computed(() => (props.address ? new URL(props.address).host : ''))
 const lastRun = computed(() => [...props.executions].sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc))[0] ?? null)
 const peopleCount = computed(() => props.sharing?.people.length ?? 0)
@@ -132,6 +193,17 @@ const dataDirectory = computed(() => props.app.application?.storage?.dataDirecto
       </div>
     </section>
 
+    <section v-if="neverDeployed && !update" class="strip" aria-label="Deploy" data-testid="deploy-card">
+      <div class="row">
+        <span>
+          <strong class="needs">Not deployed yet</strong>
+          <span v-if="missingRequiredSecrets.length" class="hint" data-testid="deploy-blocked"> · waiting for the required secret<template v-if="missingRequiredSecrets.length > 1">s</template> <span class="mono">{{ missingRequiredSecrets.join(', ') }}</span>. Save <template v-if="missingRequiredSecrets.length > 1">them</template><template v-else>it</template> under Secrets, then deploy.</span>
+          <span v-else class="hint"> · deploy it to start it.</span>
+        </span>
+        <Button label="Deploy" icon="pi pi-play" size="small" data-testid="deploy-button" :loading="deployBusy" :disabled="missingRequiredSecrets.length > 0 || savedSecretNames === null" @click="deployNow" />
+      </div>
+    </section>
+
     <section v-if="update" class="strip" aria-label="Needs you" data-testid="update-card">
       <div class="row">
         <span>
@@ -150,8 +222,13 @@ const dataDirectory = computed(() => props.app.application?.storage?.dataDirecto
           </template>
           <br><span v-if="update.edited" class="hint">You edited this app, so updating replaces your changes. </span>
           <span class="hint">Its data, settings, secrets, sharing and schedules are kept.</span>
+          <span v-if="update.newSecrets.length" class="newsecrets" data-testid="update-secrets">
+            <label v-for="name in update.newSecrets" :key="name" class="newsecret"><span class="mono">{{ name }}</span>
+              <input v-model="updateSecrets[name]" type="password" autocomplete="off" :aria-label="`Value for ${name}`" :data-testid="`update-secret-${name}`">
+            </label>
+          </span>
         </span>
-        <Button :label="retryOnly ? 'Retry deploy' : update.edited ? 'Replace my changes and update' : 'Update'" icon="pi pi-download" size="small" :loading="updateBusy" @click="applyUpdate" />
+        <Button :label="retryOnly ? 'Retry deploy' : update.edited ? 'Replace my changes and update' : 'Update'" icon="pi pi-download" size="small" :loading="updateBusy" @click="applyUpdateWithSecrets" />
       </div>
     </section>
 
@@ -196,6 +273,9 @@ const dataDirectory = computed(() => props.app.application?.storage?.dataDirecto
 <style scoped>
 .overview { display: flex; flex-direction: column; gap: 18px; }
 .card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+.newsecrets { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.newsecret { display: flex; align-items: center; gap: 8px; }
+.newsecret input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: inherit; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .status { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }

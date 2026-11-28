@@ -1,5 +1,10 @@
 using Automaton.Api.Mcp;
 using Automaton.Api.Services;
+using Microsoft.Extensions.Configuration;
+using Automaton.Core.Models;
+using Automaton.Api.Data;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Tests;
 
@@ -29,6 +34,48 @@ public sealed class AppMcpManagerTests
 
         Assert.That(deploy!.Message, Is.EqualTo(AppMcpReader.NotFound));
         Assert.That(secrets!.Message, Is.EqualTo(AppMcpReader.NotFound));
+    }
+
+    // Synchronous on purpose: the accessor's HttpContext is async-local and would not flow out of an async helper.
+    private static (AppMcpManager Manager, Guid AppId) InstalledApp(params ApplicationSecretDeclaration[] declarations)
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var db = AppAuthorizationTestData.CreateDbContext();
+        AppAuthorizationTestData.SeedApp(db, appId, ownerId, "catalog-app");
+        db.WebApps.Single(a => a.Id == appId).ApplicationContractJson =
+            ApplicationContractSerialization.Serialize(new ApplicationContract { Secrets = declarations.ToList() });
+        db.SaveChanges();
+        var users = AppAuthorizationTestData.CreateUserContextService(ownerId);
+        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
+        var authorization = new ResourceAuthorizationService(db, users);
+        var secrets = new AppSecretService(db, new SecretStore(db, protector), protector, authorization);
+        return (new AppMcpManager(null!, null!, null!, null!, secrets, null!, null!, null!, db, authorization, users, null!, null!, null!,
+            new ConfigurationService(new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["AppConfig:WebsiteUrl"] = "https://studio.example.com" }).Build())), appId);
+    }
+
+    [Test]
+    public async Task AfterInstall_RequiredSecretMissing_IsNotDeployedAndNamesIt()
+    {
+        var (manager, appId) = InstalledApp(
+            new ApplicationSecretDeclaration { Name = "NEEDED_TOKEN" }, new ApplicationSecretDeclaration { Name = "EXTRA", Optional = true });
+
+        var result = await manager.AfterInstallAsync(appId, "x", default);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        Assert.That(json, Does.Contain("\"deployed\":false").And.Contain("NEEDED_TOKEN").And.Not.Contain("EXTRA"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task AfterInstall_NoRequiredSecretMissing_TriesToDeploy(bool optionalOnly)
+    {
+        var (manager, appId) = InstalledApp(optionalOnly ? [new ApplicationSecretDeclaration { Name = "EXTRA", Optional = true }] : []);
+
+        // The deploy service is not wired in this fixture, so reaching it is what shows the app was not held back.
+        var ex = Assert.ThrowsAsync<McpUserException>(() => manager.AfterInstallAsync(appId, "x", default));
+        Assert.That(ex!.Message, Does.Contain("Deploying stored source"));
     }
 
     [Test]
