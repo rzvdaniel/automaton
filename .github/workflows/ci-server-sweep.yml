@@ -1,0 +1,45 @@
+# Deletes CI servers (label automaton-ci=true) that a failed or cancelled run left behind, with their SSH keys and DNS
+# records (automaton#1876). The run fails when it deleted anything, so the owner gets GitHub's failure email; a clean run passes.
+# Servers without the label are never touched. Needs the secrets HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN.
+name: CI server sweep
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      max_age_minutes:
+        description: 'Delete labelled servers older than this many minutes (default 240; 0 deletes all, for testing)'
+        required: false
+        default: '240'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-server-sweep
+
+env:
+  HCLOUD_VERSION: '1.62.0'
+
+jobs:
+  sweep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      MAX_AGE_MINUTES: ${{ inputs.max_age_minutes || '240' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require the secrets
+        run: |
+          [[ -n "$HCLOUD_TOKEN" && -n "$CLOUDFLARE_DNS_TOKEN" ]] || { echo "::error::Set the HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN repository secrets."; exit 1; }
+      - name: Install hcloud
+        run: |
+          curl -fsSL "https://github.com/hetznercloud/cli/releases/download/v${HCLOUD_VERSION}/hcloud-linux-amd64.tar.gz" -o hcloud.tgz
+          sudo tar -xzf hcloud.tgz -C /usr/local/bin hcloud
+      - name: Sweep
+        run: bash scripts/ci/release-install-check.sh sweep
