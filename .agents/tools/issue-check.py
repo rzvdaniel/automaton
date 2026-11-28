@@ -81,7 +81,8 @@ def find_comment(repo, number):
 def run(event, repo):
     issue = event["issue"]
     labels = {l["name"] for l in issue.get("labels", [])}
-    if SKIP_LABELS & labels or "pull_request" in issue:
+    title = issue.get("title") or ""
+    if SKIP_LABELS & labels or "pull_request" in issue or re.match(r"^Release \d+\.\d+\.\d+", title):
         return "skipped"
     number, names = issue["number"], missing(issue.get("body"), labels)
     existing = find_comment(repo, number)

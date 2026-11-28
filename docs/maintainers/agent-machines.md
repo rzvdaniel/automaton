@@ -6,6 +6,8 @@ timeout and logs in the Actions run. Replaces `scripts/agent-queue/` once the pi
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `agent-issue.yml` | issue labelled `agent:go` by `rzvdaniel` or `rzvdaniel-bot` | Runs `.agents/jobs/implement-issue.md` for the issue (180 min). Then, if an open PR of the issue lacks only the main review and/or security pass, `agent-finish-pr.sh` runs `.agents/jobs/finish-pr.md` (60 min): reviewers post with the runner's other logins and the gate merges. Success: card to **Verify**. Failure or timeout: `agent:failed`, a comment with the run link, card to **Inbox** (it needs the owner; Ready only holds work `pick` takes). Agent Keeper's **Pick up** Action starts the next card within 10 minutes. |
+| `verify-release.yml` | every 10 minutes / manual dispatch | Polls the test server version (`verify-trigger.sh`) and runs `.agents/jobs/verify-release.md` when an unverified version has cards in **Verify**, then posts one summary comment (`verified`, `verified-partial`, `failed`, `ready to deploy: yes/no`) on the pinned `Release X.Y.Z` issue (`release-summary.py`). |
+| `auto-release.yml` | 06:00 and 14:00 UTC / manual dispatch | Checks `.agents/tools/auto-release.py`: when `Verify` cards wait on merged PRs not in any release, `main` is green, the install check on `main` passed, no release/upgrade/Verify run is active, and today's cadence (`RELEASE_CADENCE`, default `2`) has room, dispatches `server-release.yml` with the next patch version. |
 
 Picking (Agent Keeper's Pick up, board 17; `agent-board.sh pick` by hand): does nothing while an `agent:go` issue is open; takes the top **Ready for agents** card; a card with
 `needs-shape` or no **Done when** goes to **Inbox** with one comment; a card labelled `agent:failed` is skipped until the
@@ -18,7 +20,7 @@ the machine's `gh` login is rzvdaniel-bot. No production key is on the machine.
 
 Before registering a runner, the owner checks (nothing in the repo enforces it): Settings → Actions → General →
 "Require approval for all outside collaborators"; the runner sits in a runner group limited to the agent workflows
-(`agent-issue.yml`); no other workflow uses `runs-on: self-hosted`.
+(`agent-issue.yml`, `verify-release.yml`, `auto-release.yml`); no other workflow uses `runs-on: self-hosted`.
 The agent runs with permissions skipped as the bot: the prompt treats text from other logins as untrusted, and only the owner's
 comments reopen a failed card. `pick` serves `rzvdaniel/automaton`, `automaton-apps` and `automaton-monster` (others dispatch `agent-issue.yml` here; each needs a `~/<repo>` clone and `agent:go` and `agent:failed` labels).
 

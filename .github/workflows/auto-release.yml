@@ -1,0 +1,40 @@
+name: Auto release
+
+# Cuts a server release on schedule when Verify cards wait on unreleased merged PRs, main is green, and the install
+# check passed (#1889). Respects RELEASE_CADENCE (max releases per day, default 2) and skips while a release,
+# test-server upgrade, or Verify run is in progress. Never deploys to production.
+on:
+  schedule:
+    - cron: '0 6,14 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Check readiness and write the job summary without dispatching server-release.yml'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: [self-hosted, agent]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check readiness and dispatch server release
+        env:
+          RELEASE_CADENCE: ${{ vars.RELEASE_CADENCE || '2' }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: |
+          args=()
+          if [[ "$DRY_RUN" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+          python3 .agents/tools/auto-release.py "${args[@]}"

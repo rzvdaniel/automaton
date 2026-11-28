@@ -102,6 +102,8 @@ jobs:
       - run: python3 .agents/tools/test_check_action_pins.py
       - run: python3 .agents/tools/test_deploy_notice.py
       - run: python3 .agents/tools/test_issue_check.py
+      - run: python3 .agents/tools/test_auto_release.py
+      - run: python3 .agents/tools/test_release_summary.py
       - run: python3 .agents/tools/check-action-pins.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
