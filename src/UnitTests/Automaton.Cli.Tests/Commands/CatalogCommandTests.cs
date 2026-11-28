@@ -197,4 +197,22 @@ public class CatalogCommandTests
         try { Assert.That(CatalogBuildService.Build(directory, null).Problems.Single(), Does.Contain("repository is unknown")); }
         finally { Environment.SetEnvironmentVariable("GITHUB_REPOSITORY", previous); }
     }
+
+    [Test]
+    public void BuildCatalog_WarnsWhenManifestUsesDeprecatedApplicationDescription_AndStillSucceeds()
+    {
+        Directory.CreateDirectory(Path.Combine(directory, "a/tool"));
+        File.WriteAllText(Path.Combine(directory, "catalog-apps.json"), """{"apps":[{"folder":"a/tool","category":"Ops","minServerVersion":"1.2.3"}]}""");
+        File.WriteAllText(Path.Combine(directory, "a/tool/automaton.json"), """{"name":"Tool","summary":"Short summary","application":{"description":"Old one-line description"}}""");
+
+        var result = CatalogBuildService.BuildCatalog(directory, "acme/apps", _ => Sha);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Problems, Is.Empty);
+            Assert.That(result.Json, Is.Not.Null);
+            Assert.That(result.Warnings, Has.Count.EqualTo(1));
+            Assert.That(result.Warnings[0], Does.Contain("a/tool: application.description is no longer used; put the text in summary"));
+        });
+    }
 }

@@ -19,7 +19,7 @@ public sealed class ApplicationContract
     /// <summary>Optional: <c>web</c> or <c>api</c> for a running app. Missing means web.</summary>
     public string? Kind { get; set; }
 
-    /// <summary>Optional one-line description of the app.</summary>
+    /// <summary>Deprecated: no longer shown in Studio; put the one-line text in top-level <c>summary</c>. Still accepted so existing apps keep working.</summary>
     public string? Description { get; set; }
 
     /// <summary>Optional key paths of a web app, each with a label.</summary>

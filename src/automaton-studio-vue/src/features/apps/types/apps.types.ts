@@ -169,8 +169,6 @@ export interface ApplicationContract {
   compose?: unknown
   /** 'api' when the app declares it is an API; web is assumed otherwise (#864). */
   kind?: string | null
-  /** One-line description of the app, from automaton.json. */
-  description?: string | null
   /** Key paths of a web app, each with a label. */
   pages?: Array<{ path: string; label?: string; method?: string; description?: string }>
   /** Path of an API app's OpenAPI document. */
