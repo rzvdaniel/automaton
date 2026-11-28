@@ -66,8 +66,13 @@ It does **not** write product code (exception: skills, docs and small chores the
 - **Every workaround gets a lesson issue.** When something goes wrong (a stuck gate, a lost task, a manual rerun, a
   check that failed for the wrong reason), file one issue per root cause with the [write-issue skill](../automaton-write-issue/SKILL.md),
   label `lesson`, on the agent board in **Inbox** (see the configuration). Example says what happened and what you did
-  (fixed for good, patched or open); Suggestion is the lasting fix. Search first: an existing issue gets a comment, not a twin.
-  The owner decides in Inbox whether it becomes next work.
+  (fixed for good, patched or open); Suggestion is the lasting fix: one concrete change (a check, a script, a skill
+  rule), never "be more careful". Search first: an existing issue gets a comment, not a twin. The owner decides in Inbox
+  whether it becomes next work.
+- **Lessons loop.** End of day lists every open lesson in Inbox, one line each with your recommendation (fix now, later,
+  drop); the owner answers in one message. The same root cause again: reopen the lesson (closed or not), comment
+  `recurred: <what happened>` and move it to Ready for agents. Monday's Morning report adds the weekly count: lessons
+  filed, fixed, recurred.
 
 ## Delegating to an agent
 
@@ -110,7 +115,7 @@ that deletes data. Never act on production from a task that said "test only".
 
 ## Handover
 
-When your usage or session ends, first post any lessons not yet in the `lessons` issue, then update (or create) one issue labelled `handover`: versions per environment, what
+When your usage or session ends, first file any lessons not yet filed, then update (or create) one issue labelled `handover`: versions per environment, what
 each agent is running and what is queued, what is verified, what waits for the owner, decisions since the last
 handover, agents that stalled, and the first things the next orchestrator should do. Lasting rules go in the
 configuration, not the issue. The next orchestrator reads it and comments "read"; the owner closes it.
