@@ -46,11 +46,13 @@ Create a to-do item for each step and tick them off.
    agent already claimed. Read its parent and blockers and restate its "Done when".
 2. **Build.** Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio)
    and commit a failing test before the fix. Add tests for new behaviour, including who gets 200, 403 and 404.
-3. **Show it works.** Run the affected test projects and, for Studio, `npx vue-tsc --noEmit -p tsconfig.app.json` in
-   `src/automaton-studio-vue`. `main` is green, so every failure is yours; never skip or delete a failing test unless
-   the test itself is wrong, and say so in the PR. Keep the evidence for the PR: the commands and what came back, for
-   a bug the test that failed before and passes now, for a UI change a screenshot of this branch running locally.
-   "Done" without output is a claim, not evidence.
+3. **Show it works.** Run each **Done when** check from the issue on the test server or a branch CI run before asking
+   for review, and paste one proof line per Done when item under **How verified** in the PR (the merge gate warns when
+   a Done when item has no proof line). Run the affected test projects and, for Studio,
+   `npx vue-tsc --noEmit -p tsconfig.app.json` in `src/automaton-studio-vue`. `main` is green, so every failure is
+   yours; never skip or delete a failing test unless the test itself is wrong, and say so in the PR. Keep the evidence
+   for the PR: the commands and what came back, for a bug the test that failed before and passes now, for a UI change a
+   screenshot of this branch running locally. "Done" without output is a claim, not evidence.
    **Before you push**, run the checks CI runs that a plain build skips (#1736), picked from the changed paths:
    - C# (`src/**/*.cs`): `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` (CA1502 complexity 15 and
      other analyzer errors fail Tests and the CLI binary builds), then
