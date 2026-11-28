@@ -113,7 +113,7 @@ A changed setting restarts the running app. A default can use the app's own publ
 
 ## Secrets
 
-Declare the name in `application.secrets`, set the value from standard input (never from an argument, so it stays out of shell history and AI chat), then redeploy so a running app picks it up. Read it from the environment in code.
+Declare the name in `application.secrets`, set the value from standard input (never from an argument, so it stays out of shell history and AI chat). Saving or deleting an app secret restarts the running app a few seconds later (several changes close together give one restart) and the app's activity says "Restarted to apply secret NAME". Vault secrets (`--project`, `--user`) are not restarted for yet: redeploy to pick them up. Read it from the environment in code.
 
 ```bash
 automaton secrets set STRIPE_KEY              # this app

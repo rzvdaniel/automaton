@@ -10,6 +10,7 @@ public static class AuditEventTypes
     public const string AppPermissionRejected = "AppPermissionRejected";
     public const string AppPermissionRevoked = "AppPermissionRevoked";
     public const string AppDataGrantAdded = "AppDataGrantAdded";
+    public const string AppRestartedForSecrets = "AppRestartedForSecrets";
     public const string AppDataGrantRemoved = "AppDataGrantRemoved";
     public const string AppEmailSent = "AppEmailSent";
     public const string AppEmailRefused = "AppEmailRefused";
