@@ -142,4 +142,21 @@ public sealed class HostContainerComposeDocumentBuilderTests
                 Is.EqualTo(HostContainerComposeDocumentBuilder.GrantedVolumeName(grant)));
         });
     }
+
+    [Test]
+    public void Build_RefusesAnOwnVolumeNamedLikeAGrantedOne()
+    {
+        var grant = new HostContainerGrantedMount(Guid.NewGuid(), Guid.NewGuid(), "content", "/granted/ghost-abc123/content", true);
+        var compose = new ApplicationComposeSpec
+        {
+            PublicService = "web",
+            Services = [new() { Name = "web", Image = "x/y:1", Port = 8080 }],
+            Volumes = ["granted_" + grant.SourceAppId.ToString("N")[..12] + "_content"]
+        };
+        var scope = new HostContainerScope(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(() => HostContainerComposeDocumentBuilder.Build(compose,
+            new Dictionary<string, string> { ["web"] = "x/y@sha256:1" }, scope, Guid.NewGuid(), "10.0.0.1",
+            new HostContainerResourceLimits(1, 256, 128), 64, 10, 3, [grant]));
+    }
 }

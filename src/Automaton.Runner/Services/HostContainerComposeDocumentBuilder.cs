@@ -26,7 +26,9 @@ internal static class HostContainerComposeDocumentBuilder
         var volumes = compose.Volumes.ToDictionary(name => name,
             name => (object)new { name = VolumeName(scope, name), external = true }, StringComparer.Ordinal);
         foreach (var grant in grantedMounts)
-            volumes[GrantedVolumeKey(grant)] = new { name = GrantedVolumeName(grant), external = true };
+            // The app's own volumes must never be replaced by (or alias) a granted one.
+            if (!volumes.TryAdd(GrantedVolumeKey(grant), new { name = GrantedVolumeName(grant), external = true }))
+                throw new InvalidOperationException("A declared volume uses the name reserved for a granted data volume.");
         return new
         {
             services,

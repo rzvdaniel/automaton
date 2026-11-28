@@ -23,7 +23,7 @@ public interface IAppRuntimeProcessManager
     /// Starts a running runtime again from its deployed files so it loads the app's current secrets.
     /// Returns false when there is nothing to restart; only container runtimes receive secrets.
     /// </summary>
-    Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken, bool replaceCompose = false)
         => Task.FromResult(false);
 
     /// <summary>The last lines of the app's container output; null when the runtime has no container to read.</summary>

@@ -72,7 +72,7 @@ public sealed class AppDataGrantService(
         await db.SaveChangesAsync(token);
         await RecordAsync(ActivityType.AppDataGrantAdded, AuditEventTypes.AppDataGrantAdded, AuditActions.Added,
             source, grantee, volume, readWrite, token);
-        await restarter.RestartRunningAsync(granteeAppId, CancellationToken.None);
+        await restarter.RestartWithComposeAsync(granteeAppId, CancellationToken.None);
         return await GetAsync(sourceAppId, token);
     }
 
@@ -88,7 +88,7 @@ public sealed class AppDataGrantService(
         await db.SaveChangesAsync(token);
         await RecordAsync(ActivityType.AppDataGrantRemoved, AuditEventTypes.AppDataGrantRemoved, AuditActions.Removed,
             source, grantee, grant.Volume, grant.ReadWrite, token);
-        await restarter.RestartRunningAsync(grant.GranteeAppId, CancellationToken.None);
+        await restarter.RestartWithComposeAsync(grant.GranteeAppId, CancellationToken.None);
         return await GetAsync(appId, token);
     }
 

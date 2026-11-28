@@ -430,9 +430,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     /// Replaces the running container with a new one from a copy of the deployed files, using the normal
     /// start, readiness and promotion path; the old container keeps serving until the new one is ready (except for `runtime.update: stop-first`, which stops it first).
     /// The copy gets a fresh candidate identity because brokered hosts name (and reuse) containers by it.
-    /// Compose runtimes receive no app secrets, so they are left alone.
+    /// Compose runtimes receive no app secrets, so they are left alone unless <paramref name="replaceCompose"/> (changed data grants).
     /// </summary>
-    public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken, bool replaceCompose = false)
     {
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
         // A runtime left "starting" by an interrupted start has no container; a restart recovers it.
@@ -441,7 +441,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         if (HasNoContainerRuntime(metadata)) return true;
         if (metadata is null || !(stuckStarting || running)) return false;
         // A running Compose runtime gets no app secrets and is left alone: that is not a failed restart.
-        if (metadata.ComposeCandidateId is not null && running) return true;
+        if (metadata.ComposeCandidateId is not null && running && !replaceCompose) return true;
         if (metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed })
             || running && string.IsNullOrWhiteSpace(metadata.ContainerId)
             || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))

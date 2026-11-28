@@ -67,7 +67,7 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
         => deployment.DeleteVersion(request.AppId, request.DeploymentTargetId, request.ActionKey, request.Version);
     private async Task<RestartAppRuntimeResult> RestartAsync(RestartAppRuntimeRequest request, CancellationToken token)
         => new(request.AppId, request.DeploymentTargetId,
-            await runtime.RestartRuntimeAsync(request.AppId, request.DeploymentTargetId, token)
+            await runtime.RestartRuntimeAsync(request.AppId, request.DeploymentTargetId, token, request.ReplaceCompose)
                 ? true : throw new InvalidOperationException(
                     "The app is not running on this Runner, so there was nothing to restart. Deploy it again."));
     private async Task<PauseResumeAppRuntimeResult> PauseAsync(PauseAppRuntimeRequest request, CancellationToken token)

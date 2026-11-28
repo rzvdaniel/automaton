@@ -105,11 +105,11 @@ public class RunnerDeploymentService
     }
 
     /// <summary>Restarts a running runtime under the same per-target gate as deployments.</summary>
-    public async Task<bool> RestartRuntimeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    public async Task<bool> RestartRuntimeAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken, bool replaceCompose = false)
     {
         var gate = deploymentGates.GetOrAdd((appId, deploymentTargetId), _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken);
-        try { return await runtimeProcessManager.RestartAsync(appId, deploymentTargetId, cancellationToken); }
+        try { return await runtimeProcessManager.RestartAsync(appId, deploymentTargetId, cancellationToken, replaceCompose); }
         finally { gate.Release(); }
     }
 
