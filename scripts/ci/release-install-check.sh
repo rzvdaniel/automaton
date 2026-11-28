@@ -52,12 +52,11 @@ cf() { # cf METHOD PATH [json]
 # its automaton-ci-<run>- SSH keys and the DNS records that point at its address, then exit 1 so the owner hears of it.
 # Servers without the label are never listed. A clean sweep prints "no leftovers" and exits 0.
 sweep() {
-    local cutoff id created name ip run zone key rec removed=0 servers keys recs
+    local cutoff id created name ip run zone key rec removed=0 servers keys run_keys recs
     cutoff=$(date -u -d "-${MAX_AGE_MINUTES:-240} minutes" +%s)
     zone=$(cf GET "zones?name=$zone_name" | jq -r '.result[0].id // empty')
     # Read the lists into variables first: a failing hcloud (bad token, outage) must fail the run, not look like "no leftovers".
     servers=$(hcloud server list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.public_net.ipv4.ip // "-") \(.name)"')
-    keys=$(hcloud ssh-key list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.name)"')
     while read -r id created ip name; do
         [[ -n "$id" ]] || continue
         (( $(date -u -d "$created" +%s) < cutoff )) || continue
@@ -70,7 +69,8 @@ sweep() {
         fi
         if [[ "$name" == automaton-ci-* ]]; then
             run=${name#automaton-ci-}; run=${run%-*}
-            for key in $(hcloud ssh-key list -l "$label" -o json | jq -r --arg r "automaton-ci-$run-" '.[] | select(.name | startswith($r)) | .id'); do
+            run_keys=$(hcloud ssh-key list -l "$label" -o json | jq -r --arg r "automaton-ci-$run-" '.[] | select(.name | startswith($r)) | .id')
+            for key in $run_keys; do
                 hcloud ssh-key delete "$key" && echo "  deleted SSH key $key"
             done
         fi
@@ -78,7 +78,8 @@ sweep() {
         summary "- Deleted server \`$name\` created $created"
         removed=$((removed + 1))
     done <<< "$servers"
-    # SSH keys whose server is already gone
+    # SSH keys whose server is already gone (re-listed after server cleanup so deleted keys are not deleted twice)
+    keys=$(hcloud ssh-key list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.name)"')
     while read -r id created name; do
         [[ -n "$id" ]] || continue
         (( $(date -u -d "$created" +%s) < cutoff )) || continue
