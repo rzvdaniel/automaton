@@ -20,7 +20,7 @@ for pr in $prs; do
   fi
   echo "agent-finish-pr: PR $pr lacks only review/security; starting reviewers"
   # Reviews start automaton-reviewer subagents, which only Claude Code has: always claude, whatever AGENT_CLI says.
-  PROMPT_FILE=.agents/jobs/finish-pr.md AGENT_REPO="$repo" AGENT_CLI=claude AGENT_MODEL=${AGENT_REVIEW_MODEL:-sonnet} \
+  PROMPT_FILE=.agents/jobs/finish-pr.md AGENT_REPO="$repo" AGENT_CLI=${AGENT_REVIEW_CLI:-claude} AGENT_MODEL=${AGENT_REVIEW_MODEL:-sonnet} \
     ISSUE_URL="https://github.com/$repo/issues/$number" \
     PR_URL="https://github.com/$repo/pull/$pr" bash "$tools/agent-run.sh" || rc=$?
 done

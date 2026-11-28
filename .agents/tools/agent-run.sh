@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run one agent prompt on an agent machine (called by the agent workflows), with Claude Code or Antigravity (agy).
+# Run one agent prompt on an agent machine (called by the agent workflows) through an agent tool adapter (agents/<tool>.sh: claude, agy).
 # Env: PROMPT_FILE (repo path), PR_URL (replaces PR_URL in the prompt), AGENT_REPO (owner/repo of the issue; its checkout ~/<repo> is the work base), ISSUE_URL (replaces ISSUE_URL in the prompt), AGENT_TASK_TIMEOUT (default 3h),
-# AGENT_CLI (claude, or agy), AGENT_MODEL (sonnet for claude, gemini-4-hydrogen-high for agy), AGENT_EFFORT (low), CLAUDE_CODE_OAUTH_TOKEN (never printed),
+# AGENT_CLI (an adapter name: claude, agy; unknown names run claude), AGENT_MODEL (sonnet for claude, gemini-4-hydrogen-high for agy), AGENT_EFFORT (low), CLAUDE_CODE_OAUTH_TOKEN (never printed),
 # AGENT_RECORD=1: post one line on the issue with the tool, model, minutes and whether the Claude fallback ran (#1864).
 # With agy, a failed run, a usage limit or a run that leaves no pull request for the issue runs once more on claude.
 set -euo pipefail
@@ -57,24 +57,18 @@ bring_agents() {
 }
 bring_agents
 prompt=$(cat "$prompt_base/$PROMPT_FILE"); prompt=${prompt//ISSUE_URL/${ISSUE_URL:-}}; prompt=${prompt//PR_URL/${PR_URL:-}}
-cli=${AGENT_CLI:-claude}; [ "$cli" = agy ] || cli=claude
+adapters="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agents"
+cli=${AGENT_CLI:-claude}; [[ $cli =~ ^[a-z0-9-]+$ && -f "$adapters/$cli.sh" ]] || cli=claude
 timeout_after=${AGENT_TASK_TIMEOUT:-3h}
 # With agy, keep time for one Claude fallback inside the job's limit: agy gets AGENT_AGY_TIMEOUT (default 100m),
 # the fallback what is left of AGENT_TASK_TIMEOUT (in minutes, e.g. 180m).
 total_min=${timeout_after%m}; [[ $total_min =~ ^[0-9]+$ ]] || total_min=180
 agy_timeout=${AGENT_AGY_TIMEOUT:-100m}
 issue_number=${ISSUE_URL:-}; issue_number=${issue_number##*/}; [[ $issue_number =~ ^[0-9]+$ ]] || issue_number=
-# run_cli <claude|agy> <model>: one run in this worktree; returns the CLI's exit code (124 = timed out)
+# run_cli <tool> <model>: one run in this worktree through the tool's adapter (agents/<tool>.sh); returns its exit code (124 = timed out)
 run_cli() {
-  if [ "$1" = agy ]; then
-    # agy cannot start subagents: the finish step (agent-finish-pr.sh) posts the reviews with the runner's other logins.
-    # agy never sees the Claude token
-    env -u CLAUDE_CODE_OAUTH_TOKEN timeout -k 30 "$agy_timeout" agy -p "$prompt
-
-You cannot start subagents in this run. Do every step of the job except the reviews and the security pass: open the pull request with its description and stop there. The next step of this job posts the reviews and merges through the gate."       --model "$2" --effort "${AGENT_EFFORT:-low}" --dangerously-skip-permissions < /dev/null 2>&1
-    return
-  fi
-  timeout -k 30 "$timeout_after" claude -p "$prompt" --model "$2" --effort "${AGENT_EFFORT:-low}" --dangerously-skip-permissions < /dev/null
+  local limit=$timeout_after; [ "$1" = agy ] && limit=$agy_timeout
+  timeout -k 30 "$limit" bash "$adapters/$1.sh" run "$2" "$prompt"
 }
 # has_pr: an open or merged pull request references the issue (unknown issue: assume yes)
 has_pr() {

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test agent-run.sh with fake claude/agy/gh and a temp repo: shared checkout stays on main, worktree removed after the run.
 set -euo pipefail
+unset AGENT_CLI AGENT_MODEL AGENT_REPO AGENT_RECORD AGENT_EFFORT AGENT_FALLBACK_MODEL AGENT_TASK_TIMEOUT AGENT_AGY_TIMEOUT ISSUE_URL PR_URL
 tools=$(cd "$(dirname "$0")" && pwd)
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 git init -q --bare "$t/origin.git"
@@ -36,7 +37,7 @@ HOME="$t/home" PATH="$t/bin:$PATH" AGENT_WORKDIR="$t/base" AGENT_WORK_ROOT="$t/w
 [ "$(git -C "$t/home/other" worktree list | wc -l)" = 1 ] || { echo "FAIL: other repo worktree left"; exit 1; }
 [ "$(git -C "$t/base" worktree list | wc -l)" = 1 ] || { echo "FAIL: automaton worktree used for other repo"; exit 1; }
 # #1871: a run for another repository fast-forwards the automaton checkout and re-runs a changed agent-run.sh
-mkdir -p "$t/base/.agents/tools"; cp "$tools/agent-run.sh" "$t/base/.agents/tools/agent-run.sh"
+mkdir -p "$t/base/.agents/tools"; cp -r "$tools/agent-run.sh" "$tools/agents" "$t/base/.agents/tools/"
 git -C "$t/base" add -f .; git -C "$t/base" -c user.name=t -c user.email=t@t commit -q -m tools; git -C "$t/base" push -q origin main
 git clone -q -b main "$t/origin.git" "$t/upd" 2>/dev/null; cd "$t/upd"
 { cat "$tools/agent-run.sh"; echo '# new version marker'; } > .agents/tools/agent-run.sh
