@@ -420,3 +420,23 @@ jobs:
             sleep "$delay"
           done
           gh run watch "$run_id" --exit-status --interval 20 > /dev/null
+
+  # Upgrades the test server and its online Runners after a release on main is published (#1887).
+  # Shares the `agent` concurrency group with Verify release and Agent issue so an upgrade
+  # waits for any running verification or agent job to finish first.
+  upgrade-test-server:
+    needs: bundle
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, agent]
+    timeout-minutes: 30
+    concurrency:
+      group: agent
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Upgrade test server and Runners
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash .agents/tools/upgrade-test-server.sh "$VERSION"
