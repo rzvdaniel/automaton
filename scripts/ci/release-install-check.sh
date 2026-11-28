@@ -52,15 +52,19 @@ cf() { # cf METHOD PATH [json]
 # its automaton-ci-<run>- SSH keys and the DNS records that point at its address, then exit 1 so the owner hears of it.
 # Servers without the label are never listed. A clean sweep prints "no leftovers" and exits 0.
 sweep() {
-    local cutoff id created name ip run zone key rec removed=0
+    local cutoff id created name ip run zone key rec removed=0 servers keys recs
     cutoff=$(date -u -d "-${MAX_AGE_MINUTES:-240} minutes" +%s)
     zone=$(cf GET "zones?name=$zone_name" | jq -r '.result[0].id // empty')
+    # Read the lists into variables first: a failing hcloud (bad token, outage) must fail the run, not look like "no leftovers".
+    servers=$(hcloud server list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.public_net.ipv4.ip // "-") \(.name)"')
+    keys=$(hcloud ssh-key list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.name)"')
     while read -r id created ip name; do
         [[ -n "$id" ]] || continue
         (( $(date -u -d "$created" +%s) < cutoff )) || continue
         echo "Leftover server $name (id $id, created $created)"
         if [[ -n "$zone" && -n "$ip" && "$ip" != - ]]; then
-            for rec in $(cf GET "zones/$zone/dns_records?type=A&content=$ip&per_page=100" | jq -r '.result[].id'); do
+            recs=$(cf GET "zones/$zone/dns_records?type=A&content=$ip&per_page=100" | jq -r '.result[].id')
+            for rec in $recs; do
                 cf DELETE "zones/$zone/dns_records/$rec" >/dev/null && echo "  deleted DNS record $rec"
             done
         fi
@@ -73,7 +77,7 @@ sweep() {
         hcloud server delete "$id" && echo "  deleted server $id"
         summary "- Deleted server \`$name\` created $created"
         removed=$((removed + 1))
-    done < <(hcloud server list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.public_net.ipv4.ip // "-") \(.name)"')
+    done <<< "$servers"
     # SSH keys whose server is already gone
     while read -r id created name; do
         [[ -n "$id" ]] || continue
@@ -81,7 +85,7 @@ sweep() {
         hcloud ssh-key delete "$id" && echo "Leftover SSH key $name deleted"
         summary "- Deleted SSH key \`$name\`"
         removed=$((removed + 1))
-    done < <(hcloud ssh-key list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.name)"')
+    done <<< "$keys"
     if (( removed == 0 )); then echo "no leftovers"; summary "no leftovers"; return 0; fi
     fail "Deleted $removed leftover CI resources (listed above): a run left them behind"
 }
