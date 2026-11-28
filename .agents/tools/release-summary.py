@@ -25,6 +25,14 @@ MARKER_PREFIX = "<!-- release-summary:"
 PINNED_QUERY = """query($o:String!,$r:String!){repository(owner:$o,name:$r){pinnedIssues(first:10){nodes{issue{number title state}}}}}"""
 
 
+TRUSTED_LOGINS = {"rzvdaniel", "rzvdaniel-bot"}
+TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+
+
+def _is_trusted_author(login: str | None, association: str | None) -> bool:
+    return (login or "") in TRUSTED_LOGINS or (association or "") in TRUSTED_ASSOCIATIONS
+
+
 class SummaryClient(ar.GitHubClient):
     """GitHub CLI client extended with issue, comment, artifact, and pin operations."""
 
@@ -65,10 +73,13 @@ class SummaryClient(ar.GitHubClient):
         out = ar.run_cmd([
             self.gh_bin, "issue", "list", "-R", repo, "--state", "all",
             "--search", f'"{title}" in:title', "--limit", "20",
-            "--json", "number,title,state,url",
+            "--json", "number,title,state,url,author,authorAssociation",
         ])
         for item in json.loads(out or "[]"):
-            if item.get("title") == title:
+            if item.get("title") != title:
+                continue
+            author_login = (item.get("author") or {}).get("login")
+            if _is_trusted_author(author_login, item.get("authorAssociation")):
                 return item
         return None
 
@@ -375,7 +386,15 @@ def publish_summary(
     if not dry_run:
         marker = f"{MARKER_PREFIX} {summary['version']} -->"
         comments = client.list_comments(repo, issue["number"])
-        existing_comment = next((c for c in comments if (c.get("body") or "").startswith(marker)), None)
+        existing_comment = next(
+            (
+                c
+                for c in comments
+                if (c.get("body") or "").startswith(marker)
+                and _is_trusted_author((c.get("user") or {}).get("login"), c.get("author_association"))
+            ),
+            None,
+        )
         if existing_comment:
             client.update_comment(repo, existing_comment["id"], comment_body)
         else:

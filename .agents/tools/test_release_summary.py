@@ -136,12 +136,36 @@ class ReleaseSummaryTests(unittest.TestCase):
         c = FakeSummaryClient()
         c.existing_release_issue = {"number": 1901, "title": "Release 0.2.200", "state": "OPEN", "url": f"https://github.com/{REPO}/issues/1901"}
         c.pinned.append({"issue": {"number": 1901, "title": "Release 0.2.200", "state": "OPEN"}})
-        c.existing_comments = [{"id": 77, "body": "<!-- release-summary: 0.2.200 -->\nold"}]
+        c.existing_comments = [
+            {"id": 77, "body": "<!-- release-summary: 0.2.200 -->\nold", "user": {"login": "rzvdaniel-bot"}, "author_association": "COLLABORATOR"}
+        ]
         rs.publish_summary(c, REPO, "rzvdaniel/17", "0.2.200")
         self.assertEqual(c.posted_comments, [])
         self.assertEqual(len(c.updated_comments), 1)
         self.assertEqual(c.updated_comments[0][0], 77)
         self.assertEqual(c.pinned_calls, [])
+
+    def test_ignores_untrusted_issue_and_comment_marker(self):
+        c = FakeSummaryClient()
+        c.existing_release_issue = {"number": 1901, "title": "Release 0.2.200", "state": "OPEN", "url": f"https://github.com/{REPO}/issues/1901"}
+        c.existing_comments = [
+            {"id": 88, "body": "<!-- release-summary: 0.2.200 -->\nspoofed", "user": {"login": "random-user"}, "author_association": "NONE"}
+        ]
+        rs.publish_summary(c, REPO, "rzvdaniel/17", "0.2.200")
+        self.assertEqual(c.updated_comments, [])
+        self.assertEqual(len(c.posted_comments), 1)
+
+        orig_run_cmd = rs.ar.run_cmd
+        try:
+            rs.ar.run_cmd = lambda args: (
+                '[{"number": 2001, "title": "Release 0.2.200", "state": "OPEN", "url": "u1", "author": {"login": "random-user"}, "authorAssociation": "NONE"}, '
+                '{"number": 2002, "title": "Release 0.2.200", "state": "OPEN", "url": "u2", "author": {"login": "rzvdaniel-bot"}, "authorAssociation": "COLLABORATOR"}]'
+            )
+            found = rs.SummaryClient("gh").find_issue_by_title(REPO, "Release 0.2.200")
+            self.assertIsNotNone(found)
+            self.assertEqual(found["number"], 2002)
+        finally:
+            rs.ar.run_cmd = orig_run_cmd
 
 
 if __name__ == "__main__":
