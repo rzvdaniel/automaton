@@ -19,9 +19,26 @@ for pr in $prs; do
     echo "agent-finish-pr: PR $pr fails on more than reviews; leaving it"; continue
   fi
   echo "agent-finish-pr: PR $pr lacks only review/security; starting reviewers"
-  # Reviews start automaton-reviewer subagents, which only Claude Code has: always claude, whatever AGENT_CLI says.
-  PROMPT_FILE=.agents/jobs/finish-pr.md AGENT_REPO="$repo" AGENT_CLI=${AGENT_REVIEW_CLI:-claude} AGENT_MODEL=${AGENT_REVIEW_MODEL:-sonnet} \
-    ISSUE_URL="https://github.com/$repo/issues/$number" \
-    PR_URL="https://github.com/$repo/pull/$pr" bash "$tools/agent-run.sh" || rc=$?
+  if [ "${AGENT_REVIEW_CLI:-claude}" = claude ]; then
+    # Claude Code starts one automaton-reviewer subagent per missing piece and merges through the gate.
+    PROMPT_FILE=.agents/jobs/finish-pr.md AGENT_REPO="$repo" AGENT_CLI=claude AGENT_MODEL=${AGENT_REVIEW_MODEL:-sonnet} \
+      ISSUE_URL="https://github.com/$repo/issues/$number" \
+      PR_URL="https://github.com/$repo/pull/$pr" bash "$tools/agent-run.sh" || rc=$?
+    continue
+  fi
+  # Tools without subagents (agy): each missing piece is its own fresh run, so the two reviews stay independent;
+  # this script merges through the gate afterwards (a CHANGES NEEDED review keeps the gate red).
+  for piece in review security; do
+    grep -q -E "^FAIL +$piece:" <<<"$out" || continue
+    job=review-main.md; [ "$piece" = security ] && job=review-security.md
+    PROMPT_FILE=.agents/jobs/$job AGENT_REPO="$repo" AGENT_CLI="$AGENT_REVIEW_CLI" AGENT_MODEL=${AGENT_REVIEW_MODEL:-gemini-4-neon-high} \
+      ISSUE_URL="https://github.com/$repo/issues/$number" \
+      PR_URL="https://github.com/$repo/pull/$pr" bash "$tools/agent-run.sh" || rc=$?
+  done
+  if python3 "$tools/merge-gate.py" "$pr" --repo "$repo" --merge; then
+    gh issue comment "$number" -R "$repo" --body "Reviews posted by $AGENT_REVIEW_CLI (${AGENT_REVIEW_MODEL:-gemini-4-neon-high}); PR #$pr merged through the gate." >/dev/null 2>&1 || true
+  else
+    gh issue comment "$number" -R "$repo" --body "Reviews by $AGENT_REVIEW_CLI (${AGENT_REVIEW_MODEL:-gemini-4-neon-high}) done; PR #$pr not merged: the merge gate still fails (see the PR)." >/dev/null 2>&1 || true
+  fi
 done
 exit $rc
