@@ -1,19 +1,25 @@
 name: Release install check
-# Installs each published server release on a throwaway Hetzner server (separate project "automaton-ci"), checks it by
-# script, installs the previous release and upgrades it, restores a backup of one install onto a fresh install of the
-# same server (rebuilt, so one server per run), then deletes it. Needs the repository secrets
-# HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN; without them the run fails at the first step.
+# Checks a commit build (nightly on main, or on demand) or a published server release on a throwaway Hetzner server
+# (separate project "automaton-ci"), running upgrade, fresh install, external/API scans and backup/restore, then deletes it.
+# Needs repository secrets HCLOUD_TOKEN and CLOUDFLARE_DNS_TOKEN; without them the check job fails at the first step.
 on:
   workflow_run:
     workflows: ['Publish Automaton Server']
     types: [completed]
-  # The default certificate path (Traefik, Let's Encrypt): fresh mode only, about 5 certificates a week.
   schedule:
+    # Nightly install check against a build of main (images tagged by commit, mode all).
+    - cron: '23 1 * * *'
+    # The default certificate path (Traefik, Let's Encrypt): fresh mode against the newest published release, ~5 certs/week.
     - cron: '17 22 * * 0'
   workflow_dispatch:
     inputs:
+      target:
+        description: 'What to check: commit (build this ref) or release (a published server-v* release)'
+        type: choice
+        options: [commit, release]
+        default: commit
       version:
-        description: 'Release to check, e.g. 0.2.195 (default: the newest server release)'
+        description: 'Published release to check, e.g. 0.2.195 (checks that release instead of building this commit)'
         required: false
       server_types:
         description: 'Server types to try in order'
@@ -35,19 +41,117 @@ on:
         description: 'Test the failure path: restore with a wrong key (the run must fail at the restore job)'
         type: boolean
         default: false
+run-name: >-
+  ${{
+    (github.event_name == 'schedule' && github.event.schedule != '17 22 * * 0' && 'Release install check (commit all)')
+    || (github.event_name == 'workflow_dispatch' && inputs.version == '' && inputs.target != 'release' && !inputs.restore_wrong_key && format('Release install check (commit {0})', inputs.mode || 'all'))
+    || format('Release install check ({0})', github.event_name)
+  }}
 permissions:
   contents: read
-# One server at a time: both runs share the Cloudflare zone and the hcloud project.
+# One server at a time: runs share the Cloudflare zone and the hcloud project.
 concurrency:
   group: release-install-check
   cancel-in-progress: false
 env:
   HCLOUD_VERSION: '1.62.0'  # server rebuild --user-data-from-file needs 1.62 or later
 jobs:
-  # Builds the API's OpenAPI file from the release's own source (Swagger stays off on servers). It runs the release's startup
+  plan:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      target: ${{ steps.resolve.outputs.target }}
+      mode: ${{ steps.resolve.outputs.mode }}
+      tls: ${{ steps.resolve.outputs.tls }}
+      version: ${{ steps.resolve.outputs.version }}
+      previous: ${{ steps.resolve.outputs.previous }}
+      ref: ${{ steps.resolve.outputs.ref }}
+      is_nightly: ${{ steps.resolve.outputs.is_nightly }}
+    steps:
+      - name: Resolve check target and versions
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_CRON: ${{ github.event.schedule }}
+          INPUT_TARGET: ${{ inputs.target }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_TLS: ${{ inputs.tls }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          is_nightly=false
+          if [[ "$EVENT_NAME" == workflow_run ]]; then
+            target=release
+            mode=all
+            tls=custom
+          elif [[ "$EVENT_NAME" == schedule ]]; then
+            if [[ "$SCHEDULE_CRON" == '17 22 * * 0' ]]; then
+              target=release
+              mode=fresh
+              tls=letsencrypt
+            else
+              target=commit
+              mode=all
+              tls=custom
+              is_nightly=true
+            fi
+          else
+            target="${INPUT_TARGET:-commit}"
+            [[ -z "$INPUT_VERSION" ]] || target=release
+            mode="${INPUT_MODE:-all}"
+            tls="${INPUT_TLS:-custom}"
+          fi
+
+          mapfile -t tags < <(gh release list --limit 100 --json tagName,isDraft,isPrerelease,createdAt \
+            --jq '[.[] | select((.isDraft or .isPrerelease) | not) | select(.tagName | startswith("server-v"))] | sort_by(.createdAt) | reverse | .[].tagName')
+
+          if [[ "$target" == release ]]; then
+            current="${INPUT_VERSION:+server-v$INPUT_VERSION}"; current="${current:-${tags[0]:-}}"
+            [[ -n "$current" ]] || { echo "::error::No published server release found."; exit 1; }
+            printf '%s\n' "${tags[@]}" | grep -qxF -- "$current" || { echo "::error::$current is not a published server release."; exit 1; }
+            previous=''
+            for t in "${tags[@]}"; do [[ "$t" != "$current" ]] && { previous="$t"; break; }; done
+            if [[ "$mode" == upgrade || "$mode" == all ]]; then
+              [[ -n "$previous" ]] || { echo "::error::No previous server release to upgrade from."; exit 1; }
+            fi
+            version="${current#server-v}"
+            previous="${previous#server-v}"
+            ref="$current"
+          else
+            latest="${tags[0]:-}"
+            previous="${latest#server-v}"
+            if [[ "$mode" == upgrade || "$mode" == all ]]; then
+              [[ -n "$previous" ]] || { echo "::error::No published server release to upgrade from."; exit 1; }
+            fi
+            short_sha="${COMMIT_SHA:0:7}"
+            if [[ "$previous" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+              version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))-ci.$short_sha"
+            else
+              version="0.0.1-ci.$short_sha"
+            fi
+            ref="$COMMIT_SHA"
+          fi
+
+          {
+            echo "target=$target"
+            echo "mode=$mode"
+            echo "tls=$tls"
+            echo "version=$version"
+            echo "previous=$previous"
+            echo "ref=$ref"
+            echo "is_nightly=$is_nightly"
+          } >> "$GITHUB_OUTPUT"
+
+  # Builds the API's OpenAPI file from the target source (Swagger stays off on servers). It runs the API startup
   # code, so this job has no secrets, only a read-only token, and passes the file on as an artifact.
   openapi:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
@@ -63,30 +167,10 @@ jobs:
           --health-cmd "pg_isready -U spec" --health-interval 5s --health-timeout 5s --health-retries 10
     permissions:
       contents: read
-    outputs:
-      version: ${{ steps.versions.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
-      - name: Pick the release
-        id: versions
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          # Only a published, non-draft server release is built: no tag pushed for the purpose.
-          mapfile -t tags < <(gh release list --limit 100 --json tagName,isDraft,isPrerelease \
-            --jq '.[] | select((.isDraft or .isPrerelease) | not) | select(.tagName | startswith("server-v")) | .tagName')
-          current="${INPUT_VERSION:+server-v$INPUT_VERSION}"; current="${current:-${tags[0]}}"
-          printf '%s\n' "${tags[@]}" | grep -qxF -- "$current" || { echo "::error::$current is not a published server release."; exit 1; }
-          echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
-        with:
-          ref: server-v${{ steps.versions.outputs.version }}
+          ref: ${{ needs.plan.outputs.ref }}
           path: release-src
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
@@ -116,9 +200,133 @@ jobs:
           path: ${{ runner.temp }}/openapi.json
           retention-days: 3
           if-no-files-found: ignore
+
+  # For commit-build runs, builds and pushes images tagged by commit (no GitHub Release is published).
+  images:
+    needs: plan
+    if: needs.plan.outputs.target == 'commit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      packages: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [server, worker, studio, store, age]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set repository name
+        id: repository
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "name=${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        id: image
+        with:
+          context: .
+          file: docker/Dockerfile.${{ matrix.component }}
+          push: true
+          platforms: linux/amd64
+          tags: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}:${{ needs.plan.outputs.ref }}
+          build-args: |
+            VITE_RUNTIME_CONFIG=true
+            SERVER_VERSION=${{ needs.plan.outputs.version }}
+            VITE_API_BASE_URL=
+            VITE_PUBLIC_APPS_BASE_URL=
+            VITE_GITHUB_AUTH_API_BASE_URL=
+            VITE_SUBSCRIPTIONS_ENABLED=false
+            VITE_APP_TITLE=Automaton Studio
+      - name: Export image reference
+        env:
+          IMAGE: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}@${{ steps.image.outputs.digest }}
+          COMPONENT: ${{ matrix.component }}
+        run: printf '%s\n' "$IMAGE" > "$COMPONENT.image"
+      - name: Smoke test age tool image
+        if: matrix.component == 'age'
+        env:
+          IMAGE: ghcr.io/${{ steps.repository.outputs.name }}-age:${{ needs.plan.outputs.ref }}
+        run: |
+          docker pull "$IMAGE"
+          docker run --rm "$IMAGE" age --version
+          docker run --rm "$IMAGE" age-keygen --help >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.component }}
+          path: '*.image'
+          retention-days: 1
+
+  bundle:
+    needs: [plan, images]
+    if: needs.plan.outputs.target == 'commit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-*
+          merge-multiple: true
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Assemble commit bundle
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          GITHUB_SHA: ${{ needs.plan.outputs.ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash scripts/ci/build-server-bundle.sh
+          tar -czf automaton-server.tar.gz automaton-server
+          sha256sum automaton-server.tar.gz > automaton-server.tar.gz.sha256
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build CLI binary
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          dotnet publish src/Automaton.Cli/Automaton.Cli.csproj -c Release -r linux-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:Version="$VERSION" -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.0 -o cli-publish
+          mkdir -p cli
+          cp cli-publish/automaton cli/automaton
+          chmod +x cli/automaton
+          DOTNET_ROOT=/nonexistent ./cli/automaton --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: commit-bundle
+          path: |
+            automaton-server.tar.gz
+            automaton-server.tar.gz.sha256
+            cli/automaton
+          retention-days: 1
+
   check:
-    needs: openapi
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    needs: [plan, openapi, bundle]
+    if: |
+      !cancelled() &&
+      needs.plan.result == 'success' &&
+      needs.openapi.result == 'success' &&
+      (needs.bundle.result == 'success' || needs.bundle.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 210
     permissions:
@@ -132,17 +340,17 @@ jobs:
       HEAD_COUNTER_URL: ${{ secrets.HEAD_COUNTER_URL }}
       HEAD_COUNTER_TOKEN: ${{ secrets.HEAD_COUNTER_TOKEN }}
       # The shared wildcard from ci-certificate.yml: installs with --tls-mode custom, no Let's Encrypt request per run.
-      # A scheduled run and tls=letsencrypt leave them empty: the install then asks Let's Encrypt (the default path).
-      CI_TLS_CERT: ${{ (github.event_name == 'schedule' || inputs.tls == 'letsencrypt') && '' || secrets.CI_TLS_CERT }}
-      CI_TLS_KEY: ${{ (github.event_name == 'schedule' || inputs.tls == 'letsencrypt') && '' || secrets.CI_TLS_KEY }}
+      # When tls=letsencrypt they stay empty: the install then asks Let's Encrypt (the default path).
+      CI_TLS_CERT: ${{ needs.plan.outputs.tls == 'letsencrypt' && '' || secrets.CI_TLS_CERT }}
+      CI_TLS_KEY: ${{ needs.plan.outputs.tls == 'letsencrypt' && '' || secrets.CI_TLS_KEY }}
       SERVER_TYPES: ${{ inputs.server_types || 'cx23 cpx12' }}
       LOCATIONS: ${{ inputs.locations || 'nbg1 fsn1 hel1' }}
       RUN_ID: ${{ github.run_id }}
     steps:
-      # On workflow_dispatch (--ref branch), run that branch's commit so PR changes to the check are tested; other triggers use the default branch.
+      # On commit-build and workflow_dispatch runs, check out that commit so PR/branch changes to the check are tested; other triggers use the default branch.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.repository.default_branch }}
+          ref: ${{ (needs.plan.outputs.target == 'commit' || github.event_name == 'workflow_dispatch') && github.sha || github.event.repository.default_branch }}
           persist-credentials: false
       - name: Require the secrets
         run: |
@@ -154,27 +362,29 @@ jobs:
           curl -fsSL "https://github.com/hetznercloud/cli/releases/download/v${HCLOUD_VERSION}/hcloud-linux-amd64.tar.gz" -o hcloud.tgz
           sudo tar -xzf hcloud.tgz -C /usr/local/bin hcloud
           hcloud version
-      - name: Pick the releases
-        id: versions
+      - name: Write step summary header
         env:
-          INPUT_VERSION: ${{ inputs.version }}
+          TARGET: ${{ needs.plan.outputs.target }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          PREVIOUS: ${{ needs.plan.outputs.previous }}
+          COMMIT_SHA: ${{ needs.plan.outputs.ref }}
         run: |
-          set -euo pipefail
-          mapfile -t tags < <(gh release list --limit 100 --json tagName,isDraft,isPrerelease,createdAt \
-            --jq '[.[] | select((.isDraft or .isPrerelease) | not) | select(.tagName | startswith("server-v"))] | sort_by(.createdAt) | reverse | .[].tagName')
-          current="server-v${{ needs.openapi.outputs.version }}"
-          previous=''
-          for t in "${tags[@]}"; do [[ "$t" != "$current" ]] && { previous="$t"; break; }; done
-          [[ -n "$previous" ]] || { echo "::error::No previous server release to upgrade from."; exit 1; }
-          echo "version=${current#server-v}" >> "$GITHUB_OUTPUT"
-          echo "previous=${previous#server-v}" >> "$GITHUB_OUTPUT"
-          echo "### Release install check: ${current#server-v} (upgrade from ${previous#server-v})" >> "$GITHUB_STEP_SUMMARY"
-      # The OpenAPI file comes from the "openapi" job, which builds the release source without any secret.
+          if [[ "$TARGET" == commit ]]; then
+            echo "### Release install check: commit \`${COMMIT_SHA:0:12}\` ($VERSION, upgrade from ${PREVIOUS:-none})" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Release install check: $VERSION (upgrade from ${PREVIOUS:-none})" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # The OpenAPI file comes from the "openapi" job, which builds the target source without any secret.
       - uses: actions/download-artifact@v4
         continue-on-error: true
         with:
           name: openapi
           path: ${{ runner.temp }}/openapi
+      - uses: actions/download-artifact@v4
+        if: needs.plan.outputs.target == 'commit'
+        with:
+          name: commit-bundle
+          path: ${{ runner.temp }}/commit-bundle
       - name: Use the OpenAPI file for the signed-in API scan
         run: |
           if [[ ! -s "$RUNNER_TEMP/openapi/openapi.json" ]]; then
@@ -187,16 +397,62 @@ jobs:
       # One server for the run: upgrade and scan, back up, rebuild, fresh install and scan, restore, delete.
       - name: Upgrade, fresh install and restore on one rebuilt server
         env:
-          VERSION: ${{ steps.versions.outputs.version }}
-          PREVIOUS: ${{ steps.versions.outputs.previous }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          PREVIOUS: ${{ needs.plan.outputs.previous }}
           RESTORE_WRONG_KEY: ${{ inputs.restore_wrong_key && '1' || '' }}
-          # The weekly run is fresh only: the upgrade and restore paths do not depend on the certificate.
-          MODE: ${{ github.event_name == 'schedule' && 'fresh' || inputs.mode || 'all' }}
-          TLS_MODE: ${{ (github.event_name == 'schedule' || inputs.tls == 'letsencrypt') && 'letsencrypt' || 'custom' }}
-        run: bash scripts/ci/release-install-check.sh "$MODE"
+          MODE: ${{ needs.plan.outputs.mode }}
+          TLS_MODE: ${{ needs.plan.outputs.tls }}
+          TARGET: ${{ needs.plan.outputs.target }}
+        run: |
+          if [[ "$TARGET" == commit ]]; then
+            export BUNDLE_ARCHIVE="$RUNNER_TEMP/commit-bundle/automaton-server.tar.gz"
+            export BUNDLE_CHECKSUM="$RUNNER_TEMP/commit-bundle/automaton-server.tar.gz.sha256"
+            export CLI_BINARY="$RUNNER_TEMP/commit-bundle/automaton"
+            chmod +x "$CLI_BINARY"
+          fi
+          bash scripts/ci/release-install-check.sh "$MODE"
       # The scripts delete what they create; this also covers a cancelled run.
       - name: Delete leftover servers of this run
         if: always()
         run: |
           for id in $(hcloud server list -l "automaton-ci=true,run=$RUN_ID" -o json | jq -r '.[].id'); do hcloud server delete "$id"; done
           for id in $(hcloud ssh-key list -l automaton-ci=true -o json | jq -r --arg r "automaton-ci-$RUN_ID-" '.[] | select(.name | startswith($r)) | .id'); do hcloud ssh-key delete "$id"; done
+
+  # A failing nightly run on main files or comments on one lesson issue on board 17 Inbox (no duplicates).
+  report-failure:
+    needs: [plan, openapi, images, bundle, check]
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.plan.outputs.is_nightly == 'true' &&
+      (needs.openapi.result == 'failure' || needs.images.result == 'failure' || needs.bundle.result == 'failure' || needs.check.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+          persist-credentials: false
+      - name: File or comment on nightly failure lesson issue
+        env:
+          REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ needs.plan.outputs.ref }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          AGENT_GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAPI_RESULT: ${{ needs.openapi.result }}
+          IMAGES_RESULT: ${{ needs.images.result }}
+          BUNDLE_RESULT: ${{ needs.bundle.result }}
+          CHECK_RESULT: ${{ needs.check.result }}
+        run: |
+          failed=()
+          [[ "$OPENAPI_RESULT" == failure ]] && failed+=(openapi)
+          [[ "$IMAGES_RESULT" == failure ]] && failed+=(images)
+          [[ "$BUNDLE_RESULT" == failure ]] && failed+=(bundle)
+          [[ "$CHECK_RESULT" == failure ]] && failed+=(check)
+          FAILED_JOBS=$(IFS=, ; echo "${failed[*]:-unknown}")
+          export FAILED_JOBS
+          bash scripts/ci/report-install-check-failure.sh

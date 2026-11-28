@@ -10,12 +10,45 @@ on:
         type: choice
         options: [auto, always, never]
         default: auto
+      skip_install_check:
+        description: 'Emergency bypass: reason to release without a passing install check on this commit'
+        required: false
+        default: ''
 permissions:
   contents: read
 jobs:
+  # Refuses to start the release unless the latest commit install check (mode all) on this commit, or an ancestor
+  # with no installer/server path changes since, passed (or skip_install_check gives an emergency reason).
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      skip_reason: ${{ steps.check.outputs.skip_reason }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check install-check gate
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SKIP_REASON: ${{ inputs.skip_install_check }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/release-install-check-gate.py --sha "$GITHUB_SHA" --repo "$GITHUB_REPOSITORY" --skip-reason "$SKIP_REASON"
+          trimmed="${SKIP_REASON#"${SKIP_REASON%%[![:space:]]*}"}"
+          trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+          echo "skip_reason=$trimmed" >> "$GITHUB_OUTPUT"
+
   # The release report: every pull request merged since the previous release, the risky ones first, then an AI
   # check. It never fails the release: without the token or on a usage limit the body says "AI check unavailable".
   report:
+    needs: gate
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -62,8 +95,13 @@ jobs:
             inconsistent with its description. Do not write anything else.
       - name: Assemble the release body
         if: always()
+        env:
+          SKIP_REASON: ${{ needs.gate.outputs.skip_reason }}
         run: |
           {
+            if [[ -n "$SKIP_REASON" ]]; then
+              printf '> **Install check skipped:** %s\n\n' "$SKIP_REASON"
+            fi
             echo "## AI check"; echo
             # The release body is public: keep only the verdict line and up to five short bullets, never raw model output.
             if [[ -f release-ai-check.md ]] && head -1 release-ai-check.md | grep -qE '^Verdict: (Green|Yellow|Red)$'; then
@@ -81,6 +119,7 @@ jobs:
           name: release-body
           path: release-body.md
   images:
+    needs: gate
     runs-on: ubuntu-24.04
     permissions:
       packages: write
@@ -180,81 +219,16 @@ jobs:
         continue-on-error: true
         with:
           name: release-body
-      - name: Build release bundle
-        env:
-          VERSION: ${{ inputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]]
-          mkdir automaton-server
-          cp docker/install/{compose.yaml,configure.py,acme_responder.py,check_dns.py,explain_certificate_failure.py,host_security.py,backup.sh,cleanup.sh,fail2ban.sh,watchdog.py,restore.sh,update-from-request.sh,restart-from-request.sh,os-update-from-request.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
-          cp -r docker/install/fail2ban automaton-server/fail2ban
-          cp -r docker/production-host automaton-server/production-host
-          cp scripts/install-automaton.sh automaton-server/install.sh
-          cp scripts/update-automaton.sh automaton-server/update.sh
-          cp src/automaton-vue/docs/install.md automaton-server/README.md
-          printf 'server-v%s\n' "$VERSION" > automaton-server/version
-          previous=$(gh release list --limit 100 --json tagName --jq '[.[] | select(.tagName | startswith("server-v"))][0].tagName // empty')
-          if [[ -n "$previous" ]]; then
-            mkdir previous-release
-            gh release download "$previous" --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256 --dir previous-release
-            (cd previous-release && sha256sum -c automaton-server.tar.gz.sha256)
-            tar -xzf previous-release/automaton-server.tar.gz -C previous-release automaton-server/release.env
-          fi
-          {
-            echo "API_IMAGE=$(cat server.image)"
-            echo "WORKER_IMAGE=$(cat worker.image)"
-            echo "STUDIO_IMAGE=$(cat studio.image)"
-            echo "STORE_IMAGE=$(cat store.image)"
-            echo "AGE_IMAGE=$(cat age.image)"
-            resolve() {
-              docker pull "$2" >&2
-              printf '%s=%s\n' "$1" "$(docker image inspect --format '{{index .RepoDigests 0}}' "$2")"
-            }
-            if [[ -n "$previous" ]]; then
-              # Infrastructure stays pinned across releases; changing it needs a reviewed migration.
-              grep -E '^(RABBITMQ|TRAEFIK)_IMAGE=' previous-release/automaton-server/release.env
-              if grep -q '^POSTGRES_IMAGE=' previous-release/automaton-server/release.env; then
-                grep '^POSTGRES_IMAGE=' previous-release/automaton-server/release.env
-              else
-                # The first PostgreSQL release follows a MySQL release, whose manifest has no PostgreSQL image.
-                resolve POSTGRES_IMAGE postgres:16
-              fi
-              # The ACME responder image stays pinned too; the first release that has it resolves it once.
-              if grep -q '^RESPONDER_IMAGE=' previous-release/automaton-server/release.env; then
-                grep '^RESPONDER_IMAGE=' previous-release/automaton-server/release.env
-              else
-                resolve RESPONDER_IMAGE python:3-alpine
-              fi
-            else
-              resolve POSTGRES_IMAGE postgres:16
-              resolve RABBITMQ_IMAGE rabbitmq:4-management
-              resolve TRAEFIK_IMAGE traefik:v3
-              resolve RESPONDER_IMAGE python:3-alpine
-            fi
-            # New Runners install the Runner image built from this commit. That workflow only runs when Runner code
-            # changed, so with no run for this commit the unchanged :latest image is the right one.
-            runner_run=$(gh run list --workflow runner-image.yml --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
-            if [[ -n "$runner_run" ]]; then
-              gh run watch "$runner_run" --exit-status >&2                 || { echo "The Runner image workflow run $runner_run for $GITHUB_SHA did not succeed; rerun it, then rerun this release." >&2; exit 1; }
-              resolve RUNNER_IMAGE "ghcr.io/rzvdaniel/automaton-runner:sha-$GITHUB_SHA"
-            else
-              resolve RUNNER_IMAGE ghcr.io/rzvdaniel/automaton-runner:latest
-            fi
-          } > automaton-server/release.env
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Verify anonymous image distribution
-        run: |
-          public_config=$(mktemp -d)
-          trap 'rm -rf "$public_config"' EXIT
-          while IFS= read -r reference; do
-            docker --config "$public_config" pull "$reference"
-          # A new GHCR package starts private; make it public, then rerun, if this fails for a release image.
-          done < <(cat server.image worker.image studio.image store.image age.image)
+      - name: Build release bundle and verify anonymous image distribution
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci/build-server-bundle.sh
       - name: Smoke test isolated installation
         run: |
           sudo apt-get update
