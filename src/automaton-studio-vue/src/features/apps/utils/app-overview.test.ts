@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { accessLabel, appOriginLabel, appKindOf, describeSchedule, formatWhen, getAppHealth, secretsPill, statusSentence, type StatusInput } from './app-overview'
+import {
+  accessLabel,
+  appKindOf,
+  appOriginLabel,
+  describeSchedule,
+  docsAtAGlance,
+  formatLiveAddress,
+  formatWhen,
+  getAppHealth,
+  liveOrigin,
+  secretsPill,
+  statusSentence,
+  whoCanOpenLabel,
+  type StatusInput,
+} from './app-overview'
 import type { AppOperationalSummary } from './app-operational-summary'
 
 const now = new Date('2026-11-08T12:00:00Z')
@@ -136,5 +150,52 @@ describe('secretsPill', () => {
 
   it('says all set when nothing is unset', () => {
     expect(secretsPill([{ name: 'A' }], ['A'])).toEqual({ text: 'all set', bad: false })
+  })
+})
+
+describe('Live card helpers', () => {
+  it('shortens long private app hosts while preserving custom domains', () => {
+    expect(formatLiveAddress('https://app-9f7bcfc71234567890abcdef12345678.apps.runner-01.automaton.monster/'))
+      .toBe('app-9f7bcfc7….apps.runner-01.automaton.monster')
+    expect(formatLiveAddress('https://keeper.example.com/')).toBe('keeper.example.com')
+    expect(formatLiveAddress('')).toBe('')
+  })
+
+  it('formats Who can open it for every sharing audience', () => {
+    expect(whoCanOpenLabel('web', 'me', 0)).toBe('Only you can open it')
+    expect(whoCanOpenLabel('web', 'people', 1)).toBe('1 person can open it')
+    expect(whoCanOpenLabel('web', 'people', 3)).toBe('3 people can open it')
+    expect(whoCanOpenLabel('web', 'team', 0, 'Ops')).toBe('Ops team can open it')
+    expect(whoCanOpenLabel('web', 'server', 0)).toBe('Everyone signed in on this server can open it')
+    expect(whoCanOpenLabel('web', 'internet', 0)).toBe('Anyone can open it')
+    expect(whoCanOpenLabel('api', 'me', 0)).toBe('Callers need an API key')
+  })
+
+  it('formats Installed from without commit noise', () => {
+    const base = { developmentMode: 'local', runtimeSource: 'cli-deploy' } as const
+    expect(liveOrigin({ ...base, installedFromRepo: 'rzvdaniel/automaton-apps', installedFromFolder: 'maintenance/agent-keeper' }))
+      .toEqual({ label: 'Installed from', value: 'rzvdaniel/automaton-apps/maintenance/agent-keeper' })
+    expect(liveOrigin({ ...base, forkedFromAppName: 'Todo' })).toEqual({ label: 'Installed from', value: 'Catalog · Todo' })
+    expect(liveOrigin(base)).toEqual({ label: 'Origin', value: 'Deployed with the CLI' })
+  })
+})
+
+describe('docsAtAGlance', () => {
+  it('reads Pages, Scheduled and Needs from automaton.json, ignoring optional secrets', () => {
+    expect(docsAtAGlance({
+      pages: [{ path: '/', label: 'Agent queue' }],
+      schedules: [{ name: 'Pick up', action: 'pick-up', cron: '*/10 * * * *' }],
+      secrets: [{ name: 'AGENT_GH_TOKEN' }, { name: 'OPT_HOOK', optional: true }],
+      permissions: ['runner:host-exec'],
+    } as never)).toEqual({
+      pages: 'Agent queue',
+      schedules: ['Pick up · every 10 minutes'],
+      needs: 'Secret AGENT_GH_TOKEN · host access',
+    })
+  })
+
+  it('returns null when nothing is declared', () => {
+    expect(docsAtAGlance({ pages: [], schedules: [], secrets: [], permissions: [] } as never)).toBeNull()
+    expect(docsAtAGlance(null)).toBeNull()
   })
 })

@@ -144,6 +144,16 @@ export interface ApplicationStorageSpec {
   mounts: ApplicationStorageMount[]
 }
 
+export interface ApplicationScheduleDeclaration {
+  name: string
+  action: string
+  description?: string | null
+  cron?: string | null
+  intervalSeconds?: number | null
+  timeZone?: string
+  input?: Record<string, unknown> | null
+}
+
 export interface ApplicationContract {
   build: ApplicationBuildSpec
   runtime: ApplicationRuntimeSpec
@@ -152,6 +162,9 @@ export interface ApplicationContract {
   secrets?: ApplicationSecretDeclaration[]
   settings?: ApplicationSettingDeclaration[]
   permissions?: string[]
+  openPaths?: string[]
+  publicAccess?: { level: 'required' | 'recommended'; reason: string } | null
+  schedules?: ApplicationScheduleDeclaration[]
   isStaticSite?: boolean
   compose?: unknown
   /** 'api' when the app declares it is an API; web is assumed otherwise (#864). */
@@ -633,15 +646,7 @@ export interface InstallManifest {
   settings?: Array<{ name: string; description?: string | null; default?: string | null; required?: boolean }>
   secrets?: Array<{ name: string; description?: string | null; from?: string | null; optional?: boolean }>
   permissions?: string[]
-  schedules?: Array<{
-    name: string
-    action: string
-    description?: string | null
-    cron?: string | null
-    intervalSeconds?: number | null
-    timeZone?: string
-    input?: Record<string, unknown> | null
-  }>
+  schedules?: ApplicationScheduleDeclaration[]
 }
 
 /** Who can open an app: only the owner, chosen people, everyone signed in on the server, or anyone on the internet. */

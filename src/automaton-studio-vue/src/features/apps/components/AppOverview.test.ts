@@ -19,31 +19,98 @@ import { appsService } from '../services/apps.service'
 
 const mountOverview = (extra: Partial<App>, more: Record<string, unknown> = {}) => mount(AppOverview, {
   props: {
-    ...more,
     app: { id: 'app-1', name: 'Backup', isPaused: false, canUpdate: true, ...extra } as App,
-    targets: [], executions: [], schedules: [], actions: [], address: '', publicAddress: '', privateAddress: '', sharing: null,
+    targets: [], executions: [], schedules: [], actions: [], address: '', sharing: null,
+    ...more,
   },
   global: { plugins: [PrimeVue, ToastService], stubs: { RouterLink: true } },
 })
 
 describe('AppOverview layout', () => {
-  it('no longer carries the Restart/Pause card, Addresses, Permissions or What it needs', async () => {
-    const wrapper = mountOverview({})
+  it('shows Live full width when there are no schedules and omits What it does', async () => {
+    const wrapper = mountOverview({
+      installedFromRepo: 'rzvdaniel/automaton-apps',
+      installedFromFolder: 'maintenance/agent-keeper',
+      installedFromCommit: 'b166c9f1234',
+    }, {
+      address: 'https://app-9f7bcfc71234567890abcdef12345678.apps.runner-01.automaton.monster/',
+      targets: [{ id: 't1', isDefault: true, status: 'Running', lastSuccessfulDeploymentAt: new Date(Date.now() - 3600_000).toISOString(), runner: { id: 'r1', name: 'Automaton-Runner-01', isOnline: true } }],
+    })
     await flushPromises()
     expect(wrapper.find('[data-testid="restart-app"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pause-card"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="addresses"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="permissions-card"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('What it needs')
-    expect(wrapper.get('[data-testid="installed-from"]').text()).toContain('Deployed with the CLI')
+    expect(wrapper.text()).not.toContain('What it does')
+    expect(wrapper.find('[data-testid="scheduled-card"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="live-card"]').classes()).toContain('card--wide')
+    expect(wrapper.get('[data-testid="live-address"]').text()).toBe('app-9f7bcfc7….apps.runner-01.automaton.monster')
+    expect(wrapper.get('[data-testid="live-who"]').text()).toBe('Only you can open it')
+    expect(wrapper.get('[data-testid="installed-from"]').text()).toContain('rzvdaniel/automaton-apps/maintenance/agent-keeper')
+    expect(wrapper.get('[data-testid="runs-on"]').find('[data-testid="installed-from"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="running-commit"]').text()).toBe('b166c9f')
+    expect(wrapper.get('[data-testid="runs-on"]').text()).toContain('View source')
   })
 
-  it('shows the Disk card with the app total and the disk it lives on', async () => {
-    vi.mocked(appsService.getDisk).mockResolvedValue({ appId: 'app-1', totalBytes: 244 * 1024 ** 2, imageBytes: 143 * 1024 ** 2, filesBytes: 101 * 1024 ** 2, hostDiskTotalBytes: 39 * 1024 ** 3, hostDiskAvailableBytes: 32 * 1024 ** 3 } as never)
-    const wrapper = mountOverview({})
+  it('shows Scheduled card beside Live and updates last run when Run now starts an Action', async () => {
+    vi.mocked(appsService.runAction).mockResolvedValue({
+      id: 'run-2',
+      appId: 'app-1',
+      moduleKey: 'pick-up',
+      status: 'Succeeded',
+      createdAtUtc: new Date().toISOString(),
+    } as never)
+    const wrapper = mountOverview({}, {
+      schedules: [{
+        id: 's1',
+        applicationId: 'app-1',
+        actionKey: 'pick-up',
+        name: 'Pick up',
+        executionScope: 'AppRunner',
+        scheduleType: 'Cron',
+        cronExpression: '*/10 * * * *',
+        timeZone: 'UTC',
+        enabled: true,
+        nextRunAtUtc: new Date(Date.now() + 600_000).toISOString(),
+        concurrencyPolicy: 'SkipIfRunning',
+        misfirePolicy: 'Skip',
+      }],
+      executions: [{
+        id: 'run-1',
+        appId: 'app-1',
+        moduleKey: 'pick-up',
+        status: 'Failed',
+        failureSummary: 'token expired',
+        createdAtUtc: new Date(Date.now() - 3600_000).toISOString(),
+      }],
+    })
     await flushPromises()
-    expect(wrapper.get('[data-testid="disk-total"]').text()).toBe('244 MB')
-    expect(wrapper.get('[data-testid="host-disk"]').text()).toContain('warning at 80%')
+    expect(wrapper.get('[data-testid="live-card"]').classes()).not.toContain('card--wide')
+    const sched = wrapper.get('[data-testid="scheduled-card"]')
+    expect(sched.text()).toContain('Pick up')
+    expect(sched.text()).toContain('every 10 minutes')
+    expect(sched.get('[data-testid="scheduled-last-run"]').text()).toContain('Last run failed: token expired')
+    expect(sched.get('[data-testid="scheduled-last-run"]').classes()).toContain('sched-run--bad')
+
+    await sched.get('[data-testid="schedule-run-now"]').trigger('click')
+    await flushPromises()
+    expect(appsService.runAction).toHaveBeenCalledWith('app-1', 'pick-up', {})
+    expect(sched.get('[data-testid="scheduled-last-run"]').text()).toContain('ok')
+    expect(sched.get('[data-testid="scheduled-last-run"]').classes()).toContain('sched-run--ok')
+    expect(wrapper.emitted('executions-changed')).toBeTruthy()
+  })
+
+  it('shows the Disk card without default data folder data, and shows non-default data folders', async () => {
+    vi.mocked(appsService.getDisk).mockResolvedValue({ appId: 'app-1', totalBytes: 244 * 1024 ** 2, imageBytes: 143 * 1024 ** 2, filesBytes: 101 * 1024 ** 2, hostDiskTotalBytes: 39 * 1024 ** 3, hostDiskAvailableBytes: 32 * 1024 ** 3 } as never)
+    const defaultFolder = mountOverview({ application: { storage: { dataDirectory: 'data', mounts: [] } } as never })
+    await flushPromises()
+    expect(defaultFolder.get('[data-testid="disk-total"]').text()).toBe('244 MB')
+    expect(defaultFolder.get('[data-testid="host-disk"]').text()).toContain('warning at 80%')
+    expect(defaultFolder.find('[data-testid="disk-data-folder"]').exists()).toBe(false)
+
+    const customFolder = mountOverview({ application: { runtime: { command: { executable: 'node' } }, storage: { dataDirectory: 'var/db', mounts: [] } } as never })
+    await flushPromises()
+    expect(customFolder.get('[data-testid="disk-data-folder"]').text()).toBe('data folder var/db')
   })
 })
 
