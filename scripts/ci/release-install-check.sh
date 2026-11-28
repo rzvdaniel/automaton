@@ -8,7 +8,7 @@
 #                                             rebuild (hcloud server rebuild), fresh install and scan, restore, check, delete
 #   release-install-check.sh fullscan        install $VERSION, run the checks, then the weekly signed-in full ZAP scan (release-full-scan.sh,
 #                                             active scan: junk data, so only here on a throwaway server); needs API_SPEC
-#   release-install-check.sh sweep            delete automaton-ci servers older than $MAX_AGE_MINUTES (default 180)
+#   release-install-check.sh sweep            delete leftover automaton-ci servers, SSH keys and DNS records older than $MAX_AGE_MINUTES (default 240); fails if any
 # Environment: HCLOUD_TOKEN (project "automaton-ci" only), CLOUDFLARE_DNS_TOKEN (Zone.DNS edit on the test domain only),
 # API_SPEC (path of the release's openapi.json: the fresh scan also scans the whole API signed in), VERSION / PREVIOUS (X.Y.Z), optional CI_DOMAIN (automatontest.fyi), CI_EMAIL, SERVER_TYPES ("cx23 cpx12"),
 # LOCATIONS ("nbg1 fsn1 hel1"), CI_TLS_CERT / CI_TLS_KEY (PEM of the wildcard for *.ci.$CI_DOMAIN and *.apps.ci.$CI_DOMAIN, from
@@ -48,17 +48,42 @@ cf() { # cf METHOD PATH [json]
         -H 'Content-Type: application/json' ${3:+--data "$3"}
 }
 
+# sweep: delete every automaton-ci=true server older than MAX_AGE_MINUTES (default 240; the longest job times out at 210),
+# its automaton-ci-<run>- SSH keys and the DNS records that point at its address, then exit 1 so the owner hears of it.
+# Servers without the label are never listed. A clean sweep prints "no leftovers" and exits 0.
 sweep() {
-    local cutoff
-    cutoff=$(date -u -d "-${MAX_AGE_MINUTES:-180} minutes" +%s)
-    hcloud server list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created)"' | while read -r id created; do
-        if (( $(date -u -d "$created" +%s) < cutoff )); then
-            echo "Deleting $id created $created"; hcloud server delete "$id"
+    local cutoff id created name ip run zone key rec removed=0
+    cutoff=$(date -u -d "-${MAX_AGE_MINUTES:-240} minutes" +%s)
+    zone=$(cf GET "zones?name=$zone_name" | jq -r '.result[0].id // empty')
+    while read -r id created ip name; do
+        [[ -n "$id" ]] || continue
+        (( $(date -u -d "$created" +%s) < cutoff )) || continue
+        echo "Leftover server $name (id $id, created $created)"
+        if [[ -n "$zone" && -n "$ip" && "$ip" != - ]]; then
+            for rec in $(cf GET "zones/$zone/dns_records?type=A&content=$ip&per_page=100" | jq -r '.result[].id'); do
+                cf DELETE "zones/$zone/dns_records/$rec" >/dev/null && echo "  deleted DNS record $rec"
+            done
         fi
-    done
-    hcloud ssh-key list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created)"' | while read -r id created; do
-        if (( $(date -u -d "$created" +%s) < cutoff )); then hcloud ssh-key delete "$id"; fi
-    done
+        if [[ "$name" == automaton-ci-* ]]; then
+            run=${name#automaton-ci-}; run=${run%-*}
+            for key in $(hcloud ssh-key list -l "$label" -o json | jq -r --arg r "automaton-ci-$run-" '.[] | select(.name | startswith($r)) | .id'); do
+                hcloud ssh-key delete "$key" && echo "  deleted SSH key $key"
+            done
+        fi
+        hcloud server delete "$id" && echo "  deleted server $id"
+        summary "- Deleted server \`$name\` created $created"
+        removed=$((removed + 1))
+    done < <(hcloud server list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.public_net.ipv4.ip // "-") \(.name)"')
+    # SSH keys whose server is already gone
+    while read -r id created name; do
+        [[ -n "$id" ]] || continue
+        (( $(date -u -d "$created" +%s) < cutoff )) || continue
+        hcloud ssh-key delete "$id" && echo "Leftover SSH key $name deleted"
+        summary "- Deleted SSH key \`$name\`"
+        removed=$((removed + 1))
+    done < <(hcloud ssh-key list -l "$label" -o json | jq -r '.[] | "\(.id) \(.created) \(.name)"')
+    if (( removed == 0 )); then echo "no leftovers"; summary "no leftovers"; return 0; fi
+    fail "Deleted $removed leftover CI resources (listed above): a run left them behind"
 }
 if [[ "$mode" == sweep ]]; then sweep; exit 0; fi
 [[ "$mode" == fresh || "$mode" == upgrade || "$mode" == restore || "$mode" == all || "$mode" == fullscan ]] || fail "Unknown mode $mode"
