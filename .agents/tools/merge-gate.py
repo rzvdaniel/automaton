@@ -162,6 +162,54 @@ def proof_row(pr: dict, body: str) -> tuple[str, str, str] | None:
 
 INSTALL_CHECK_PATHS = re.compile(r"^(scripts/ci/|\.github/workflows/release-install-check\.yml$)")
 RUN_URL = re.compile(r"/actions/runs/(\d+)")
+ISSUE_REF = re.compile(r"\b(?:refs?|part of)\s+#(\d+)", re.I)
+DONE_WHEN_HEADING = re.compile(r"^[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*|__)?Done when[ \t]*:?(?:\*\*|__)?[ \t]*:?[ \t]*$", re.I)
+ANY_HEADING = re.compile(r"^[ \t]*(?:#{1,6}[ \t]+\S|(?:\*\*|__)[A-Za-z][A-Za-z ]*:?(?:\*\*|__)[ \t]*:?[ \t]*$)")
+BULLET_LINE = re.compile(r"^[ \t]*(?:[-*]|\d+\.)[ \t]+(?:\[[ xX]\][ \t]+)?\S")
+
+
+def issue_refs(body: str) -> list[str]:
+    """Issue numbers referenced with Refs #N or Part of #N, deduplicated in order."""
+    return list(dict.fromkeys(ISSUE_REF.findall(body or "")))
+
+
+def done_when_items(issue_body: str) -> list[str]:
+    """Extract the Done when items from an issue body (bullet lines, or one item for plain text)."""
+    lines = (issue_body or "").replace("\r\n", "\n").splitlines()
+    in_section = False
+    section_lines = []
+    for line in lines:
+        if not in_section:
+            if DONE_WHEN_HEADING.match(line):
+                in_section = True
+        else:
+            if ANY_HEADING.match(line):
+                break
+            section_lines.append(line)
+    if not section_lines:
+        return []
+    bullets = [line.strip() for line in section_lines if BULLET_LINE.match(line)]
+    if bullets:
+        return bullets
+    text = "\n".join(section_lines).strip()
+    return [text] if text else []
+
+
+def done_when_row(pr: dict, body: str) -> tuple[str, str, str] | None:
+    """Warn when How verified has fewer proof lines than the referenced issue's Done when items."""
+    author = ((pr.get("author") or {}).get("login") or "").lower()
+    if author in ("dependabot[bot]", "app/dependabot"):
+        return None
+    items = pr.get("done_when") or []
+    if not items:
+        return None
+    section = FENCE.sub("", how_verified(body))
+    proof_lines = [line for line in section.splitlines() if BULLET_LINE.match(line)]
+    if len(proof_lines) >= len(items):
+        return ("PASS", "done-when", f"{len(proof_lines)} proof line(s) for {len(items)} Done when item(s)")
+    return ("WARN", "done-when",
+            f"{len(proof_lines)} proof line(s) under How verified for {len(items)} Done when item(s); "
+            "add one proof line per Done when item")
 
 
 def install_run_ids(body: str) -> list[str]:
@@ -249,6 +297,10 @@ def check(pr: dict, patterns: list[str], security: list[str] = (), skip_ci: bool
     if proof:
         rows.append(proof)
 
+    done_when = done_when_row(pr, body)
+    if done_when:
+        rows.append(done_when)
+
     install = install_row(pr, body)
     if install:
         rows.append(install)
@@ -308,6 +360,14 @@ def main() -> int:
                 continue
             pr["install_runs"].append({"id": run_id, "path": run.get("path"), "head_sha": run.get("head_sha"),
                                        "conclusion": run.get("conclusion")})
+    pr["done_when"] = []
+    for issue_num in issue_refs(pr.get("body") or "")[:5]:
+        try:
+            issue = json.loads(gh("api", f"repos/{slug}/issues/{issue_num}"))
+        except subprocess.CalledProcessError:
+            continue
+        if "pull_request" not in issue:
+            pr["done_when"].extend(done_when_items(issue.get("body") or ""))
     # The owner's paths come from the base branch, so a pull request cannot shorten its own list.
     try:
         owners = gh("api", f"repos/{slug}/contents/.github/CODEOWNERS?ref={pr['baseRefName']}",

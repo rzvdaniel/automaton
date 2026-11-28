@@ -21,8 +21,16 @@ working alone. Everyone else waits for that release instead of cutting another.
 
 - **One change:** release, upgrade, run the PR's "Check after release" list, proof, label.
 - **A batch:** list the PRs merged since the last release (`gh pr list --state merged --search "merged:>=<date>"`),
-  release once, upgrade once, then run each PR's "Check after release" list and write one proof per issue. A list
-  that is missing or too vague to follow is a finding on that PR; write the checks from the issue's "Done when".
+  release once, upgrade once, then confirm the release instead of redoing every PR's proof:
+  - **Check what a PR cannot:** the upgrade from the previous release, the whole batch together (including Studio smoke
+    checks), real domains and certificates, plus a **spot-check of 3 issues picked at random** from the release.
+  - **Trust proven PRs:** when a PR's **How verified** section has a proof line covering every **Done when** item of its
+    issue, trust that proof instead of re-running those items (unless the issue is one of the 3 random spot-checks).
+  - **Check gaps in full:** an issue whose PR has no proof line for a **Done when** item gets that item checked in full
+    on the test server. A "Check after release" list that is missing or too vague to follow is a finding on that PR;
+    write the checks from the issue's "Done when".
+  - **Record the mode per issue:** in each issue's proof and in the batch summary, say whether it was `trusted proof`,
+    `spot-checked`, or `checked in full`.
 - Risky changes (Runner, migrations, install or update scripts) get a release of their own, so a failure points at
   one change.
 - **When a check fails:** label that issue `verification-failed` and fix forward with a small follow-up PR (same

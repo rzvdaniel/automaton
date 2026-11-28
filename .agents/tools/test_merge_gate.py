@@ -242,5 +242,43 @@ class InstallCheck(unittest.TestCase):
         self.assertEqual(gate.install_run_ids(body), ["123"])
 
 
+class DoneWhenProof(unittest.TestCase):
+    def verdict(self, done_when, verified, author=""):
+        body = "**How verified:**\n" + verified + "\n**Risk:** low\n**How to revert:** r\n**Docs:** none, because t"
+        item = dict(pr(["README.md"], body=body), author={"login": author}, done_when=done_when)
+        return [row for row in gate.check(item, PATTERNS)[1] if row[1] == "done-when"]
+
+    def test_extracts_issue_refs(self):
+        self.assertEqual(gate.issue_refs("Refs #1855 and Part of #12 and Refs #1855."), ["1855", "12"])
+        self.assertEqual(gate.issue_refs("No issue here"), [])
+
+    def test_extracts_done_when_bullets_and_plain_text(self):
+        issue = "**Goal**\nx\n\n**Done when**\n- First item\n- [ ] Second item\n\n**Related**\n#1"
+        self.assertEqual(gate.done_when_items(issue), ["- First item", "- [ ] Second item"])
+        plain = "### Done when\nSingle paragraph criterion.\n"
+        self.assertEqual(gate.done_when_items(plain), ["Single paragraph criterion."])
+        self.assertEqual(gate.done_when_items("**Goal**\nNo done when"), [])
+
+    def test_warns_when_fewer_proof_lines_than_done_when_items(self):
+        items = ["First item", "Second item"]
+        rows = self.verdict(items, "- First item: passed")
+        self.assertEqual(rows[0][0], "WARN")
+        self.assertNotIn("done-when", failed(gate.check(dict(pr(["README.md"]), done_when=items), PATTERNS)))
+
+    def test_passes_when_each_done_when_item_has_a_proof_line(self):
+        items = ["First item", "Second item"]
+        rows = self.verdict(items, "- First item: passed\n- Second item: passed")
+        self.assertEqual(rows[0][0], "PASS")
+
+    def test_bullets_inside_code_block_do_not_count_as_proof_lines(self):
+        items = ["First item", "Second item"]
+        verified = "- First item: passed\n```\n- output line 1\n- output line 2\n```"
+        self.assertEqual(self.verdict(items, verified)[0][0], "WARN")
+
+    def test_skipped_when_no_done_when_or_dependabot(self):
+        self.assertEqual(self.verdict([], "ran it"), [])
+        self.assertEqual(self.verdict(["First item"], "ran it", author="dependabot[bot]"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
