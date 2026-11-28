@@ -4,8 +4,8 @@ from pathlib import Path
 spec = importlib.util.spec_from_file_location("ic", Path(__file__).with_name("issue-check.py"))
 ic = importlib.util.module_from_spec(spec); spec.loader.exec_module(ic)
 
-FEATURE = "**Goal**\nx\n\n**Example**\ny\n\n**Suggestion**\n- z\n\n**Done when**\nchecked\n\n**Related**\n#1\n"
-BUG = "### Problem\na\n\n### Steps\n1. b\n\n### Result\nc\n\n### Expected\nd\n\n### Done when\ne\n"
+FEATURE = "**Goal**\nx\n\n**Example**\ny\n\n**Suggestion**\n- z\n\n**Done when**\n- checked on the test server\n\n**Related**\n#1\n"
+BUG = "### Problem\na\n\n### Steps\n1. b\n\n### Result\nc\n\n### Expected\nd\n\n### Done when\n- verified in CI run\n"
 
 
 class Missing(unittest.TestCase):
@@ -26,14 +26,44 @@ class Missing(unittest.TestCase):
         self.assertEqual(ic.kind(set(), ic.sections(FEATURE)), "feature")
 
     def test_missing_sections_listed(self):
-        self.assertEqual(ic.missing("**Goal**\nx\n**Done when**\ny", set()), ["Example", "Suggestion"])
+        self.assertEqual(ic.missing("**Goal**\nx\n**Done when**\n- checked on test server", set()), ["Example", "Suggestion"])
         self.assertEqual(ic.missing("", set()), ["Goal", "Example", "Suggestion", "Done when"])
         self.assertEqual(ic.missing(None, set()), ["Goal", "Example", "Suggestion", "Done when"])
 
     def test_empty_done_when(self):
         for empty in ("", "  \n", "_No response_"):
-            body = FEATURE.replace("checked", empty)
+            body = FEATURE.replace("- checked on the test server", empty)
             self.assertEqual(ic.missing(body, set()), ["Done when (empty)"], repr(empty))
+
+    def test_done_when_requires_check_per_item(self):
+        body = FEATURE.replace("- checked on the test server", "- feature works")
+        self.assertEqual(
+            ic.missing(body, set()),
+            ["Done when (each item must say how and where an agent checks it, e.g. test server, install check, CI run)"],
+        )
+        mixed = FEATURE.replace(
+            "- checked on the test server",
+            "- verified on the test server\n- button looks nice",
+        )
+        self.assertEqual(
+            ic.missing(mixed, set()),
+            ["Done when (each item must say how and where an agent checks it, e.g. test server, install check, CI run)"],
+        )
+        good_multi = FEATURE.replace(
+            "- checked on the test server",
+            "- verified on the test server\n- install check passes on throwaway host\n- CI run is green",
+        )
+        self.assertEqual(ic.missing(good_multi, set()), [])
+
+    def test_before_work_unticked_flags_and_ticked_clears(self):
+        unticked = FEATURE + "\n**Before work**\n- [ ] Set AGENT_GH_TOKEN\n- [x] Create account\n"
+        self.assertEqual(ic.missing(unticked, set()), ["Before work (unticked prerequisite)"])
+        ticked = FEATURE + "\n**Before work**\n- [x] Set AGENT_GH_TOKEN\n- [X] Create account\n"
+        self.assertEqual(ic.missing(ticked, set()), [])
+
+    def test_before_work_heading_ends_done_when(self):
+        body = "**Goal**\na\n**Example**\nb\n**Suggestion**\nc\n**Done when**\n**Before work**\n- [x] ready on test server"
+        self.assertEqual(ic.missing(body, set()), ["Done when (empty)"])
 
     def test_done_when_ends_at_next_heading(self):
         body = "**Goal**\na\n**Example**\nb\n**Suggestion**\nc\n**Done when**\n**Related**\n#1"

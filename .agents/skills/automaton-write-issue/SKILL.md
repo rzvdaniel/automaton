@@ -24,7 +24,8 @@ What should be true, in plain words: "An app owner can delete their app after lo
 ## Body
 
 The section names are those of the issue forms in `.github/ISSUE_TEMPLATE/` (`feature.yml`, `bug.yml`), the one source;
-`.agents/tools/issue-check.py` labels an issue `needs-shape` when a required one is missing. Related is optional.
+`.agents/tools/issue-check.py` labels an issue `needs-shape` when a required section is missing, a **Done when** item
+names no check, or a **Before work** box is unticked. `Before work` and `Related` are optional.
 
 For a bug:
 
@@ -42,8 +43,11 @@ What happens, with the exact error or status code.
 **Expected**
 What should happen instead.
 
+**Before work**
+Optional: owner-only prerequisites (tokens, accounts, console clicks), one checkbox each (`- [ ] ...`).
+
 **Done when**
-What will be checked on the test server (and, if it shows there, on production).
+Each item says how an agent checks it and where (test server, install check, CI run).
 
 **Related**
 Optional: issues, PRs and files by path.
@@ -69,15 +73,24 @@ A concrete case: who does what, and what they see.
 
 - Out of scope: what this issue will not do.
 
+**Before work**
+Optional: owner-only prerequisites (tokens, accounts, console clicks), one checkbox each (`- [ ] ...`).
+
 **Done when**
-What will be checked on the test server, as a real user would do it.
+Each item says how an agent checks it and where (test server, install check, CI run).
 
 **Related**
 Optional: issues, PRs and files by path.
 ```
 
-"Done when" names an end-to-end check, not "tests pass". If only a unit test can cover it (for example it needs a
-fresh server), say so; the issue then gets `verified-partial` until someone runs the real check.
+**Done when** names an end-to-end check, not "tests pass": each item must say how an agent checks it and where (test
+server, install check, CI run). If only a unit test can cover it (for example it needs a fresh server), say so; the
+issue then gets `verified-partial` until someone runs the real check.
+
+**Before work** holds owner-only prerequisites (tokens, accounts, console clicks) with one checkbox (`- [ ]`) each.
+`.agents/tools/issue-check.py` adds `needs-shape` while any **Before work** box is unticked (or when a **Done when**
+item names no check), so Agent Keeper's Pick up sends the card to Inbox until the owner ticks the box and fixes the
+item.
 
 Keep it short. Link related issues and PRs by number. No credentials, hostnames from secrets, or customer data.
 

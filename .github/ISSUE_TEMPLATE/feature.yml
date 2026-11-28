@@ -34,7 +34,7 @@ body:
     id: done-when
     attributes:
       label: Done when
-      description: What will be checked on the test server, as a real user would do it. Not "tests pass".
+      description: Each item says how an agent checks it and where (test server, install check, CI run). Not "tests pass".
     validations:
       required: true
   - type: textarea
