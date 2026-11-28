@@ -228,6 +228,70 @@ public class ValidationServiceTests
         Assert.That(result.Success, Is.False);
     }
 
+    [Test]
+    public async Task ValidateAsync_WhenApplicationDescriptionIsSet_WarnsAndStillPasses()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        var contract = ApplicationContractTestFactory.Create();
+        contract.Description = "Old one-line description";
+
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Legacy App",
+            Summary = "Short summary",
+            Application = contract
+        });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+
+        var service = new ValidationService(configService, (_, _, _, _) =>
+            Task.FromResult(new RemoteAppValidationInfo("runner-1")));
+
+        var result = await service.ValidateAsync(projectRoot);
+
+        var warning = result.Checks.Single(c => c.Name == "applicationDescription");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.True);
+            Assert.That(warning.Success, Is.True);
+            Assert.That(warning.IsWarning, Is.True);
+            Assert.That(warning.Message, Is.EqualTo("application.description is no longer used; put the text in summary"));
+            Assert.That(result.NextSteps, Has.Some.Contains("summary"));
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_WhenStrictAndApplicationDescriptionIsSet_FailsValidation()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        var contract = ApplicationContractTestFactory.Create();
+        contract.Description = "Old one-line description";
+
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Legacy App",
+            Application = contract
+        });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+
+        var service = new ValidationService(configService, (_, _, _, _) =>
+            Task.FromResult(new RemoteAppValidationInfo("runner-1")));
+
+        var result = await service.ValidateAsync(projectRoot, strict: true);
+
+        var warning = result.Checks.Single(c => c.Name == "applicationDescription");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.False);
+            Assert.That(warning.Success, Is.False);
+            Assert.That(warning.IsWarning, Is.False);
+            Assert.That(warning.Message, Does.Contain("application.description is no longer used; put the text in summary"));
+        });
+    }
+
     private static void AssertCheck(ValidationResult result, string name, bool expectedSuccess, string expectedMessageFragment)
     {
         var check = result.Checks.Single(c => c.Name == name);

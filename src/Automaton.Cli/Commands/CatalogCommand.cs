@@ -54,16 +54,17 @@ public static class CatalogCommand
         command.SetHandler((string target, string? repoName, string? outPath, bool validateOnly) =>
         {
             var full = Path.GetFullPath(target);
-            var (json, problems) = CatalogBuildService.Build(full, repoName);
-            if (json is null)
+            var result = CatalogBuildService.BuildCatalog(full, repoName);
+            foreach (var warning in result.Warnings) Console.Error.WriteLine($"Warning: {warning}");
+            if (result.Json is null)
             {
-                foreach (var problem in problems) Console.Error.WriteLine($"Error: {problem}");
+                foreach (var problem in result.Problems) Console.Error.WriteLine($"Error: {problem}");
                 Environment.ExitCode = 1;
                 return;
             }
             if (validateOnly) { Console.WriteLine("catalog-apps.json is valid."); return; }
             var path = outPath ?? Path.Combine(full, CatalogBuildService.CatalogFileName);
-            File.WriteAllText(path, json);
+            File.WriteAllText(path, result.Json);
             Console.WriteLine($"Wrote {path}");
         }, directory, repo, output, validate);
         return command;

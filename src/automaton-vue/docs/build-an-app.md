@@ -178,7 +178,7 @@ Push it to GitHub, wait for the `Catalog` workflow to write `catalog.json`, then
 
 ## Manifest fields
 
-All fields sit under `application` unless noted. `appId`, `name` and `summary` (one line for the store card, at most the first screen) are top level; `server` optionally names the server.
+All fields sit under `application` unless noted. `appId`, `name`, `summary` (one line for Studio and store cards) and `description` (longer text for the store listing) are top level; `server` optionally names the server.
 
 | Field | Meaning |
 |---|---|
@@ -191,7 +191,7 @@ All fields sit under `application` unless noted. `appId`, `name` and `summary` (
 | `health.path`, `health.startupTimeoutSeconds` | Ready after a 2xx answer; maximum start time. |
 | `storage.dataDirectory`, `storage.mounts` | Folders that survive redeploys. |
 | `kind` | `web` (default) or `api`. |
-| `description`, `pages`, `openApi` | One line (200 characters), up to 10 key paths `{ "path": "/", "label": "Home" }`, and an API app's OpenAPI path such as `/openapi.json`. |
+| `pages`, `openApi` | Up to 10 key paths `{ "path": "/", "label": "Home" }`, and an API app's OpenAPI path such as `/openapi.json`. |
 | `homeCard` | `{ "intervalSeconds": 900 }` (300 to 86400): how often the `home-card` Action refreshes the app's card on Studio Home. |
 | `openPaths` | Paths that answer without Automaton sign-in (see below). |
 | `publicAccess` | Hint `{ "level": "required" or "recommended", "reason": "..." }` shown before install when outside callers must reach the app. It changes nothing by itself. |

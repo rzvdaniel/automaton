@@ -14,10 +14,10 @@ or `automaton link <app-id>` for an existing one.
 The `application` object in `automaton.json` is the source of truth. Automaton
 does not prescribe the app's language, framework, source layout, or architecture.
 When you create or change an app, also fill the optional descriptive fields so
-Studio can show the app: `application.kind` (`web` or `api`; missing means web),
-`application.description` (one line, at most 200 characters), `application.pages`
-(a few `{ "path": "/", "label": "Home" }` entries for a web app),
-`application.openApi` (path of the API's OpenAPI document, for example
+Studio can show the app: top-level `summary` (one line for Studio and store
+cards), `application.kind` (`web` or `api`; missing means web),
+`application.pages` (a few `{ "path": "/", "label": "Home" }` entries for a web
+app), `application.openApi` (path of the API's OpenAPI document, for example
 `/openapi.json`, for an API app), and a one-line `metadata.description` in each
 `action.yaml`. All are optional; leave one out rather than guess.
 Use `automaton validate`, then `automaton deploy`, and wait for the deployment

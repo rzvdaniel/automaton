@@ -127,6 +127,15 @@ public sealed class ValidationService
                 "automaton.json is missing a friendly app name",
                 strict);
         }
+
+        if (projectConfig != null && !string.IsNullOrWhiteSpace(projectConfig.Application.Description))
+        {
+            nextSteps.Add("Move application.description to top-level summary in automaton.json");
+            yield return CreateWarningOrFailure(
+                "applicationDescription",
+                "application.description is no longer used; put the text in summary",
+                strict);
+        }
     }
 
     private static ValidationCheckResult CreateWarningOrFailure(string name, string message, bool strict)
