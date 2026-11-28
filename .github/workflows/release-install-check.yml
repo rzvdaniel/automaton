@@ -169,8 +169,15 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        if: needs.plan.outputs.target == 'commit'
         with:
-          ref: ${{ needs.plan.outputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.repository.default_branch }}
+          path: release-src
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        if: needs.plan.outputs.target == 'release'
+        with:
+          ref: server-v${{ needs.plan.outputs.version }}
           path: release-src
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
@@ -204,7 +211,7 @@ jobs:
   # For commit-build runs, builds and pushes images tagged by commit (no GitHub Release is published).
   images:
     needs: plan
-    if: needs.plan.outputs.target == 'commit'
+    if: github.event_name != 'workflow_run' && needs.plan.outputs.target == 'commit'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -217,7 +224,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.plan.outputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.repository.default_branch }}
           persist-credentials: false
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -237,7 +244,7 @@ jobs:
           file: docker/Dockerfile.${{ matrix.component }}
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}:${{ needs.plan.outputs.ref }}
+          tags: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}:${{ github.sha }}
           build-args: |
             VITE_RUNTIME_CONFIG=true
             SERVER_VERSION=${{ needs.plan.outputs.version }}
@@ -254,7 +261,7 @@ jobs:
       - name: Smoke test age tool image
         if: matrix.component == 'age'
         env:
-          IMAGE: ghcr.io/${{ steps.repository.outputs.name }}-age:${{ needs.plan.outputs.ref }}
+          IMAGE: ghcr.io/${{ steps.repository.outputs.name }}-age:${{ github.sha }}
         run: |
           docker pull "$IMAGE"
           docker run --rm "$IMAGE" age --version
@@ -267,7 +274,7 @@ jobs:
 
   bundle:
     needs: [plan, images]
-    if: needs.plan.outputs.target == 'commit'
+    if: github.event_name != 'workflow_run' && needs.plan.outputs.target == 'commit'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -276,7 +283,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.plan.outputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.repository.default_branch }}
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
@@ -290,7 +297,7 @@ jobs:
       - name: Assemble commit bundle
         env:
           VERSION: ${{ needs.plan.outputs.version }}
-          GITHUB_SHA: ${{ needs.plan.outputs.ref }}
+          GITHUB_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           bash scripts/ci/build-server-bundle.sh
@@ -366,7 +373,7 @@ jobs:
           TARGET: ${{ needs.plan.outputs.target }}
           VERSION: ${{ needs.plan.outputs.version }}
           PREVIOUS: ${{ needs.plan.outputs.previous }}
-          COMMIT_SHA: ${{ needs.plan.outputs.ref }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           if [[ "$TARGET" == commit ]]; then
             echo "### Release install check: commit \`${COMMIT_SHA:0:12}\` ($VERSION, upgrade from ${PREVIOUS:-none})" >> "$GITHUB_STEP_SUMMARY"
@@ -423,6 +430,7 @@ jobs:
     if: |
       always() &&
       !cancelled() &&
+      github.event_name == 'schedule' &&
       needs.plan.outputs.is_nightly == 'true' &&
       (needs.openapi.result == 'failure' || needs.images.result == 'failure' || needs.bundle.result == 'failure' || needs.check.result == 'failure')
     runs-on: ubuntu-24.04
@@ -433,12 +441,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.plan.outputs.ref }}
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - name: File or comment on nightly failure lesson issue
         env:
           REPO: ${{ github.repository }}
-          COMMIT_SHA: ${{ needs.plan.outputs.ref }}
+          COMMIT_SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           AGENT_GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
