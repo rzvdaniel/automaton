@@ -11,9 +11,22 @@ MARKER = "<!-- issue-check -->"
 SKIP_LABELS = {"handover", "lessons", "dependencies", "dependency-advisory", "question"}
 BUG = ["Problem", "Steps", "Result", "Expected", "Done when"]
 FEATURE = ["Goal", "Example", "Suggestion", "Done when"]
-OPTIONAL = ["Related"]
+OPTIONAL = ["Related", "Before work"]
 HEADING = re.compile(r"^[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*|__)?([A-Za-z][A-Za-z ]*?)[ \t]*:?(?:\*\*|__)?[ \t]*:?[ \t]*$")
 EMPTY = {"", "_no response_", "no response", "n/a", "none", "tbd", "todo"}
+UNTICKED_BOX = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)[ \t]*\[[ \t]*\]", re.MULTILINE)
+LIST_ITEM = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)[ \t]+(?:\[[ xX]\][ \t]+)?(.*)")
+CHECK_RE = re.compile(
+    r"\b(?:"
+    r"test[- ]server|install[- ]check|ci(?:\s+run)?|workflow|github\s+actions|"
+    r"throwaway|runner-02|local(?:ly)?|"
+    r"unit\s+test(?:s)?|integration\s+test(?:s)?|smoke\s+test(?:s)?|"
+    r"dotnet\s+test|pytest|unittest|npm\s+run|vue-tsc|"
+    r"issue-check|merge[- ]gate|curl|playwright|browser|"
+    r"studio|cli|api|mcp|runner|website|store"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def sections(body):
@@ -34,21 +47,43 @@ def kind(labels, secs):
     return "bug" if "bug" in labels or "problem" in secs else "feature"
 
 
+def done_when_items(text):
+    """Split Done when into logical items (bullet/numbered items with continuation lines, or one block)."""
+    items = []
+    for line in text.split("\n"):
+        m = LIST_ITEM.match(line)
+        if m:
+            items.append(m.group(1).strip())
+        elif line.strip():
+            if items:
+                items[-1] += " " + line.strip()
+            else:
+                items.append(line.strip())
+    return [i for i in items if i]
+
+
 def missing(body, labels):
-    """Names of required sections that are absent, plus 'Done when' if it has no content."""
+    """Names of required sections that are absent, plus Done when and Before work readiness checks."""
     secs = sections(body)
     required = BUG if kind(labels, secs) == "bug" else FEATURE
     out = [n for n in required if n.lower() not in secs]
-    if "Done when" not in out and secs["done when"].strip().lower() in EMPTY:
-        out.append("Done when (empty)")
+    if "Done when" not in out:
+        dw = secs["done when"].strip()
+        if dw.lower() in EMPTY:
+            out.append("Done when (empty)")
+        elif any(not CHECK_RE.search(item) for item in done_when_items(dw)):
+            out.append("Done when (each item must say how and where an agent checks it, e.g. test server, install check, CI run)")
+    if "before work" in secs and UNTICKED_BOX.search(secs["before work"]):
+        out.append("Before work (unticked prerequisite)")
     return out
 
 
 def comment_text(kind_, names):
     items = "\n".join(f"- {n}" for n in names)
-    return (f"{MARKER}\nThis {kind_} issue is missing:\n\n{items}\n\n"
-            "Add them as bold or `###` headings, as the issue form and the write-issue skill describe. "
-            "This comment and the `needs-shape` label go away once the issue has them.")
+    return (f"{MARKER}\nThis {kind_} issue needs attention before an agent can pick it up:\n\n{items}\n\n"
+            "Fix these as the issue form and the write-issue skill describe (bold or `###` headings, a check and "
+            "where to run it per Done when item, and ticked Before work boxes). "
+            "This comment and the `needs-shape` label go away once the issue is ready.")
 
 
 def api(method, path, data=None):
