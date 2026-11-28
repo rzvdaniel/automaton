@@ -307,17 +307,16 @@ jobs:
           dotnet publish src/Automaton.Cli/Automaton.Cli.csproj -c Release -r linux-x64 --self-contained true \
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:Version="$VERSION" -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.0 -o cli-publish
-          mkdir -p cli
-          cp cli-publish/automaton cli/automaton
-          chmod +x cli/automaton
-          DOTNET_ROOT=/nonexistent ./cli/automaton --version
+          cp cli-publish/automaton automaton
+          chmod +x automaton
+          DOTNET_ROOT=/nonexistent ./automaton --version
       - uses: actions/upload-artifact@v4
         with:
           name: commit-bundle
           path: |
             automaton-server.tar.gz
             automaton-server.tar.gz.sha256
-            cli/automaton
+            automaton
           retention-days: 1
 
   check:
