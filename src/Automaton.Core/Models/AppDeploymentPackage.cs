@@ -52,7 +52,7 @@ public sealed record CleanupAppDeploymentTargetResult(
     string? Error = null);
 
 /// <summary>Starts an app's running runtime again from its deployed files, so it loads current secrets.</summary>
-public sealed record RestartAppRuntimeRequest(Guid AppId, Guid DeploymentTargetId);
+public sealed record RestartAppRuntimeRequest(Guid AppId, Guid DeploymentTargetId, bool ReplaceCompose = false);
 
 /// <summary>Stops an app's runtime without removing its files, secrets or data; the app stays paused until resumed.</summary>
 public sealed record PauseAppRuntimeRequest(Guid AppId, Guid DeploymentTargetId);

@@ -113,4 +113,50 @@ public sealed class HostContainerComposeDocumentBuilderTests
             Assert.That(labels.TryGetProperty("com.automaton.managed", out _), Is.True);
         }
     }
+
+    [Test]
+    public void Build_MountsGrantedVolumesOnlyIntoThePublicService_ReadOnlyByDefault()
+    {
+        var compose = new ApplicationComposeSpec
+        {
+            PublicService = "web",
+            Services = [new() { Name = "web", Image = "x/y:1", Port = 8080 }, new() { Name = "db", Image = "x/db:1" }],
+            Volumes = []
+        };
+        var scope = new HostContainerScope(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: Guid.NewGuid());
+        var grant = new HostContainerGrantedMount(Guid.NewGuid(), Guid.NewGuid(), "content", "/granted/ghost-abc123/content", true);
+        var images = new Dictionary<string, string> { ["web"] = "x/y@sha256:1", ["db"] = "x/db@sha256:2" };
+
+        var document = HostContainerComposeDocumentBuilder.Build(compose, images, scope, Guid.NewGuid(), "10.0.0.1",
+            new HostContainerResourceLimits(1, 256, 128), 64, 10, 3, [grant]);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(document));
+        var services = json.RootElement.GetProperty("services");
+
+        Assert.Multiple(() =>
+        {
+            var web = services.GetProperty("web").GetProperty("volumes")[0].GetString()!;
+            Assert.That(web, Does.EndWith(":/granted/ghost-abc123/content:ro"));
+            Assert.That(services.GetProperty("db").TryGetProperty("volumes", out _), Is.False);
+            var key = web[..web.IndexOf(':')];
+            Assert.That(json.RootElement.GetProperty("volumes").GetProperty(key).GetProperty("name").GetString(),
+                Is.EqualTo(HostContainerComposeDocumentBuilder.GrantedVolumeName(grant)));
+        });
+    }
+
+    [Test]
+    public void Build_RefusesAnOwnVolumeNamedLikeAGrantedOne()
+    {
+        var grant = new HostContainerGrantedMount(Guid.NewGuid(), Guid.NewGuid(), "content", "/granted/ghost-abc123/content", true);
+        var compose = new ApplicationComposeSpec
+        {
+            PublicService = "web",
+            Services = [new() { Name = "web", Image = "x/y:1", Port = 8080 }],
+            Volumes = ["granted_" + grant.SourceAppId.ToString("N")[..12] + "_content"]
+        };
+        var scope = new HostContainerScope(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(() => HostContainerComposeDocumentBuilder.Build(compose,
+            new Dictionary<string, string> { ["web"] = "x/y@sha256:1" }, scope, Guid.NewGuid(), "10.0.0.1",
+            new HostContainerResourceLimits(1, 256, 128), 64, 10, 3, [grant]));
+    }
 }

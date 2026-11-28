@@ -569,6 +569,7 @@ internal static class ApiAppCatalogRegistration
         services.AddSingleton<ICustomDomainResolver, DnsCustomDomainResolver>();
         services.AddSingleton<ICustomDomainLiveProbe, HttpsCustomDomainLiveProbe>();
         services.AddScoped<CustomDomainService>();
+        services.AddScoped<AppDataGrantService>();
         services.AddScoped<IAppRuntimeCommandQueue, RunnerExecutionAppCommandQueue>();
         services.AddScoped<AppPauseService>();
         services.AddScoped<Home.HomeCardScheduleService>();

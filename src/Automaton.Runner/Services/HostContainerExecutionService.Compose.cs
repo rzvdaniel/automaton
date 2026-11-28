@@ -59,13 +59,19 @@ internal sealed class HostContainerComposeProjectExecutor(
                 return Failure("compose_volume", "A managed Compose volume has invalid ownership or could not be prepared.");
         }
 
+        foreach (var grant in request.GrantedMounts)
+        {
+            if (!await IsGrantedVolumeAvailableAsync(grant, scope.MachineRunnerId, cancellationToken))
+                return Failure("compose_granted_volume", "A data volume granted to this app is missing or is not a managed app volume.");
+        }
+
         var tempDirectory = Directory.CreateTempSubdirectory("automaton-compose-");
         try
         {
             var file = Path.Combine(tempDirectory.FullName, "compose.yaml");
             await File.WriteAllTextAsync(file, JsonSerializer.Serialize(HostContainerComposeDocumentBuilder.Build(
                 compose, resolvedImages, scope, request.CandidateId, hostAddress, limits,
-                request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value)), cancellationToken);
+                request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value, request.GrantedMounts)), cancellationToken);
             var up = await executor(
                 ["docker", "compose", "--project-name", project, "--file", file, "up", "--detach", "--pull", "never"],
                 ComposeOperationTimeout, cancellationToken);
@@ -276,6 +282,22 @@ internal sealed class HostContainerComposeProjectExecutor(
         if (!created.Success) return false;
         inspect = await executor(["docker", "volume", "inspect", "--format", "{{json .Labels}}", name], ComposeOperationTimeout, cancellationToken);
         return inspect.Success && HasComposeVolumeLabels(inspect.Output, scope, volume);
+    }
+
+    private async Task<bool> IsGrantedVolumeAvailableAsync(
+        HostContainerGrantedMount grant,
+        Guid machineRunnerId,
+        CancellationToken cancellationToken)
+    {
+        if (!grant.Target.StartsWith("/granted/", StringComparison.Ordinal)
+            || grant.Target.Any(c => c is ':' or ',' or '\\' || char.IsWhiteSpace(c) || char.IsControl(c))
+            || grant.Target.Contains("..", StringComparison.Ordinal))
+            return false;
+        var source = new HostContainerScope(Guid.Empty, Guid.Empty, grant.SourceAppId, grant.SourceDeploymentTargetId,
+            MachineRunnerId: machineRunnerId);
+        var inspect = await executor(["docker", "volume", "inspect", "--format", "{{json .Labels}}",
+            HostContainerComposeDocumentBuilder.GrantedVolumeName(grant)], ComposeOperationTimeout, cancellationToken);
+        return inspect.Success && HasComposeVolumeLabels(inspect.Output, source, grant.Volume);
     }
 
     private static IReadOnlyList<string> ComposeVolumeCreateArguments(HostContainerScope scope, string volume, string name)

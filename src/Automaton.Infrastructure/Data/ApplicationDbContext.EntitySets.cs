@@ -50,6 +50,7 @@ public partial class ApplicationDbContext
     public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
     public virtual DbSet<AppShare> AppShares { get; set; }
     public virtual DbSet<AppCustomDomain> AppCustomDomains { get; set; }
+    public virtual DbSet<AppDataGrant> AppDataGrants { get; set; }
     public virtual DbSet<AppVersion> AppVersions { get; set; }
     public virtual DbSet<AppModuleExecution> AppModuleExecutions { get; set; }
     public virtual DbSet<ActionSchedule> ActionSchedules { get; set; }

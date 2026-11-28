@@ -25,6 +25,8 @@ User code does not run inside the Runner process. APIs, server-rendered sites, A
 
 Generic deployments do not accept host mounts, privileged containers, host networking or the Docker socket. Static sites share one Nginx serving container that serves each app's published files.
 
+An app never sees another app's data, with one exception the people who manage both apps choose. A data grant lets an admin tool (a database admin, a file browser) open a named data volume of another app that runs on the same Runner. It is read-only unless you confirm read-write a second time, shows on both apps (`GET /api/apps/{id}/data-grants`), is logged in Activity and the audit log, restarts the receiving app so it takes effect, and stops working as soon as you remove it. Add one with `POST /api/apps/{source-id}/data-grants` (`granteeAppId`, `volume`, and `readWrite` plus `confirmReadWrite` for write access) and remove it with `DELETE /api/apps/{id}/data-grants/{grant-id}`. The volume appears in the receiving app's container under `/granted/<app>/<volume>`.
+
 Containers are a process boundary, not a virtual machine. On a shared machine they suit people who trust each other (one person, a team, an organisation), not mutually untrusted tenants. Put workloads you do not trust on a separate machine with its own Runner.
 
 ## Runners and the docker socket

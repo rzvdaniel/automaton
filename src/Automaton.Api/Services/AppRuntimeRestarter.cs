@@ -14,6 +14,12 @@ public interface IAppRuntimeRestarter
     /// <paramref name="wait"/> it waits for each Runner and returns how many restarted, or throws <see cref="RuntimeCommandFailedException"/>.
     /// </summary>
     Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false);
+
+    /// <summary>
+    /// Like <see cref="RestartRunningAsync"/>, but a Compose runtime is replaced too, so it picks up changed data grants
+    /// (a plain restart leaves Compose runtimes alone because they get no secrets).
+    /// </summary>
+    Task<int> RestartWithComposeAsync(Guid appId, CancellationToken token) => RestartRunningAsync(appId, token);
 }
 
 /// <summary>
@@ -31,7 +37,13 @@ public sealed class AppRuntimeRestarter(
     public const string CommandKind = "restart-runtime";
     private static readonly TimeSpan RestartTimeout = TimeSpan.FromSeconds(150);
 
-    public async Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false)
+    public Task<int> RestartRunningAsync(Guid appId, CancellationToken token, bool wait = false)
+        => RestartAsync(appId, token, wait, replaceCompose: false);
+
+    public Task<int> RestartWithComposeAsync(Guid appId, CancellationToken token)
+        => RestartAsync(appId, token, wait: false, replaceCompose: true);
+
+    private async Task<int> RestartAsync(Guid appId, CancellationToken token, bool wait, bool replaceCompose)
     {
         var targets = await RunningTargets(db, appId).ToListAsync(token);
         var queued = 0;
@@ -41,7 +53,7 @@ public sealed class AppRuntimeRestarter(
             try
             {
                 RunnerExecutionRequest request = new(
-                    AppActionCommand.Create(CommandKind, new RestartAppRuntimeRequest(appId, target.Id)));
+                    AppActionCommand.Create(CommandKind, new RestartAppRuntimeRequest(appId, target.Id, replaceCompose)));
                 if (wait) await operations.QueueAndWaitAsync(target.RunnerId, user.GetUserId(), request, RestartTimeout, token);
                 else await operations.QueueAsync(target.RunnerId, user.GetUserId(), request, token);
                 queued++;
