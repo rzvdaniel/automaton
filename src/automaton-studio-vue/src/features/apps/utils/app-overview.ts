@@ -1,5 +1,5 @@
 import type { ActionSchedule } from '../services/action-schedules.service'
-import type { App, SharingAudience } from '../types/apps.types'
+import type { App, ApplicationContract, SharingAudience } from '../types/apps.types'
 import { isActionOnlyApp, type AppOperationalSummary } from './app-operational-summary'
 
 /** What the app is, which decides its main button and what its Overview lists. */
@@ -133,8 +133,39 @@ export function accessLabel(audience: SharingAudience | undefined): string {
   switch (audience) {
     case 'internet': return 'Public'
     case 'server': return 'Everyone on this server'
+    case 'team': return 'Team'
     case 'people': return 'People I choose'
     default: return 'Only you'
+  }
+}
+
+/** Plain text for the Live card's Who row. */
+export function whoCanOpenLabel(
+  kind: AppKind,
+  audience: SharingAudience | undefined,
+  peopleCount: number,
+  teamName?: string | null,
+): string {
+  if (kind === 'api' && audience !== 'internet') return 'Callers need an API key'
+  switch (audience) {
+    case 'internet': return 'Anyone can open it'
+    case 'server': return 'Everyone signed in on this server can open it'
+    case 'team': return teamName ? `${teamName} team can open it` : 'Team members can open it'
+    case 'people': return peopleCount === 1 ? '1 person can open it' : `${peopleCount} people can open it`
+    default: return 'Only you can open it'
+  }
+}
+
+/** Shortens long private app hosts (`app-<32hex>.domain` -> `app-<8hex>….domain`) for plain-text display. */
+export function formatLiveAddress(address: string): string {
+  if (!address) return ''
+  try {
+    const parsed = new URL(address)
+    const shortened = parsed.hostname.replace(/^app-([0-9a-f]{8})[0-9a-f]{24}(\..+)$/i, 'app-$1…$2')
+    const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname.replace(/\/+$/, '') : ''
+    return `${shortened}${path}`
+  } catch {
+    return address
   }
 }
 
@@ -212,6 +243,68 @@ export function appOriginLabel(app: Pick<App, 'forkedFromAppName' | 'installedFr
   }
   if (app.forkedFromAppName) return `From the catalog · ${app.forkedFromAppName}`
   return app.developmentMode === 'local' || app.runtimeSource !== 'studio' ? 'Deployed with the CLI' : 'Built in Studio'
+}
+
+/** Where an app came from for the Live card: plain repo/folder, catalog fork, CLI, or Studio. */
+export function liveOrigin(
+  app: Pick<App, 'forkedFromAppName' | 'installedFromRepo' | 'installedFromFolder' | 'developmentMode' | 'runtimeSource'>,
+): { label: string; value: string } {
+  if (app.installedFromRepo) {
+    const folder = app.installedFromFolder ? `/${app.installedFromFolder}` : ''
+    return { label: 'Installed from', value: `${app.installedFromRepo}${folder}` }
+  }
+  if (app.forkedFromAppName) return { label: 'Installed from', value: `Catalog · ${app.forkedFromAppName}` }
+  return {
+    label: 'Origin',
+    value: app.developmentMode === 'local' || app.runtimeSource !== 'studio' ? 'Deployed with the CLI' : 'Built in Studio',
+  }
+}
+
+const PERMISSION_LABELS: Record<string, string> = {
+  'runner:host-exec': 'host access',
+  'runner:maintain': 'runner maintenance',
+  'notify:email': 'send email',
+  'backups:read': 'read backups',
+  'backups:run': 'start backups',
+  'server:read': 'server status',
+  'server:restart': 'restart server',
+  'server:update-os': 'OS updates',
+  'server:cleanup': 'server cleanup',
+  'apps:read-status': 'app status',
+  'security:read': 'read security',
+  'security:manage': 'manage security',
+  'logs:receive': 'server logs',
+}
+
+export interface DocsAtAGlance {
+  pages: string
+  schedules: string[]
+  needs: string
+}
+
+/** Three summary facts for the Docs tab's At a glance card, read from the app's contract (`automaton.json`). */
+export function docsAtAGlance(application?: ApplicationContract | null): DocsAtAGlance | null {
+  if (!application) return null
+  const pages = (application.pages ?? []).map((page) => page.label || page.path).filter(Boolean).join(', ')
+  const schedules = (application.schedules ?? []).map((item) => {
+    const cadence = describeSchedule({
+      scheduleType: item.cron ? 'Cron' : 'Interval',
+      cronExpression: item.cron ?? undefined,
+      intervalSeconds: item.intervalSeconds ?? undefined,
+      timeZone: item.timeZone,
+    })
+    return `${item.name || item.action} · ${cadence}`
+  })
+  const requiredSecrets = (application.secrets ?? []).filter((secret) => !secret.optional).map((secret) => secret.name)
+  const secretPart = requiredSecrets.length === 1
+    ? `Secret ${requiredSecrets[0]}`
+    : requiredSecrets.length > 1
+      ? `Secrets ${requiredSecrets.join(', ')}`
+      : ''
+  const permissionParts = (application.permissions ?? []).map((permission) => PERMISSION_LABELS[permission] ?? permission)
+  const needs = [secretPart, ...permissionParts].filter(Boolean).join(' · ')
+  if (!pages && schedules.length === 0 && !needs) return null
+  return { pages, schedules, needs }
 }
 
 /** The pill beside "N secrets": only required secrets that are not set count as missing; an unset optional one says so. */

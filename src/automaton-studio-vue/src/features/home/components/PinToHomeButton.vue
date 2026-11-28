@@ -29,7 +29,7 @@ async function toggle() {
   <Button
     :label="compact ? undefined : pinned ? 'Pinned' : 'Pin to Home'"
     :icon="pinned ? 'pi pi-bookmark-fill' : 'pi pi-bookmark'"
-    size="small"
+    :size="compact ? 'small' : undefined"
     severity="secondary"
     outlined
     :loading="busy"

@@ -433,14 +433,14 @@ async function handleSharingChanged() {
               <h1>{{ app.name }}</h1>
               <span v-if="transition" class="health health--busy" role="status" data-testid="app-health"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ transition }}</span>
               <span v-else class="health" :class="`health--${health}`" data-testid="app-health"><span class="dot" aria-hidden="true"></span>{{ health }}</span>
-              <button v-if="access && app.canUpdate !== false" type="button" class="pill pill--access" title="Change who can open it" data-testid="app-access" @click="showShareDialog = true">{{ access }}</button>
-              <span v-else-if="access" class="pill pill--access" data-testid="app-access">{{ access }}</span>
+              <button v-if="access && app.canUpdate !== false" type="button" class="pill--access" title="Change who can open it" data-testid="app-access" @click="showShareDialog = true">{{ access }}</button>
+              <span v-else-if="access" class="pill--access" data-testid="app-access">{{ access }}</span>
             </div>
             <p v-if="app.summary" class="summary">{{ app.summary }}</p>
           </div>
           <div class="head-actions">
             <PinToHomeButton :app-id="app.id" :app-name="app.name" />
-            <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" icon="pi pi-share-alt" outlined data-testid="share-app" @click="showShareDialog = true" />
+            <Button v-if="kind !== 'tool' && app.canUpdate !== false" label="Share" icon="pi pi-share-alt" severity="secondary" outlined data-testid="share-app" @click="showShareDialog = true" />
             <template v-if="kind === 'tool'">
               <Button
                 v-if="app.canUpdate !== false"
@@ -499,6 +499,7 @@ async function handleSharingChanged() {
           @navigate="handleNavigation"
           @paused-changed="editorStore.refreshApp(appId)"
           @targets-changed="refreshTargets"
+          @executions-changed="refreshExecutions"
         />
         <AppActions
           v-else-if="shownView === 'actions'"
@@ -524,7 +525,7 @@ async function handleSharingChanged() {
           :app-name="app.name"
           :version="app.installedFromCommit?.slice(0, 7)"
         />
-        <AppDocsTab v-else-if="shownView === 'docs'" :app-id="app.id" :description="app.description" :version="app.installedFromCommit?.slice(0, 7)" @navigate="handleNavigation" />
+        <AppDocsTab v-else-if="shownView === 'docs'" :app-id="app.id" :description="app.description" :version="app.installedFromCommit?.slice(0, 7)" :application="app.application" @navigate="handleNavigation" />
         <AppSourceTab v-else-if="shownView === 'source'" :app-id="app.id" :definition="app.application" />
         <AppSecrets
           v-else-if="shownView === 'secrets'"
@@ -636,24 +637,55 @@ h1 {
 .head-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
-.pill {
+.health {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 3px 10px;
   border-radius: 999px;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--panel);
 }
-
-.health { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
 .health .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); }
-.health--failing { color: var(--signal-ink); }
-.health--failing .dot { background: var(--signal); }
-.health--stopped .dot { background: var(--line); }
-.pill--access { border: 1px solid var(--line); background: none; color: var(--ink); }
+.health--healthy { color: #166534; background: #dcfce7; }
+.health--healthy .dot { background: #16a34a; }
+.health--failing { color: #b91c1c; background: #fee2e2; }
+.health--failing .dot { background: #dc2626; }
+.health--stopped, .health--busy { color: #92400e; background: #fef3c7; }
+.health--stopped .dot { background: #d97706; }
+:global(.app-dark) .health--healthy { color: #86efac; background: rgba(22, 163, 74, 0.18); }
+:global(.app-dark) .health--healthy .dot { background: #4ade80; }
+:global(.app-dark) .health--failing { color: #fca5a5; background: rgba(220, 38, 38, 0.2); }
+:global(.app-dark) .health--failing .dot { background: #f87171; }
+:global(.app-dark) .health--stopped, :global(.app-dark) .health--busy { color: #fcd34d; background: rgba(217, 119, 6, 0.2); }
+:global(.app-dark) .health--stopped .dot { background: #fbbf24; }
+.pill--access {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink-soft);
+}
 button.pill--access { cursor: pointer; }
 button.pill--access:hover { background: var(--row-line); }
+.head-actions :deep(.p-button-outlined.p-button-secondary) {
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.head-actions :deep(.p-button-outlined.p-button-secondary:hover) {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
 .head-actions :deep(.open-app) { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .more-text { display: flex; flex-direction: column; max-width: 240px; }
 .more-text small { color: var(--ink-soft); font-size: 12px; white-space: normal; }
@@ -664,9 +696,14 @@ button.pill--access:hover { background: var(--row-line); }
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 100%;
 }
 
 .tab {
+  flex-shrink: 0;
+  white-space: nowrap;
   min-height: 40px;
   padding: 0 14px;
   border: 0;

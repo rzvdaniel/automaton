@@ -13,7 +13,7 @@ import { getLiveTarget } from '../utils/deployment-target-actions'
 import { formatWhen } from '../utils/app-overview'
 import type { AppViewKey } from '../app-navigation'
 
-const props = defineProps<{ app: App; targets: ReadonlyArray<AppDeploymentTarget>; origin?: string }>()
+const props = defineProps<{ app: App; targets: ReadonlyArray<AppDeploymentTarget> }>()
 const emit = defineEmits<{ changed: []; navigate: [view: AppViewKey] }>()
 const toast = useToast()
 
@@ -23,9 +23,7 @@ const runnerText = computed(() => {
   const runner = liveTarget.value?.runner
   return runner ? `${runner.name} · ${runner.isOnline ? 'online' : 'offline'}` : 'none assigned'
 })
-const INSTALLED = 'Installed from '
-const originLabel = computed(() => props.origin?.startsWith(INSTALLED) ? 'Installed from' : 'Origin')
-const originValue = computed(() => props.origin?.startsWith(INSTALLED) ? props.origin.slice(INSTALLED.length) : props.origin)
+const commit = computed(() => props.app.installedFromCommit?.slice(0, 7) ?? '')
 const hasActions = computed(() => !props.app.application?.isStaticSite)
 
 function fail(summary: string, error: unknown) {
@@ -112,69 +110,91 @@ async function restore(actionKey: string, version: string) {
 <template>
   <section class="card" aria-labelledby="runs-on-title" data-testid="runs-on">
     <h2 id="runs-on-title">Running</h2>
-    <div class="row">
-      <span>Runner</span>
-      <span class="value"><span class="dot" :class="{ off: !liveTarget?.runner?.isOnline }" aria-hidden="true"></span>{{ runnerText }}</span>
-      <Button v-if="canEdit && liveTarget" label="Change…" size="small" severity="secondary" outlined @click="openRunner" />
-    </div>
-    <div v-if="canEdit && isDeploying" class="row" data-testid="cancel-deploy">
-      <span>Deploying</span>
-      <span class="value hint">Stuck? Cancel it to redeploy or delete.</span>
-      <Button label="Cancel deploy" size="small" severity="danger" text :loading="cancelling" @click="cancelDeploy" />
-    </div>
-    <div v-if="liveTarget?.lastSuccessfulDeploymentAt || (canEdit && hasActions)" class="row">
-      <span>Version</span>
-      <span class="value"><span v-if="liveTarget?.lastSuccessfulDeploymentAt" class="hint">deployed {{ formatWhen(liveTarget.lastSuccessfulDeploymentAt) }}</span></span>
-      <Button v-if="canEdit && hasActions" label="Earlier versions…" size="small" severity="secondary" outlined @click="openVersions" />
-    </div>
-    <div class="row">
-      <span>Definition</span>
-      <span class="value mono">automaton.json</span>
-      <Button label="View in Source" size="small" text @click="emit('navigate', 'source')" />
-    </div>
-    <div v-if="origin" class="row" data-testid="installed-from">
-      <span>{{ originLabel }}</span>
-      <span class="value mono">{{ originValue }}</span>
-    </div>
-  </section>
-
-  <Dialog v-model:visible="runnerDialog" modal header="Change Runner" :style="{ width: 'min(28rem, 92vw)' }">
-    <Select v-model="runnerId" :options="runnerOptions" option-label="label" option-value="value" option-disabled="disabled" placeholder="Choose a Runner" class="w-full" aria-label="Runner" />
-    <p v-if="props.app.projectId" class="hint" data-testid="project-runner-hint">
-      Only Runners shared with this project are listed. Your personal Runner is not shared automatically, because sharing lets every project member deploy to it.
-      The Runner's owner can share it with <code>automaton project runners add &lt;runner&gt; --project {{ props.app.projectId }}</code>.
-    </p>
-    <template #footer>
-      <Button label="Cancel" text @click="runnerDialog = false" />
-      <Button label="Save" :loading="savingRunner" :disabled="!runnerId" @click="saveRunner" />
-    </template>
-  </Dialog>
-
-  <Dialog v-model:visible="versionsDialog" modal header="Earlier versions" :style="{ width: 'min(36rem, 94vw)' }">
-    <p v-if="versionsError" class="hint">{{ versionsError }}</p>
-    <p v-else-if="actionVersions.length === 0" class="hint">Loading…</p>
-    <div v-for="action in actionVersions" :key="action.key" class="versions">
-      <strong>{{ action.key }}</strong>
-      <p v-if="action.versions.length === 0" class="hint">No versions kept.</p>
-      <div v-for="version in action.versions" :key="version.version" class="row">
-        <span>{{ formatWhen(version.createdAtUtc) }} <span class="hint">· {{ Math.ceil(version.sizeBytes / 1024) }} KB</span></span>
-        <span v-if="version.isCurrent" class="hint">current</span>
-        <Button v-else label="Restore" size="small" text @click="restore(action.key, version.version)" />
+    <div class="rows">
+      <div class="row">
+        <span class="label">Runner</span>
+        <span class="value"><span class="dot" :class="{ online: !!liveTarget?.runner?.isOnline, off: !liveTarget?.runner?.isOnline }" aria-hidden="true"></span>{{ runnerText }}</span>
+        <span class="act"><Button v-if="canEdit && liveTarget" label="Change…" size="small" severity="secondary" outlined @click="openRunner" /></span>
+      </div>
+      <div v-if="canEdit && isDeploying" class="row" data-testid="cancel-deploy">
+        <span class="label">Deploying</span>
+        <span class="value hint">Stuck? Cancel it to redeploy or delete.</span>
+        <span class="act"><Button label="Cancel deploy" size="small" severity="danger" text :loading="cancelling" @click="cancelDeploy" /></span>
+      </div>
+      <div v-if="commit || liveTarget?.lastSuccessfulDeploymentAt || (canEdit && hasActions)" class="row">
+        <span class="label">Version</span>
+        <span class="value">
+          <code v-if="commit" data-testid="running-commit">{{ commit }}</code><template v-if="commit && liveTarget?.lastSuccessfulDeploymentAt"> · </template><span v-if="liveTarget?.lastSuccessfulDeploymentAt" class="hint">deployed {{ formatWhen(liveTarget.lastSuccessfulDeploymentAt) }}</span>
+        </span>
+        <span class="act"><Button v-if="canEdit && hasActions" label="Earlier versions…" size="small" severity="secondary" outlined @click="openVersions" /></span>
+      </div>
+      <div class="row">
+        <span class="label">Definition</span>
+        <span class="value"><code class="mono">automaton.json</code></span>
+        <span class="act"><Button label="View source" size="small" severity="secondary" outlined @click="emit('navigate', 'source')" /></span>
       </div>
     </div>
-  </Dialog>
+
+    <Dialog v-model:visible="runnerDialog" modal header="Change Runner" :style="{ width: 'min(28rem, 92vw)' }">
+      <Select v-model="runnerId" :options="runnerOptions" option-label="label" option-value="value" option-disabled="disabled" placeholder="Choose a Runner" class="w-full" aria-label="Runner" />
+      <p v-if="props.app.projectId" class="hint" data-testid="project-runner-hint">
+        Only Runners shared with this project are listed. Your personal Runner is not shared automatically, because sharing lets every project member deploy to it.
+        The Runner's owner can share it with <code>automaton project runners add &lt;runner&gt; --project {{ props.app.projectId }}</code>.
+      </p>
+      <template #footer>
+        <Button label="Cancel" text @click="runnerDialog = false" />
+        <Button label="Save" :loading="savingRunner" :disabled="!runnerId" @click="saveRunner" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="versionsDialog" modal header="Earlier versions" :style="{ width: 'min(36rem, 94vw)' }">
+      <p v-if="versionsError" class="hint">{{ versionsError }}</p>
+      <p v-else-if="actionVersions.length === 0" class="hint">Loading…</p>
+      <div v-for="action in actionVersions" :key="action.key" class="versions">
+        <strong>{{ action.key }}</strong>
+        <p v-if="action.versions.length === 0" class="hint">No versions kept.</p>
+        <div v-for="version in action.versions" :key="version.version" class="version-row">
+          <span>{{ formatWhen(version.createdAtUtc) }} <span class="hint">· {{ Math.ceil(version.sizeBytes / 1024) }} KB</span></span>
+          <span v-if="version.isCurrent" class="hint">current</span>
+          <Button v-else label="Restore" size="small" text @click="restore(action.key, version.version)" />
+        </div>
+      </div>
+    </Dialog>
+  </section>
 </template>
 
 <style scoped>
-.card { display: flex; flex-direction: column; gap: 4px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
-h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
-.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--row-line); }
+.card { display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+h2 { margin: 0 0 10px; font-size: 17px; font-weight: 600; }
+.rows { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 100px 1fr auto; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--row-line); font-size: 14px; }
 .row:last-child { border-bottom: 0; }
-.row > :first-child { width: 90px; color: var(--ink-soft); font-size: 13px; }
+.label { color: var(--ink-soft); }
 .dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ink-soft); }
+.dot.online { background: #16a34a; }
+:global(.app-dark) .dot.online { background: #4ade80; }
 .dot.off { background: var(--line); }
-.value { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.value { min-width: 0; overflow-wrap: anywhere; }
+.act { display: flex; justify-content: flex-end; }
+.act:empty { display: none; }
+.card :deep(.p-button-outlined.p-button-secondary) {
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.card :deep(.p-button-outlined.p-button-secondary:hover) {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
 .hint { color: var(--ink-soft); font-size: 13px; }
-.mono, code { font-family: var(--mono); font-size: 12px; }
+.mono, code { font-family: var(--mono); font-size: 13px; }
 .versions { margin-bottom: 12px; }
+.version-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--row-line); }
+.version-row:last-child { border-bottom: 0; }
+@media (max-width: 520px) {
+  .row { grid-template-columns: 90px 1fr; }
+  .act { grid-column: 2; justify-content: flex-start; }
+}
 </style>
