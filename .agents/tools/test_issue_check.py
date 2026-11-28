@@ -88,6 +88,8 @@ class Run(unittest.TestCase):
             self.assertEqual(ic.run(self.event("", [l]), "o/r"), "skipped")
         e = self.event(""); e["issue"]["pull_request"] = {}
         self.assertEqual(ic.run(e, "o/r"), "skipped")
+        r = self.event(""); r["issue"]["title"] = "Release 0.2.200"
+        self.assertEqual(ic.run(r, "o/r"), "skipped")
         self.assertEqual(self.calls, [])
 
     def test_comment_never_repeats_body(self):

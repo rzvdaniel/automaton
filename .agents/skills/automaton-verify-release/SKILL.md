@@ -45,9 +45,11 @@ the command Studio shows under **Runners → Upgrade runner**.
 
 ## Automatic start
 
+The `Auto release` workflow (`.github/workflows/auto-release.yml`) runs at 06:00 and 14:00 UTC on runner-01 via `.agents/tools/auto-release.py`: when cards sit in Verify with merged PRs not yet in a release, `main` is green, the install check on `main` passed, no release/upgrade/Verify run is in progress, and today's `RELEASE_CADENCE` limit (default 2) has room, it dispatches `server-release.yml` with the next patch version.
+
 The `Verify release` workflow (`.github/workflows/verify-release.yml`) polls the test server every 10 minutes. When
 `/opt/automaton-server/version` is a version it has not verified and issues sit in Verify, it starts an agent run
-(`.agents/jobs/verify-release.md`) that checks them all and labels each. Upgrading the test server is therefore enough;
+(`.agents/jobs/verify-release.md`) that checks them all and labels each, then posts one summary comment (`verified`, `verified-partial`, `failed`, `ready to deploy: yes/no`) on a pinned `"Release X.Y.Z"` issue via `.agents/tools/release-summary.py`. Upgrading the test server is therefore enough;
 a version is tried once; after a failed run delete the state file and run `gh workflow run verify-release.yml` (the state is `~/.local/state/automaton/verified-version`).
 
 ## Test accounts

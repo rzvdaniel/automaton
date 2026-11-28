@@ -34,17 +34,39 @@ jobs:
       group: agent
       cancel-in-progress: false
     steps:
+      - name: Claim version for verification
+        id: claim
+        env:
+          ISSUE_URL: ${{ needs.check.outputs.version }}
+        run: |
+          # Record the attempt first: a failed run must not restart every 10 minutes. To retry, run `verify-trigger.sh reset` on the runner; the next poll starts it again.
+          # Several triggered runs can pass the check together; only the one that records the version goes on (exit 3).
+          rc=0; bash "$HOME/automaton/.agents/tools/verify-trigger.sh" done "$ISSUE_URL" || rc=$?
+          if [[ $rc -eq 3 ]]; then echo "claimed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          [[ $rc -eq 0 ]] || exit "$rc"
+          echo "claimed=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.claim.outputs.claimed == 'true'
+        with:
+          persist-credentials: false
       - name: Run Claude
+        id: agent
+        if: steps.claim.outputs.claimed == 'true'
+        continue-on-error: true
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           PROMPT_FILE: .agents/jobs/verify-release.md
           ISSUE_URL: ${{ needs.check.outputs.version }}  # agent-run.sh puts it where the prompt says ISSUE_URL
           AGENT_TASK_TIMEOUT: 180m
           AGENT_MODEL: opus
-        run: |
-          # Record the attempt first: a failed run must not restart every 10 minutes. To retry, run `verify-trigger.sh reset` on the runner; the next poll starts it again.
-          # Several triggered runs can pass the check together; only the one that records the version goes on (exit 3).
-          rc=0; bash "$HOME/automaton/.agents/tools/verify-trigger.sh" done "$ISSUE_URL" || rc=$?
-          [[ $rc -ne 3 ]] || exit 0
-          [[ $rc -eq 0 ]] || exit "$rc"
-          bash "$HOME/automaton/.agents/tools/agent-run.sh"
+        run: bash "$HOME/automaton/.agents/tools/agent-run.sh"
+      - name: Post Release summary issue
+        if: steps.claim.outputs.claimed == 'true' && !cancelled()
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+          VERIFY_OUTCOME: ${{ steps.agent.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 .agents/tools/release-summary.py --version "$VERSION" --verify-outcome "$VERIFY_OUTCOME" --run-url "$RUN_URL"
+      - name: Fail job if verification agent failed
+        if: steps.claim.outputs.claimed == 'true' && steps.agent.outcome != 'success'
+        run: exit 1
