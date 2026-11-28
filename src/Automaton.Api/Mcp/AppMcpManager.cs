@@ -143,18 +143,24 @@ public sealed class AppMcpManager(
         try
         {
             var app = await installer.InstallAsync(new CatalogInstallRequest { Repo = repo, Folder = folder, Commit = commit, Name = name }, token);
-            var userId = users.GetUserId();
-            var missing = await FindMissingSecretsAsync(app.Id, userId, token);
-            if (missing.Count > 0)
-                return new
-                {
-                    appId = app.Id, name = app.Name, studio = StudioLink(app.Id), deployed = false,
-                    missingSecrets = missing.Select(m => m.Name).ToList(),
-                    next = "Installed, not deployed: it waits for these required secrets. Secret values never pass through MCP, so open the Studio link, save them under Settings → Secrets, then press Deploy on the app's page.",
-                };
-            return await DeployInstalledAsync(app.Id, userId, token);
+            return await AfterInstallAsync(app.Id, app.Name, token);
         }
         catch (ArgumentException ex) { throw new McpUserException(ex.Message); }
+    }
+
+    /// <summary>Deploys the stored source of a just-installed app, or reports the required secrets it waits for.</summary>
+    internal async Task<object> AfterInstallAsync(Guid appId, string name, CancellationToken token)
+    {
+        var userId = users.GetUserId();
+        var missing = await FindMissingSecretsAsync(appId, userId, token);
+        if (missing.Count > 0)
+            return new
+            {
+                appId, name, studio = StudioLink(appId), deployed = false,
+                missingSecrets = missing.Select(m => m.Name).ToList(),
+                next = "Installed, not deployed: it waits for these required secrets. Secret values never pass through MCP, so open the Studio link, save them under Settings → Secrets, then press Deploy on the app's page.",
+            };
+        return await DeployInstalledAsync(appId, userId, token);
     }
 
     private async Task<object> DeployInstalledAsync(Guid appId, Guid userId, CancellationToken token)
