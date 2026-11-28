@@ -34,13 +34,17 @@ jobs:
       group: agent
       cancel-in-progress: false
     steps:
-      - name: Run Claude
+      - name: Run the verifier
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           PROMPT_FILE: .agents/jobs/verify-release.md
           ISSUE_URL: ${{ needs.check.outputs.version }}  # agent-run.sh puts it where the prompt says ISSUE_URL
           AGENT_TASK_TIMEOUT: 180m
-          AGENT_MODEL: opus
+          # Repo variables: AGENT_VERIFY_CLI claude|agy and AGENT_VERIFY_MODEL (claude: opus); the agy fallback as for agent issues.
+          AGENT_CLI: ${{ vars.AGENT_VERIFY_CLI }}
+          AGENT_MODEL: ${{ vars.AGENT_VERIFY_MODEL || 'opus' }}
+          AGENT_FALLBACK_CLI: ${{ vars.AGENT_FALLBACK_CLI }}
+          AGENT_FALLBACK_MODEL: ${{ vars.AGENT_FALLBACK_MODEL }}
         run: |
           # Record the attempt first: a failed run must not restart every 10 minutes. To retry, run `verify-trigger.sh reset` on the runner; the next poll starts it again.
           # Several triggered runs can pass the check together; only the one that records the version goes on (exit 3).
