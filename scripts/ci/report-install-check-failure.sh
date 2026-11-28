@@ -43,7 +43,15 @@ ensure_board_inbox() {
         echo "::warning::Could not add #$issue_num to board $BOARD; move it to Inbox by hand." >&2
         return 0
     fi
-    if ! AGENT_GH="$GH" AGENT_BOARD="$BOARD" GH_TOKEN="$BOARD_TOKEN" bash "$BOARD_SCRIPT" move "$REPO" "$issue_num" Inbox; then
+    local attempt moved=false
+    for attempt in 1 2 3; do
+        if AGENT_GH="$GH" AGENT_BOARD="$BOARD" GH_TOKEN="$BOARD_TOKEN" bash "$BOARD_SCRIPT" move "$REPO" "$issue_num" Inbox 2>/dev/null; then
+            moved=true
+            break
+        fi
+        sleep 2
+    done
+    if ! $moved; then
         echo "::warning::Added #$issue_num to board $BOARD, but could not move it to Inbox." >&2
     fi
 }
