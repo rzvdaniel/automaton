@@ -12,6 +12,19 @@ on:
       number:
         description: 'Issue number'
         required: true
+      # Set by Agent Keeper's settings; empty falls back to the repo variables of the same name.
+      agent_cli:
+        description: 'Implementation tool: claude or agy (empty: repo variable AGENT_CLI)'
+        required: false
+      agent_model:
+        description: 'Implementation model (empty: repo variable AGENT_MODEL)'
+        required: false
+      review_cli:
+        description: 'Review tool: claude or agy (empty: repo variable AGENT_REVIEW_CLI)'
+        required: false
+      review_model:
+        description: 'Review model (empty: repo variable AGENT_REVIEW_MODEL)'
+        required: false
 
 permissions:
   contents: read
@@ -34,8 +47,8 @@ jobs:
           AGENT_REPO: ${{ inputs.repo || github.repository }}
           AGENT_TASK_TIMEOUT: 180m
           # Repo variables (#1864): AGENT_CLI claude|agy, AGENT_MODEL; with agy, a failed run or one without a PR reruns on claude.
-          AGENT_CLI: ${{ vars.AGENT_CLI }}
-          AGENT_MODEL: ${{ vars.AGENT_MODEL }}
+          AGENT_CLI: ${{ inputs.agent_cli || vars.AGENT_CLI }}
+          AGENT_MODEL: ${{ inputs.agent_model || vars.AGENT_MODEL }}
           AGENT_RECORD: '1'
         run: bash "$HOME/automaton/.agents/tools/agent-run.sh"
       - name: Finish an open pull request that only lacks reviews
@@ -47,8 +60,8 @@ jobs:
           NUMBER: ${{ github.event.issue.number || inputs.number }}
           AGENT_TASK_TIMEOUT: 60m
           # Repo variables: AGENT_REVIEW_CLI claude|agy, AGENT_REVIEW_MODEL (agy: gemini-4-neon-high).
-          AGENT_REVIEW_CLI: ${{ vars.AGENT_REVIEW_CLI }}
-          AGENT_REVIEW_MODEL: ${{ vars.AGENT_REVIEW_MODEL }}
+          AGENT_REVIEW_CLI: ${{ inputs.review_cli || vars.AGENT_REVIEW_CLI }}
+          AGENT_REVIEW_MODEL: ${{ inputs.review_model || vars.AGENT_REVIEW_MODEL }}
         run: bash "$HOME/automaton/.agents/tools/agent-finish-pr.sh"
 
   finish:
