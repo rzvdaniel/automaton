@@ -122,9 +122,21 @@ const pauseBusy = ref(false)
 const pauseExplanation = computed(() => app.value?.actionsOnly
   ? 'Pause turns its schedules off; its data, secrets, settings and address are kept.'
   : 'Pause stops the app and its schedules; its data, secrets, settings and address are kept.')
+/** What the app is doing right now after a menu click, shown by its name at once. */
+const transition = ref('')
+async function restartNow(id: string) {
+  transition.value = 'restarting…'
+  try {
+    await restartApp(id, toast)
+    await editorStore.refreshApp(appId.value)
+  } finally {
+    transition.value = ''
+  }
+}
 async function setPaused(pause: boolean) {
   if (!app.value) return
   pauseBusy.value = true
+  transition.value = pause ? 'pausing…' : 'resuming…'
   if (!pause) toast.add({ severity: 'info', summary: 'Resuming', detail: APP_START_PROGRESS, life: 6000 })
   try {
     const state = await appsService.setPaused(app.value.id, pause, pause ? pauseReason.value.trim() || undefined : undefined)
@@ -136,6 +148,7 @@ async function setPaused(pause: boolean) {
     toast.add({ severity: 'error', summary: 'Error', detail: appActionErrorMessage(err, err instanceof Error ? err.message : 'Could not change the app'), life: 12000 })
   } finally {
     pauseBusy.value = false
+    transition.value = ''
   }
 }
 /** Owners and administrators can pause; only people who can change the app can restart or delete it. */
@@ -145,7 +158,7 @@ const moreItems = computed(() => {
   const label = (text: string, hint: string) => ({ text, hint })
   const entries = []
   if (canManage.value && !item.isPaused && !item.actionsOnly) {
-    entries.push({ ...label('Restart', 'Loads changed settings and secrets'), icon: 'pi pi-refresh', command: () => void restartApp(item.id, toast) })
+    entries.push({ ...label('Restart', 'Loads changed settings and secrets'), icon: 'pi pi-refresh', command: () => void restartNow(item.id) })
   }
   if (canManage.value || isAdministrator) {
     entries.push(item.isPaused
@@ -418,7 +431,8 @@ async function handleSharingChanged() {
           <div class="head-text">
             <div class="title-line">
               <h1>{{ app.name }}</h1>
-              <span class="health" :class="`health--${health}`" data-testid="app-health"><span class="dot" aria-hidden="true"></span>{{ health }}</span>
+              <span v-if="transition" class="health health--busy" role="status" data-testid="app-health"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ transition }}</span>
+              <span v-else class="health" :class="`health--${health}`" data-testid="app-health"><span class="dot" aria-hidden="true"></span>{{ health }}</span>
               <button v-if="access && app.canUpdate !== false" type="button" class="pill pill--access" title="Change who can open it" data-testid="app-access" @click="showShareDialog = true">{{ access }}</button>
               <span v-else-if="access" class="pill pill--access" data-testid="app-access">{{ access }}</span>
             </div>
