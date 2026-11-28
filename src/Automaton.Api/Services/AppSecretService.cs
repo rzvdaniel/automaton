@@ -34,7 +34,8 @@ public sealed class AppSecretService(
     ISecretProtector protector,
     ResourceAuthorizationService authorization,
     SecretAuditLog? auditLog = null,
-    IOptions<PublishedAppsConfig>? publishedApps = null)
+    IOptions<PublishedAppsConfig>? publishedApps = null,
+    IAppSecretRestartScheduler? restarts = null)
 {
     public const string ApiUrlVariable = "AUTOMATON_API_URL";
 
@@ -87,6 +88,7 @@ public sealed class AppSecretService(
         }
         await db.SaveChangesAsync(token);
         if (auditLog is not null) await auditLog.ChangedAsync(owner, appId, userId, name, created.Version, token);
+        if (scope == AppSecretScopes.App) restarts?.SecretChanged(appId, userId, name);
         return new(name, created.Version, DateTime.UtcNow, scope, description);
     }
 
@@ -114,6 +116,7 @@ public sealed class AppSecretService(
         db.SecretDefinitions.Remove(definition);
         await db.SaveChangesAsync(token);
         if (auditLog is not null) await auditLog.ChangedAsync(owner, appId, userId, name, null, token);
+        if (scope == AppSecretScopes.App) restarts?.SecretChanged(appId, userId, name);
         return true;
     }
 

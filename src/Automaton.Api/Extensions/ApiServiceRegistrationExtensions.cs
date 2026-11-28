@@ -351,6 +351,7 @@ internal static class ApiMessagingRegistration
         services.AddScoped<ISecretStore, SecretStore>();
         services.AddScoped<SecretAuditLog>();
         services.AddScoped<AppSecretService>();
+        services.AddSingleton<IAppSecretRestartScheduler, AppSecretRestartScheduler>();
         services.AddScoped<AppSettingValueService>();
         services.AddScoped<IAppRuntimeRestarter, AppRuntimeRestarter>();
         services.AddScoped<AppPermissionService>();
