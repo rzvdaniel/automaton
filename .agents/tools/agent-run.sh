@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run one agent prompt on an agent machine (called by the agent workflows) through an agent tool adapter (agents/<tool>.sh: claude, agy).
 # Env: PROMPT_FILE (repo path), PR_URL (replaces PR_URL in the prompt), AGENT_REPO (owner/repo of the issue; its checkout ~/<repo> is the work base), ISSUE_URL (replaces ISSUE_URL in the prompt), AGENT_TASK_TIMEOUT (default 3h),
-# AGENT_CLI (an adapter name: claude, agy; unknown names run claude), AGENT_MODEL (sonnet for claude, gemini-4-hydrogen-high for agy), AGENT_EFFORT (low), CLAUDE_CODE_OAUTH_TOKEN (never printed),
+# AGENT_CLI (an adapter name: claude, agy; unknown names run claude), AGENT_MODEL (sonnet for claude, gemini-4-hydrogen-high for agy), AGENT_FALLBACK_CLI and AGENT_FALLBACK_MODEL (the retry after a failed agy run), AGENT_EFFORT (low, claude only), CLAUDE_CODE_OAUTH_TOKEN (never printed),
 # AGENT_RECORD=1: post one line on the issue with the tool, model, minutes and whether the Claude fallback ran (#1864).
 # With agy, a failed run, a usage limit or a run that leaves no pull request for the issue runs once more on claude.
 set -euo pipefail
@@ -67,7 +67,7 @@ agy_timeout=${AGENT_AGY_TIMEOUT:-100m}
 issue_number=${ISSUE_URL:-}; issue_number=${issue_number##*/}; [[ $issue_number =~ ^[0-9]+$ ]] || issue_number=
 # run_cli <tool> <model>: one run in this worktree through the tool's adapter (agents/<tool>.sh); returns its exit code (124 = timed out)
 run_cli() {
-  local limit=$timeout_after; [ "$1" = agy ] && limit=$agy_timeout
+  local limit=$timeout_after; [ "$1" = agy ] && [ "$fallback" = no ] && limit=$agy_timeout
   timeout -k 30 "$limit" bash "$adapters/$1.sh" run "$2" "$prompt"
 }
 # has_pr: an open or merged pull request references the issue (unknown issue: assume yes)
@@ -79,19 +79,23 @@ has_pr() {
   [ "${n:-0}" -gt 0 ]
 }
 started=$(date +%s); fallback=no
+# The retry after a failed agy run: AGENT_FALLBACK_CLI claude (Claude Code, the default) or agy (Claude models through
+# Antigravity, a separate quota from Gemini and from Claude Code), with AGENT_FALLBACK_MODEL.
+fb_cli=${AGENT_FALLBACK_CLI:-claude}; [[ $fb_cli =~ ^[a-z0-9-]+$ && -f "$adapters/$fb_cli.sh" ]] || fb_cli=claude
+if [ "$fb_cli" = agy ]; then fb_model=${AGENT_FALLBACK_MODEL:-claude-sonnet-5-5-low}; else fb_model=${AGENT_FALLBACK_MODEL:-sonnet}; fi
 if [ "$cli" = agy ]; then model=${AGENT_MODEL:-gemini-4-hydrogen-high}; else model=${AGENT_MODEL:-sonnet}; fi
 set +e
 run_cli "$cli" "$model"; rc=$?
 # A usage limit ends agy with an error, or with no pull request; the log's wording is not trusted (it echoes the task).
 if [ "$cli" = agy ] && { [ "$rc" != 0 ] || ! has_pr; }; then
-  echo "agent-run: agy did not finish the job (exit $rc); running it again on claude" >&2
+  echo "agent-run: agy did not finish the job (exit $rc); running it again on $fb_cli ($fb_model)" >&2
   # a clean worktree (agy's leftovers gone), then the agents and skills again: clean -x removes the copies too
   if git checkout -q -f --detach origin/main && git clean -qfdx && bring_agents; then
-    fallback=yes; cli=claude; model=${AGENT_FALLBACK_MODEL:-sonnet}
+    fallback=yes; cli=$fb_cli; model=$fb_model
     used_min=$(( ($(date +%s) - started) / 60 )); timeout_after="$(( total_min - used_min - 5 > 20 ? total_min - used_min - 5 : 20 ))m"
-    run_cli claude "$model"; rc=$?
+    run_cli "$cli" "$model"; rc=$?
   else
-    echo "agent-run: could not reset the worktree for the claude fallback; stopping" >&2; rc=1
+    echo "agent-run: could not reset the worktree for the fallback; stopping" >&2; rc=1
   fi
 fi
 [ "$rc" = 124 ] && echo "agent-run: timed out after $timeout_after; stopped" >&2

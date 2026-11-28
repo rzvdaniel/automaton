@@ -49,6 +49,9 @@ jobs:
           # Repo variables (#1864): AGENT_CLI claude|agy, AGENT_MODEL; with agy, a failed run or one without a PR reruns on claude.
           AGENT_CLI: ${{ inputs.agent_cli || vars.AGENT_CLI }}
           AGENT_MODEL: ${{ inputs.agent_model || vars.AGENT_MODEL }}
+          # Retry after a failed agy run: AGENT_FALLBACK_CLI claude|agy, AGENT_FALLBACK_MODEL (agy: claude-sonnet-5-5-low).
+          AGENT_FALLBACK_CLI: ${{ vars.AGENT_FALLBACK_CLI }}
+          AGENT_FALLBACK_MODEL: ${{ vars.AGENT_FALLBACK_MODEL }}
           AGENT_RECORD: '1'
         run: bash "$HOME/automaton/.agents/tools/agent-run.sh"
       - name: Finish an open pull request that only lacks reviews
