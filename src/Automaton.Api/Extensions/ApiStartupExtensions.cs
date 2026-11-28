@@ -25,6 +25,15 @@ internal static class ApiApplicationPipelineExtensions
     {
         app.UseForwardedHeaders();
         app.UseRouting();
+        app.Use((context, next) =>
+        {
+            context.Response.OnStarting(() =>
+            {
+                ResponseSecurityHeaders.Apply(context.Response, corsOrigins ?? []);
+                return Task.CompletedTask;
+            });
+            return next();
+        });
         ApiRequestLoggingMiddleware.Configure(app, logSuccessfulRequests);
         app.UseMiddleware<ApiKeyFailureMiddleware>();
         app.UseRateLimiter();
