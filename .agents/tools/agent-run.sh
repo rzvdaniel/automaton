@@ -74,7 +74,8 @@ run_cli() {
 has_pr() {
   [ -n "$issue_number" ] || return 0
   local n
-  n=$(gh pr list -R "${AGENT_REPO:-rzvdaniel/automaton}" --state all --limit 100 --search "$issue_number in:title,body" --json state,title,body     --jq "[.[] | select(.state != \"CLOSED\") | select((.title + \" \" + .body) | test(\"#$issue_number([^0-9]|\$)\"))] | length" 2>/dev/null) || return 0
+  # The newest PRs, not --search: the search index lags a new PR by minutes, so a PR opened just now was missed (apps#528).
+  n=$(gh pr list -R "${AGENT_REPO:-rzvdaniel/automaton}" --state all --limit 50 --json state,title,body     --jq "[.[] | select(.state != \"CLOSED\") | select((.title + \" \" + .body) | test(\"#$issue_number([^0-9]|\$)\"))] | length" 2>/dev/null) || return 0
   [ "${n:-0}" -gt 0 ]
 }
 started=$(date +%s); fallback=no

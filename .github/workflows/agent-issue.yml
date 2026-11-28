@@ -82,7 +82,7 @@ jobs:
           # A green job is not enough: the run must have left an open or merged PR that references the issue (#1625).
           HAS_PR=
           if [ "$RESULT" = success ]; then
-            HAS_PR=$(gh pr list -R "$REPO" --state all --limit 100 --search "$NUMBER in:title,body" --json number,state,title,body \
+            HAS_PR=$(gh pr list -R "$REPO" --state all --limit 50 --json number,state,title,body \
               --jq "[.[] | select(.state != \"CLOSED\") | select((.title + \" \" + .body) | test(\"#$NUMBER([^0-9]|$)\"))] | length" || echo 0)
           fi
           if [ "$RESULT" = success ] && [ "${HAS_PR:-0}" -gt 0 ]; then
